@@ -382,6 +382,26 @@ class ScvTest {
         assertTrue(scVal is SCValXdr.ExecutableTag)
         assertEquals(SCValTypeXdr.SCV_EXECUTABLE_TAG, scVal.discriminant)
         assertEquals("my-tag", Scv.fromExecutableTag(scVal))
+        assertContentEquals("my-tag".encodeToByteArray(), Scv.fromExecutableTagBytes(scVal))
+    }
+
+    @Test
+    fun testExecutableTagBytes() {
+        // 0xC0 and 0xFF never appear in valid UTF-8: the bytes accessors carry
+        // them exactly, and the strict String accessor refuses them, pointing
+        // at the bytes accessor.
+        val tagBytes = byteArrayOf(0xC0.toByte(), 0xFF.toByte())
+        val scVal = Scv.toExecutableTagBytes(tagBytes)
+
+        assertTrue(scVal is SCValXdr.ExecutableTag)
+        assertEquals(SCValTypeXdr.SCV_EXECUTABLE_TAG, scVal.discriminant)
+        assertContentEquals(tagBytes, Scv.fromExecutableTagBytes(scVal))
+
+        val e = assertFailsWith<IllegalArgumentException> { Scv.fromExecutableTag(scVal) }
+        assertTrue(
+            e.message!!.contains("fromExecutableTagBytes"),
+            "the message must point at the bytes accessor: ${e.message}"
+        )
     }
 
     @Test
@@ -450,6 +470,7 @@ class ScvTest {
         assertFailsWith<IllegalArgumentException> { Scv.fromString(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromSymbol(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromExecutableTag(intVal) }
+        assertFailsWith<IllegalArgumentException> { Scv.fromExecutableTagBytes(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromBytes(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromVec(intVal) }
         assertFailsWith<IllegalArgumentException> { Scv.fromMap(intVal) }

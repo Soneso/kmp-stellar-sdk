@@ -31,8 +31,8 @@ import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
 import com.soneso.stellar.sdk.xdr.OperationBodyXdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCBytesXdr
-import com.soneso.stellar.sdk.xdr.SCStringXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.tagString
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
@@ -82,11 +82,11 @@ class ContractClientExternalRefDeployTest {
     private val fixedSalt = ByteArray(32) { 0x11 }
     private val helloWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
 
-    private fun tagKeyB64(): String {
+    private fun tagKeyB64(tag: ByteArray = executableTag.encodeToByteArray()): String {
         val key = LedgerKeyXdr.ContractData(
             LedgerKeyContractDataXdr(
                 contract = Address(ownerContractId).toSCAddress(),
-                key = SCValXdr.ExecutableTag(SCStringXdr(executableTag)),
+                key = SCValXdr.ExecutableTag(tag),
                 durability = ContractDataDurabilityXdr.PERSISTENT
             )
         )
@@ -100,11 +100,11 @@ class ContractClientExternalRefDeployTest {
         return key.toXdrBase64()
     }
 
-    private fun tagEntryB64(): String {
+    private fun tagEntryB64(tag: ByteArray = executableTag.encodeToByteArray()): String {
         val entry = ContractDataEntryXdr(
             ext = ExtensionPointXdr.Void,
             contract = Address(ownerContractId).toSCAddress(),
-            key = SCValXdr.ExecutableTag(SCStringXdr(executableTag)),
+            key = SCValXdr.ExecutableTag(tag),
             durability = ContractDataDurabilityXdr.PERSISTENT,
             `val` = SCValXdr.Bytes(SCBytesXdr(wasmHashBytes))
         )
@@ -147,9 +147,10 @@ class ContractClientExternalRefDeployTest {
         getTxNotFoundFirst: Boolean = false,
         getTxStatus: String = "SUCCESS",
         getTxReturnValue: SCValXdr = SCValXdr.Address(
-            SCAddressXdr.ContractId(ContractIDXdr(HashXdr(createdContractHash))))
+            SCAddressXdr.ContractId(ContractIDXdr(HashXdr(createdContractHash)))),
+        tag: ByteArray = executableTag.encodeToByteArray()
     ): SorobanServer {
-        val tagKey = tagKeyB64()
+        val tagKey = tagKeyB64(tag)
         val codeKey = codeKeyB64()
         var getTxCalls = 0
         val engine = MockEngine { request ->
@@ -157,7 +158,7 @@ class ContractClientExternalRefDeployTest {
             capturedBodies.add(body)
             val resultJson = when {
                 "\"getLedgerEntries\"" in body && tagKey in body ->
-                    if (tagEntryExists) entriesResultJson(tagEntryB64()) else emptyEntriesResultJson
+                    if (tagEntryExists) entriesResultJson(tagEntryB64(tag)) else emptyEntriesResultJson
                 "\"getLedgerEntries\"" in body && codeKey in body ->
                     entriesResultJson(codeEntryB64(
                         if (codeParseable) helloWasm else "not wasm".encodeToByteArray()))
@@ -267,7 +268,7 @@ class ContractClientExternalRefDeployTest {
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
         assertEquals(ownerContractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
-        assertEquals(executableTag, executable.value.tag.value)
+        assertEquals(executableTag, executable.value.tagString)
         val preimage = hostFunction.value.contractIdPreimage
         assertIs<com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr.FromAddress>(preimage)
         assertTrue(preimage.value.salt.value.contentEquals(fixedSalt))
@@ -301,7 +302,63 @@ class ContractClientExternalRefDeployTest {
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
         assertEquals(ownerContractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
-        assertEquals(executableTag, executable.value.tag.value)
+        assertEquals(executableTag, executable.value.tagString)
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    @Test
+    fun testDeployCarriesBinaryTagBytesEndToEnd() = runTest {
+        // No Kotlin String can carry these bytes: 0xC0, 0xFF and 0xFE never
+        // appear in valid UTF-8. Both halves of the deploy must carry them
+        // exactly: the resolution request's ledger key and the submitted
+        // envelope's executable.
+        val binaryTag = byteArrayOf(0xC0.toByte(), 0x00, 0xFF.toByte(), 0xFE.toByte())
+        val signer = KeyPair.random()
+        val source = signer.getAccountId()
+        val captured = mutableListOf<String>()
+
+        // The expected key is built by splicing the raw bytes into a
+        // placeholder-built key rather than by encoding them, so it does not
+        // depend on the same encoder the implementation uses for them.
+        val placeholder = "0123" // same byte length as binaryTag
+        val expectedTagKey = Base64.encode(
+            replaceOnce(
+                Base64.decode(tagKeyB64(placeholder.encodeToByteArray())),
+                placeholder.encodeToByteArray(),
+                binaryTag
+            )
+        )
+
+        val client = ContractClient.deployFromExternalRefInternal(
+            executableOwner = ownerContractId,
+            tag = binaryTag,
+            constructorArgs = emptyList(),
+            source = source,
+            signer = signer,
+            network = Network.TESTNET,
+            rpcUrl = MOCK_RPC_SERVER_URL,
+            salt = fixedSalt,
+            loadSpec = true,
+            server = externalRefDeployMockServer(source, captured, tag = binaryTag)
+        )
+
+        // The mock serves the tag entry only under the exact binary key, so a
+        // lossy hop anywhere before the request would already have failed the
+        // resolution; the captured body pins the key regardless.
+        assertEquals(createdContractId, client.contractId)
+        assertTrue(
+            expectedTagKey in captured[0],
+            "the resolution key must carry the tag bytes exactly"
+        )
+
+        val hostFunction = submittedHostFunction(captured)
+        assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+        val executable = hostFunction.value.executable
+        assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
+        assertTrue(
+            executable.value.tag.contentEquals(binaryTag),
+            "the envelope must carry the tag bytes exactly"
+        )
     }
 
     @Test
@@ -544,7 +601,7 @@ class ContractClientExternalRefDeployTest {
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
         assertEquals(ownerContractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
-        assertEquals(executableTag, executable.value.tag.value)
+        assertEquals(executableTag, executable.value.tagString)
         val preimage = hostFunction.value.contractIdPreimage
         assertIs<com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr.FromAddress>(preimage)
         assertTrue(preimage.value.salt.value.contentEquals(fixedSalt))
@@ -582,7 +639,7 @@ class ContractClientExternalRefDeployTest {
         assertIs<HostFunctionXdr.CreateContractV2>(decoded)
         val decodedExecutable = decoded.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(decodedExecutable)
-        assertEquals("token-v2", decodedExecutable.value.tag.value)
+        assertEquals("token-v2", decodedExecutable.value.tagString)
     }
 
     @Test

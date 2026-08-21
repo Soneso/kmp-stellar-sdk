@@ -91,6 +91,24 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_snapshot 'ErrorDetailXdr.kt'
   end
 
+  # -- Snapshot tests: Bytes-backed string fields -----------------------------
+
+  def test_snapshot_contract_executable_external_ref_struct
+    assert_snapshot 'ContractExecutableExternalRefXdr.kt'
+  end
+
+  def test_snapshot_scval_union
+    assert_snapshot 'SCValXdr.kt'
+  end
+
+  def test_snapshot_scval_type_enum
+    assert_snapshot 'SCValTypeXdr.kt'
+  end
+
+  def test_snapshot_scstring_typedef
+    assert_snapshot 'SCStringXdr.kt'
+  end
+
   # -- Snapshot tests: Typedef ------------------------------------------------
 
   def test_snapshot_int32_typedef
@@ -404,6 +422,51 @@ class GeneratorSnapshotTest < Minitest::Test
     content = File.read(File.join(@output_dir, 'HashXdr.kt'))
     assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)'
     assert_includes content, 'expectedLength = 32'
+  end
+
+  # -- Bytes-backed string fields ---------------------------------------------
+
+  # The override applies per listed field: the tag positions become ByteArray at all
+  # five emission sites, while a sibling of the same string typedef keeps the wrapper.
+  def test_bytes_backed_field_is_a_byte_array_at_every_emission_site
+    struct = File.read(File.join(@output_dir, 'ContractExecutableExternalRefXdr.kt'))
+    assert_includes struct, 'val tag: ByteArray'
+    assert_includes struct, 'val tag = reader.readVariableOpaque()'
+    assert_includes struct, 'writer.writeVariableOpaque(tag)'
+    assert_includes struct, 'put("tag", XdrJson.escapedString(tag))'
+    assert_includes struct, 'XdrJson.unescapeStringBytes(XdrJson.field(json, "tag", XDR_JSON_TYPE), XDR_JSON_TYPE, "tag")'
+    refute_includes struct, 'SCStringXdr'
+
+    union = File.read(File.join(@output_dir, 'SCValXdr.kt'))
+    tag_arm = union[/data class ExecutableTag\(\n(.*?)\n  \)/m, 1]
+    assert_equal '    val value: ByteArray', tag_arm
+    assert_includes union, 'ExecutableTag(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "executable_tag"))'
+    assert_includes union, 'is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }'
+  end
+
+  def test_a_string_position_beside_a_bytes_backed_one_keeps_the_wrapper_type
+    union = File.read(File.join(@output_dir, 'SCValXdr.kt'))
+    str_arm = union[/data class Str\(\n(.*?)\n  \)/m, 1]
+    assert_equal '    val value: SCStringXdr', str_arm
+    assert_includes union, '"string" -> Str(SCStringXdr.fromXdrJsonTree(value))'
+  end
+
+  # A table entry naming a field no processed type declares is a stale entry; when the
+  # caller opts in (the full-set run does), it raises instead of silently no-opping.
+  def test_a_stale_bytes_backed_entry_raises_when_verification_is_requested
+    Dir.mktmpdir('xdr_stale_entry_') do |dir|
+      error = assert_raises(RuntimeError) do
+        Xdrgen::Compilation.new(
+          [File.join(FIXTURE_DIR, 'test_struct.x')],
+          output_dir: dir + '/',
+          generator: Xdrgen::Generators::Kotlin,
+          namespace: 'com.soneso.stellar.sdk.xdr',
+          options: { verify_bytes_backed_fields: true }
+        ).compile
+      end
+      assert_match(/ContractExecutableExternalRef\.tag/, error.message)
+      assert_match(/SCVal\.executable_tag/, error.message)
+    end
   end
 
   def test_json_imports_are_emitted_only_where_used

@@ -43,12 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ContractClient.forContract` passes through unwrapped; a reference
   whose owner is not a contract address raises `IllegalArgumentException`,
   which `forContract` wraps as `IllegalStateException("Failed to load contract
-  spec for ...")` with the cause preserved. A tag that is not valid UTF-8
-  cannot be resolved: XDR strings decode into Kotlin strings with replacement
-  characters, so the lookup key would name a different entry, and such a tag
-  surfaces as a missing tag entry. `ContractSpec.scValToNative` converts an
-  `SCV_EXECUTABLE_TAG` value to its tag string; it previously failed the
-  conversion.
+  spec for ...")` with the cause preserved. The tag bytes the reference
+  carries reach the ledger key byte for byte, whether or not they are valid
+  UTF-8, so any tag the owner wrote resolves; error messages render the tag
+  through the SEP-0051 escape ladder, so a printable ASCII tag reads verbatim
+  and any other byte appears as its escape. `ContractSpec.scValToNative`
+  converts an `SCV_EXECUTABLE_TAG` value to a `String` when its tag bytes
+  decode as UTF-8 and to the raw `ByteArray` otherwise; it previously failed
+  the conversion.
 - `ContractClient.deployFromExternalRef` deploys a contract instance from a
   CAP-85 external reference; the parameters name the owner contract and the tag
   instead of a wasm id, next to `deployFromWasmId`. The reference is resolved
@@ -61,11 +63,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing is installed as part of the deployment, and the one-step
   `deploy(wasmBytes)` has no external reference counterpart, because there is
   nothing to upload. Without constructor arguments the operation carries the
-  `CREATE_CONTRACT` arm, with them `CREATE_CONTRACT_V2`. The UTF-8 tag
-  limitation above applies.
+  `CREATE_CONTRACT` arm, with them `CREATE_CONTRACT_V2`. The tag parameter is
+  a `ByteArray` carried byte for byte or a `String` encoded as UTF-8, and one
+  tag value feeds both the resolution and the built operation, so the entry
+  that resolved is the entry the deployment names on-chain.
 - `InvokeHostFunctionOperation.createContractFromExternalRef` builds the
   underlying create operation directly, next to `createContract`, with the same
   argument shape and internal `CREATE_CONTRACT`/`CREATE_CONTRACT_V2` branch.
+  The tag parameter takes the raw bytes or a `String` encoded as UTF-8.
 - `Address.deriveContractId(deployer, salt, network)` returns the contract id
   ("C...") a deployment by the given deployer with the given salt creates on
   the given network. The id derives from the deployer, the salt and the network
@@ -73,6 +78,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly 32 bytes raises `IllegalArgumentException`.
 
 ### Changed
+- `SCValXdr.ExecutableTag` and `ContractExecutableExternalRefXdr.tag` carry the
+  CAP-85 executable tag as `ByteArray` rather than as `SCStringXdr`. The XDR
+  type is `SCString`, which admits arbitrary bytes, and the ledger matches the
+  tag byte for byte; decoding into a Kotlin `String` replaced bytes that are
+  not valid UTF-8 with U+FFFD, so such a tag re-encoded to different bytes and
+  could neither round-trip nor resolve. The bytes now survive the binary and
+  the XDR-JSON codecs exactly. Text-based access stays available:
+  `ContractExecutableExternalRefXdr(owner, tag: String)` and
+  `Scv.toExecutableTag(String)` encode the tag as UTF-8, and the
+  `ContractExecutableExternalRefXdr.tagString` view and
+  `Scv.fromExecutableTag` decode the bytes as UTF-8 strictly, throwing on a
+  tag that is not valid UTF-8 rather than answering lossily.
+  `Scv.toExecutableTagBytes` / `Scv.fromExecutableTagBytes` carry the bytes
+  unchanged. `SCStringXdr` itself and the `SCV_STRING` / `SCV_SYMBOL` arms do
+  not change. Code written against the `SCStringXdr` shape of the two tag
+  positions needs the `ByteArray` shape, and `==` on these two positions
+  compares the tag by array identity, as on the other array-backed XDR types.
 - `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and
   `Sponsorship.ClaimableBalance` take a balance id in any spelling
   `ClaimableBalanceId` accepts, judge it when the operation is constructed, and
@@ -173,6 +195,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key is not a canonical strkey. Its verifier catches `Throwable`, so a key that
   JVM and Android previously decoded now yields a `false` verification result
   rather than an error.
+- SEP-10 and SEP-45 challenge validation propagates coroutine cancellation. A
+  cancellation arriving while the server signature was being verified was
+  reported as an invalid server signature; it now surfaces as the original
+  `CancellationException`.
 
 ## [1.11.0] - 2026-08-10
 

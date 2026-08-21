@@ -298,7 +298,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * - **UDT (enum)** → UInt
      * - **Error** → SCErrorXdr
      * - **ContractInstance** → SCContractInstanceXdr
-     * - **ExecutableTag** → String
+     * - **ExecutableTag** → String when the tag bytes decode as UTF-8, ByteArray otherwise
      *
      * @param scVal The XDR value to convert
      * @param typeDef The type specification (nullable for direct type inference)
@@ -458,7 +458,13 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
 
             SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
                 require(scVal is SCValXdr.ExecutableTag) { "Expected SCValXdr.ExecutableTag for SCV_EXECUTABLE_TAG" }
-                scVal.value.value
+                // A tag is presented as text when its bytes decode as UTF-8; any other
+                // tag yields its raw bytes.
+                try {
+                    scVal.value.decodeToString(throwOnInvalidSequence = true)
+                } catch (_: CharacterCodingException) {
+                    scVal.value
+                }
             }
 
             else -> {

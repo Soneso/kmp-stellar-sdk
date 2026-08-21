@@ -207,7 +207,7 @@ sealed class SCValXdr {
   }
 
   data class ExecutableTag(
-    val value: SCStringXdr
+    val value: ByteArray
   ) : SCValXdr() {
     override val discriminant: SCValTypeXdr = SCValTypeXdr.SCV_EXECUTABLE_TAG
   }
@@ -304,7 +304,7 @@ sealed class SCValXdr {
           NonceKey(value)
         }
         SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
-          val value = SCStringXdr.decode(reader)
+          val value = reader.readVariableOpaque()
           ExecutableTag(value)
         }
         else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
@@ -339,7 +339,7 @@ sealed class SCValXdr {
           "address" -> Address(SCAddressXdr.fromXdrJsonTree(value))
           "contract_instance" -> Instance(SCContractInstanceXdr.fromXdrJsonTree(value))
           "ledger_key_nonce" -> NonceKey(SCNonceKeyXdr.fromXdrJsonTree(value))
-          "executable_tag" -> ExecutableTag(SCStringXdr.fromXdrJsonTree(value))
+          "executable_tag" -> ExecutableTag(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "executable_tag"))
           else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
         }
       }
@@ -426,7 +426,7 @@ sealed class SCValXdr {
         value.encode(writer)
       }
       is ExecutableTag -> {
-        value.encode(writer)
+        writer.writeVariableOpaque(value)
       }
     }
   }
@@ -453,7 +453,7 @@ sealed class SCValXdr {
     is Address -> buildJsonObject { put("address", value.toXdrJsonElement()) }
     is Instance -> buildJsonObject { put("contract_instance", value.toXdrJsonElement()) }
     is NonceKey -> buildJsonObject { put("ledger_key_nonce", value.toXdrJsonElement()) }
-    is ExecutableTag -> buildJsonObject { put("executable_tag", value.toXdrJsonElement()) }
+    is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

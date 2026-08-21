@@ -26,6 +26,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -1137,6 +1138,9 @@ class WebAuthForContracts(
             // Verify signature
             val serverKeyPair = KeyPair.fromAccountId(serverSigningKey)
             serverKeyPair.verify(payload, signatureBytes)
+        } catch (e: CancellationException) {
+            // Cooperative cancellation: never report it as a failed verification.
+            throw e
         } catch (e: Exception) {
             false
         }

@@ -384,3 +384,29 @@ fun HostFunctionXdr.Companion.fromXdrBase64(base64: String): HostFunctionXdr {
     val reader = XdrReader(bytes)
     return decode(reader)
 }
+
+/**
+ * The executable tag as text.
+ *
+ * [ContractExecutableExternalRefXdr.tag] carries the authoritative bytes, which the ledger
+ * matches byte for byte; this view is their strict UTF-8 decoding.
+ *
+ * @throws CharacterCodingException if the tag bytes are not valid UTF-8; read [ContractExecutableExternalRefXdr.tag] for such a tag
+ */
+val ContractExecutableExternalRefXdr.tagString: String
+    get() = tag.decodeToString(throwOnInvalidSequence = true)
+
+/**
+ * Builds a [ContractExecutableExternalRefXdr] whose tag bytes are the UTF-8 encoding of [tag].
+ *
+ * @param executableOwner The contract holding the executable tag entry
+ * @param tag The tag as text
+ * @return The external reference carrying the encoded tag bytes
+ */
+fun ContractExecutableExternalRefXdr(
+    executableOwner: SCAddressXdr,
+    tag: String
+): ContractExecutableExternalRefXdr = ContractExecutableExternalRefXdr(
+    executableOwner = executableOwner,
+    tag = tag.encodeToByteArray()
+)

@@ -19,6 +19,18 @@ module Xdrgen
       RECURSIVE_TYPES = %w[SorobanDelegateSignatureXdr].freeze
       XDR_RECURSION_CAP = 128
 
+      # XDR string positions that carry arbitrary bytes rather than text: the CAP-85
+      # executable tag, which the ledger matches byte for byte. Each entry maps an XDR
+      # type name from the .x source to the string fields (struct) or arms (union) at
+      # that type that are emitted as ByteArray, bypassing the string wrapper type, so
+      # content that is not valid UTF-8 survives a decode/encode round trip exactly.
+      # Only the named positions change; every other use of the same string typedef
+      # keeps the generic emission.
+      BYTES_BACKED_STRING_FIELDS = {
+        'ContractExecutableExternalRef' => %w[tag].freeze,
+        'SCVal' => %w[executable_tag].freeze
+      }.freeze
+
       JSON_NAMES = KotlinJsonNames
       JSON_OVERRIDES = KotlinJsonOverrides
 
@@ -44,6 +56,7 @@ module Xdrgen
         @output_files = {}
         @package = @namespace.gsub('::', '.')
         @json_overrides_used = []
+        @bytes_backed_string_fields_used = []
 
         # Skip XdrReader/XdrWriter generation - will be provided by KMP SDK
         # render_xdr_utils
@@ -55,6 +68,7 @@ module Xdrgen
         render_definitions(@top)
 
         verify_json_overrides_consumed
+        verify_bytes_backed_string_fields_consumed
       end
 
       private
@@ -249,7 +263,7 @@ module Xdrgen
             render_member_comment(out, comments)
 
             member_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
-            member_type = kotlin_type_for(member.declaration)
+            member_type = member_kotlin_type(struct, member)
             suffix = idx < struct.members.length - 1 ? ',' : ''
             out.puts "val #{member_name}: #{member_type}#{suffix}"
           end
@@ -264,7 +278,7 @@ module Xdrgen
             out.indent do
               struct.members.each do |member|
                 local_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
-                out.puts "val #{local_name} = #{decode_expression_guarded(struct_name, member.declaration, 'reader')}"
+                out.puts "val #{local_name} = #{member_decode_expression(struct, member, 'reader', struct_name: struct_name)}"
               end
 
               param_list = struct.members.map { |m|
@@ -290,7 +304,7 @@ module Xdrgen
           out.indent do
             struct.members.each do |member|
               member_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
-              encode_statement(member.declaration, member_name, 'writer', out)
+              member_encode_statement(struct, member, member_name, 'writer', out)
             end
           end
           out.puts "}"
@@ -304,7 +318,7 @@ module Xdrgen
               struct.members.each do |member|
                 member_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
                 key = JSON_NAMES.struct_field_json_name(member.name)
-                out.puts "put(\"#{key}\", #{json_to_expression(member.declaration, member_name)})"
+                out.puts "put(\"#{key}\", #{member_json_to_expression(struct, member, member_name)})"
               end
             end
             out.puts "}"
@@ -329,7 +343,7 @@ module Xdrgen
               key = JSON_NAMES.struct_field_json_name(member.name)
               field = json_field_expression(key)
               suffix = idx < struct.members.length - 1 ? ',' : ''
-              out.puts "#{json_from_expression(member.declaration, field, key)}#{suffix}"
+              out.puts "#{member_json_from_expression(struct, member, field, key)}#{suffix}"
             end
           end
           out.puts ")"
@@ -386,7 +400,7 @@ module Xdrgen
             render_member_comment(out, comments)
 
             arm_class_name = arm.name.camelize
-            arm_type = kotlin_type_for(arm.declaration)
+            arm_type = member_kotlin_type(union, arm)
             is_default = arm.is_a?(AST::Definitions::UnionDefaultArm)
 
             if is_default || arm.cases.length > 1
@@ -502,7 +516,7 @@ module Xdrgen
                     else
                       out.puts "#{discriminant_value} -> {"
                       out.indent do
-                        out.puts "val value = #{decode_expression(arm.declaration, 'reader')}"
+                        out.puts "val value = #{member_decode_expression(union, arm, 'reader')}"
                         if arm.cases.length > 1
                           out.puts "#{arm_class_name}(discriminant, value)"
                         else
@@ -523,7 +537,7 @@ module Xdrgen
                     if arm.void?
                       out.puts "#{arm_class_name}(discriminant)"
                     else
-                      out.puts "val value = #{decode_expression(arm.declaration, 'reader')}"
+                      out.puts "val value = #{member_decode_expression(union, arm, 'reader')}"
                       out.puts "#{arm_class_name}(discriminant, value)"
                     end
                   end
@@ -562,7 +576,7 @@ module Xdrgen
                 else
                   out.puts "is #{class_name} -> {"
                   out.indent do
-                    encode_statement(arm.declaration, 'value', 'writer', out)
+                    member_encode_statement(union, arm, 'value', 'writer', out)
                   end
                   out.puts "}"
                 end
@@ -598,7 +612,7 @@ module Xdrgen
               out.puts "is #{entry[:name]} -> XdrJson.name(#{key})"
             else
               arm = union.arms.find { |a| a.name.camelize == entry[:name] }
-              value = json_to_expression(arm.declaration, 'value')
+              value = member_json_to_expression(union, arm, 'value')
               out.puts "is #{entry[:name]} -> buildJsonObject { put(#{key}, #{value}) }"
             end
           end
@@ -656,7 +670,7 @@ module Xdrgen
         discriminant = format_discriminant_value(kase, union)
         arguments = []
         arguments << discriminant if union_json_dynamic_arm?(union, arm)
-        arguments << json_from_expression(arm.declaration, 'value', key) unless arm.void?
+        arguments << member_json_from_expression(union, arm, 'value', key) unless arm.void?
 
         if arguments.empty?
           "\"#{key}\" -> #{class_name}"
@@ -674,7 +688,7 @@ module Xdrgen
 
         class_name = default.name.camelize
         arguments = [union_json_discriminant_from_key(union, union_name)]
-        arguments << json_from_expression(default.declaration, 'value', 'default') unless default.void?
+        arguments << member_json_from_expression(union, default, 'value', 'default') unless default.void?
         "else -> #{class_name}(#{arguments.join(', ')})"
       end
 
@@ -1000,6 +1014,81 @@ module Xdrgen
         return if missing.empty?
 
         raise "SEP-0051 overrides registered for types this run did not generate: #{missing.join(', ')}"
+      end
+
+      # The same stale-entry rule for BYTES_BACKED_STRING_FIELDS: an entry that matched no
+      # generated position names a renamed or removed field, and the ByteArray emission it
+      # carries has silently stopped being applied. Opt-in for the same reason as
+      # verify_json_overrides_consumed: only a run over the full Stellar .x set can conclude
+      # an entry is stale.
+      def verify_bytes_backed_string_fields_consumed
+        return unless @options[:verify_bytes_backed_fields]
+
+        registered = BYTES_BACKED_STRING_FIELDS.flat_map do |type, fields|
+          fields.map { |field| "#{type}.#{field}" }
+        end
+        missing = registered - @bytes_backed_string_fields_used
+        return if missing.empty?
+
+        raise "Bytes-backed string fields registered for positions this run did not generate: #{missing.join(', ')}"
+      end
+
+      # Whether BYTES_BACKED_STRING_FIELDS names this struct field or union arm. A listed
+      # position that is not an XDR string is a table mistake and raises rather than
+      # emitting ByteArray code for a type the reader and writer calls do not fit.
+      def bytes_backed_string_field?(defn, member)
+        fields = BYTES_BACKED_STRING_FIELDS[defn.name]
+        return false unless fields&.include?(member.name)
+
+        resolved = resolve_typedef_declaration(member.declaration)
+        unless resolved.type.is_a?(AST::Typespecs::String)
+          raise "BYTES_BACKED_STRING_FIELDS names #{defn.name}.#{member.name}, which is not an XDR string"
+        end
+
+        (@bytes_backed_string_fields_used ||= []) << "#{defn.name}.#{member.name}"
+        true
+      end
+
+      # The five positions a struct field or union arm is rendered at, each answering with
+      # the ByteArray emission when BYTES_BACKED_STRING_FIELDS names the member and with
+      # the generic one otherwise. The binary form of a string and of variable opaque is
+      # identical (length prefix, bytes, padding), and the JSON form goes through the same
+      # SEP-0051 escape ladder either way, so only the Kotlin representation differs.
+
+      def member_kotlin_type(defn, member)
+        return 'ByteArray' if bytes_backed_string_field?(defn, member)
+
+        kotlin_type_for(member.declaration)
+      end
+
+      def member_decode_expression(defn, member, reader_var, struct_name: nil)
+        return "#{reader_var}.readVariableOpaque()" if bytes_backed_string_field?(defn, member)
+        return decode_expression(member.declaration, reader_var) if struct_name.nil?
+
+        decode_expression_guarded(struct_name, member.declaration, reader_var)
+      end
+
+      def member_encode_statement(defn, member, value_expr, writer_var, out)
+        if bytes_backed_string_field?(defn, member)
+          out.puts "#{writer_var}.writeVariableOpaque(#{value_expr})"
+        else
+          encode_statement(member.declaration, value_expr, writer_var, out)
+        end
+      end
+
+      def member_json_to_expression(defn, member, value_expr)
+        return "XdrJson.escapedString(#{value_expr})" if bytes_backed_string_field?(defn, member)
+
+        json_to_expression(member.declaration, value_expr)
+      end
+
+      def member_json_from_expression(defn, member, element_expr, key)
+        unless bytes_backed_string_field?(defn, member)
+          return json_from_expression(member.declaration, element_expr, key)
+        end
+
+        size = resolve_typedef_declaration(member.declaration).type.size
+        "XdrJson.unescapeStringBytes(#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\"#{json_max_length(size)})"
       end
 
       # The JSON form of a value, as an expression yielding a JsonElement.

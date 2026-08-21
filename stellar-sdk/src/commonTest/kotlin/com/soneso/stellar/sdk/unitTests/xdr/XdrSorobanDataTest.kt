@@ -112,7 +112,7 @@ class XdrSorobanDataTest {
         XdrTestHelpers.assertXdrRoundTrip(
             ContractExecutableXdr.ExternalRef(ContractExecutableExternalRefXdr(
                 executableOwner = SCAddressXdr.ContractId(XdrTestHelpers.contractId()),
-                tag = SCStringXdr("my-tag")
+                tag = "my-tag".encodeToByteArray()
             )),
             { v, w -> v.encode(w) }, { r -> ContractExecutableXdr.decode(r) })
     }

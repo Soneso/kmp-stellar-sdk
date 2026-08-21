@@ -781,25 +781,61 @@ object Scv {
     /**
      * Build a [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG].
      *
+     * The tag bytes are the UTF-8 encoding of [tag]; use [toExecutableTagBytes] to carry
+     * arbitrary bytes.
+     *
      * @param tag executable tag to convert
      * @return [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG]
      */
     fun toExecutableTag(tag: String): SCValXdr {
-        return SCValXdr.ExecutableTag(SCStringXdr(tag))
+        return toExecutableTagBytes(tag.encodeToByteArray())
+    }
+
+    /**
+     * Build a [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG].
+     *
+     * @param tag executable tag bytes to convert; carried exactly
+     * @return [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG]
+     */
+    fun toExecutableTagBytes(tag: ByteArray): SCValXdr {
+        return SCValXdr.ExecutableTag(tag)
     }
 
     /**
      * Convert from [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG] to String.
      *
+     * The tag bytes are decoded as UTF-8 strictly; a tag that is not valid UTF-8 is read
+     * with [fromExecutableTagBytes].
+     *
      * @param scVal [SCValXdr] to convert
      * @return the executable tag
-     * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_EXECUTABLE_TAG]
+     * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_EXECUTABLE_TAG],
+     * or if the tag bytes are not valid UTF-8
      */
     fun fromExecutableTag(scVal: SCValXdr): String {
+        val bytes = fromExecutableTagBytes(scVal)
+        try {
+            return bytes.decodeToString(throwOnInvalidSequence = true)
+        } catch (e: CharacterCodingException) {
+            throw IllegalArgumentException(
+                "executable tag bytes are not valid UTF-8; use fromExecutableTagBytes to read the exact bytes",
+                e
+            )
+        }
+    }
+
+    /**
+     * Convert from [SCValXdr] with the type of [SCValTypeXdr.SCV_EXECUTABLE_TAG] to ByteArray.
+     *
+     * @param scVal [SCValXdr] to convert
+     * @return the executable tag bytes, exactly as carried
+     * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_EXECUTABLE_TAG]
+     */
+    fun fromExecutableTagBytes(scVal: SCValXdr): ByteArray {
         require(scVal is SCValXdr.ExecutableTag) {
             "invalid scVal type, expected SCV_EXECUTABLE_TAG, but got ${scVal.discriminant}"
         }
-        return scVal.value.value
+        return scVal.value
     }
 
     // ============================================================================

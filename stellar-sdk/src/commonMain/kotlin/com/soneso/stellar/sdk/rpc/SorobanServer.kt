@@ -1012,11 +1012,9 @@ class SorobanServer(
      * The reference names an owner contract and a tag, and the owner holds a persistent
      * contract data entry keyed by that tag whose value is the 32-byte hash of an
      * already uploaded WASM. This method reads that entry off the ledger; the owner
-     * contract is never invoked. The tag is passed through exactly as the reference
-     * carries it, so the ledger key matches the entry the owner wrote. A tag that is
-     * not valid UTF-8 cannot be resolved: XDR strings decode into Kotlin strings with
-     * replacement characters, so such a tag builds a key for a different entry and
-     * surfaces as a missing tag entry.
+     * contract is never invoked. The tag bytes the reference carries reach the ledger
+     * key byte for byte, whether or not they are valid UTF-8, so the key matches the
+     * entry the owner wrote for any tag.
      *
      * @param ref The external reference naming the owner contract and the tag
      * @return The 32-byte WASM hash the tag entry holds
@@ -1037,7 +1035,10 @@ class SorobanServer(
                     "only a contract can hold the executable tag entry"
             )
         }
-        val tag = ref.tag.value
+        // Error messages render the tag through the SEP-0051 escape ladder: printable
+        // ASCII other than the backslash reads verbatim, and any other byte appears as
+        // its escape instead of reaching the log raw.
+        val tag = XdrJson.displayString(ref.tag)
 
         val entry = getContractData(
             owner,

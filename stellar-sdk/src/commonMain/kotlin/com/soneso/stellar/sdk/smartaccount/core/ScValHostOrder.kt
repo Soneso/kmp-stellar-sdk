@@ -74,10 +74,7 @@ internal fun compareScValHostOrder(a: SCValXdr, b: SCValXdr): Int {
                 (b as SCValXdr.Sym).value.value.encodeToByteArray()
             )
         is SCValXdr.ExecutableTag ->
-            compareBytesUnsigned(
-                a.value.value.encodeToByteArray(),
-                (b as SCValXdr.ExecutableTag).value.value.encodeToByteArray()
-            )
+            compareBytesUnsigned(a.value, (b as SCValXdr.ExecutableTag).value)
         else ->
             compareBytesUnsigned(scValToXdrBytesForOrder(a), scValToXdrBytesForOrder(b))
     }

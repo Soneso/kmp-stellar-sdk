@@ -25,6 +25,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ExperimentalTime
 
 /**
@@ -1080,6 +1081,9 @@ class WebAuth(
 
         val isValid = try {
             serverKeyPair.verify(transactionHash, signature.signature.value)
+        } catch (e: CancellationException) {
+            // Cooperative cancellation: never report it as an invalid server signature.
+            throw e
         } catch (e: Exception) {
             throw InvalidSignatureException(serverSigningKey)
         }

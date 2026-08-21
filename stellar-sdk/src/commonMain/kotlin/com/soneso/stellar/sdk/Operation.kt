@@ -1718,6 +1718,34 @@ data class InvokeHostFunctionOperation(
 
         /**
          * Creates an operation to instantiate a contract from a CAP-85 external
+         * reference (Protocol 28), with the tag given as text.
+         *
+         * The tag bytes put on the wire are the UTF-8 encoding of [tag]; everything
+         * else matches the ByteArray overload.
+         *
+         * @param executableOwner The contract holding the executable tag entry
+         * @param tag The tag of the executable entry on the owner, as text
+         * @param address The deployer address (account or contract)
+         * @param constructorArgs Optional arguments passed to the contract constructor
+         * @param salt Optional 32 byte salt for contract id generation; random if not provided
+         * @throws IllegalArgumentException if a provided salt is not exactly 32 bytes
+         */
+        fun createContractFromExternalRef(
+            executableOwner: Address,
+            tag: String,
+            address: Address,
+            constructorArgs: List<SCValXdr>? = null,
+            salt: ByteArray? = null
+        ): InvokeHostFunctionOperation = createContractFromExternalRef(
+            executableOwner = executableOwner,
+            tag = tag.encodeToByteArray(),
+            address = address,
+            constructorArgs = constructorArgs,
+            salt = salt
+        )
+
+        /**
+         * Creates an operation to instantiate a contract from a CAP-85 external
          * reference (Protocol 28).
          *
          * The executable names an owner contract and a tag; the owner holds a
@@ -1737,7 +1765,7 @@ data class InvokeHostFunctionOperation(
          */
         fun createContractFromExternalRef(
             executableOwner: Address,
-            tag: String,
+            tag: ByteArray,
             address: Address,
             constructorArgs: List<SCValXdr>? = null,
             salt: ByteArray? = null
@@ -1757,7 +1785,7 @@ data class InvokeHostFunctionOperation(
             val executable = ContractExecutableXdr.ExternalRef(
                 ContractExecutableExternalRefXdr(
                     executableOwner = executableOwner.toSCAddress(),
-                    tag = SCStringXdr(tag)
+                    tag = tag
                 )
             )
 

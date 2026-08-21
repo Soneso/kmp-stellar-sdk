@@ -332,7 +332,7 @@ module Xdrgen
         out.indent do
           struct.members.each_with_index do |member, index|
             suffix = index < struct.members.length - 1 ? ',' : ''
-            out.puts "#{sample_expression(member.declaration, seed_offset('seed', index))}#{suffix}"
+            out.puts "#{member_sample_expression(struct, member, seed_offset('seed', index))}#{suffix}"
           end
         end
         out.puts ')'
@@ -413,7 +413,7 @@ module Xdrgen
           construction: lambda { |seed_expr|
             arguments = []
             arguments << discriminant if union_json_dynamic_arm?(union, arm)
-            arguments << sample_expression(arm.declaration, seed_expr) unless arm.void?
+            arguments << member_sample_expression(union, arm, seed_expr) unless arm.void?
             arguments.empty? ? "#{type}.#{class_name}" : "#{type}.#{class_name}(#{arguments.join(', ')})"
           }
         }
@@ -440,7 +440,7 @@ module Xdrgen
           bounded: ->(bounded) { references.all? { |referenced| bounded[referenced] } },
           construction: lambda { |seed_expr|
             arguments = [discriminant[:expression]]
-            arguments << sample_expression(arm.declaration, seed_expr) unless arm.void?
+            arguments << member_sample_expression(union, arm, seed_expr) unless arm.void?
             "#{type}.#{class_name}(#{arguments.join(', ')})"
           }
         }
@@ -468,6 +468,16 @@ module Xdrgen
 
       def seed_offset(seed_expr, index)
         index.zero? ? seed_expr : "#{seed_expr} + #{index * 3}"
+      end
+
+      # A bytes-backed string member is a ByteArray in the generated type, so its sample is
+      # bytes, sampled the way a variable-length opaque member is. sampleBytes ranges over
+      # every non-NUL byte value, so the sampled tag routinely carries bytes that are not
+      # valid UTF-8 and the round trip proves them preserved exactly.
+      def member_sample_expression(defn, member, seed_expr)
+        return "sampleBytes(#{seed_expr}, #{SAMPLE_BYTES})" if bytes_backed_string_field?(defn, member)
+
+        sample_expression(member.declaration, seed_expr)
       end
 
       # The Kotlin expression that builds a sample of one declaration.

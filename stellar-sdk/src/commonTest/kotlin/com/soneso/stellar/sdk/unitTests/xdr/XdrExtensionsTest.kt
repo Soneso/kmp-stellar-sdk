@@ -13,7 +13,9 @@ import com.soneso.stellar.sdk.unitTests.xdr.XdrTestHelpers.thresholds
 import com.soneso.stellar.sdk.unitTests.xdr.XdrTestHelpers.string32
 import com.soneso.stellar.sdk.unitTests.xdr.XdrTestHelpers.contractId
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class XdrExtensionsTest {
 
@@ -201,5 +203,31 @@ class XdrExtensionsTest {
         val b64 = event.toXdrBase64()
         val decoded = TransactionEventXdr.fromXdrBase64(b64)
         assertEquals(b64, decoded.toXdrBase64())
+    }
+
+    @Test
+    fun testExternalRefStringFactoryEncodesTheTagAsUtf8() {
+        val owner = SCAddressXdr.ContractId(contractId())
+        val ref = ContractExecutableExternalRefXdr(executableOwner = owner, tag = "token-v1")
+        assertContentEquals("token-v1".encodeToByteArray(), ref.tag)
+        assertEquals("token-v1", ref.tagString)
+
+        val multiByte = ContractExecutableExternalRefXdr(executableOwner = owner, tag = "båd-火")
+        assertContentEquals("båd-火".encodeToByteArray(), multiByte.tag)
+        assertEquals("båd-火", multiByte.tagString)
+    }
+
+    @Test
+    fun testTagStringViewIsStrict() {
+        // 0xC0 and 0xFF never appear in valid UTF-8: the view throws rather
+        // than answering with replacement characters; the bytes stay readable
+        // through the field.
+        val tagBytes = byteArrayOf(0xC0.toByte(), 0xFF.toByte())
+        val ref = ContractExecutableExternalRefXdr(
+            executableOwner = SCAddressXdr.ContractId(contractId()),
+            tag = tagBytes
+        )
+        assertFailsWith<CharacterCodingException> { ref.tagString }
+        assertContentEquals(tagBytes, ref.tag)
     }
 }

@@ -944,11 +944,24 @@ class ContractSpecTest {
     fun testScValToNativeExecutableTag() {
         val spec = ContractSpec(emptyList())
 
-        // The executable tag carries its tag text; no spec type describes it,
-        // so the conversion runs on the discriminant alone.
-        val tagVal = SCValXdr.ExecutableTag(SCStringXdr("token-v1"))
+        // No spec type describes the executable tag, so the conversion runs on
+        // the discriminant alone. Tag bytes that decode as UTF-8 come back as
+        // text.
+        val tagVal = SCValXdr.ExecutableTag("token-v1".encodeToByteArray())
         val tagResult = spec.scValToNative(tagVal, null)
         assertEquals("token-v1", tagResult)
+    }
+
+    @Test
+    fun testScValToNativeExecutableTagBinaryContent() {
+        val spec = ContractSpec(emptyList())
+
+        // 0xC0 and 0xFF never appear in valid UTF-8, so the conversion yields
+        // the raw bytes rather than a lossy decoding.
+        val tagBytes = byteArrayOf(0xC0.toByte(), 0xFF.toByte())
+        val tagResult = spec.scValToNative(SCValXdr.ExecutableTag(tagBytes), null)
+        assertIs<ByteArray>(tagResult)
+        assertContentEquals(tagBytes, tagResult)
     }
 
     @Test
