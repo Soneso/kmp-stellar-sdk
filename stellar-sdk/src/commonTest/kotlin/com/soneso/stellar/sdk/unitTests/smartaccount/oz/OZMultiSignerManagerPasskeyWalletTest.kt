@@ -35,6 +35,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.SignAuthEntryOptions
 import com.soneso.stellar.sdk.smartaccount.oz.SignAuthEntryResult
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnAuthenticationResult
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import kotlinx.coroutines.test.runTest
@@ -1046,6 +1047,68 @@ class OZMultiSignerManagerPasskeyWalletTest {
         assertTrue(
             delegatedAddresses.contains(walletAdapter.address),
             "A delegated entry must be attributed to the selected wallet address; got: $delegatedAddresses"
+        )
+    }
+
+    // ========================================================================
+    // Wallet signer — delegated entry credential arm
+    // ========================================================================
+
+    @Test
+    fun test_submitWithMultipleSigners_walletDelegatedEntryUsesLegacyAddressArm() = runTest {
+        // Delegated wallet entries authorize classical Stellar accounts, so they
+        // carry the legacy ADDRESS arm and its legacy preimage regardless of the
+        // ADDRESS_V2 default used elsewhere.
+        val deployer = KeyPair.random()
+        val walletKeypair = KeyPair.random()
+        val walletAdapter = KeypairWalletAdapter(walletKeypair)
+
+        val accountXdr = buildAccountEntryXdr(deployer).toXdrBase64()
+        val authEntryXdr = buildAuthEntry(VERIFIER_B).toXdrBase64()
+        val sorobanDataXdr = buildMinimalSorobanData().toXdrBase64()
+        val countZeroXdr = SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64()
+        val txHash = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+
+        var capturedSendBody: String? = null
+        val mockServer = buildSequentialMockServerWithSubmission(
+            accountXdrBase64 = accountXdr,
+            authEntryBase64 = authEntryXdr,
+            sorobanDataBase64 = sorobanDataXdr,
+            countXdrBase64 = countZeroXdr,
+            txHash = txHash,
+            onSendTransaction = { capturedSendBody = it }
+        )
+
+        val kit = OZSmartAccountKit.createWithServer(
+            config = buildWalletConfig(deployer, walletAdapter),
+            sorobanServer = mockServer
+        )
+        kit.setConnectedState("test-credential-id", VERIFIER_B)
+
+        val result = kit.multiSignerManager.submitWithMultipleSigners(
+            hostFunction = stubHostFunction(VERIFIER_B),
+            selectedSigners = listOf(SelectedSigner.Wallet(walletAdapter.address)),
+            resolveContextRuleIds = { _, _ -> emptyList() }
+        )
+        assertTrue(result.success, "Result must be successful; error=${result.error}")
+
+        val sendBody = assertNotNull(capturedSendBody, "sendTransaction request must be captured")
+        val root = Json.parseToJsonElement(sendBody).jsonObject
+        val envelopeB64 = root["params"]!!.jsonObject["transaction"]!!.jsonPrimitive.content
+        val tx = Transaction.fromEnvelopeXdr(envelopeB64, Network.TESTNET)
+        val op = tx.operations.first { it is InvokeHostFunctionOperation }
+            as InvokeHostFunctionOperation
+        // Locate the delegated entry arm-independently so an arm regression is
+        // reported by the assertion below rather than as a missing entry.
+        val delegatedEntry = op.auth.first { entry ->
+            entry.credentials.addressCredentials()?.let {
+                Address.fromSCAddress(it.address).toString()
+            } == walletAdapter.address
+        }
+        assertTrue(
+            delegatedEntry.credentials is SorobanCredentialsXdr.Address,
+            "Delegated wallet entry must carry the legacy ADDRESS arm; " +
+                "got ${delegatedEntry.credentials::class.simpleName}"
         )
     }
 

@@ -11,7 +11,6 @@ import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
-import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -496,8 +495,9 @@ class SorobanClientIntegrationTest {
                 // 3. Decode and return: SorobanAuthorizationEntryXdr.fromXdrBase64(signedXdr)
 
                 // For testing, we simulate the remote server signing it:
-                // Extract the expiration ledger from the entry
-                val addressCreds = (entry.credentials as? SorobanCredentialsXdr.Address)?.value
+                // Extract the expiration ledger from the entry, reading the inner
+                // address credentials independently of the credential arm.
+                val addressCreds = entry.credentials.addressCredentials()
                 val expirationLedger = addressCreds?.signatureExpirationLedger?.value?.toLong()
                     ?: throw IllegalStateException("No expiration ledger in entry")
 

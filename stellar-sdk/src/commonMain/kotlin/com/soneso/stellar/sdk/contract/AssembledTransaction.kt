@@ -103,7 +103,7 @@ class AssembledTransaction<T> internal constructor(
     private val transactionSigner: KeyPair?,
     private val parseResultXdrFn: ((SCValXdr) -> T)?,
     private var transactionBuilder: TransactionBuilder,
-    private val useUpgradedAuth: Boolean = false
+    private val useUpgradedAuth: Boolean = true
 ) {
     /**
      * The TransactionBuilder before simulation.
@@ -186,9 +186,7 @@ class AssembledTransaction<T> internal constructor(
 
         // Build and simulate
         val builtTx = transactionBuilder.build()
-        // Request ADDRESS_V2 entries only when opted in; leave the flag unset otherwise
-        // so the request omits it and pre-27 RPCs see no new field.
-        simulation = server.simulateTransaction(builtTx, useUpgradedAuth = if (useUpgradedAuth) true else null)
+        simulation = server.simulateTransaction(builtTx, useUpgradedAuth = useUpgradedAuth)
 
         // Handle restoration if needed
         if (restore && simulation!!.restorePreamble != null && !isReadCall()) {

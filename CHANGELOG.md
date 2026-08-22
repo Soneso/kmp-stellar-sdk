@@ -78,6 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly 32 bytes raises `IllegalArgumentException`.
 
 ### Changed
+- **Breaking change**: CAP-71 upgraded authorization is the default.
+  `Auth.authorizeInvocation` builds `ADDRESS_V2` credentials unless
+  `authV2 = false` is passed, which builds the legacy `ADDRESS` arm.
+  `useUpgradedAuth` defaults to true on `SimulateTransactionRequest`,
+  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`,
+  `ClientOptions`, and the `AssembledTransaction` simulation path, and the key
+  is sent on every simulate request with the current value, so an explicit
+  false reaches the server as the legacy opt-out; the key was previously
+  omitted when unset. RPC servers without Protocol 27 support ignore the flag
+  and return legacy entries, which stay valid. Set false on a network below
+  Protocol 27, where `ADDRESS_V2` entries invalidate the transaction.
+  `useUpgradedAuth` is now `Boolean` rather than `Boolean?`, which changes the
+  JVM binary signatures of `SorobanServer.simulateTransaction`,
+  `SorobanServer.prepareTransaction`, and the `SimulateTransactionRequest`
+  constructor and its generated `copy()`. Precompiled JVM consumers and
+  callers passing `null` fail loudly and need updating.
 - `SCValXdr.ExecutableTag` and `ContractExecutableExternalRefXdr.tag` carry the
   CAP-85 executable tag as `ByteArray` rather than as `SCStringXdr`. The XDR
   type is `SCString`, which admits arbitrary bytes, and the ledger matches the

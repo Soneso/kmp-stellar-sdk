@@ -182,8 +182,8 @@ class AuthTest {
             network = NETWORK
         )
 
-        assertTrue(signedEntry.credentials is SorobanCredentialsXdr.Address)
-        val addressCreds = (signedEntry.credentials as SorobanCredentialsXdr.Address).value
+        assertTrue(signedEntry.credentials is SorobanCredentialsXdr.AddressV2)
+        val addressCreds = (signedEntry.credentials as SorobanCredentialsXdr.AddressV2).value
 
         assertEquals(VALID_UNTIL_LEDGER_SEQ.toUInt(), addressCreds.signatureExpirationLedger.value)
 
@@ -351,9 +351,9 @@ class AuthTest {
         val entry2 = Auth.authorizeInvocation(signer, VALID_UNTIL_LEDGER_SEQ, invocation, NETWORK)
         val entry3 = Auth.authorizeInvocation(signer, VALID_UNTIL_LEDGER_SEQ, invocation, NETWORK)
 
-        val nonce1 = ((entry1.credentials as SorobanCredentialsXdr.Address).value.nonce.value)
-        val nonce2 = ((entry2.credentials as SorobanCredentialsXdr.Address).value.nonce.value)
-        val nonce3 = ((entry3.credentials as SorobanCredentialsXdr.Address).value.nonce.value)
+        val nonce1 = ((entry1.credentials as SorobanCredentialsXdr.AddressV2).value.nonce.value)
+        val nonce2 = ((entry2.credentials as SorobanCredentialsXdr.AddressV2).value.nonce.value)
+        val nonce3 = ((entry3.credentials as SorobanCredentialsXdr.AddressV2).value.nonce.value)
 
         assertNotEquals(nonce1, nonce2)
         assertNotEquals(nonce1, nonce3)

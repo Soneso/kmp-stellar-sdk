@@ -34,9 +34,10 @@ import com.soneso.stellar.sdk.xdr.*
  * ## Protocol gating
  *
  * Emitting `ADDRESS_V2` or `ADDRESS_WITH_DELEGATES` on a network below
- * Protocol 27 invalidates the transaction. Legacy `ADDRESS` is the default
- * everywhere; the new arms are opt-in via the `authV2` flag on
- * [authorizeInvocation] or via [attachDelegates].
+ * Protocol 27 invalidates the transaction. [authorizeInvocation] builds
+ * `ADDRESS_V2` credentials by default; pass `authV2 = false` for the legacy
+ * `ADDRESS` arm, required on networks below Protocol 27.
+ * `ADDRESS_WITH_DELEGATES` credentials are built via [attachDelegates].
  */
 object Auth {
 
@@ -154,9 +155,9 @@ object Auth {
      * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
      * @param invocation Invocation tree being authorized (typically from simulation)
      * @param network Network for replay protection
-     * @param authV2 When true, creates ADDRESS_V2 credentials instead of the legacy
-     *   ADDRESS arm. ADDRESS_V2 requires Protocol 27 or later; emitting it on an
-     *   older network invalidates the transaction.
+     * @param authV2 When true (the default), creates ADDRESS_V2 credentials. Pass
+     *   false for the legacy ADDRESS arm, required on networks below Protocol 27,
+     *   where ADDRESS_V2 entries invalidate the transaction.
      * @return Signed authorization entry
      */
     suspend fun authorizeInvocation(
@@ -164,7 +165,7 @@ object Auth {
         validUntilLedgerSeq: Long,
         invocation: SorobanAuthorizedInvocationXdr,
         network: Network,
-        authV2: Boolean = false
+        authV2: Boolean = true
     ): SorobanAuthorizationEntryXdr {
         val entrySigner = Signer { preimage ->
             val payload = Util.hash(preimage.toXdrByteArray())
@@ -189,9 +190,9 @@ object Auth {
      * @param validUntilLedgerSeq Exclusive future ledger sequence until which this is valid
      * @param invocation Invocation tree being authorized (typically from simulation)
      * @param network Network for replay protection
-     * @param authV2 When true, creates ADDRESS_V2 credentials instead of the legacy
-     *   ADDRESS arm. ADDRESS_V2 requires Protocol 27 or later; emitting it on an
-     *   older network invalidates the transaction.
+     * @param authV2 When true (the default), creates ADDRESS_V2 credentials. Pass
+     *   false for the legacy ADDRESS arm, required on networks below Protocol 27,
+     *   where ADDRESS_V2 entries invalidate the transaction.
      * @return Signed authorization entry
      */
     suspend fun authorizeInvocation(
@@ -200,7 +201,7 @@ object Auth {
         validUntilLedgerSeq: Long,
         invocation: SorobanAuthorizedInvocationXdr,
         network: Network,
-        authV2: Boolean = false
+        authV2: Boolean = true
     ): SorobanAuthorizationEntryXdr {
         val nonce = generateNonce()
         val addressCredentials = SorobanAddressCredentialsXdr(

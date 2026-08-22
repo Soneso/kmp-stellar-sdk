@@ -1288,15 +1288,28 @@ class RequestSerializationTest {
     }
 
     @Test
-    fun testSimulateTransactionRequest_onlyTransaction_omitsOptionalFields() {
+    fun testSimulateTransactionRequest_onlyTransaction_alwaysSendsUseUpgradedAuth() {
         // Given: Only the required transaction is set
         val request = SimulateTransactionRequest(transaction = "AAAA...base64...=")
 
         // When: Serializing with defaults omitted
         val jsonString = json.encodeToString(request)
 
-        // Then: The payload carries the transaction alone
-        assertEquals("""{"transaction":"AAAA...base64...="}""", jsonString)
+        // Then: The null optional fields are omitted, while useUpgradedAuth is
+        // serialized with its default true even under encodeDefaults = false
+        assertEquals("""{"transaction":"AAAA...base64...=","useUpgradedAuth":true}""", jsonString)
+    }
+
+    @Test
+    fun testSimulateTransactionRequest_explicitFalse_serializedAsFalse() {
+        // Given: The legacy opt-out
+        val request = SimulateTransactionRequest(transaction = "AAAA...base64...=", useUpgradedAuth = false)
+
+        // When: Serializing with defaults omitted
+        val jsonString = json.encodeToString(request)
+
+        // Then: The opt-out reaches the wire as an explicit false
+        assertEquals("""{"transaction":"AAAA...base64...=","useUpgradedAuth":false}""", jsonString)
     }
 
     @Test
@@ -1307,10 +1320,11 @@ class RequestSerializationTest {
         // When: Serializing with defaults encoded
         val jsonString = jsonWithDefaults.encodeToString(request)
 
-        // Then: The unset fields are emitted explicitly as null
+        // Then: The unset nullable fields are emitted explicitly as null and
+        // useUpgradedAuth carries its default true
         assertTrue(jsonString.contains("\"resourceConfig\":null"), jsonString)
         assertTrue(jsonString.contains("\"authMode\":null"), jsonString)
-        assertTrue(jsonString.contains("\"useUpgradedAuth\":null"), jsonString)
+        assertTrue(jsonString.contains("\"useUpgradedAuth\":true"), jsonString)
     }
 
     @Test
@@ -1338,10 +1352,10 @@ class RequestSerializationTest {
         // Given: A payload with only the transaction
         val request = json.decodeFromString<SimulateTransactionRequest>("""{"transaction":"AAAA"}""")
 
-        // Then: The optional fields fall back to null
+        // Then: The nullable fields fall back to null and useUpgradedAuth to true
         assertNull(request.resourceConfig)
         assertNull(request.authMode)
-        assertNull(request.useUpgradedAuth)
+        assertEquals(true, request.useUpgradedAuth)
     }
 
     @Test
@@ -1376,7 +1390,6 @@ class RequestSerializationTest {
         assertNotEquals(base, base.copy(resourceConfig = null))
         assertNotEquals(base, base.copy(authMode = SimulateTransactionRequest.AuthMode.RECORD))
         assertNotEquals(base, base.copy(useUpgradedAuth = false))
-        assertNotEquals(base, base.copy(useUpgradedAuth = null))
         assertNotEquals<Any?>(base, null)
         assertTrue(base.toString().contains("transaction=AAAA"), base.toString())
     }

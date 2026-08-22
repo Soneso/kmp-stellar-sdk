@@ -811,12 +811,17 @@ class OZMultiSignerManager internal constructor(
                 )
             }
 
+            // Delegated wallet entries authorize classical Stellar accounts, not smart
+            // accounts, so the legacy ADDRESS arm with its legacy preimage
+            // (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION) is the correct shape for the
+            // external wallet signer.
             val signedDelegatedEntry = Auth.authorizeInvocation(
                 signer = authSigner,
                 publicKey = selectedSigner.address,
                 validUntilLedgerSeq = expirationLedger.toLong(),
                 invocation = checkAuthInvocation,
-                network = Network(kit.config.networkPassphrase)
+                network = Network(kit.config.networkPassphrase),
+                authV2 = false
             )
             delegatedEntries.add(signedDelegatedEntry)
 

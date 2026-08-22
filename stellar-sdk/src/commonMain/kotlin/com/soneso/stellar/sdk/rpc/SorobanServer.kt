@@ -736,8 +736,11 @@ class SorobanServer(
      * @param transaction The transaction to simulate
      * @param resourceConfig Optional resource configuration for additional headroom
      * @param authMode Optional authorization mode (ENFORCE, RECORD, RECORD_ALLOW_NONROOT)
-     * @param useUpgradedAuth When true, requests Protocol-27 ADDRESS_V2 auth entries in recording modes;
-     *               ignored by pre-27 RPCs, which return legacy ADDRESS entries.
+     * @param useUpgradedAuth When true (the default), requests Protocol-27 ADDRESS_V2 auth entries
+     *               in recording modes. The flag is sent on every request; an explicit false requests
+     *               legacy ADDRESS entries. RPC servers without Protocol 27 support ignore the flag
+     *               and return legacy entries. Set false on networks below Protocol 27, where
+     *               ADDRESS_V2 entries invalidate the transaction.
      * @return Simulation results including costs, footprint, and results
      * @throws SorobanRpcException If the RPC request fails
      *
@@ -747,7 +750,7 @@ class SorobanServer(
         transaction: Transaction,
         resourceConfig: SimulateTransactionRequest.ResourceConfig? = null,
         authMode: SimulateTransactionRequest.AuthMode? = null,
-        useUpgradedAuth: Boolean? = null
+        useUpgradedAuth: Boolean = true
     ): SimulateTransactionResponse {
         val transactionXdr = transaction.toEnvelopeXdr().toXdrBase64()
         val request = SimulateTransactionRequest(
@@ -778,13 +781,16 @@ class SorobanServer(
      * ```
      *
      * @param transaction The transaction to prepare
-     * @param useUpgradedAuth When true, requests Protocol-27 ADDRESS_V2 auth entries during simulation;
-     *               ignored by pre-27 RPCs, which return legacy ADDRESS entries.
+     * @param useUpgradedAuth When true (the default), requests Protocol-27 ADDRESS_V2 auth entries
+     *               during simulation. The flag is sent on every request; an explicit false requests
+     *               legacy ADDRESS entries. RPC servers without Protocol 27 support ignore the flag
+     *               and return legacy entries. Set false on networks below Protocol 27, where
+     *               ADDRESS_V2 entries invalidate the transaction.
      * @return A copy of the transaction with footprint and fees populated
      * @throws PrepareTransactionException If simulation fails
      * @throws SorobanRpcException If the RPC request fails
      */
-    suspend fun prepareTransaction(transaction: Transaction, useUpgradedAuth: Boolean? = null): Transaction {
+    suspend fun prepareTransaction(transaction: Transaction, useUpgradedAuth: Boolean = true): Transaction {
         val simulation = simulateTransaction(transaction, useUpgradedAuth = useUpgradedAuth)
         return prepareTransaction(transaction, simulation)
     }
