@@ -1198,7 +1198,15 @@ func formatSCVal(_ scVal: SCValXdr, indentLevel: Int = 0) -> String {
     }
 
     if let executableTagVal = scVal as? SCValXdr.ExecutableTag {
-        return "ExecutableTag: \"\(executableTagVal.value)\""
+        // The tag is raw bytes; show it as text when it decodes as UTF-8 and as
+        // bytes otherwise.
+        let tagBytes = executableTagVal.value
+        let size = Int(tagBytes.size)
+        let unsignedBytes = (0..<size).map { UInt8(bitPattern: tagBytes.get(index: Int32($0))) }
+        if let text = String(bytes: unsignedBytes, encoding: .utf8) {
+            return "ExecutableTag: \"\(text)\""
+        }
+        return "ExecutableTag: \(formatBytes(tagBytes))"
     }
 
     return description

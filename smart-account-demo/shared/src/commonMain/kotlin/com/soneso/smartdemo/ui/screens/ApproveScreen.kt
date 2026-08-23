@@ -118,10 +118,13 @@ class ApproveScreen : Screen {
         // Uses the DEMO token contract exclusively
         val tokenContract = DemoState.demoTokenContractId ?: ""
 
-        // Validation
-        val spenderError = validateSpender(spender)
+        // Validation. The spender field is trimmed once so validation and the submitted
+        // approval operate on the same string.
+        val trimmedSpender = spender.trim()
+
+        val spenderError = validateSpender(trimmedSpender)
         val amountError = validateAmount(amount)
-        val isFormValid = spender.isNotBlank() &&
+        val isFormValid = trimmedSpender.isNotBlank() &&
             amount.isNotBlank() &&
             spenderError == null &&
             amountError == null &&
@@ -291,9 +294,9 @@ class ApproveScreen : Screen {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading && txHash == null,
                     singleLine = true,
-                    isError = spender.isNotBlank() && spenderError != null,
+                    isError = trimmedSpender.isNotBlank() && spenderError != null,
                     supportingText = {
-                        if (spender.isNotBlank() && spenderError != null) {
+                        if (trimmedSpender.isNotBlank() && spenderError != null) {
                             Text(spenderError)
                         } else {
                             Text("Address to grant the allowance to")
@@ -392,10 +395,10 @@ class ApproveScreen : Screen {
 
                                     try {
                                         ActivityLogState.info(
-                                            "Approving $amount DEMO for ${spender.take(8)}..."
+                                            "Approving $amount DEMO for ${trimmedSpender.take(8)}..."
                                         )
 
-                                        val capturedSpender = spender
+                                        val capturedSpender = trimmedSpender
                                         val capturedAmount = amount
 
                                         val result = approveAllowance(
@@ -594,7 +597,7 @@ class ApproveScreen : Screen {
                         isLoading = true
                         errorMessage = null
 
-                        val capturedSpender = spender
+                        val capturedSpender = trimmedSpender
                         val capturedAmount = amount
 
                         try {

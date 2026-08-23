@@ -73,7 +73,17 @@ suspend fun initializeKit(
         storage = storage ?: InMemoryStorageAdapter(),
         externalWallet = walletSignerAdapter,
         externalEd25519Adapter = demoEd25519Adapter,
-        maxContextRuleScanId = DemoConfig.MAX_CONTEXT_RULE_SCAN_ID.toUInt()
+        maxContextRuleScanId = DemoConfig.MAX_CONTEXT_RULE_SCAN_ID.toUInt(),
+        // The external wallet builds the demo connects to are not confirmed to sign the
+        // address-bound preimage (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS), so
+        // delegated wallet entries stay on the legacy ADDRESS credential arm. Flip this to
+        // the SDK default (true) once a wallet is confirmed to sign the address-bound form.
+        useUpgradedAuthForWalletSigners = false,
+        // The relayer chain the demo submits through (OpenZeppelin Relayer Channels) parses the
+        // submitted auth XDR with a pre-protocol-27 schema and rejects ADDRESS_V2 entries. Legacy
+        // ADDRESS entries stay valid on-chain, so the kit requests and builds those instead.
+        // Remove this override once the relayer parses protocol-27 XDR.
+        useUpgradedAuth = false
     )
 
     // Create the kit instance. This is the main entry point to all SDK operations.

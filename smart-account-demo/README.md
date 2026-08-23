@@ -254,6 +254,14 @@ The demo supports connecting an external Stellar wallet (Freighter) as a delegat
 
 Wallet connection buttons are hidden on simulators and emulators since WalletConnect requires the wallet app on a real device.
 
+### Preimage Type for Wallet Signers
+
+The demo asks external wallets to sign the legacy preimage by setting `OZSmartAccountConfig.useUpgradedAuthForWalletSigners = false` in `MainScreenFlow.kt`. Wallets confirmed to sign the address-bound CAP-71 preimage (`ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`) can drop the override and use the SDK default (`true`).
+
+### Credential Arm for the Relayer
+
+The relayer chain the demo submits through, OpenZeppelin Relayer Channels, parses the submitted auth XDR with a pre-protocol-27 schema and rejects `ADDRESS_V2` entries. `MainScreenFlow.kt` therefore also sets `OZSmartAccountConfig.useUpgradedAuth = false`. The kit then requests legacy entries from every simulation it runs and converts `fundWallet` source-account credentials to the legacy `ADDRESS` arm, which stays valid on-chain. Drop the override once the relayer parses protocol-27 XDR.
+
 ### Reown Project ID
 
 Android and iOS use the [Reown](https://cloud.reown.com/) (WalletConnect v2) SDK. A project ID is required. Set `REOWN_PROJECT_ID` in `DemoConfig.kt`. Register for a free project ID at [cloud.reown.com](https://cloud.reown.com/).
