@@ -151,6 +151,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hashes the address-bound preimage. The new optional parameter changes the JVM
   binary signatures of the `OZSmartAccountConfig` constructor and its generated
   `copy()`.
+- `OZSmartAccountConfig.useUpgradedAuth` (default true) governs the credential arm
+  of the OZ kit's internal simulations and of the `fundWallet` source-account
+  conversion. Both asked for `ADDRESS_V2` unconditionally. Set the flag to false and
+  the kit requests legacy entries from simulation and converts funding credentials to
+  the legacy `ADDRESS` arm, for relayer services that cannot parse protocol-27 auth
+  XDR. `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes the same flag and
+  hashes the preimage that arm defines. The new optional parameter again changes the
+  JVM binary signatures of the `OZSmartAccountConfig` constructor and its generated
+  `copy()`.
 
 ### Removed
 - `EffectsRequestBuilder.forClaimableBalance`. Horizon serves no

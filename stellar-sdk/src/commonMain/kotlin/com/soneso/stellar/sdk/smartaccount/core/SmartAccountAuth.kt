@@ -172,11 +172,12 @@ object SmartAccountAuth {
      * Builds the authorization payload hash for source_account credentials.
      *
      * This is used when converting source_account (Void) credentials to fresh
-     * ADDRESS_V2 credentials, typically for relayer fee sponsoring. The payload
+     * address-bearing credentials, typically for relayer fee sponsoring. The payload
      * uses the provided address, nonce, and expiration since there are no
      * existing address credentials yet.
      *
-     * The payload is the address-bound
+     * [useUpgradedAuth] selects the credential arm the signature is built for, and with
+     * it the preimage type. The upgraded ADDRESS_V2 arm hashes the address-bound
      * ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS preimage:
      * ```
      * HashIdPreimage::SorobanAuthorizationWithAddress {
@@ -188,16 +189,21 @@ object SmartAccountAuth {
      * }
      * hash = SHA256(XDR_encode(payload))
      * ```
+     * The legacy ADDRESS arm hashes the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage,
+     * which carries the same fields except the address. [address] is still the address
+     * of the credentials the signature is attached to in both arms; the legacy preimage
+     * simply does not include it. Selection is delegated to [Auth.buildHashIDPreimage].
      *
-     * The host reconstructs this preimage from the submitted ADDRESS_V2
-     * credential arm, so the address must be the one carried by the credentials
-     * the signature is attached to.
+     * The host reconstructs the preimage from the submitted credential arm, so the arm
+     * chosen here must match the arm the signature is attached to.
      *
      * @param entry The authorization entry with source_account credentials
-     * @param address The address carried by the new ADDRESS_V2 credentials
-     * @param nonce The nonce to use for the new ADDRESS_V2 credentials
+     * @param address The address carried by the new credentials
+     * @param nonce The nonce to use for the new credentials
      * @param expirationLedger The ledger number at which the signature expires
      * @param networkPassphrase The network passphrase
+     * @param useUpgradedAuth True (the default) hashes the ADDRESS_V2 address-bound
+     *   preimage; false hashes the legacy ADDRESS preimage.
      * @return The 32-byte SHA-256 hash of the authorization payload
      * @throws TransactionException.SigningFailed if XDR encoding fails
      */
@@ -206,17 +212,21 @@ object SmartAccountAuth {
         address: SCAddressXdr,
         nonce: Int64Xdr,
         expirationLedger: UInt,
-        networkPassphrase: String
+        networkPassphrase: String,
+        useUpgradedAuth: Boolean = true
     ): ByteArray {
         val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
-        val credentials = SorobanCredentialsXdr.AddressV2(
-            SorobanAddressCredentialsXdr(
-                address = address,
-                nonce = nonce,
-                signatureExpirationLedger = Uint32Xdr(expirationLedger),
-                signature = SCValXdr.Void(SCValTypeXdr.SCV_VOID)
-            )
+        val addressCredentials = SorobanAddressCredentialsXdr(
+            address = address,
+            nonce = nonce,
+            signatureExpirationLedger = Uint32Xdr(expirationLedger),
+            signature = SCValXdr.Void(SCValTypeXdr.SCV_VOID)
         )
+        val credentials = if (useUpgradedAuth) {
+            SorobanCredentialsXdr.AddressV2(addressCredentials)
+        } else {
+            SorobanCredentialsXdr.Address(addressCredentials)
+        }
         val preimage = Auth.buildHashIDPreimage(
             credentials = credentials,
             networkId = networkId,

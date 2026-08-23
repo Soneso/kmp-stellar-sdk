@@ -62,6 +62,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  * | externalEd25519Adapter | No | null |
  * | maxContextRuleScanId | No | 50 |
  * | useUpgradedAuthForWalletSigners | No | true |
+ * | useUpgradedAuth | No | true |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
  *   (e.g., accountWasmHash is not a 64-character hex string, or webauthnVerifierAddress
@@ -219,7 +220,24 @@ data class OZSmartAccountConfig(
      * When false, they carry the legacy ADDRESS arm with its non-address-bound
      * preimage, for wallet software that cannot sign the address-bound preimage type.
      */
-    val useUpgradedAuthForWalletSigners: Boolean = true
+    val useUpgradedAuthForWalletSigners: Boolean = true,
+
+    /**
+     * Governs the credential arm of the kit's internal simulations and of the
+     * [OZTransactionOperations.fundWallet] source-account conversion.
+     *
+     * When true, simulations request Protocol-27 ADDRESS_V2 entries and the funding
+     * conversion produces ADDRESS_V2 credentials, whose signed preimage
+     * (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS) carries the temporary account
+     * address. When false, simulations request legacy entries and the conversion produces
+     * legacy ADDRESS credentials with the non-address-bound preimage, for relayer services
+     * that cannot parse Protocol-27 auth XDR.
+     *
+     * This is separate from [useUpgradedAuthForWalletSigners]: that flag serves wallet
+     * software that signs a preimage, this one serves services that parse the submitted
+     * auth XDR.
+     */
+    val useUpgradedAuth: Boolean = true
 ) {
     init {
         // Validate required parameters
@@ -358,6 +376,7 @@ data class OZSmartAccountConfig(
         private var maxContextRuleScanId: UInt = 50u
         private var defaultPolicies: Map<String, SCValXdr> = emptyMap()
         private var useUpgradedAuthForWalletSigners: Boolean = true
+        private var useUpgradedAuth: Boolean = true
 
         /**
          * Sets the deployer keypair.
@@ -498,6 +517,21 @@ data class OZSmartAccountConfig(
         }
 
         /**
+         * Sets the credential arm of the kit's internal simulations and of the
+         * fundWallet source-account conversion.
+         *
+         * @param value True (the default) requests ADDRESS_V2 entries from simulation and
+         *   converts funding source-account credentials to the ADDRESS_V2 arm; false requests
+         *   legacy entries and converts to the legacy ADDRESS arm, for relayer services that
+         *   cannot parse Protocol-27 auth XDR.
+         * @return This builder for chaining
+         */
+        fun useUpgradedAuth(value: Boolean): Builder {
+            useUpgradedAuth = value
+            return this
+        }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -521,7 +555,8 @@ data class OZSmartAccountConfig(
                 externalEd25519Adapter = externalEd25519Adapter,
                 maxContextRuleScanId = maxContextRuleScanId,
                 defaultPolicies = defaultPolicies,
-                useUpgradedAuthForWalletSigners = useUpgradedAuthForWalletSigners
+                useUpgradedAuthForWalletSigners = useUpgradedAuthForWalletSigners,
+                useUpgradedAuth = useUpgradedAuth
             )
         }
     }

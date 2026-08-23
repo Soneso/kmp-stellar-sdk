@@ -456,7 +456,10 @@ class OZMultiSignerManager internal constructor(
             .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
-        val simulation = kit.sorobanServer.simulateTransaction(transaction)
+        val simulation = kit.sorobanServer.simulateTransaction(
+            transaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
         if (simulation.error != null) {
             throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
         }
@@ -546,7 +549,10 @@ class OZMultiSignerManager internal constructor(
             .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
-        val resignedSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
+        val resignedSimulation = kit.sorobanServer.simulateTransaction(
+            signedTransaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
         if (resignedSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${resignedSimulation.error}")
         }

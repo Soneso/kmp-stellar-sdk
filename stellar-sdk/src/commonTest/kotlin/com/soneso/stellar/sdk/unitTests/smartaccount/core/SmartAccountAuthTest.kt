@@ -24,6 +24,7 @@ import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationWithAddressXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.SCAddressXdr
@@ -40,6 +41,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -288,6 +290,55 @@ class SmartAccountAuthTest {
         assertTrue(
             actual.contentEquals(expected),
             "Hash must match manual WITH_ADDRESS preimage construction"
+        )
+    }
+
+    @Test
+    fun testBuildSourceAccountAuthPayloadHash_legacyArmMatchesManualPreimageConstruction() = runTest {
+        // useUpgradedAuth = false hashes the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage,
+        // which carries no address field. The address argument still names the credentials
+        // the signature is attached to, so it is supplied either way.
+        val address = Address(tempAccountAddress).toSCAddress()
+        val nonce = 42000L
+        val expirationLedger = 3000000u
+        val entry = createSourceAccountAuthEntry()
+
+        val actual = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
+            entry = entry,
+            address = address,
+            nonce = Int64Xdr(nonce),
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase,
+            useUpgradedAuth = false
+        )
+
+        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
+        val writer = XdrWriter()
+        HashIDPreimageXdr.SorobanAuthorization(
+            HashIDPreimageSorobanAuthorizationXdr(
+                networkId = HashXdr(networkId),
+                nonce = Int64Xdr(nonce),
+                signatureExpirationLedger = Uint32Xdr(expirationLedger),
+                invocation = entry.rootInvocation
+            )
+        ).encode(writer)
+        val expected = getSha256Crypto().hash(writer.toByteArray())
+
+        assertTrue(
+            actual.contentEquals(expected),
+            "Hash must match manual SOROBAN_AUTHORIZATION preimage construction"
+        )
+
+        val upgraded = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
+            entry = entry,
+            address = address,
+            nonce = Int64Xdr(nonce),
+            expirationLedger = expirationLedger,
+            networkPassphrase = networkPassphrase
+        )
+        assertFalse(
+            actual.contentEquals(upgraded),
+            "The two arms must hash different preimages for the same inputs"
         )
     }
 

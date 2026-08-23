@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -542,6 +543,103 @@ class ConfigValidationTest {
             adapter2,
             config.externalEd25519Adapter,
             "Last externalEd25519Adapter call must win"
+        )
+    }
+
+    // MARK: - useUpgradedAuth
+    //
+    // Governs the credential arm of the kit's internal simulations and of the fundWallet
+    // source-account conversion. It is independent of useUpgradedAuthForWalletSigners:
+    // one serves relayer services that parse the submitted auth XDR, the other wallet
+    // software that signs a preimage.
+
+    @Test
+    fun testUseUpgradedAuth_defaultsToTrue() {
+        assertTrue(
+            validConfig().useUpgradedAuth,
+            "useUpgradedAuth must default to true so the kit asks for protocol-27 entries"
+        )
+    }
+
+    @Test
+    fun testUseUpgradedAuth_constructorStoresExplicitFalse() {
+        val config = OZSmartAccountConfig(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier,
+            useUpgradedAuth = false
+        )
+
+        assertFalse(config.useUpgradedAuth)
+        assertTrue(
+            config.useUpgradedAuthForWalletSigners,
+            "The wallet-signer flag keeps its own default when only useUpgradedAuth is set"
+        )
+    }
+
+    @Test
+    fun testBuilder_useUpgradedAuth_defaultsToTrue() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        ).build()
+
+        assertTrue(config.useUpgradedAuth)
+    }
+
+    @Test
+    fun testBuilder_useUpgradedAuth_storesValueAndLastCallWins() {
+        val config = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .useUpgradedAuth(true)
+            .useUpgradedAuth(false)
+            .build()
+
+        assertFalse(config.useUpgradedAuth, "Last useUpgradedAuth call must win")
+    }
+
+    @Test
+    fun testBuilder_useUpgradedAuth_matchesConstructor() {
+        val constructorConfig = OZSmartAccountConfig(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier,
+            useUpgradedAuth = false
+        )
+
+        val builderConfig = OZSmartAccountConfig.builder(
+            rpcUrl = validRpcUrl,
+            networkPassphrase = validPassphrase,
+            accountWasmHash = validWasmHash,
+            webauthnVerifierAddress = validVerifier
+        )
+            .useUpgradedAuth(false)
+            .build()
+
+        assertEquals(constructorConfig, builderConfig)
+    }
+
+    @Test
+    fun testConfigCopy_useUpgradedAuth_leavesOtherFieldsIntact() {
+        val original = validConfig()
+        val modified = original.copy(useUpgradedAuth = false)
+
+        assertFalse(modified.useUpgradedAuth)
+        assertTrue(original.useUpgradedAuth, "copy() must not mutate the source config")
+        assertEquals(original.rpcUrl, modified.rpcUrl)
+        assertEquals(original.networkPassphrase, modified.networkPassphrase)
+        assertEquals(
+            original.useUpgradedAuthForWalletSigners,
+            modified.useUpgradedAuthForWalletSigners,
+            "The two auth flags are independent"
         )
     }
 
