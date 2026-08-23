@@ -23,9 +23,10 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.WebAuthnSignature
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
-import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationWithAddressXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
+import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
@@ -52,6 +53,7 @@ import kotlin.test.assertTrue
 class SmartAccountAuthTest {
 
     private val contractAddress = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+    private val tempAccountAddress = "GBVG2QOHHFBVHAEGNF4XRUCAPAGWDROONM2LC4BK4ECCQ5RTQOO64VBW"
     private val networkPassphrase = Network.TESTNET.networkPassphrase
     private val mainnetPassphrase = Network.PUBLIC.networkPassphrase
 
@@ -72,6 +74,23 @@ class SmartAccountAuthTest {
         )
     }
 
+    private fun createAddressV2AuthEntry(
+        nonce: Long,
+        scAddress: SCAddressXdr
+    ): SorobanAuthorizationEntryXdr {
+        val invocation = createTestInvocation(contractAddress)
+        val credentials = SorobanAddressCredentialsXdr(
+            address = scAddress,
+            nonce = Int64Xdr(nonce),
+            signatureExpirationLedger = Uint32Xdr(0u),
+            signature = SCValXdr.Void(SCValTypeXdr.SCV_VOID)
+        )
+        return SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.AddressV2(credentials),
+            rootInvocation = invocation
+        )
+    }
+
     private fun createSourceAccountAuthEntry(): SorobanAuthorizationEntryXdr {
         val invocation = createTestInvocation(contractAddress)
         return SorobanAuthorizationEntryXdr(
@@ -81,23 +100,26 @@ class SmartAccountAuthTest {
     }
 
     /**
-     * Manually constructs the preimage and returns SHA-256(XDR(preimage)).
+     * Manually constructs the address-bound WITH_ADDRESS preimage (networkID, nonce,
+     * signatureExpirationLedger, address, invocation) and returns SHA-256(XDR(preimage)).
      * Used as the ground-truth reference in hash correctness tests.
      */
     private suspend fun buildExpectedHash(
+        address: SCAddressXdr,
         nonce: Long,
         expirationLedger: UInt,
         invocation: SorobanAuthorizedInvocationXdr,
         passphrase: String
     ): ByteArray {
         val networkId = getSha256Crypto().hash(passphrase.encodeToByteArray())
-        val preimageInner = HashIDPreimageSorobanAuthorizationXdr(
+        val preimageInner = HashIDPreimageSorobanAuthorizationWithAddressXdr(
             networkId = HashXdr(networkId),
             nonce = Int64Xdr(nonce),
             signatureExpirationLedger = Uint32Xdr(expirationLedger),
+            address = address,
             invocation = invocation
         )
-        val preimage = HashIDPreimageXdr.SorobanAuthorization(preimageInner)
+        val preimage = HashIDPreimageXdr.SorobanAuthorizationWithAddress(preimageInner)
         val writer = XdrWriter()
         preimage.encode(writer)
         return getSha256Crypto().hash(writer.toByteArray())
@@ -110,6 +132,7 @@ class SmartAccountAuthTest {
         val entry = createSourceAccountAuthEntry()
         val hash = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = Address(tempAccountAddress).toSCAddress(),
             nonce = Int64Xdr(99999L),
             expirationLedger = 1000000u,
             networkPassphrase = networkPassphrase
@@ -120,14 +143,17 @@ class SmartAccountAuthTest {
     @Test
     fun testBuildSourceAccountAuthPayloadHash_differentNoncesProduceDifferentHashes() = runTest {
         val entry = createSourceAccountAuthEntry()
+        val address = Address(tempAccountAddress).toSCAddress()
         val hash1 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = Int64Xdr(111L),
             expirationLedger = 1000000u,
             networkPassphrase = networkPassphrase
         )
         val hash2 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = Int64Xdr(222L),
             expirationLedger = 1000000u,
             networkPassphrase = networkPassphrase
@@ -139,17 +165,44 @@ class SmartAccountAuthTest {
     }
 
     @Test
-    fun testBuildSourceAccountAuthPayloadHash_differentExpirationProducesDifferentHash() = runTest {
+    fun testBuildSourceAccountAuthPayloadHash_differentAddressesProduceDifferentHashes() = runTest {
         val entry = createSourceAccountAuthEntry()
         val nonce = Int64Xdr(12345L)
         val hash1 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = Address(tempAccountAddress).toSCAddress(),
             nonce = nonce,
             expirationLedger = 1000000u,
             networkPassphrase = networkPassphrase
         )
         val hash2 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = Address(contractAddress).toSCAddress(),
+            nonce = nonce,
+            expirationLedger = 1000000u,
+            networkPassphrase = networkPassphrase
+        )
+        assertTrue(
+            !hash1.contentEquals(hash2),
+            "The address is bound into the preimage, so different addresses must produce different hashes"
+        )
+    }
+
+    @Test
+    fun testBuildSourceAccountAuthPayloadHash_differentExpirationProducesDifferentHash() = runTest {
+        val entry = createSourceAccountAuthEntry()
+        val address = Address(tempAccountAddress).toSCAddress()
+        val nonce = Int64Xdr(12345L)
+        val hash1 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
+            entry = entry,
+            address = address,
+            nonce = nonce,
+            expirationLedger = 1000000u,
+            networkPassphrase = networkPassphrase
+        )
+        val hash2 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
+            entry = entry,
+            address = address,
             nonce = nonce,
             expirationLedger = 2000000u,
             networkPassphrase = networkPassphrase
@@ -163,16 +216,19 @@ class SmartAccountAuthTest {
     @Test
     fun testBuildSourceAccountAuthPayloadHash_differentNetworkPassphraseProducesDifferentHash() = runTest {
         val entry = createSourceAccountAuthEntry()
+        val address = Address(tempAccountAddress).toSCAddress()
         val nonce = Int64Xdr(12345L)
         val expirationLedger = 1000000u
         val hashTestnet = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = nonce,
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
         )
         val hashMainnet = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = nonce,
             expirationLedger = expirationLedger,
             networkPassphrase = mainnetPassphrase
@@ -186,16 +242,19 @@ class SmartAccountAuthTest {
     @Test
     fun testBuildSourceAccountAuthPayloadHash_isConsistent() = runTest {
         val entry = createSourceAccountAuthEntry()
+        val address = Address(tempAccountAddress).toSCAddress()
         val nonce = Int64Xdr(77777L)
         val expirationLedger = 5000000u
         val hash1 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = nonce,
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
         )
         val hash2 = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = nonce,
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
@@ -205,18 +264,21 @@ class SmartAccountAuthTest {
 
     @Test
     fun testBuildSourceAccountAuthPayloadHash_matchesManualPreimageConstruction() = runTest {
+        val address = Address(tempAccountAddress).toSCAddress()
         val nonce = 42000L
         val expirationLedger = 3000000u
         val entry = createSourceAccountAuthEntry()
 
         val actual = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = entry,
+            address = address,
             nonce = Int64Xdr(nonce),
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
         )
 
         val expected = buildExpectedHash(
+            address = address,
             nonce = nonce,
             expirationLedger = expirationLedger,
             invocation = entry.rootInvocation,
@@ -225,7 +287,7 @@ class SmartAccountAuthTest {
 
         assertTrue(
             actual.contentEquals(expected),
-            "Hash must match manual preimage construction"
+            "Hash must match manual WITH_ADDRESS preimage construction"
         )
     }
 
@@ -247,14 +309,15 @@ class SmartAccountAuthTest {
 
     @Test
     fun testBuildAuthPayloadHash_andBuildSourceAccountAuthPayloadHash_sameInputsProduceSameHash() = runTest {
+        val address = Address(tempAccountAddress).toSCAddress()
         val nonce = 55555L
         val expirationLedger = 4000000u
 
-        // Address-credentials entry with the test nonce
-        val addressEntry = createAddressAuthEntry(nonce = nonce)
+        // ADDRESS_V2-credentials entry with the test address and nonce
+        val addressV2Entry = createAddressV2AuthEntry(nonce = nonce, scAddress = address)
 
-        val hashFromAddressEntry = SmartAccountAuth.buildAuthPayloadHash(
-            entry = addressEntry,
+        val hashFromAddressV2Entry = SmartAccountAuth.buildAuthPayloadHash(
+            entry = addressV2Entry,
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
         )
@@ -264,15 +327,17 @@ class SmartAccountAuthTest {
 
         val hashFromSourceAccountEntry = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
             entry = sourceAccountEntry,
+            address = address,
             nonce = Int64Xdr(nonce),
             expirationLedger = expirationLedger,
             networkPassphrase = networkPassphrase
         )
 
         assertTrue(
-            hashFromAddressEntry.contentEquals(hashFromSourceAccountEntry),
-            "buildAuthPayloadHash and buildSourceAccountAuthPayloadHash must produce the same hash " +
-                "when given the same nonce, expiration, invocation, and network passphrase"
+            hashFromAddressV2Entry.contentEquals(hashFromSourceAccountEntry),
+            "buildAuthPayloadHash over an ADDRESS_V2 entry and buildSourceAccountAuthPayloadHash " +
+                "must produce the same hash when given the same address, nonce, expiration, " +
+                "invocation, and network passphrase"
         )
     }
 

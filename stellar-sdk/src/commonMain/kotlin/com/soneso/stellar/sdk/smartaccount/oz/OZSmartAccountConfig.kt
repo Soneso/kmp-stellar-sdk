@@ -61,6 +61,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  * | externalWallet | No | null |
  * | externalEd25519Adapter | No | null |
  * | maxContextRuleScanId | No | 50 |
+ * | useUpgradedAuthForWalletSigners | No | true |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
  *   (e.g., accountWasmHash is not a 64-character hex string, or webauthnVerifierAddress
@@ -207,7 +208,18 @@ data class OZSmartAccountConfig(
      * [OZWalletOperations.createWallet] and [OZWalletOperations.deployPendingCredential];
      * a per-call `policies` argument overrides this default. Defaults to no policies.
      */
-    val defaultPolicies: Map<String, SCValXdr> = emptyMap()
+    val defaultPolicies: Map<String, SCValXdr> = emptyMap(),
+
+    /**
+     * Governs the credential arm of delegated external-wallet auth entries.
+     *
+     * When true, delegated entries built for [SelectedSigner.Wallet] signers carry
+     * upgraded ADDRESS_V2 credentials, whose signed preimage
+     * (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS) carries the wallet address.
+     * When false, they carry the legacy ADDRESS arm with its non-address-bound
+     * preimage, for wallet software that cannot sign the address-bound preimage type.
+     */
+    val useUpgradedAuthForWalletSigners: Boolean = true
 ) {
     init {
         // Validate required parameters
@@ -345,6 +357,7 @@ data class OZSmartAccountConfig(
         private var externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null
         private var maxContextRuleScanId: UInt = 50u
         private var defaultPolicies: Map<String, SCValXdr> = emptyMap()
+        private var useUpgradedAuthForWalletSigners: Boolean = true
 
         /**
          * Sets the deployer keypair.
@@ -472,6 +485,19 @@ data class OZSmartAccountConfig(
         }
 
         /**
+         * Sets the credential arm used for delegated external-wallet auth entries.
+         *
+         * @param value True (the default) builds ADDRESS_V2 credentials, whose signed
+         *   preimage carries the wallet address; false builds the legacy ADDRESS arm
+         *   for wallet software that cannot sign the address-bound preimage type.
+         * @return This builder for chaining
+         */
+        fun useUpgradedAuthForWalletSigners(value: Boolean): Builder {
+            useUpgradedAuthForWalletSigners = value
+            return this
+        }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -494,7 +520,8 @@ data class OZSmartAccountConfig(
                 externalWallet = externalWallet,
                 externalEd25519Adapter = externalEd25519Adapter,
                 maxContextRuleScanId = maxContextRuleScanId,
-                defaultPolicies = defaultPolicies
+                defaultPolicies = defaultPolicies,
+                useUpgradedAuthForWalletSigners = useUpgradedAuthForWalletSigners
             )
         }
     }

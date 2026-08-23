@@ -156,9 +156,10 @@ sealed class SelectedSigner {
  * [SelectedSigner.Passkey] with the credential ID and keyData populated from the
  * signer data obtained during context rule discovery.
  *
- * Delegated signers produce their own auth entries with Address credentials that
- * reference the smart account's __check_auth function. The smart account's signature
- * map includes a placeholder entry for each delegated signer.
+ * Delegated signers produce their own auth entries with address credentials
+ * (ADDRESS_V2 by default; see [OZSmartAccountConfig.useUpgradedAuthForWalletSigners])
+ * that reference the smart account's __check_auth function. The smart account's
+ * signature map includes a placeholder entry for each delegated signer.
  *
  * Example usage:
  * ```kotlin
@@ -196,9 +197,10 @@ class OZMultiSignerManager internal constructor(
      * - [SelectedSigner.Passkey] — triggers one OS WebAuthn authentication prompt each.
      * - [SelectedSigner.Wallet] — requests a delegated auth entry from the external wallet.
      *
-     * Delegated signers produce their own auth entries with Address credentials that
-     * invoke the smart account's __check_auth function. The smart account's signature
-     * map includes a placeholder entry for each delegated signer.
+     * Delegated signers produce their own auth entries with address credentials
+     * (ADDRESS_V2 by default; see [OZSmartAccountConfig.useUpgradedAuthForWalletSigners])
+     * that invoke the smart account's __check_auth function. The smart account's
+     * signature map includes a placeholder entry for each delegated signer.
      *
      * @param tokenContract The token contract address (C-address)
      * @param recipient The recipient address (G-address or C-address)
@@ -811,17 +813,18 @@ class OZMultiSignerManager internal constructor(
                 )
             }
 
-            // Delegated wallet entries authorize classical Stellar accounts, not smart
-            // accounts, so the legacy ADDRESS arm with its legacy preimage
-            // (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION) is the correct shape for the
-            // external wallet signer.
+            // Delegated wallet entries carry upgraded ADDRESS_V2 credentials by default,
+            // binding the wallet address into the signed preimage
+            // (ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS). The config opt-out
+            // builds the legacy ADDRESS arm for wallet software that cannot sign the
+            // address-bound preimage type.
             val signedDelegatedEntry = Auth.authorizeInvocation(
                 signer = authSigner,
                 publicKey = selectedSigner.address,
                 validUntilLedgerSeq = expirationLedger.toLong(),
                 invocation = checkAuthInvocation,
                 network = Network(kit.config.networkPassphrase),
-                authV2 = false
+                authV2 = kit.config.useUpgradedAuthForWalletSigners
             )
             delegatedEntries.add(signedDelegatedEntry)
 

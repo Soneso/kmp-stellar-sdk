@@ -140,6 +140,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `actual` declarations the common tests need. It did not compile before. The
   variant runs on JUnit 5, as the JVM target does, and
   `-PexcludeIntegrationTests` reaches it too.
+- OZ smart-account delegated external-wallet auth entries carry `ADDRESS_V2`
+  credentials by default, binding the wallet address into the signed preimage
+  (`ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`). The new
+  `OZSmartAccountConfig.useUpgradedAuthForWalletSigners` opts back to the legacy
+  `ADDRESS` arm for wallet software that cannot sign the address-bound preimage
+  type. The relayer source-account conversion in `fundWallet` likewise builds
+  `ADDRESS_V2` credentials carrying the temporary account address;
+  `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes that address and
+  hashes the address-bound preimage. The new optional parameter changes the JVM
+  binary signatures of the `OZSmartAccountConfig` constructor and its generated
+  `copy()`.
 
 ### Removed
 - `EffectsRequestBuilder.forClaimableBalance`. Horizon serves no
