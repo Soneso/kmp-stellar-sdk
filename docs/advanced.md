@@ -66,18 +66,21 @@ val signedEntry = Auth.authorizeEntry(
 
 A Soroban authorization entry carries one of three address credential arms:
 
-- `Address` (the default, `SOROBAN_CREDENTIALS_ADDRESS`) — valid on every network.
-- `AddressV2` (`SOROBAN_CREDENTIALS_ADDRESS_V2`) — the same fields, but the
-  signature is bound to the credential address. Valid only on Protocol 27+.
+- `Address` (`SOROBAN_CREDENTIALS_ADDRESS`) — the legacy arm, valid on every
+  network.
+- `AddressV2` (the default, `SOROBAN_CREDENTIALS_ADDRESS_V2`) — the same
+  fields, but the signature is bound to the credential address. Valid only on
+  Protocol 27+.
 - `AddressWithDelegates` (`SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES`) — adds a
   recursive tree of delegate signatures. Valid only on Protocol 27+.
 
-Emitting a V2 or WITH_DELEGATES entry on a pre-27 network invalidates the
-transaction, so the legacy `Address` arm stays the default. Opt into V2 only
-when you target a Protocol 27+ network.
+`AddressV2` is the default arm: `Auth.authorizeInvocation` builds it and
+simulation requests it. Emitting a V2 or WITH_DELEGATES entry on a pre-27
+network invalidates the transaction, so on a network below Protocol 27 opt out
+to the legacy `Address` arm (`useUpgradedAuth = false`, `authV2 = false`).
 
-**Signing a legacy entry** is unchanged — `Auth.authorizeEntry` signs the
-top-level address, whatever the arm:
+**Signing an entry.** `Auth.authorizeEntry` signs the top-level address,
+whatever the arm:
 
 ```kotlin
 val signed = Auth.authorizeEntry(
@@ -88,40 +91,42 @@ val signed = Auth.authorizeEntry(
 )
 ```
 
-**Opting into V2 via simulation** is a request flag. A Protocol 27+ RPC that
-supports it returns `AddressV2` auth entries in recording mode; sign them the
-same way as legacy entries:
+**V2 via simulation** is the default. The `useUpgradedAuth` key is sent on
+every simulate request with the current value (default `true`); a Protocol 27+
+RPC returns `AddressV2` auth entries in recording mode, signed the same way as
+legacy entries. Pass `false` to request legacy `Address` entries — required on
+a network below Protocol 27, where V2 entries invalidate the transaction:
 
 ```kotlin
 import com.soneso.stellar.sdk.rpc.SorobanServer
 
 val server = SorobanServer("https://soroban-testnet.stellar.org")
-val simulation = server.simulateTransaction(transaction, useUpgradedAuth = true)
-// Or, in one step:
-val prepared = server.prepareTransaction(transaction, useUpgradedAuth = true)
+val simulation = server.simulateTransaction(transaction) // requests AddressV2
+// Legacy opt-out, e.g. for a network below Protocol 27:
+val prepared = server.prepareTransaction(transaction, useUpgradedAuth = false)
 ```
 
-`ContractClient` exposes the same opt-in through `ClientOptions(useUpgradedAuth = true)`.
-An RPC that does not yet support the flag silently ignores it and returns legacy
-entries; detect support by inspecting the returned credential arm, never by
-catching an error.
+`ContractClient` exposes the same flag through `ClientOptions(useUpgradedAuth = false)`.
+An RPC below Protocol 27 silently ignores the flag and returns legacy entries;
+detect support by inspecting the returned credential arm, never by catching an
+error.
 
-**Opting into V2 client-side** works without the request flag (or against an
-RPC that does not support it): simulation then returns legacy `Address` auth
-entries; build the address-bound `AddressV2` arm with `Auth.authorizeInvocation`:
+**Building V2 client-side** works without the request flag, against an RPC
+that returns legacy `Address` entries: `Auth.authorizeInvocation` builds the
+address-bound `AddressV2` arm by default:
 
 ```kotlin
 val signed = Auth.authorizeInvocation(
     signer = aliceKeyPair,
     validUntilLedgerSeq = currentLedger + 100L,
     invocation = invocationFromSimulation,
-    network = Network.PUBLIC,
-    authV2 = true
+    network = Network.PUBLIC
 )
 ```
 
 `AddressV2` is only valid on Protocol 27+ networks; emitting it on an older
-network invalidates the transaction.
+network invalidates the transaction, so pass `authV2 = false` there for the
+legacy arm.
 
 **Building a delegated entry.** Simulation never returns a delegate tree; you
 assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and
@@ -154,10 +159,10 @@ val withDelegateSig = Auth.authorizeEntry(
 // A delegates-only entry whose top-level signature stays void is legitimate.
 ```
 
-**Submitting V2 or delegated entries.** Simulation and the high-level
-`ContractClient` / `AssembledTransaction` only emit legacy `Address` entries, so
-the V2 and delegate arms built above are also submitted at the `SorobanServer`
-level. Attach the signed entries to the operation, then **re-simulate in
+**Submitting delegated or hand-built entries.** The delegate arm built above —
+like any V2 entry assembled client-side from a legacy simulation — is
+submitted at the `SorobanServer` level. Attach the signed entries to the
+operation, then **re-simulate in
 enforcing mode** before submitting: when the authorizing address is a contract
 account, its `__check_auth` runs only in the enforcing pass, and the storage it
 reads (plus any delegate account entries) must be in the footprint.
@@ -473,7 +478,8 @@ suspend fun resolveExternalRef() {
 ```
 
 `getExternalRefWasmHash` returns the 32-byte WASM hash. It throws
-`IllegalArgumentException` when the reference's owner is not a contract address, and
+`IllegalArgumentException` when the reference's owner is not a contract address —
+only a contract can hold the executable tag entry, so no request is issued — and
 `IllegalStateException` when the owner has no entry under the tag, the entry is not a
 contract data entry, or the value does not hold a 32-byte hash. The owner contract is
 read, never invoked.
@@ -507,10 +513,19 @@ suspend fun deployFromExternalRef(keyPair: KeyPair) {
 ```
 
 `constructorArgs` (a `List<SCValXdr>`, as for `deployFromWasmId`) and `salt` are
-optional. The underlying create operation can also be built directly with
-`InvokeHostFunctionOperation.createContractFromExternalRef`, next to `createContract`.
-Both entry points also take the tag as `ByteArray` for tags that are not text; the
-String form encodes as UTF-8.
+optional. The deployment operation always carries the `CREATE_CONTRACT_V2` arm with
+the constructor arguments as the constructor vector, an empty vector when none are
+given — as every `ContractClient` deployment path does (`deploy`,
+`deployFromWasmId`, `deployFromExternalRef`). The underlying create operation can
+also be built directly with
+`InvokeHostFunctionOperation.createContractFromExternalRef`, next to `createContract`;
+these low-level builders emit plain `CREATE_CONTRACT` when no constructor arguments
+are given and `CREATE_CONTRACT_V2` otherwise. Both entry points also take the tag as
+`ByteArray` for tags that are not text; the String form encodes as UTF-8. Both
+`deployFromExternalRef` and `createContractFromExternalRef` throw
+`IllegalArgumentException` before anything is built or requested when
+`executableOwner` is not a contract address — only a contract can hold the
+executable tag entry.
 
 #### Deriving a Contract Id Before Deploying
 
@@ -1128,7 +1143,8 @@ suspend fun authorizeCustomInvocation(
         validUntilLedgerSeq = currentLedger + 100000L,
         invocation = invocation,
         network = Network.PUBLIC
-        // authV2 = true emits ADDRESS_V2 credentials (Protocol 27+ networks only).
+        // Builds ADDRESS_V2 credentials by default; pass authV2 = false for the
+        // legacy ADDRESS arm, required on networks below Protocol 27.
     )
 }
 ```

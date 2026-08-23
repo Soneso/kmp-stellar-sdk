@@ -124,10 +124,17 @@ val client = ContractClient.deployFromExternalRef(
 )
 ```
 
+The `ContractClient` deployment paths (`deploy`, `deployFromWasmId`,
+`deployFromExternalRef`) always submit the `CREATE_CONTRACT_V2` host function with
+the constructor vector, empty when no args are given.
 `InvokeHostFunctionOperation.createContractFromExternalRef(executableOwner: Address,
 tag: String, address: Address, constructorArgs: List<SCValXdr>? = null, salt:
 ByteArray? = null)` builds the underlying create operation directly, next to
-`createContract`. Both it and `deployFromExternalRef` also take the tag as
+`createContract`; these low-level builders emit plain `CREATE_CONTRACT` when no
+constructor args are given and `CREATE_CONTRACT_V2` otherwise, and both
+`createContractFromExternalRef` overloads throw `IllegalArgumentException` before
+anything is built when `executableOwner` is not a contract address (only a contract
+can hold the executable tag entry). Both entry points also take the tag as
 `ByteArray` for tags that are not text; the String overloads encode as UTF-8.
 
 `Address.deriveContractId(deployer: Address, salt: ByteArray, network: Network)`
@@ -322,16 +329,18 @@ swapTx.signAuthEntries(
 ```
 
 **Protocol 27 auth arms (CAP-71).** Address credentials use one of three arms:
-legacy `Address` (default, every network), `AddressV2`, or `AddressWithDelegates`
-(V2/delegates require Protocol 27+; emitting them pre-27 invalidates the tx).
-By default, simulation and the high-level
-`ContractClient`/`AssembledTransaction` produce the legacy `Address` arm.
-Request V2 from a supporting Protocol 27+ RPC (stellar-rpc v27.1.0+) with
-`simulateTransaction(tx, useUpgradedAuth = true)` /
-`ClientOptions(useUpgradedAuth = true)` — RPCs without support silently ignore
-the flag and return legacy entries — or build V2/delegate entries client-side
-with the low-level `Auth` helpers and submit via `SorobanServer`. Emit `AddressV2`
-with `Auth.authorizeInvocation(..., authV2 = true)`. Build a delegate tree with
+`AddressV2` (the default), legacy `Address` (valid on every network), or
+`AddressWithDelegates` (V2/delegates require Protocol 27+; emitting them pre-27
+invalidates the tx). Simulation and the high-level
+`ContractClient`/`AssembledTransaction` request V2 by default: the
+`useUpgradedAuth` key is sent on every simulate request (default `true`), and a
+Protocol 27+ RPC (stellar-rpc v27.1.0+) returns `AddressV2` entries in recording
+modes; pre-27 RPCs silently ignore the flag and return legacy entries.
+`Auth.authorizeInvocation` builds `AddressV2` by default. On a network below
+Protocol 27 opt out to the legacy arm: `simulateTransaction(tx, useUpgradedAuth = false)` /
+`ClientOptions(useUpgradedAuth = false)` / `Auth.authorizeInvocation(..., authV2 = false)`.
+Delegate entries are always built client-side with the low-level `Auth` helpers
+and submitted via `SorobanServer`. Build a delegate tree with
 `Auth.attachDelegates(entry, validUntilLedgerSeq, listOf(DelegateDescriptor(addr)))`,
 then sign each node via `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`
 (a delegates-only entry keeps a void top-level signature). `needsNonInvokerSigningBy()`

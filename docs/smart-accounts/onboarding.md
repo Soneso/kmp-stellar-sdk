@@ -102,6 +102,8 @@ Each context rule stores:
 
 When a transaction requires authorization, the signature authorizes against one specific context rule, chosen on the client side and bound into the signed payload. A rule is eligible when it matches the operation's context type — either a rule for that specific context (e.g. `CallContract("C...")`) or a Default rule, which matches any operation. The SDK selects an eligible rule automatically based on the operation and the selected signers; the contract then validates exactly that rule. An expired rule fails validation.
 
+Because a `CreateContract` rule is identified by a 32-byte WASM hash only, automatic rule selection throws a `ValidationException` for a create-contract operation whose executable is a CAP-85 external reference or a Stellar Asset Contract — neither executable carries a WASM hash to match. Authorize such deployments by supplying explicit rule IDs through the `resolveContextRuleIds` callback (see the [API reference](api-reference.md#resolvecontextruleids)).
+
 SDK methods:
 ```kotlin
 // Add a rule for a specific contract.

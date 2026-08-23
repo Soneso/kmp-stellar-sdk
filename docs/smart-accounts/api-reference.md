@@ -2118,6 +2118,8 @@ ContextRuleType.CallContract("CBCD1234...")
 ContextRuleType.CreateContract(wasmHashBytes)
 ```
 
+The on-chain rule schema identifies a `CreateContract` rule by a 32-byte WASM hash only. Automatic context-rule resolution therefore throws a `ValidationException` for a create-contract invocation whose executable is a CAP-85 external reference or a Stellar Asset Contract — neither executable carries a WASM hash to match. Authorize such deployments by supplying explicit rule IDs through the [`resolveContextRuleIds`](#resolvecontextruleids) callback instead of relying on automatic resolution.
+
 ---
 
 ## Builder Helpers

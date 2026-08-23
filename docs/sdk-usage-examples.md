@@ -1322,7 +1322,7 @@ Authorization entries provide cryptographic proof of consent for contract invoca
 
 For complete authorization workflows (multi-signature, atomic swaps), see the [Advanced Contract Control (buildInvoke)](#advanced-contract-control-buildinvoke) section which demonstrates `AssembledTransaction.signAuthEntries()` usage.
 
-> Authorization credentials have three address arms: the legacy `ADDRESS` (the default, valid on every network) and the Protocol 27+ `ADDRESS_V2` and `ADDRESS_WITH_DELEGATES` (CAP-71). Signing a legacy entry is unchanged; opt into V2 with `simulateTransaction(tx, useUpgradedAuth = true)` or `ClientOptions(useUpgradedAuth = true)` (or build it client-side with `Auth.authorizeInvocation(..., authV2 = true)`), and build delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`. See [Advanced SDK Usage](advanced.md) for the delegate and multi-party signing flows.
+> Authorization credentials have three address arms: `ADDRESS_V2` (the default, Protocol 27+, CAP-71), the legacy `ADDRESS` (valid on every network), and `ADDRESS_WITH_DELEGATES` (Protocol 27+, CAP-71). `Auth.authorizeInvocation` builds `ADDRESS_V2` by default and simulation requests it. On a network below Protocol 27, V2 entries invalidate the transaction, so request the legacy arm with `simulateTransaction(tx, useUpgradedAuth = false)` or `ClientOptions(useUpgradedAuth = false)` and build it with `Auth.authorizeInvocation(..., authV2 = false)`. Signing is the same whatever the arm; build delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`. See [Advanced SDK Usage](advanced.md) for the delegate and multi-party signing flows.
 
 ```kotlin
 // Example 1: Sign a single authorization entry

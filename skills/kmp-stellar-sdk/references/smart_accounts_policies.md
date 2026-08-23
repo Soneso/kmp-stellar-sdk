@@ -970,6 +970,8 @@ If the automatic resolver cannot find a unique rule, it throws `ValidationExcept
 - `"Selected signers match multiple context rules: 1, 3, ..."` — use `resolveContextRuleIds` to disambiguate.
 - `"No context rule contains all selected signers."` — the selected signer set crosses rules; either restrict the selection to one rule's signers or pass `resolveContextRuleIds`.
 
+Before matching, the automatic resolver also throws `ValidationException` for a create-contract auth entry whose executable is a CAP-85 external reference or a Stellar Asset Contract (`"CreateContract invocation references ..."`): a `CreateContract` rule is identified by a 32-byte WASM hash only, and neither executable carries one. Such deployments always need explicit rule IDs via `resolveContextRuleIds`.
+
 ### External wallet requirements
 
 For `SelectedSigner.Ed25519` signers, register a signing source via `kit.externalSigners.addEd25519FromRawKey(...)` or `config.externalEd25519Adapter` — see [smart_accounts.md](./smart_accounts.md) External Signer Manager.

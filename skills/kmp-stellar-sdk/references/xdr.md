@@ -425,8 +425,9 @@ val signedBase64: String = signedEntry.toXdrBase64()
 
 **Credential arms (`SorobanCredentialsXdr`).** The credentials are a sealed
 union over four arms: `Void` (source account, no signature), `Address`
-(legacy `SOROBAN_CREDENTIALS_ADDRESS`, the default), `AddressV2`
-(`SOROBAN_CREDENTIALS_ADDRESS_V2`), and `AddressWithDelegates`
+(legacy `SOROBAN_CREDENTIALS_ADDRESS`), `AddressV2`
+(`SOROBAN_CREDENTIALS_ADDRESS_V2`, the arm `Auth.authorizeInvocation` builds
+by default), and `AddressWithDelegates`
 (`SOROBAN_CREDENTIALS_ADDRESS_WITH_DELEGATES`, wrapping
 `SorobanAddressCredentialsWithDelegatesXdr` with a recursive
 `SorobanDelegateSignatureXdr` tree). The V2 and WITH_DELEGATES arms (CAP-71) are
