@@ -62,15 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returned client is ready to invoke, the same flow `deployFromWasmId` uses.
   Nothing is installed as part of the deployment, and the one-step
   `deploy(wasmBytes)` has no external reference counterpart, because there is
-  nothing to upload. Without constructor arguments the operation carries the
-  `CREATE_CONTRACT` arm, with them `CREATE_CONTRACT_V2`. The tag parameter is
-  a `ByteArray` carried byte for byte or a `String` encoded as UTF-8, and one
-  tag value feeds both the resolution and the built operation, so the entry
-  that resolved is the entry the deployment names on-chain.
+  nothing to upload. The operation always carries the `CREATE_CONTRACT_V2` arm
+  with the constructor arguments, an empty vector when none are given. The tag
+  parameter is a `ByteArray` carried byte for byte or a `String` encoded as
+  UTF-8, and one tag value feeds both the resolution and the built operation,
+  so the entry that resolved is the entry the deployment names on-chain.
 - `InvokeHostFunctionOperation.createContractFromExternalRef` builds the
   underlying create operation directly, next to `createContract`, with the same
   argument shape and internal `CREATE_CONTRACT`/`CREATE_CONTRACT_V2` branch.
-  The tag parameter takes the raw bytes or a `String` encoded as UTF-8.
+  The tag parameter takes the raw bytes or a `String` encoded as UTF-8. An
+  `executableOwner` that is not a contract address raises
+  `IllegalArgumentException`; only a contract can hold the executable tag
+  entry.
 - `Address.deriveContractId(deployer, salt, network)` returns the contract id
   ("C...") a deployment by the given deployer with the given salt creates on
   the given network. The id derives from the deployer, the salt and the network
@@ -111,6 +114,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not change. Code written against the `SCStringXdr` shape of the two tag
   positions needs the `ByteArray` shape, and `==` on these two positions
   compares the tag by array identity, as on the other array-backed XDR types.
+- `ContractClient` deployments always carry the `CREATE_CONTRACT_V2` arm with
+  the constructor arguments, an empty vector when none are given; `deploy` and
+  `deployFromWasmId` carried the plain `CREATE_CONTRACT` arm before when no
+  constructor arguments were given. The plain form stays available through
+  `InvokeHostFunctionOperation.createContract` and
+  `InvokeHostFunctionOperation.createContractFromExternalRef`.
 - `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and
   `Sponsorship.ClaimableBalance` take a balance id in any spelling
   `ClaimableBalanceId` accepts, judge it when the operation is constructed, and

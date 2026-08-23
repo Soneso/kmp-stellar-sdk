@@ -277,7 +277,7 @@ class ContractClientExternalRefDeployTest {
     }
 
     @Test
-    fun testDeployWithoutConstructorArgsUsesCreateContract() = runTest {
+    fun testDeployWithoutConstructorArgsUsesCreateContractV2WithEmptyVector() = runTest {
         val signer = KeyPair.random()
         val source = signer.getAccountId()
         val captured = mutableListOf<String>()
@@ -297,8 +297,11 @@ class ContractClientExternalRefDeployTest {
 
         assertEquals(createdContractId, client.contractId)
 
+        // The high-level deploy always emits the CREATE_CONTRACT_V2 arm; with no
+        // constructor arguments it carries an empty vector.
         val hostFunction = submittedHostFunction(captured)
-        assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+        assertIs<HostFunctionXdr.CreateContractV2>(hostFunction)
+        assertTrue(hostFunction.value.constructorArgs.isEmpty())
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
         assertEquals(ownerContractId, Address.fromSCAddress(executable.value.executableOwner).getEncodedAddress())
@@ -352,7 +355,7 @@ class ContractClientExternalRefDeployTest {
         )
 
         val hostFunction = submittedHostFunction(captured)
-        assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+        assertIs<HostFunctionXdr.CreateContractV2>(hostFunction)
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.ExternalRef>(executable)
         assertTrue(
@@ -563,9 +566,12 @@ class ContractClientExternalRefDeployTest {
 
         assertEquals(createdContractId, contractId)
         // The wasm-hash deploy path submits through the same helper as the
-        // external-ref path; its envelope carries the wasm executable arm.
+        // external-ref path; its envelope carries the wasm executable arm, and
+        // like every high-level deployment it emits CREATE_CONTRACT_V2 with an
+        // empty constructor vector when no arguments are given.
         val hostFunction = submittedHostFunction(captured)
-        assertIs<HostFunctionXdr.CreateContract>(hostFunction)
+        assertIs<HostFunctionXdr.CreateContractV2>(hostFunction)
+        assertTrue(hostFunction.value.constructorArgs.isEmpty())
         val executable = hostFunction.value.executable
         assertIs<com.soneso.stellar.sdk.xdr.ContractExecutableXdr.WasmHash>(executable)
         assertTrue(executable.value.value.contentEquals(wasmHashBytes))
@@ -674,6 +680,61 @@ class ContractClientExternalRefDeployTest {
             }
             assertTrue(e.message!!.contains("Salt must be 32 bytes, got $length"),
                 "unexpected message: ${e.message}")
+        }
+    }
+
+    /**
+     * One address of every [Address.AddressType] arm other than CONTRACT. The
+     * assertion pins the list to the enum, so a new arm fails here until it is
+     * covered.
+     */
+    private fun nonContractOwners(): List<Address> {
+        val owners = listOf(
+            Address(MOCK_RPC_SOURCE_ACCOUNT),
+            Address.fromMuxedAccount(ByteArray(40) { 0x22 }),
+            Address.fromClaimableBalance(ByteArray(32) { 0x33 }),
+            Address.fromLiquidityPool(ByteArray(32) { 0x44 })
+        )
+        assertEquals(
+            Address.AddressType.entries.filter { it != Address.AddressType.CONTRACT },
+            owners.map { it.addressType }
+        )
+        return owners
+    }
+
+    @Test
+    fun testBuilderRejectsNonContractOwnerWithStringTag() {
+        for (owner in nonContractOwners()) {
+            val e = assertFailsWith<IllegalArgumentException> {
+                InvokeHostFunctionOperation.createContractFromExternalRef(
+                    executableOwner = owner,
+                    tag = executableTag,
+                    address = Address(MOCK_RPC_SOURCE_ACCOUNT),
+                    salt = fixedSalt
+                )
+            }
+            assertTrue(
+                e.message!!.contains("only a contract can hold the executable tag entry"),
+                "unexpected message for ${owner.addressType}: ${e.message}"
+            )
+        }
+    }
+
+    @Test
+    fun testBuilderRejectsNonContractOwnerWithByteArrayTag() {
+        for (owner in nonContractOwners()) {
+            val e = assertFailsWith<IllegalArgumentException> {
+                InvokeHostFunctionOperation.createContractFromExternalRef(
+                    executableOwner = owner,
+                    tag = executableTag.encodeToByteArray(),
+                    address = Address(MOCK_RPC_SOURCE_ACCOUNT),
+                    salt = fixedSalt
+                )
+            }
+            assertTrue(
+                e.message!!.contains("only a contract can hold the executable tag entry"),
+                "unexpected message for ${owner.addressType}: ${e.message}"
+            )
         }
     }
 

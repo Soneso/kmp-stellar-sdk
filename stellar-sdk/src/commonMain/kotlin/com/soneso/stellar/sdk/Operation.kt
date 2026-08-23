@@ -1728,7 +1728,8 @@ data class InvokeHostFunctionOperation(
          * @param address The deployer address (account or contract)
          * @param constructorArgs Optional arguments passed to the contract constructor
          * @param salt Optional 32 byte salt for contract id generation; random if not provided
-         * @throws IllegalArgumentException if a provided salt is not exactly 32 bytes
+         * @throws IllegalArgumentException if [executableOwner] is not a contract
+         * address, or if a provided salt is not exactly 32 bytes
          */
         fun createContractFromExternalRef(
             executableOwner: Address,
@@ -1761,7 +1762,8 @@ data class InvokeHostFunctionOperation(
          * @param address The deployer address (account or contract)
          * @param constructorArgs Optional arguments passed to the contract constructor
          * @param salt Optional 32 byte salt for contract id generation; random if not provided
-         * @throws IllegalArgumentException if a provided salt is not exactly 32 bytes
+         * @throws IllegalArgumentException if [executableOwner] is not a contract
+         * address, or if a provided salt is not exactly 32 bytes
          */
         fun createContractFromExternalRef(
             executableOwner: Address,
@@ -1770,6 +1772,11 @@ data class InvokeHostFunctionOperation(
             constructorArgs: List<SCValXdr>? = null,
             salt: ByteArray? = null
         ): InvokeHostFunctionOperation {
+            require(executableOwner.addressType == Address.AddressType.CONTRACT) {
+                "External reference owner is not a contract address; " +
+                    "only a contract can hold the executable tag entry"
+            }
+
             // The salt determines the deployed contract ID, so it must come from a CSPRNG
             val actualSalt = salt ?: secureRandomBytes(32)
 
