@@ -758,6 +758,11 @@ class ContractClient private constructor(
          * 3. Deploy contract with optional constructor
          * 4. Return ready-to-use client
          *
+         * The deployment operation always carries the CREATE_CONTRACT_V2 arm with
+         * the constructor arguments, an empty vector when none are given. The plain
+         * CREATE_CONTRACT form stays available through
+         * [InvokeHostFunctionOperation.createContract].
+         *
          * For advanced scenarios requiring WASM reuse, see [install] and [deployFromWasmId].
          *
          * @param wasmBytes The contract WASM code
@@ -887,6 +892,11 @@ class ContractClient private constructor(
          *
          * Most developers should use the one-step [deploy] method instead.
          *
+         * The deployment operation always carries the CREATE_CONTRACT_V2 arm with
+         * [constructorArgs] as the constructor vector, an empty vector when none
+         * are given. The plain CREATE_CONTRACT form stays available through
+         * [InvokeHostFunctionOperation.createContract].
+         *
          * @param wasmId WASM ID (hex string) from [install]
          * @param constructorArgs Constructor arguments as List<SCValXdr> (XDR)
          * @param source Source account
@@ -984,6 +994,11 @@ class ContractClient private constructor(
          * instead of on-chain. The contract spec is loaded from the resolved WASM
          * before submission, like [deployFromWasmId].
          *
+         * The deployment operation always carries the CREATE_CONTRACT_V2 arm with
+         * [constructorArgs] as the constructor vector, an empty vector when none
+         * are given. The plain CREATE_CONTRACT form stays available through
+         * [InvokeHostFunctionOperation.createContractFromExternalRef].
+         *
          * The tag bytes put on the wire are the UTF-8 encoding of [tag]; the
          * ByteArray overload carries arbitrary tag bytes.
          *
@@ -1040,6 +1055,11 @@ class ContractClient private constructor(
          * before the transaction is built, so an unresolvable reference fails here
          * instead of on-chain. The contract spec is loaded from the resolved WASM
          * before submission, like [deployFromWasmId].
+         *
+         * The deployment operation always carries the CREATE_CONTRACT_V2 arm with
+         * [constructorArgs] as the constructor vector, an empty vector when none
+         * are given. The plain CREATE_CONTRACT form stays available through
+         * [InvokeHostFunctionOperation.createContractFromExternalRef].
          *
          * The one [tag] value feeds both the resolution and the built operation, so
          * the entry the deployment names on-chain is the entry that resolved: the
@@ -1137,8 +1157,8 @@ class ContractClient private constructor(
                 // Resolve the reference before building the transaction. A non-contract
                 // owner raises IllegalArgumentException before any request; a tag entry
                 // failure raises IllegalStateException naming the owner and the tag.
-                // The operation below reads its tag back out of this reference, so the
-                // resolved entry and the deployed executable cannot diverge.
+                // The operation below carries this same reference as its executable, so
+                // the resolved entry and the deployed executable cannot diverge.
                 val ref = ContractExecutableExternalRefXdr(
                     executableOwner = owner.toSCAddress(),
                     tag = tag
@@ -1161,12 +1181,11 @@ class ContractClient private constructor(
                     null
                 }
 
-                val operation = InvokeHostFunctionOperation.createContractFromExternalRef(
-                    executableOwner = owner,
-                    tag = ref.tag,
-                    address = Address(source),
-                    constructorArgs = constructorArgs,
-                    salt = salt
+                val operation = createContractV2Operation(
+                    executable = ContractExecutableXdr.ExternalRef(ref),
+                    source = source,
+                    salt = salt,
+                    constructorArgs = constructorArgs
                 )
 
                 val account = rpc.getAccount(source)
@@ -1316,6 +1335,40 @@ class ContractClient private constructor(
         }
 
         /**
+         * Builds the create-contract operation the [ContractClient] deployment
+         * paths submit. The host function always carries the CREATE_CONTRACT_V2
+         * arm with [constructorArgs] as the constructor vector, an empty vector
+         * when there are none. The plain CREATE_CONTRACT form stays available
+         * through [InvokeHostFunctionOperation.createContract] and
+         * [InvokeHostFunctionOperation.createContractFromExternalRef].
+         *
+         * @throws IllegalArgumentException if [salt] is not exactly 32 bytes
+         */
+        private fun createContractV2Operation(
+            executable: ContractExecutableXdr,
+            source: String,
+            salt: ByteArray,
+            constructorArgs: List<SCValXdr>
+        ): InvokeHostFunctionOperation {
+            require(salt.size == 32) { "Salt must be 32 bytes, got ${salt.size}" }
+
+            val preimage = ContractIDPreimageXdr.FromAddress(
+                ContractIDPreimageFromAddressXdr(
+                    address = Address(source).toSCAddress(),
+                    salt = Uint256Xdr(salt)
+                )
+            )
+            val createContractArgs = CreateContractArgsV2Xdr(
+                contractIdPreimage = preimage,
+                executable = executable,
+                constructorArgs = constructorArgs
+            )
+            return InvokeHostFunctionOperation(
+                hostFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
+            )
+        }
+
+        /**
          * Internal helper to deploy contract from WASM hash. The [server]
          * parameter is the seam through which unit tests inject a mocked
          * server; it defaults to a server over [rpcUrl].
@@ -1332,39 +1385,12 @@ class ContractClient private constructor(
         ): String {
             val account = server.getAccount(source)
 
-            val addressObj = Address(source)
-            val scAddress = addressObj.toSCAddress()
-            val saltXdr = Uint256Xdr(salt)
-
-            val preimage = ContractIDPreimageXdr.FromAddress(
-                ContractIDPreimageFromAddressXdr(address = scAddress, salt = saltXdr)
+            val operation = createContractV2Operation(
+                executable = ContractExecutableXdr.WasmHash(HashXdr(wasmHash)),
+                source = source,
+                salt = salt,
+                constructorArgs = constructorParams
             )
-
-            val wasmHashXdr = HashXdr(wasmHash)
-            val executable = ContractExecutableXdr.WasmHash(wasmHashXdr)
-
-            val operation: InvokeHostFunctionOperation
-
-            if (constructorParams.isNotEmpty()) {
-                // Use CreateContractV2 for contracts with constructors
-                val createContractArgs = CreateContractArgsV2Xdr(
-                    contractIdPreimage = preimage,
-                    executable = executable,
-                    constructorArgs = constructorParams
-                )
-
-                val createFunction = HostFunctionXdr.CreateContractV2(createContractArgs)
-                operation = InvokeHostFunctionOperation(hostFunction = createFunction)
-            } else {
-                // Use CreateContract for contracts without constructors
-                val createContractArgs = CreateContractArgsXdr(
-                    contractIdPreimage = preimage,
-                    executable = executable
-                )
-
-                val createFunction = HostFunctionXdr.CreateContract(createContractArgs)
-                operation = InvokeHostFunctionOperation(hostFunction = createFunction)
-            }
 
             return deployOperationInternal(
                 operation = operation,

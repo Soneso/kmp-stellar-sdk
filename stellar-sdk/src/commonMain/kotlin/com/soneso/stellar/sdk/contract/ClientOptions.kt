@@ -32,7 +32,9 @@ import com.soneso.stellar.sdk.Network
  *           write calls are automatically signed and submitted. When false, only simulation
  *           is performed and you can inspect the transaction before submitting manually.
  * @property useUpgradedAuth Whether to request Protocol-27 ADDRESS_V2 auth entries during simulation
- *           (default: false). Ignored by pre-27 RPCs, which return legacy ADDRESS entries.
+ *           (default: true). The flag is sent on every simulate request; an explicit false requests
+ *           legacy ADDRESS entries, required on networks below Protocol 27. RPC servers without
+ *           Protocol 27 support ignore the flag and return legacy entries.
  */
 data class ClientOptions(
     val sourceAccountKeyPair: KeyPair,
@@ -45,5 +47,5 @@ data class ClientOptions(
     val simulate: Boolean = true,
     val restore: Boolean = true,
     val autoSubmit: Boolean = true,
-    val useUpgradedAuth: Boolean = false
+    val useUpgradedAuth: Boolean = true
 )

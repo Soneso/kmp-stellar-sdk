@@ -114,7 +114,7 @@ The demo includes **11 comprehensive features**:
 - **UI**: `ui/screens/DeployContractScreen.kt`
 - **Logic**: `stellar/DeployContract.kt`
 - **Resources**: `resources/wasm/` (3 example WASM files)
-- **Demonstrates**: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`, platform-specific resource loading
+- **Demonstrates**: `ContractClient.deploy()` one-step deployment (WASM upload, contract creation, constructor invocation in a single call), platform-specific resource loading
 
 ### 9. Invoke Hello World Contract
 - **Location**: `shared/src/commonMain/kotlin/com/soneso/demo/`

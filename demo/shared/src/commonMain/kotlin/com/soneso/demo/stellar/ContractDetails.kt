@@ -111,6 +111,14 @@ suspend fun fetchContractDetails(
             message = "Invalid contract ID format: ${e.message}",
             exception = e
         )
+    } catch (e: IllegalStateException) {
+        // The contract instance points at a CAP-85 external reference whose executable
+        // tag entry could not be resolved on the owner contract.
+        ContractDetailsResult.Error(
+            message = "Could not resolve the contract's external reference: " +
+                "${e.message ?: "the executable tag entry is missing or malformed"}",
+            exception = e
+        )
     } catch (e: Exception) {
         // Unexpected errors
         ContractDetailsResult.Error(

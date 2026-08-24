@@ -32,7 +32,9 @@ struct AccountDetailsCard: View {
                     DetailRow(label: "Home Domain", value: homeDomain)
                 }
                 DetailRow(label: "Last Modified Ledger", value: account.lastModifiedLedger.description)
-                DetailRow(label: "Last Modified Time", value: account.lastModifiedTime)
+                if let lastModifiedTime = account.lastModifiedTime {
+                    DetailRow(label: "Last Modified Time", value: lastModifiedTime)
+                }
             }
 
             // Balances

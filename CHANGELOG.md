@@ -62,15 +62,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   returned client is ready to invoke, the same flow `deployFromWasmId` uses.
   Nothing is installed as part of the deployment, and the one-step
   `deploy(wasmBytes)` has no external reference counterpart, because there is
-  nothing to upload. Without constructor arguments the operation carries the
-  `CREATE_CONTRACT` arm, with them `CREATE_CONTRACT_V2`. The tag parameter is
-  a `ByteArray` carried byte for byte or a `String` encoded as UTF-8, and one
-  tag value feeds both the resolution and the built operation, so the entry
-  that resolved is the entry the deployment names on-chain.
+  nothing to upload. The operation always carries the `CREATE_CONTRACT_V2` arm
+  with the constructor arguments, an empty vector when none are given. The tag
+  parameter is a `ByteArray` carried byte for byte or a `String` encoded as
+  UTF-8, and one tag value feeds both the resolution and the built operation,
+  so the entry that resolved is the entry the deployment names on-chain.
 - `InvokeHostFunctionOperation.createContractFromExternalRef` builds the
   underlying create operation directly, next to `createContract`, with the same
   argument shape and internal `CREATE_CONTRACT`/`CREATE_CONTRACT_V2` branch.
-  The tag parameter takes the raw bytes or a `String` encoded as UTF-8.
+  The tag parameter takes the raw bytes or a `String` encoded as UTF-8. An
+  `executableOwner` that is not a contract address raises
+  `IllegalArgumentException`; only a contract can hold the executable tag
+  entry.
 - `Address.deriveContractId(deployer, salt, network)` returns the contract id
   ("C...") a deployment by the given deployer with the given salt creates on
   the given network. The id derives from the deployer, the salt and the network
@@ -78,6 +81,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly 32 bytes raises `IllegalArgumentException`.
 
 ### Changed
+- **Breaking change**: CAP-71 upgraded authorization is the default.
+  `Auth.authorizeInvocation` builds `ADDRESS_V2` credentials unless
+  `authV2 = false` is passed, which builds the legacy `ADDRESS` arm.
+  `useUpgradedAuth` defaults to true on `SimulateTransactionRequest`,
+  `SorobanServer.simulateTransaction`, `SorobanServer.prepareTransaction`,
+  `ClientOptions`, and the `AssembledTransaction` simulation path, and the key
+  is sent on every simulate request with the current value, so an explicit
+  false reaches the server as the legacy opt-out; the key was previously
+  omitted when unset. RPC servers without Protocol 27 support ignore the flag
+  and return legacy entries, which stay valid. Set false on a network below
+  Protocol 27, where `ADDRESS_V2` entries invalidate the transaction.
+  `useUpgradedAuth` is now `Boolean` rather than `Boolean?`, which changes the
+  JVM binary signatures of `SorobanServer.simulateTransaction`,
+  `SorobanServer.prepareTransaction`, and the `SimulateTransactionRequest`
+  constructor and its generated `copy()`. Precompiled JVM consumers and
+  callers passing `null` fail loudly and need updating.
 - `SCValXdr.ExecutableTag` and `ContractExecutableExternalRefXdr.tag` carry the
   CAP-85 executable tag as `ByteArray` rather than as `SCStringXdr`. The XDR
   type is `SCString`, which admits arbitrary bytes, and the ledger matches the
@@ -95,6 +114,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not change. Code written against the `SCStringXdr` shape of the two tag
   positions needs the `ByteArray` shape, and `==` on these two positions
   compares the tag by array identity, as on the other array-backed XDR types.
+- `ContractClient` deployments always carry the `CREATE_CONTRACT_V2` arm with
+  the constructor arguments, an empty vector when none are given; `deploy` and
+  `deployFromWasmId` carried the plain `CREATE_CONTRACT` arm before when no
+  constructor arguments were given. The plain form stays available through
+  `InvokeHostFunctionOperation.createContract` and
+  `InvokeHostFunctionOperation.createContractFromExternalRef`.
 - `ClaimClaimableBalanceOperation`, `ClawbackClaimableBalanceOperation` and
   `Sponsorship.ClaimableBalance` take a balance id in any spelling
   `ClaimableBalanceId` accepts, judge it when the operation is constructed, and
@@ -115,6 +140,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `actual` declarations the common tests need. It did not compile before. The
   variant runs on JUnit 5, as the JVM target does, and
   `-PexcludeIntegrationTests` reaches it too.
+- OZ smart-account delegated external-wallet auth entries carry `ADDRESS_V2`
+  credentials by default, binding the wallet address into the signed preimage
+  (`ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS`). The new
+  `OZSmartAccountConfig.useUpgradedAuthForWalletSigners` opts back to the legacy
+  `ADDRESS` arm for wallet software that cannot sign the address-bound preimage
+  type. The relayer source-account conversion in `fundWallet` likewise builds
+  `ADDRESS_V2` credentials carrying the temporary account address;
+  `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes that address and
+  hashes the address-bound preimage. The new optional parameter changes the JVM
+  binary signatures of the `OZSmartAccountConfig` constructor and its generated
+  `copy()`.
+- `OZSmartAccountConfig.useUpgradedAuth` (default true) governs the credential arm
+  of the OZ kit's internal simulations and of the `fundWallet` source-account
+  conversion. Both asked for `ADDRESS_V2` unconditionally. Set the flag to false and
+  the kit requests legacy entries from simulation and converts funding credentials to
+  the legacy `ADDRESS` arm, for relayer services that cannot parse protocol-27 auth
+  XDR. `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes the same flag and
+  hashes the preimage that arm defines. The new optional parameter again changes the
+  JVM binary signatures of the `OZSmartAccountConfig` constructor and its generated
+  `copy()`.
 
 ### Removed
 - `EffectsRequestBuilder.forClaimableBalance`. Horizon serves no

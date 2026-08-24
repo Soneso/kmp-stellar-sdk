@@ -125,10 +125,13 @@ class TransferScreen : Screen {
             DemoConfig.DEMO_TOKEN_DECIMALS
         }
 
-        // Validation
-        val recipientError = validateRecipient(recipient)
+        // Validation. The recipient field is trimmed once so validation and the submitted
+        // transfer operate on the same string.
+        val trimmedRecipient = recipient.trim()
+
+        val recipientError = validateRecipient(trimmedRecipient)
         val amountError = validateAmount(amount)
-        val isFormValid = recipient.isNotBlank() &&
+        val isFormValid = trimmedRecipient.isNotBlank() &&
             amount.isNotBlank() &&
             recipientError == null &&
             amountError == null &&
@@ -322,9 +325,9 @@ class TransferScreen : Screen {
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading && txHash == null,
                     singleLine = true,
-                    isError = recipient.isNotBlank() && recipientError != null,
+                    isError = trimmedRecipient.isNotBlank() && recipientError != null,
                     supportingText = {
-                        if (recipient.isNotBlank() && recipientError != null) {
+                        if (trimmedRecipient.isNotBlank() && recipientError != null) {
                             Text(recipientError)
                         } else {
                             Text("Stellar account (G...) or contract (C...) address")
@@ -387,12 +390,12 @@ class TransferScreen : Screen {
 
                                     try {
                                         ActivityLogState.info(
-                                            "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
+                                            "Transferring $amount $tokenLabel to ${trimmedRecipient.take(8)}..."
                                         )
 
                                         val result = transfer(
                                             tokenContract = tokenContract,
-                                            recipient = recipient,
+                                            recipient = trimmedRecipient,
                                             amount = amount,
                                             decimals = tokenDecimals
                                         )
@@ -500,7 +503,7 @@ class TransferScreen : Screen {
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Text(
-                                    text = recipient,
+                                    text = trimmedRecipient,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontFamily = FontFamily.Monospace,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -587,12 +590,12 @@ class TransferScreen : Screen {
                         try {
                             if (isSinglePasskeyTransfer(selectedSigners)) {
                                 ActivityLogState.info(
-                                    "Transferring $amount $tokenLabel to ${recipient.take(8)}..."
+                                    "Transferring $amount $tokenLabel to ${trimmedRecipient.take(8)}..."
                                 )
 
                                 val result = transfer(
                                     tokenContract = tokenContract,
-                                    recipient = recipient,
+                                    recipient = trimmedRecipient,
                                     amount = amount,
                                     decimals = tokenDecimals
                                 )
@@ -606,13 +609,13 @@ class TransferScreen : Screen {
                                 val selected = buildSelectedSigners(selectedSigners)
 
                                 ActivityLogState.info(
-                                    "Multi-signer transfer: $amount $tokenLabel to ${recipient.take(8)}... " +
+                                    "Multi-signer transfer: $amount $tokenLabel to ${trimmedRecipient.take(8)}... " +
                                         "(${selected.size} signer(s))"
                                 )
 
                                 val result = multiSignerTransferWithEd25519(
                                     tokenContract = tokenContract,
-                                    recipient = recipient,
+                                    recipient = trimmedRecipient,
                                     amount = amount,
                                     decimals = tokenDecimals,
                                     selectedSigners = selected,

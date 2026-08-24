@@ -426,7 +426,7 @@ class OZTransactionOperations internal constructor(
      *
      * ## Relayer Mode Selection
      *
-     * - **Mode 1**: Used when auth entries contain only Address credentials.
+     * - **Mode 1**: Used when auth entries contain only address-bearing credentials.
      *   Submits host function + signed auth entries via `relayerClient.send()`.
      *
      * - **Mode 2**: Used when any auth entry has source_account (Void) credentials.
@@ -488,7 +488,10 @@ class OZTransactionOperations internal constructor(
             .build()
 
         // STEP 4: Simulate transaction
-        val simulation = kit.sorobanServer.simulateTransaction(transaction)
+        val simulation = kit.sorobanServer.simulateTransaction(
+            transaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
 
         // STEP 5: Check for simulation errors
         if (simulation.error != null) {
@@ -656,7 +659,10 @@ class OZTransactionOperations internal constructor(
             .build()
 
         // STEP 10: Re-simulate with signed auth entries to get correct resource fees
-        val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
+        val reSimulation = kit.sorobanServer.simulateTransaction(
+            signedTransaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
 
         if (reSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
@@ -731,7 +737,7 @@ class OZTransactionOperations internal constructor(
      *
      * Creates a temporary keypair, funds it via Friendbot, then transfers the balance
      * (minus reserve) to the smart account contract. Supports relayer fee sponsoring
-     * by converting source_account auth entries to Address credentials.
+     * by converting source_account auth entries to address-bearing credentials.
      *
      * Flow:
      * 1. Generate random temporary keypair
@@ -741,7 +747,7 @@ class OZTransactionOperations internal constructor(
      * 5. Calculate transfer amount (balance - reserve)
      * 6. Build transfer from temp to smart account
      * 7. Simulate to get auth entries
-     * 8. Convert source_account auth entries to Address credentials (for relayer)
+     * 8. Convert source_account auth entries to address-bearing credentials (for relayer)
      * 9. Sign auth entries with temp keypair
      * 10. Re-simulate with signed auth entries
      * 11. Decide fee sponsoring mode and submit
@@ -770,9 +776,12 @@ class OZTransactionOperations internal constructor(
      *
      * ## Source Account Auth Conversion
      *
-     * The funding flow converts source_account (Void) credentials to Address credentials
-     * with a generated nonce. This allows the relayer to substitute its own channel accounts
-     * for fee sponsoring, enabling zero-balance smart accounts to receive their first funds.
+     * The funding flow converts source_account (Void) credentials to address-bearing
+     * credentials carrying the temp account address and a generated nonce. This allows the
+     * relayer to substitute its own channel accounts for fee sponsoring, enabling
+     * zero-balance smart accounts to receive their first funds. The credential arm follows
+     * [OZSmartAccountConfig.useUpgradedAuth]: ADDRESS_V2 by default, or the legacy ADDRESS
+     * arm for relayer services that cannot parse Protocol-27 auth XDR.
      *
      * IMPORTANT: Only works on testnet. Do not use on mainnet.
      *
@@ -799,7 +808,7 @@ class OZTransactionOperations internal constructor(
      * println("Funded directly: $amount XLM")
      * ```
      *
-     * @see convertAndSignAuthEntries for source_account to Address credential conversion
+     * @see convertAndSignAuthEntries for the source_account credential conversion
      */
     suspend fun fundWallet(
         nativeTokenContract: String,
@@ -890,7 +899,10 @@ class OZTransactionOperations internal constructor(
             .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
-        val simulation = kit.sorobanServer.simulateTransaction(transaction)
+        val simulation = kit.sorobanServer.simulateTransaction(
+            transaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
 
         if (simulation.error != null) {
             throw TransactionException.simulationFailed("Failed to simulate funding transfer: ${simulation.error}")
@@ -899,7 +911,7 @@ class OZTransactionOperations internal constructor(
         // Extract auth entries from simulation
         val simulatedAuthEntries = simulation.results?.firstOrNull()?.parseAuth() ?: emptyList()
 
-        // STEP 8: Convert source_account auth entries to Address credentials.
+        // STEP 8: Convert source_account auth entries to address-bearing credentials.
         // This allows the Relayer to use its own channel accounts for fee sponsoring.
         val latestLedger = kit.sorobanServer.getLatestLedger()
         val expirationLedger = latestLedger.sequence.toUInt() + Util.LEDGERS_PER_HOUR.toUInt()
@@ -907,7 +919,8 @@ class OZTransactionOperations internal constructor(
         val signedAuthEntries = convertAndSignAuthEntries(
             authEntries = simulatedAuthEntries,
             tempKeypair = tempKeypair,
-            expirationLedger = expirationLedger
+            expirationLedger = expirationLedger,
+            useUpgradedAuth = kit.config.useUpgradedAuth
         )
 
         // STEP 9: Rebuild transaction with signed auth entries and re-simulate.
@@ -922,7 +935,10 @@ class OZTransactionOperations internal constructor(
             .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
-        val reSimulation = kit.sorobanServer.simulateTransaction(signedTransaction)
+        val reSimulation = kit.sorobanServer.simulateTransaction(
+            signedTransaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
 
         if (reSimulation.error != null) {
             throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
@@ -1019,7 +1035,10 @@ class OZTransactionOperations internal constructor(
             .setTimeout(kit.config.timeoutInSeconds.toLong())
             .build()
 
-        val simulation = kit.sorobanServer.simulateTransaction(transaction)
+        val simulation = kit.sorobanServer.simulateTransaction(
+            transaction,
+            useUpgradedAuth = kit.config.useUpgradedAuth
+        )
 
         if (simulation.error != null) {
             throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
@@ -1037,36 +1056,47 @@ class OZTransactionOperations internal constructor(
     // MARK: - Private Helpers
 
     /**
-     * Converts source_account auth entries to Address credentials and signs them.
+     * Converts source_account auth entries to address-bearing credentials and signs them.
      *
-     * For source_account credentials (Void type), this creates new Address credentials
-     * with a nonce and signature. This allows the Relayer to use its own channel accounts
-     * for fee sponsoring. For Address credentials, signs them with the provided keypair.
+     * For source_account credentials (Void type), this creates new credentials carrying the
+     * temp account address, a nonce, and a signature over the preimage the chosen arm
+     * defines. This allows the Relayer to use its own channel accounts for fee sponsoring.
+     * For address-bearing credentials, signs them with the provided keypair, preserving the
+     * credential arm.
      *
      * @param authEntries The authorization entries to convert and sign
      * @param tempKeypair The keypair to use for signing
      * @param expirationLedger The ledger number at which signatures expire
-     * @return List of signed authorization entries with Address credentials
+     * @param useUpgradedAuth True converts source_account credentials to the ADDRESS_V2 arm
+     *   signed over the address-bound WITH_ADDRESS preimage; false converts them to the legacy
+     *   ADDRESS arm signed over the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage. Entries that
+     *   already carry address credentials keep their own arm either way.
+     * @return List of signed authorization entries with address-bearing credentials
      */
     private suspend fun convertAndSignAuthEntries(
         authEntries: List<SorobanAuthorizationEntryXdr>,
         tempKeypair: KeyPair,
-        expirationLedger: UInt
+        expirationLedger: UInt,
+        useUpgradedAuth: Boolean
     ): List<SorobanAuthorizationEntryXdr> {
         return authEntries.map { entry ->
             val credType = entry.credentials
 
-            // For source_account credentials, convert to Address credentials
+            // For source_account credentials, convert to address-bearing credentials
             if (credType is SorobanCredentialsXdr.Void) {
-                // Generate a nonce for the new Address credential
+                // Generate a nonce for the new credential
                 val nonce = Int64Xdr(generateNonce())
+                val tempAddress = Address(tempKeypair.getAccountId()).toSCAddress()
 
-                // Build auth payload hash
+                // Build the auth payload hash for the arm the credential below carries;
+                // the host reconstructs the preimage from that submitted arm.
                 val payloadHash = SmartAccountAuth.buildSourceAccountAuthPayloadHash(
                     entry = entry,
+                    address = tempAddress,
                     nonce = nonce,
                     expirationLedger = expirationLedger,
-                    networkPassphrase = kit.config.networkPassphrase
+                    networkPassphrase = kit.config.networkPassphrase,
+                    useUpgradedAuth = useUpgradedAuth
                 )
 
                 // Sign with temp keypair
@@ -1081,16 +1111,20 @@ class OZTransactionOperations internal constructor(
                 ))
                 val signatureVecScVal = Scv.toVec(listOf(signatureMapScVal))
 
-                // Create new Address credentials entry to replace source_account
+                // Create the new address-bearing credentials to replace source_account
                 val addressCredentials = SorobanAddressCredentialsXdr(
-                    address = Address(tempKeypair.getAccountId()).toSCAddress(),
+                    address = tempAddress,
                     nonce = nonce,
                     signatureExpirationLedger = Uint32Xdr(expirationLedger),
                     signature = signatureVecScVal
                 )
 
                 SorobanAuthorizationEntryXdr(
-                    credentials = SorobanCredentialsXdr.Address(addressCredentials),
+                    credentials = if (useUpgradedAuth) {
+                        SorobanCredentialsXdr.AddressV2(addressCredentials)
+                    } else {
+                        SorobanCredentialsXdr.Address(addressCredentials)
+                    },
                     rootInvocation = entry.rootInvocation
                 )
             } else {

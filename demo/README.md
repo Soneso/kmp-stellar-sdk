@@ -147,12 +147,12 @@ The demo app includes 11 comprehensive feature demonstrations:
 
 ### 8. Deploy Smart Contract
 - Upload and deploy WASM contracts to testnet
-- One-step deployment with constructor arguments
-- Two-step deployment (install WASM + deploy from WASM ID)
+- One-step deployment: WASM upload, contract creation, and constructor invocation in a single call
+- Optional constructor arguments, converted from Kotlin types by the contract spec
 - Platform-specific WASM file loading
 - Support for 3 demo contracts (hello_world, auth, token)
 - Located in `shared/src/commonMain/resources/wasm/`
-- Demonstrates: `ContractClient.deploy()`, `install()`, `deployFromWasmId()`
+- Demonstrates: `ContractClient.deploy()`
 
 ### 9. Invoke Hello World Contract
 - Invoke deployed smart contracts with the "hello" function

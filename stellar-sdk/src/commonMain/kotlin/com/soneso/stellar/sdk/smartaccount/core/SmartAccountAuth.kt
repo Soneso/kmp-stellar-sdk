@@ -12,15 +12,15 @@ import com.soneso.stellar.sdk.addressCredentials
 import com.soneso.stellar.sdk.withUpdatedAddressCredentials
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
-import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
-import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.SCAddressXdr
+import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAddressCredentialsXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
+import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
-import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
 
@@ -171,41 +171,68 @@ object SmartAccountAuth {
     /**
      * Builds the authorization payload hash for source_account credentials.
      *
-     * This is used when converting source_account credentials to Address credentials,
-     * typically for relayer fee sponsoring. The payload is constructed similarly to
-     * buildAuthPayloadHash but uses the provided nonce and expiration since there are
-     * no existing credentials yet.
+     * This is used when converting source_account (Void) credentials to fresh
+     * address-bearing credentials, typically for relayer fee sponsoring. The payload
+     * uses the provided address, nonce, and expiration since there are no
+     * existing address credentials yet.
      *
-     * The payload is constructed as:
+     * [useUpgradedAuth] selects the credential arm the signature is built for, and with
+     * it the preimage type. The upgraded ADDRESS_V2 arm hashes the address-bound
+     * ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS preimage:
      * ```
-     * HashIdPreimage::SorobanAuthorization {
+     * HashIdPreimage::SorobanAuthorizationWithAddress {
      *   networkId: SHA256(networkPassphrase as UTF-8),
      *   nonce: provided nonce,
      *   signatureExpirationLedger: expirationLedger,
+     *   address: provided address,
      *   invocation: entry.rootInvocation
      * }
      * hash = SHA256(XDR_encode(payload))
      * ```
+     * The legacy ADDRESS arm hashes the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage,
+     * which carries the same fields except the address. [address] is still the address
+     * of the credentials the signature is attached to in both arms; the legacy preimage
+     * simply does not include it. Selection is delegated to [Auth.buildHashIDPreimage].
+     *
+     * The host reconstructs the preimage from the submitted credential arm, so the arm
+     * chosen here must match the arm the signature is attached to.
      *
      * @param entry The authorization entry with source_account credentials
-     * @param nonce The nonce to use for the new Address credentials
+     * @param address The address carried by the new credentials
+     * @param nonce The nonce to use for the new credentials
      * @param expirationLedger The ledger number at which the signature expires
      * @param networkPassphrase The network passphrase
+     * @param useUpgradedAuth True (the default) hashes the ADDRESS_V2 address-bound
+     *   preimage; false hashes the legacy ADDRESS preimage.
      * @return The 32-byte SHA-256 hash of the authorization payload
      * @throws TransactionException.SigningFailed if XDR encoding fails
      */
     suspend fun buildSourceAccountAuthPayloadHash(
         entry: SorobanAuthorizationEntryXdr,
+        address: SCAddressXdr,
         nonce: Int64Xdr,
         expirationLedger: UInt,
-        networkPassphrase: String
+        networkPassphrase: String,
+        useUpgradedAuth: Boolean = true
     ): ByteArray {
-        return hashLegacySourceAccountPreimage(
+        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
+        val addressCredentials = SorobanAddressCredentialsXdr(
+            address = address,
             nonce = nonce,
-            expirationLedger = expirationLedger,
-            invocation = entry.rootInvocation,
-            networkPassphrase = networkPassphrase
+            signatureExpirationLedger = Uint32Xdr(expirationLedger),
+            signature = SCValXdr.Void(SCValTypeXdr.SCV_VOID)
         )
+        val credentials = if (useUpgradedAuth) {
+            SorobanCredentialsXdr.AddressV2(addressCredentials)
+        } else {
+            SorobanCredentialsXdr.Address(addressCredentials)
+        }
+        val preimage = Auth.buildHashIDPreimage(
+            credentials = credentials,
+            networkId = networkId,
+            invocation = entry.rootInvocation
+        )
+        return hashPreimage(preimage)
     }
 
     // ========================================================================
@@ -394,40 +421,6 @@ object SmartAccountAuth {
     // ========================================================================
     // Helper Functions
     // ========================================================================
-
-    /**
-     * Hashes a legacy source-account authorization preimage.
-     *
-     * Constructs the legacy `HashIDPreimage::SorobanAuthorization` from the given
-     * parameters, XDR-encodes it, and returns SHA-256(encoded bytes). This is the
-     * fixed preimage type for source-account funding: a Void credential is converted
-     * to a fresh ADDRESS credential, which is never V2 or WITH_DELEGATES, so the
-     * legacy preimage is always correct here.
-     *
-     * @param nonce The nonce for the fresh address credentials
-     * @param expirationLedger The signature expiration ledger number
-     * @param invocation The root invocation from the authorization entry
-     * @param networkPassphrase The network passphrase
-     * @return The 32-byte SHA-256 hash of the encoded preimage
-     * @throws TransactionException.SigningFailed if XDR encoding fails
-     */
-    private suspend fun hashLegacySourceAccountPreimage(
-        nonce: Int64Xdr,
-        expirationLedger: UInt,
-        invocation: SorobanAuthorizedInvocationXdr,
-        networkPassphrase: String
-    ): ByteArray {
-        val networkId = getSha256Crypto().hash(networkPassphrase.encodeToByteArray())
-
-        val authPreimage = HashIDPreimageSorobanAuthorizationXdr(
-            networkId = HashXdr(networkId),
-            nonce = nonce,
-            signatureExpirationLedger = Uint32Xdr(expirationLedger),
-            invocation = invocation
-        )
-
-        return hashPreimage(HashIDPreimageXdr.SorobanAuthorization(authPreimage))
-    }
 
     /**
      * XDR-encodes [preimage] and returns SHA-256(encoded bytes).

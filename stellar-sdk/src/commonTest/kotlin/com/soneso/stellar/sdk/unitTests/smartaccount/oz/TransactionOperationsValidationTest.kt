@@ -27,6 +27,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilder
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.scval.Scv
@@ -54,6 +55,10 @@ import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationWithAddressXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
+import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
+import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
@@ -67,6 +72,7 @@ import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -144,8 +150,8 @@ import kotlin.test.assertTrue
  * - the funding-transfer simulation failing
  * - the full happy path, asserting the exact funded XLM amount returned
  * - auth-entry preparation for both credential shapes: source_account entries converted to fresh
- *   Address credentials, and existing Address credentials re-signed with their address and nonce
- *   preserved
+ *   ADDRESS_V2 credentials signed over the address-bound preimage, and existing Address
+ *   credentials re-signed with their arm, address and nonce preserved
  * - relayed funding, including a relayer rejection
  *
  * All Soroban RPC traffic is served by a scripted Ktor MockEngine and all storage is in-memory;
@@ -1013,7 +1019,8 @@ class TransactionOperationsValidationTest {
     private fun buildSigningConfig(
         deployer: KeyPair,
         webauthnProvider: WebAuthnProvider?,
-        storage: StorageAdapter
+        storage: StorageAdapter,
+        useUpgradedAuth: Boolean = true
     ): OZSmartAccountConfig = OZSmartAccountConfig(
         rpcUrl = "https://soroban-testnet.stellar.org",
         networkPassphrase = Network.TESTNET.networkPassphrase,
@@ -1021,7 +1028,8 @@ class TransactionOperationsValidationTest {
         webauthnVerifierAddress = validContractAddress,
         deployerKeypair = deployer,
         webauthnProvider = webauthnProvider,
-        storage = storage
+        storage = storage,
+        useUpgradedAuth = useUpgradedAuth
     )
 
     /**
@@ -1043,6 +1051,7 @@ class TransactionOperationsValidationTest {
         connectedCredentialId: String? = credentialId,
         contractId: String = validContractAddress2,
         relayerClient: OZRelayerClient? = null,
+        useUpgradedAuth: Boolean = true,
         onRequest: ((index: Int, body: String) -> Unit)? = null
     ): OZSmartAccountKit {
         val storage = InMemoryStorageAdapter()
@@ -1057,7 +1066,7 @@ class TransactionOperationsValidationTest {
             )
         }
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildSigningConfig(deployer, webauthnProvider, storage),
+            config = buildSigningConfig(deployer, webauthnProvider, storage, useUpgradedAuth),
             sorobanServer = buildScriptedMockServer(responses, trailingResponse, onRequest),
             relayerClient = relayerClient
         )
@@ -1315,6 +1324,18 @@ class TransactionOperationsValidationTest {
     private fun rpcMethodOf(body: String): String =
         Json.parseToJsonElement(body).jsonObject["method"]?.jsonPrimitive?.content ?: ""
 
+    /**
+     * The `useUpgradedAuth` values carried by the `simulateTransaction` requests in [bodies],
+     * in call order. A simulate request without the key reports null, which fails the
+     * assertions below rather than being read as either arm.
+     */
+    private fun simulateUpgradedAuthFlags(bodies: List<String>): List<Boolean?> =
+        bodies.filter { rpcMethodOf(it) == "simulateTransaction" }
+            .map { body ->
+                Json.parseToJsonElement(body).jsonObject["params"]
+                    ?.jsonObject?.get("useUpgradedAuth")?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+            }
+
     // ========================================================================
     // submit() - Passkey Signing of a Matching Auth Entry
     // ========================================================================
@@ -1391,6 +1412,110 @@ class TransactionOperationsValidationTest {
         val submittedEvent = observed.filterIsInstance<SmartAccountEvent.TransactionSubmitted>().single()
         assertEquals(txHash, submittedEvent.hash)
         assertTrue(submittedEvent.success)
+    }
+
+    // ========================================================================
+    // Credential arm of the kit's internal simulations
+    //
+    // config.useUpgradedAuth decides which auth entries the kit asks simulation for. The
+    // contractCall path simulates three times -- the initial recording simulation, the
+    // context-rule count query and the re-simulation over the signed entries -- and all
+    // three must carry the configured arm, since a mixed request set would hand the
+    // signing loop entries of an arm the submission cannot use.
+    // ========================================================================
+
+    @Test
+    fun contractCall_defaultConfig_everySimulationRequestsUpgradedAuth() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val authEntry = buildAuthEntry(validContractAddress2)
+        val simulateAuth = simulateAuthResponseJson(listOf(authEntry.toXdrBase64()), sorobanData)
+        val countZero = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData)
+        val txHash = "d1b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        val requestBodies = mutableListOf<String>()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                latestLedgerResponseJson(latestLedgerSequence),
+                accountJson,
+                countZero,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = passkeyProvider(),
+            withStoredCredential = true,
+            onRequest = { _, body -> requestBodies.add(body) }
+        )
+
+        val result = kit.transactionOperations.contractCall(
+            target = validContractAddress,
+            targetFn = "increment",
+            resolveContextRuleIds = { _, _ -> listOf(0u) }
+        )
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+
+        val flags = simulateUpgradedAuthFlags(requestBodies)
+        assertEquals(3, flags.size, "contractCall must simulate three times")
+        assertEquals(
+            listOf(true, true, true),
+            flags,
+            "Without an opt-out every kit simulation asks for upgraded ADDRESS_V2 entries"
+        )
+    }
+
+    @Test
+    fun contractCall_useUpgradedAuthDisabled_everySimulationRequestsLegacyAuth() = runTest {
+        // config.useUpgradedAuth = false serves relayer services that parse the submitted auth
+        // XDR with a pre-protocol-27 schema: every simulation the kit runs must ask for legacy
+        // entries so no ADDRESS_V2 entry reaches the submission.
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val authEntry = buildAuthEntry(validContractAddress2)
+        val simulateAuth = simulateAuthResponseJson(listOf(authEntry.toXdrBase64()), sorobanData)
+        val countZero = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData)
+        val txHash = "e1b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        val requestBodies = mutableListOf<String>()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                latestLedgerResponseJson(latestLedgerSequence),
+                accountJson,
+                countZero,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = passkeyProvider(),
+            withStoredCredential = true,
+            useUpgradedAuth = false,
+            onRequest = { _, body -> requestBodies.add(body) }
+        )
+
+        val result = kit.transactionOperations.contractCall(
+            target = validContractAddress,
+            targetFn = "increment",
+            resolveContextRuleIds = { _, _ -> listOf(0u) }
+        )
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+
+        val flags = simulateUpgradedAuthFlags(requestBodies)
+        assertEquals(3, flags.size, "contractCall must simulate three times")
+        assertEquals(
+            listOf(false, false, false),
+            flags,
+            "The config opt-out must reach every kit simulation on the wire"
+        )
     }
 
     @Test
@@ -2431,10 +2556,16 @@ class TransactionOperationsValidationTest {
         trailingResponse: String? = null,
         contractId: String = validContractAddress2,
         relayerClient: OZRelayerClient? = null,
+        useUpgradedAuth: Boolean = true,
         onRequest: ((index: Int, body: String) -> Unit)? = null
     ): OZSmartAccountKit {
         val kit = OZSmartAccountKit.createWithServer(
-            config = buildSigningConfig(deployer, webauthnProvider = null, storage = InMemoryStorageAdapter()),
+            config = buildSigningConfig(
+                deployer,
+                webauthnProvider = null,
+                storage = InMemoryStorageAdapter(),
+                useUpgradedAuth = useUpgradedAuth
+            ),
             sorobanServer = buildFundWalletMockServer(responses, trailingResponse, onRequest),
             relayerClient = relayerClient
         )
@@ -2734,7 +2865,7 @@ class TransactionOperationsValidationTest {
         )
         // The temp account is a classic keypair, not the smart account, so the auth entry
         // simulation reports source_account (Void) credentials -- the same shape
-        // convertAndSignAuthEntries() converts to a signed Address credential.
+        // convertAndSignAuthEntries() converts to a signed ADDRESS_V2 credential.
         val transferSimulateJson = simulateAuthResponseJson(
             listOf(sourceAccountAuthEntry().toXdrBase64()),
             sorobanData
@@ -2764,13 +2895,207 @@ class TransactionOperationsValidationTest {
     }
 
     // ========================================================================
-    // fundWallet() - Address-Credential Auth Entries
+    // fundWallet() - Auth-Entry Conversion and Re-Signing
     //
     // The funding simulation normally reports source_account (Void) credentials, which are
-    // converted to fresh Address credentials. An entry that already carries Address credentials
-    // takes the other branch: the credential arm, address and nonce are preserved and only the
-    // expiration and signature are replaced.
+    // converted to fresh ADDRESS_V2 credentials carrying the temp account address and signed
+    // over the address-bound WITH_ADDRESS preimage. An entry that already carries address
+    // credentials takes the other branch: the credential arm, address and nonce are preserved
+    // and only the expiration and signature are replaced.
     // ========================================================================
+
+    @Test
+    fun fundWallet_sourceAccountAuthEntry_convertsToSignedAddressV2Credential() = runTest {
+        FriendBot.httpClientOverride = buildFriendbotSuccessClient()
+        val deployer = KeyPair.random()
+        val tempAccountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(KeyPair.random()).toXdrBase64())
+        val deployerAccountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+
+        val balanceJson = simulateValueResponseJson(
+            Scv.toInt128(BigInteger.fromLong(1_005L * Util.STROOPS_PER_XLM)).toXdrBase64(),
+            sorobanData
+        )
+        val sourceEntry = sourceAccountAuthEntry()
+        val transferSimulateJson = simulateAuthResponseJson(
+            listOf(sourceEntry.toXdrBase64()),
+            sorobanData
+        )
+        val reSimulateJson = simulateAuthResponseJson(emptyList(), sorobanData)
+        val txHash = "41b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        var sendBody: String? = null
+        val kit = createFundWalletKit(
+            deployer = deployer,
+            responses = listOf(
+                tempAccountJson,
+                tempAccountJson,
+                deployerAccountJson,
+                balanceJson,
+                transferSimulateJson,
+                latestLedgerResponseJson(latestLedgerSequence),
+                tempAccountJson,
+                reSimulateJson,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            onRequest = { index, body -> if (index == 8) sendBody = body }
+        )
+
+        assertEquals("1000", kit.transactionOperations.fundWallet(nativeTokenContract = validContractAddress))
+
+        val submitted = submittedAuthEntries(assertNotNull(sendBody)).single()
+        val credentials = assertIs<SorobanCredentialsXdr.AddressV2>(
+            submitted.credentials,
+            "the converted entry must carry ADDRESS_V2 credentials"
+        ).value
+        assertEquals(
+            expirationLedger,
+            credentials.signatureExpirationLedger.value,
+            "the signature expiration is the current ledger plus one hour"
+        )
+
+        val (publicKey, signature) = ed25519SignatureFields(credentials.signature)
+        assertEquals(
+            KeyPair.fromPublicKey(publicKey).getAccountId(),
+            Address.fromSCAddress(credentials.address).toString(),
+            "the credential address must be the temp account that signed the entry"
+        )
+
+        // Ground-truth address-bound preimage, constructed independently of the
+        // SDK's hash helper: networkID, nonce, signatureExpirationLedger, address,
+        // invocation under ENVELOPE_TYPE_SOROBAN_AUTHORIZATION_WITH_ADDRESS.
+        val networkId = getSha256Crypto().hash(Network.TESTNET.networkPassphrase.encodeToByteArray())
+        val preimage = HashIDPreimageXdr.SorobanAuthorizationWithAddress(
+            HashIDPreimageSorobanAuthorizationWithAddressXdr(
+                networkId = HashXdr(networkId),
+                nonce = credentials.nonce,
+                signatureExpirationLedger = credentials.signatureExpirationLedger,
+                address = credentials.address,
+                invocation = sourceEntry.rootInvocation
+            )
+        )
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val payloadHash = getSha256Crypto().hash(writer.toByteArray())
+        assertTrue(
+            KeyPair.fromPublicKey(publicKey).verify(payloadHash, signature),
+            "the signature must verify over the WITH_ADDRESS preimage carrying the temp account address"
+        )
+    }
+
+    @Test
+    fun fundWallet_useUpgradedAuthDisabled_convertsToSignedLegacyAddressCredential() = runTest {
+        // With config.useUpgradedAuth = false the conversion produces the legacy ADDRESS arm,
+        // whose signature covers the ENVELOPE_TYPE_SOROBAN_AUTHORIZATION preimage. The temp
+        // account address still goes into the credential; the legacy preimage just omits it.
+        FriendBot.httpClientOverride = buildFriendbotSuccessClient()
+        val deployer = KeyPair.random()
+        val tempAccountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(KeyPair.random()).toXdrBase64())
+        val deployerAccountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+
+        val balanceJson = simulateValueResponseJson(
+            Scv.toInt128(BigInteger.fromLong(1_005L * Util.STROOPS_PER_XLM)).toXdrBase64(),
+            sorobanData
+        )
+        val sourceEntry = sourceAccountAuthEntry()
+        val transferSimulateJson = simulateAuthResponseJson(
+            listOf(sourceEntry.toXdrBase64()),
+            sorobanData
+        )
+        val reSimulateJson = simulateAuthResponseJson(emptyList(), sorobanData)
+        val txHash = "71b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        var sendBody: String? = null
+        val requestBodies = mutableListOf<String>()
+        val kit = createFundWalletKit(
+            deployer = deployer,
+            responses = listOf(
+                tempAccountJson,
+                tempAccountJson,
+                deployerAccountJson,
+                balanceJson,
+                transferSimulateJson,
+                latestLedgerResponseJson(latestLedgerSequence),
+                tempAccountJson,
+                reSimulateJson,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            useUpgradedAuth = false,
+            onRequest = { index, body ->
+                requestBodies.add(body)
+                if (index == 8) sendBody = body
+            }
+        )
+
+        assertEquals("1000", kit.transactionOperations.fundWallet(nativeTokenContract = validContractAddress))
+
+        assertEquals(
+            listOf(false, false, false),
+            simulateUpgradedAuthFlags(requestBodies),
+            "the balance query, the funding simulation and the re-simulation must all ask for legacy entries"
+        )
+
+        val submitted = submittedAuthEntries(assertNotNull(sendBody)).single()
+        val credentials = assertIs<SorobanCredentialsXdr.Address>(
+            submitted.credentials,
+            "with the opt-out the converted entry must carry the legacy ADDRESS credentials"
+        ).value
+        assertEquals(
+            expirationLedger,
+            credentials.signatureExpirationLedger.value,
+            "the signature expiration is the current ledger plus one hour"
+        )
+
+        val (publicKey, signature) = ed25519SignatureFields(credentials.signature)
+        assertEquals(
+            KeyPair.fromPublicKey(publicKey).getAccountId(),
+            Address.fromSCAddress(credentials.address).toString(),
+            "the credential address must be the temp account that signed the entry"
+        )
+
+        // Ground-truth legacy preimage, constructed independently of the SDK's hash helper:
+        // networkID, nonce, signatureExpirationLedger and invocation under
+        // ENVELOPE_TYPE_SOROBAN_AUTHORIZATION, with no address field.
+        val networkId = getSha256Crypto().hash(Network.TESTNET.networkPassphrase.encodeToByteArray())
+        val preimage = HashIDPreimageXdr.SorobanAuthorization(
+            HashIDPreimageSorobanAuthorizationXdr(
+                networkId = HashXdr(networkId),
+                nonce = credentials.nonce,
+                signatureExpirationLedger = credentials.signatureExpirationLedger,
+                invocation = sourceEntry.rootInvocation
+            )
+        )
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val payloadHash = getSha256Crypto().hash(writer.toByteArray())
+        assertTrue(
+            KeyPair.fromPublicKey(publicKey).verify(payloadHash, signature),
+            "the signature must verify over the legacy SorobanAuthorization preimage"
+        )
+
+        // The address-bound preimage is what the upgraded arm signs; it must not verify here,
+        // so a conversion that ignored the opt-out cannot pass the assertion above by accident.
+        val withAddressWriter = XdrWriter()
+        HashIDPreimageXdr.SorobanAuthorizationWithAddress(
+            HashIDPreimageSorobanAuthorizationWithAddressXdr(
+                networkId = HashXdr(networkId),
+                nonce = credentials.nonce,
+                signatureExpirationLedger = credentials.signatureExpirationLedger,
+                address = credentials.address,
+                invocation = sourceEntry.rootInvocation
+            )
+        ).encode(withAddressWriter)
+        assertFalse(
+            KeyPair.fromPublicKey(publicKey).verify(
+                getSha256Crypto().hash(withAddressWriter.toByteArray()),
+                signature
+            ),
+            "the legacy signature must not cover the address-bound preimage"
+        )
+    }
 
     @Test
     fun fundWallet_addressCredentialAuthEntry_reSignsPreservingAddressAndNonce() = runTest {
@@ -3088,9 +3413,9 @@ class TransactionOperationsValidationTest {
 
     @Test
     fun fundWallet_relayerConfigured_submitsConvertedAuthEntriesThroughRelayer() = runTest {
-        // The funding entries start as source_account credentials and are converted to Address
-        // credentials, so no source_account auth is left and the host-function relayer mode
-        // applies rather than the signed-envelope mode.
+        // The funding entries start as source_account credentials and are converted to
+        // ADDRESS_V2 credentials, so no source_account auth is left and the host-function
+        // relayer mode applies rather than the signed-envelope mode.
         FriendBot.httpClientOverride = buildFriendbotSuccessClient()
         val deployer = KeyPair.random()
         val tempAccountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(KeyPair.random()).toXdrBase64())
@@ -3144,9 +3469,9 @@ class TransactionOperationsValidationTest {
         val relayedEntry = SorobanAuthorizationEntryXdr.fromXdrBase64(
             relayedAuth.single().jsonPrimitive.content
         )
-        assertIs<SorobanCredentialsXdr.Address>(
+        assertIs<SorobanCredentialsXdr.AddressV2>(
             relayedEntry.credentials,
-            "the source_account credential is relayed as a signed Address credential"
+            "the source_account credential is relayed as a signed ADDRESS_V2 credential"
         )
 
         assertTrue(

@@ -1811,7 +1811,10 @@ class OZWalletOperations internal constructor(
 
         // Simulate transaction
         val simulation = try {
-            kit.sorobanServer.simulateTransaction(transaction = transaction)
+            kit.sorobanServer.simulateTransaction(
+                transaction = transaction,
+                useUpgradedAuth = kit.config.useUpgradedAuth
+            )
         } catch (e: Exception) {
             throw TransactionException.simulationFailed(
                 "Failed to simulate deployment transaction: ${e.message}",

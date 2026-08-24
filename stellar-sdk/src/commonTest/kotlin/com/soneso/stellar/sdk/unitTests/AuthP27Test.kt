@@ -927,6 +927,27 @@ class AuthP27Test {
     }
 
     @Test
+    fun testAuthorizeInvocationKeyPairDefaultCreatesAddressV2Arm() = runTest {
+        val signer = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val result = Auth.authorizeInvocation(
+            signer, EXPIRATION, goldenInvocation(), NETWORK
+        )
+        assertTrue(result.credentials is SorobanCredentialsXdr.AddressV2)
+    }
+
+    @Test
+    fun testAuthorizeInvocationCustomSignerDefaultCreatesAddressV2Arm() = runTest {
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val customSigner = Auth.Signer { preimage ->
+            Auth.Signature(keyPair.getAccountId(), keyPair.sign(Util.hash(xdrBytes(preimage))))
+        }
+        val result = Auth.authorizeInvocation(
+            customSigner, keyPair.getAccountId(), EXPIRATION, goldenInvocation(), NETWORK
+        )
+        assertTrue(result.credentials is SorobanCredentialsXdr.AddressV2)
+    }
+
+    @Test
     fun testAuthorizeInvocationV2UsesWithAddressPreimage() = runTest {
         val signer = KeyPair.fromSecretSeed(SIGNER_SEED)
         val result = Auth.authorizeInvocation(

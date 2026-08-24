@@ -607,11 +607,15 @@ class SorobanAtomicSwapIntegrationTest {
         val latestLedgerResponse = sorobanServer.getLatestLedger()
         val signatureExpirationLedger = latestLedgerResponse.sequence + 10
 
-        // Sign authorization entries for both Alice and Bob
+        // Sign authorization entries for both Alice and Bob. The inner address
+        // credentials are read independently of the credential arm, so entries
+        // returned as legacy ADDRESS or as ADDRESS_V2 both reach their signer;
+        // Auth.authorizeEntry stamps the expiration, signs, and writes the
+        // signature back preserving the arm.
         val signedAuthEntries = authEntries.map { authEntry ->
-            val credentials = authEntry.credentials
-            if (credentials is SorobanCredentialsXdr.Address) {
-                val addressAccountId = when (val address = credentials.value.address) {
+            val addressCredentials = authEntry.credentials.addressCredentials()
+            if (addressCredentials != null) {
+                val addressAccountId = when (val address = addressCredentials.address) {
                     is SCAddressXdr.AccountId -> {
                         val accountId = address.value.value
                         KeyPair.fromPublicKey((accountId as PublicKeyXdr.Ed25519).value.value).getAccountId()
@@ -639,7 +643,7 @@ class SorobanAtomicSwapIntegrationTest {
                     else -> authEntry // Shouldn't happen, but return original if address doesn't match
                 }
             } else {
-                authEntry // Return original if not Address credentials
+                authEntry // Source-account (Void) credentials carry no signature
             }
         }
 

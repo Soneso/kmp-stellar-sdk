@@ -1,5 +1,7 @@
 package com.soneso.stellar.sdk.rpc.requests
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -12,9 +14,11 @@ import kotlinx.serialization.Serializable
  * @property transaction Base64-encoded XDR TransactionEnvelope to simulate.
  * @property resourceConfig Optional configuration for resource estimation.
  * @property authMode Authorization mode for simulation. Controls how auth entries are handled.
- * @property useUpgradedAuth When true, requests Protocol-27 ADDRESS_V2 auth entries instead of legacy
- *                  ADDRESS entries in recording modes. RPC servers below Protocol 27 ignore the
- *                  flag and still return legacy ADDRESS entries.
+ * @property useUpgradedAuth When true (the default), requests Protocol-27 ADDRESS_V2 auth entries
+ *                  instead of legacy ADDRESS entries in recording modes. The key is serialized on
+ *                  every request, so an explicit false reaches the server as the legacy opt-out.
+ *                  RPC servers below Protocol 27 ignore the flag and still return legacy ADDRESS
+ *                  entries. A payload without the key deserializes to true.
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference/methods/simulateTransaction">simulateTransaction documentation</a>
  */
@@ -23,7 +27,9 @@ data class SimulateTransactionRequest(
     val transaction: String,
     val resourceConfig: ResourceConfig? = null,
     val authMode: AuthMode? = null,
-    val useUpgradedAuth: Boolean? = null
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+    val useUpgradedAuth: Boolean = true
 ) {
     init {
         require(transaction.isNotBlank()) { "transaction must not be blank" }

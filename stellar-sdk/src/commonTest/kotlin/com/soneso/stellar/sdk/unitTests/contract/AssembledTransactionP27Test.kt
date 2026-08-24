@@ -201,12 +201,8 @@ class AssembledTransactionP27Test {
         return SorobanServer(SERVER_URL, client)
     }
 
-    private fun assembled(
-        server: SorobanServer,
-        signer: KeyPair?,
-        useUpgradedAuth: Boolean = false
-    ): AssembledTransaction<SCValXdr> {
-        val builder = TransactionBuilder(
+    private fun invokeBuilder(): TransactionBuilder =
+        TransactionBuilder(
             sourceAccount = Account(SOURCE_ACCOUNT, SOURCE_SEQ),
             network = NETWORK
         )
@@ -219,12 +215,18 @@ class AssembledTransactionP27Test {
             )
             .setTimeout(300L)
             .setBaseFee(100L)
+
+    private fun assembled(
+        server: SorobanServer,
+        signer: KeyPair?,
+        useUpgradedAuth: Boolean = true
+    ): AssembledTransaction<SCValXdr> {
         return AssembledTransaction(
             server = server,
             submitTimeout = 30,
             transactionSigner = signer,
             parseResultXdrFn = null,
-            transactionBuilder = builder,
+            transactionBuilder = invokeBuilder(),
             useUpgradedAuth = useUpgradedAuth
         )
     }
@@ -235,17 +237,20 @@ class AssembledTransactionP27Test {
     }
 
     // ========================================================================
-    // useUpgradedAuth JSON presence/absence
+    // useUpgradedAuth JSON wire contract: key always present with the current value
     // ========================================================================
 
     @Test
-    fun testUseUpgradedAuthAbsentFromJsonWhenNull() = runTest {
+    fun testUseUpgradedAuthExplicitFalsePresentAsFalse() = runTest {
         var captured: String? = null
         mockServer(listOf(legacyEntry()), onSimulate = { captured = it }).use { server ->
             assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED), useUpgradedAuth = false).simulate(restore = false)
         }
         assertNotNull(captured)
-        assertFalse("useUpgradedAuth" in captured!!, "useUpgradedAuth key must be absent when not requested")
+        assertTrue(
+            "\"useUpgradedAuth\":false" in captured!!.replace(" ", ""),
+            "explicit false must reach the server as the legacy opt-out"
+        )
     }
 
     @Test
@@ -259,7 +264,29 @@ class AssembledTransactionP27Test {
     }
 
     @Test
-    fun testClientOptionsUseUpgradedAuthThreadsThroughBuildInvoke() = runTest {
+    fun testAssembledTransactionDefaultSendsUseUpgradedAuthTrue() = runTest {
+        // No useUpgradedAuth argument anywhere: the constructor default applies.
+        var captured: String? = null
+        mockServer(listOf(v2Entry()), onSimulate = { captured = it }).use { server ->
+            AssembledTransaction<SCValXdr>(
+                server = server,
+                submitTimeout = 30,
+                transactionSigner = KeyPair.fromSecretSeed(SIGNER_SEED),
+                parseResultXdrFn = null,
+                transactionBuilder = invokeBuilder()
+            ).simulate(restore = false)
+        }
+        assertNotNull(captured)
+        assertTrue(
+            "\"useUpgradedAuth\":true" in captured!!.replace(" ", ""),
+            "the default simulate request must carry useUpgradedAuth true"
+        )
+    }
+
+    @Test
+    fun testClientOptionsDefaultSendsUseUpgradedAuthTrue() = runTest {
+        // ClientOptions built without useUpgradedAuth: the default-path simulate
+        // request must carry the key as true.
         var captured: String? = null
         mockServer(listOf(v2Entry()), onSimulate = { captured = it }).use { server ->
             val client = ContractClient.forServer(CONTRACT_ID, SERVER_URL, NETWORK, server, contractSpec = null)
@@ -267,8 +294,7 @@ class AssembledTransactionP27Test {
                 sourceAccountKeyPair = KeyPair.fromAccountId(SOURCE_ACCOUNT),
                 contractId = CONTRACT_ID,
                 network = NETWORK,
-                rpcUrl = SERVER_URL,
-                useUpgradedAuth = true
+                rpcUrl = SERVER_URL
             )
             client.buildInvoke(
                 functionName = "hello",
@@ -282,6 +308,34 @@ class AssembledTransactionP27Test {
         assertNotNull(captured)
         assertTrue(
             "\"useUpgradedAuth\":true" in captured!!.replace(" ", ""),
+            "a simulate request with nothing set must carry useUpgradedAuth true"
+        )
+    }
+
+    @Test
+    fun testClientOptionsUseUpgradedAuthThreadsThroughBuildInvoke() = runTest {
+        var captured: String? = null
+        mockServer(listOf(legacyEntry()), onSimulate = { captured = it }).use { server ->
+            val client = ContractClient.forServer(CONTRACT_ID, SERVER_URL, NETWORK, server, contractSpec = null)
+            val options = ClientOptions(
+                sourceAccountKeyPair = KeyPair.fromAccountId(SOURCE_ACCOUNT),
+                contractId = CONTRACT_ID,
+                network = NETWORK,
+                rpcUrl = SERVER_URL,
+                useUpgradedAuth = false
+            )
+            client.buildInvoke(
+                functionName = "hello",
+                parameters = emptyList(),
+                source = SOURCE_ACCOUNT,
+                signer = KeyPair.fromSecretSeed(SIGNER_SEED),
+                parseResultXdrFn = { it },
+                options = options
+            )
+        }
+        assertNotNull(captured)
+        assertTrue(
+            "\"useUpgradedAuth\":false" in captured!!.replace(" ", ""),
             "ClientOptions.useUpgradedAuth must reach the simulate request through ContractClient"
         )
     }
