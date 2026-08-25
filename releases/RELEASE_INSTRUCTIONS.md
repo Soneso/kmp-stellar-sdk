@@ -381,7 +381,9 @@ git log --oneline -5
 1. Navigate to: https://github.com/Soneso/kmp-stellar-sdk/releases/new
 2. **Choose tag**: Select `vX.Y.Z`
 3. **Release title**: `Version X.Y.Z - Brief Description`
-4. **Description**: Copy content from `RELEASE_NOTES_X.Y.Z.md`
+4. **Description**: Copy content from `RELEASE_NOTES_X.Y.Z.md`. Every link in the
+   release body must be absolute (`https://github.com/Soneso/kmp-stellar-sdk/blob/main/...`);
+   relative `../` links 404 on release pages.
 5. **Set as latest release**: Check this box
 6. Click **Publish release**
 
