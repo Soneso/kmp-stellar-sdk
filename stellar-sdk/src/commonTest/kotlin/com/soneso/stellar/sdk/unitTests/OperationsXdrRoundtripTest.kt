@@ -1263,6 +1263,61 @@ class OperationsXdrRoundtripTest {
         assertTrue(exception.message!!.contains("more than 7 decimal places"))
     }
 
+    @Test
+    fun testAmountTrailingZerosBeyondSevenDecimalsAccepted() {
+        val operation = PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "0.50000000")
+        val body = operation.toOperationBody() as OperationBodyXdr.PaymentOp
+        assertEquals(5_000_000L, body.value.amount.value)
+    }
+
+    @Test
+    fun testAmountSevenSignificantDecimalsWithTrailingZerosAccepted() {
+        val operation = PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "100.123456700")
+        val body = operation.toOperationBody() as OperationBodyXdr.PaymentOp
+        assertEquals(1_001_234_567L, body.value.amount.value)
+    }
+
+    @Test
+    fun testAmountAllZeroFractionLongerThanSevenAccepted() {
+        val operation = PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.0000000000")
+        val body = operation.toOperationBody() as OperationBodyXdr.PaymentOp
+        assertEquals(10_000_000L, body.value.amount.value)
+    }
+
+    @Test
+    fun testAmountEightSignificantDecimalsStillThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "0.123456780")
+        }
+        assertTrue(exception.message!!.contains("more than 7 decimal places"))
+        assertTrue(exception.message!!.contains("got 8"))
+    }
+
+    @Test
+    fun testAmountWithSignInFractionThrows() {
+        // A sign read by toLong inside the fraction would build 0.95 XLM from "1.-5"
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.-5")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
+    }
+
+    @Test
+    fun testAmountWithSignInLongFractionThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.+50000000")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
+    }
+
+    @Test
+    fun testAmountWithNonNumericFractionThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            PaymentOperation(ACCOUNT_B, ASSET_NATIVE, "1.5a")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
+    }
+
     // ========== Operation.Companion.formatAmountScale ==========
 
     @Test
@@ -1290,6 +1345,28 @@ class OperationsXdrRoundtripTest {
     @Test
     fun testFormatAmountScalePadsFraction() {
         assertEquals("1.5000000", Operation.formatAmountScale("1.5"))
+    }
+
+    @Test
+    fun testFormatAmountScaleTrailingZerosBeyondSevenDecimalsAccepted() {
+        assertEquals("1.5000000", Operation.formatAmountScale("1.50000000"))
+    }
+
+    @Test
+    fun testFormatAmountScaleEightSignificantDecimalsStillThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Operation.formatAmountScale("1.123456780")
+        }
+        assertTrue(exception.message!!.contains("scale"))
+        assertTrue(exception.message!!.contains("got 8"))
+    }
+
+    @Test
+    fun testFormatAmountScaleNonNumericFractionThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            Operation.formatAmountScale("1.-5")
+        }
+        assertTrue(exception.message!!.contains("Invalid amount format"))
     }
 
     @Test

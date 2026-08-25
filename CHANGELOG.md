@@ -168,6 +168,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reachable through the operations that touched it.
 
 ### Fixed
+- Amount strings on operations may carry trailing zeros past the seventh
+  decimal place: `"0.50000000"` now builds 0.5 where it was previously
+  rejected. The seven-decimal limit counts significant decimals, so
+  `"0.12345678"` is still rejected. This applies to every operation that takes
+  a decimal amount string.
+- A sign character inside the fractional part of an amount string is rejected:
+  `"1.-5"` previously built 0.95 instead of failing, since the fraction was
+  parsed as a signed number.
 - Strkey decoding requires canonical encoding. Input that at least one target
   previously accepted now raises `IllegalArgumentException` on all of them: trailing
   `=` padding, any content after a `=`, whitespace anywhere in the string
@@ -306,8 +314,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and any diagnostic events. A refused submission previously went undetected
   and the polling window reported the misleading status NOT_FOUND after three
   minutes. A DUPLICATE response is polled like a pending one, since it names a
-  transaction the network already knows, so a resubmitted deployment that
-  already succeeded reports that success. The exception's
+  transaction the network already knows, so a resubmitted deployment that is
+  still in flight reports its outcome. The exception's
   `assembledTransaction` property is now nullable, since these entry points
   submit without one.
 - Contract-deployment salts now come from the platform CSPRNG
