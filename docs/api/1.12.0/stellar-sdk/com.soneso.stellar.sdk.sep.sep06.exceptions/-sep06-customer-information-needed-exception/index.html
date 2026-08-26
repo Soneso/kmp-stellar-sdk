@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Sep06CustomerInformationNeededException</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep06.exceptions/Sep06CustomerInformationNeededException///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep06.exceptions</a><span class="delimiter">/</span><span class="current">Sep06CustomerInformationNeededException</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Sep06Customer</span><wbr></wbr><span>Information</span><wbr></wbr><span>Needed</span><wbr></wbr><span><span>Exception</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">Sep06CustomerInformationNeededException</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>fields<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span> : <a href="../-sep06-exception/index.html">Sep06Exception</a></div><p class="paragraph">Exception thrown when additional customer information is required (HTTP 403).</p><p class="paragraph">Indicates that the anchor requires additional KYC information before processing the request. The response type is &quot;non_interactive_customer_info_needed&quot; and includes a list of SEP-9 field names that must be collected and submitted via SEP-12 KYC API before retrying the request.</p><p class="paragraph">This error typically occurs when:</p><ul><li><p class="paragraph">Initial deposit/withdrawal request is made without sufficient KYC</p></li><li><p class="paragraph">Anchor requires additional information for higher transaction limits</p></li><li><p class="paragraph">Regulatory requirements necessitate more customer data</p></li><li><p class="paragraph">Transaction type requires specific fields (e.g., bank account details)</p></li></ul><p class="paragraph">Recovery actions:</p><ul><li><p class="paragraph">Collect the required fields from the user</p></li><li><p class="paragraph">Submit the information via SEP-12 KYC API</p></li><li><p class="paragraph">Retry the original deposit/withdrawal request</p></li></ul><p class="paragraph">Example - Handle customer information needed:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun initiateDeposit(<br>    sep06Service: Sep06Service,<br>    sep12Service: Sep12Service,<br>    assetCode: String,<br>    jwt: String<br>): Sep06DepositResponse? {<br>    try {<br>        return sep06Service.deposit(assetCode, jwt)<br>    } catch (e: Sep06CustomerInformationNeededException) {<br>        println(&quot;Additional information required:&quot;)<br>        e.fields.forEach { field -&gt;<br>            println(&quot;  - $field&quot;)<br>        }<br><br>        // Collect and submit required fields via SEP-12<br>        val customerData = collectCustomerData(e.fields)<br>        sep12Service.putCustomer(customerData, jwt)<br><br>        // Retry the deposit<br>        return sep06Service.deposit(assetCode, jwt)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Display required fields to user:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">fun handleKycRequired(e: Sep06CustomerInformationNeededException) {<br>    val fieldDescriptions = mapOf(<br>        &quot;first_name&quot; to &quot;First Name&quot;,<br>        &quot;last_name&quot; to &quot;Last Name&quot;,<br>        &quot;email_address&quot; to &quot;Email Address&quot;,<br>        &quot;bank_account_number&quot; to &quot;Bank Account Number&quot;,<br>        &quot;bank_routing_number&quot; to &quot;Bank Routing Number&quot;<br>    )<br><br>    println(&quot;Please provide the following information:&quot;)<br>    e.fields.forEach { field -&gt;<br>        val description = fieldDescriptions[field] ?: field<br>        println(&quot;  - $description&quot;)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="../-sep06-exception/index.html">Sep06Exception</a> base class</p></li><li><p class="paragraph"><a href="../-sep06-customer-information-status-exception/index.html">Sep06CustomerInformationStatusException</a> for KYC status errors</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md">SEP-0006 Specification</a></p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0009.md">SEP-0009 Standard KYC Fields</a></p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012 KYC API</a></p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="258496936%2FConstructors%2F-2014708805" anchor-label="Sep06CustomerInformationNeededException" id="258496936%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-sep06-customer-information-needed-exception.html"><span>Sep06Customer</span><wbr></wbr><span>Information</span><wbr></wbr><span>Needed</span><wbr></wbr><span><span>Exception</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="258496936%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">fields<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-654012527%2FProperties%2F-2014708805" anchor-label="cause" id="-654012527%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805"><span><span>cause</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-654012527%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805">cause</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2005364557%2FProperties%2F-2014708805" anchor-label="fields" id="-2005364557%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fields.html"><span><span>fields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2005364557%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fields.html">fields</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">List of SEP-9 field names that must be collected from the customer</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1824300659%2FProperties%2F-2014708805" anchor-label="message" id="1824300659%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805"><span><span>message</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1824300659%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805">message</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1029706912%2FFunctions%2F-2014708805" anchor-label="toString" id="1029706912%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-string.html"><span>to</span><wbr></wbr><span><span>String</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1029706912%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="to-string.html"><span class="token function">toString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

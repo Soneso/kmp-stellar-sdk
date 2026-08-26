@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Transaction</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk/Transaction///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk</a><span class="delimiter">/</span><span class="current">Transaction</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Transaction</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">Transaction</a> : <a href="../-abstract-transaction/index.html">AbstractTransaction</a></div><p class="paragraph">Represents a transaction in the Stellar network.</p><p class="paragraph">A transaction is a grouping of operations that are executed together atomically. All operations must succeed for the transaction to succeed. If any operation fails, all effects are rolled back.</p><h2 class="">Transaction Structure</h2><p class="paragraph">A transaction consists of:</p><ul><li><p class="paragraph"><strong>Source Account</strong>: The account that originates the transaction and pays the fee</p></li><li><p class="paragraph"><strong>Fee</strong>: Total fee in stroops (baseFee * operations.size)</p></li><li><p class="paragraph"><strong>Sequence Number</strong>: Must be exactly sourceAccount.sequence + 1</p></li><li><p class="paragraph"><strong>Operations</strong>: List of 1-100 operations to execute</p></li><li><p class="paragraph"><strong>Memo</strong>: Optional memo (up to 28 bytes for text memos)</p></li><li><p class="paragraph"><strong>Preconditions</strong>: Optional time bounds, ledger bounds, etc.</p></li><li><p class="paragraph"><strong>Signatures</strong>: List of signatures authorizing the transaction</p></li></ul><h2 class="">Building Transactions</h2><p class="paragraph">Use <a href="../-transaction-builder/index.html">TransactionBuilder</a> to construct transactions:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val sourceAccount = Account(&quot;GABC...&quot;, 1234567890)<br>val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)<br>    .addOperation(<br>        PaymentOperation(<br>            destination = &quot;GDEF...&quot;,<br>            asset = AssetTypeNative,<br>            amount = &quot;10.0&quot;<br>        )<br>    )<br>    .addMemo(MemoText(&quot;Payment for services&quot;))<br>    .setTimeout(300) // 5 minutes<br>    .setBaseFee(100)<br>    .build()<br><br>// Sign with source account keypair<br>transaction.sign(sourceKeypair)<br><br>// Submit to Horizon<br>val response = horizonServer.submitTransaction(transaction)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h2 class="">Fee Calculation</h2><p class="paragraph">The transaction fee is calculated as: <code class="lang-kotlin">baseFee * operations.size</code></p><p class="paragraph">The minimum base fee is 100 stroops (0.00001 XLM), so:</p><ul><li><p class="paragraph">1 operation: 100 stroops = 0.00001 XLM</p></li><li><p class="paragraph">10 operations: 1,000 stroops = 0.0001 XLM</p></li><li><p class="paragraph">100 operations: 10,000 stroops = 0.001 XLM</p></li></ul><h2 class="">Sequence Numbers</h2><p class="paragraph">Each account has a sequence number that must be incremented with each transaction. The transaction's sequence number must be exactly <code class="lang-kotlin">sourceAccount.sequence + 1</code>. After successful execution, the account's sequence number becomes the transaction's sequence number.</p><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div></div></span></div><div><div class="title"><p class="paragraph"><a href="https://developers.stellar.org/docs/learn/fundamentals/transactions">Transactions</a></p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../-transaction-builder/index.html"><span>Transaction</span><wbr></wbr><span><span>Builder</span></span></a></div></span></div><div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="457489045%2FClasslikes%2F-2014708805" anchor-label="Companion" id="457489045%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="457489045%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-762445496%2FProperties%2F-2014708805" anchor-label="fee" id="-762445496%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fee.html"><span><span>fee</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-762445496%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fee.html">fee</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">Total transaction fee in stroops</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1059076206%2FProperties%2F-2014708805" anchor-label="memo" id="-1059076206%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="memo.html"><span><span>memo</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1059076206%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="memo.html">memo</a><span class="token operator">: </span><a href="../-memo/index.html">Memo</a></div><div class="brief "><p class="paragraph">Transaction memo (default MemoNone)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1427847070%2FProperties%2F-2014708805" anchor-label="network" id="-1427847070%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/network.html"><span><span>network</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1427847070%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="../-abstract-transaction/network.html">network</a><span class="token operator">: </span><a href="../-network/index.html">Network</a></div><div class="brief "><p class="paragraph">The network this transaction is for</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-55002656%2FProperties%2F-2014708805" anchor-label="operations" id="-55002656%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="operations.html"><span><span>operations</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-55002656%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="operations.html">operations</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="../-operation/index.html">Operation</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">List of operations (1-100)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-526191725%2FProperties%2F-2014708805" anchor-label="preconditions" id="-526191725%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="preconditions.html"><span><span>preconditions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-526191725%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="preconditions.html">preconditions</a><span class="token operator">: </span><a href="../-transaction-preconditions/index.html">TransactionPreconditions</a></div><div class="brief "><p class="paragraph">Transaction preconditions (time/ledger bounds, etc.)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1661128286%2FProperties%2F-2014708805" anchor-label="sequenceNumber" id="-1661128286%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="sequence-number.html"><span>sequence</span><wbr></wbr><span><span>Number</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1661128286%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="sequence-number.html">sequenceNumber</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div><div class="brief "><p class="paragraph">The sequence number for this transaction</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1674940783%2FProperties%2F-2014708805" anchor-label="signatures" id="1674940783%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/signatures.html"><span><span>signatures</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1674940783%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="../-abstract-transaction/signatures.html">signatures</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-mutable-list/index.html">MutableList</a><span class="token operator">&lt;</span><a href="../-decorated-signature/index.html">DecoratedSignature</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">List of signatures attached to this transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-298008466%2FProperties%2F-2014708805" anchor-label="sorobanData" id="-298008466%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="soroban-data.html"><span>soroban</span><wbr></wbr><span><span>Data</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-298008466%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="soroban-data.html">sorobanData</a><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-soroban-transaction-data-xdr/index.html">SorobanTransactionDataXdr</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Soroban transaction data for smart contract operations (optional)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1095846780%2FProperties%2F-2014708805" anchor-label="sourceAccount" id="1095846780%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="source-account.html"><span>source</span><wbr></wbr><span><span>Account</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1095846780%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="source-account.html">sourceAccount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">The source account for this transaction (G... or M... address)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1649463541%2FFunctions%2F-2014708805" anchor-label="equals" id="1649463541%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="equals.html"><span><span>equals</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1649463541%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">operator override </span><span class="token keyword">fun </span><a href="equals.html"><span class="token function">equals</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">other<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1757273078%2FFunctions%2F-2014708805" anchor-label="getTimeBounds" id="1757273078%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-time-bounds.html"><span>get</span><wbr></wbr><span>Time</span><wbr></wbr><span><span>Bounds</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1757273078%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="get-time-bounds.html"><span class="token function">getTimeBounds</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-time-bounds/index.html">TimeBounds</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Returns the time bounds defined for the transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1208627140%2FFunctions%2F-2014708805" anchor-label="hash" id="-1208627140%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/hash.html"><span><span>hash</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1208627140%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="../-abstract-transaction/hash.html"><span class="token function">hash</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div><div class="brief "><p class="paragraph">Returns the transaction hash (SHA-256 of signature base).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="830963793%2FFunctions%2F-2014708805" anchor-label="hashCode" id="830963793%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="hash-code.html"><span>hash</span><wbr></wbr><span><span>Code</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="830963793%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="hash-code.html"><span class="token function">hashCode</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="953702467%2FFunctions%2F-2014708805" anchor-label="hashHex" id="953702467%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/hash-hex.html"><span>hash</span><wbr></wbr><span><span>Hex</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="953702467%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="../-abstract-transaction/hash-hex.html"><span class="token function">hashHex</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Returns the transaction hash as a lowercase hexadecimal string.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1418388954%2FFunctions%2F-2014708805" anchor-label="isSorobanTransaction" id="1418388954%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="is-soroban-transaction.html"><span>is</span><wbr></wbr><span>Soroban</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1418388954%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="is-soroban-transaction.html"><span class="token function">isSorobanTransaction</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div><div class="brief "><p class="paragraph">Returns true if this is a Soroban transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-542850061%2FFunctions%2F-2014708805" anchor-label="sign" id="-542850061%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/sign.html"><span><span>sign</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-542850061%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="../-abstract-transaction/sign.html"><span class="token function">sign</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">signer<span class="token operator">: </span><a href="../-key-pair/index.html">KeyPair</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Adds a signature by signing the transaction hash with the provided keypair.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1909292731%2FFunctions%2F-2014708805" anchor-label="signatureBase" id="-1909292731%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="signature-base.html"><span>signature</span><wbr></wbr><span><span>Base</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1909292731%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">suspend override </span><span class="token keyword">fun </span><a href="signature-base.html"><span class="token function">signatureBase</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div><div class="brief "><p class="paragraph">Returns the signature base - the data that must be signed.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1322827647%2FFunctions%2F-2014708805" anchor-label="signHashX" id="1322827647%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/sign-hash-x.html"><span>sign</span><wbr></wbr><span>Hash</span><wbr></wbr><span><span>X</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1322827647%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="../-abstract-transaction/sign-hash-x.html"><span class="token function">signHashX</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">preimage<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Adds a hash(x) signature by revealing the preimage.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2099205741%2FFunctions%2F-2014708805" anchor-label="toEnvelopeXdr" id="-2099205741%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-envelope-xdr.html"><span>to</span><wbr></wbr><span>Envelope</span><wbr></wbr><span><span>Xdr</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2099205741%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="to-envelope-xdr.html"><span class="token function">toEnvelopeXdr</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-transaction-envelope-xdr/index.html">TransactionEnvelopeXdr</a></div><div class="brief "><p class="paragraph">Converts this transaction to its XDR envelope representation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-513468218%2FFunctions%2F-2014708805" anchor-label="toEnvelopeXdrBase64" id="-513468218%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../-abstract-transaction/to-envelope-xdr-base64.html"><span>to</span><wbr></wbr><span>Envelope</span><wbr></wbr><span>Xdr</span><wbr></wbr><span><span>Base64</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-513468218%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="../-abstract-transaction/to-envelope-xdr-base64.html"><span class="token function">toEnvelopeXdrBase64</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Returns base64-encoded TransactionEnvelope XDR.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="652797728%2FFunctions%2F-2014708805" anchor-label="toString" id="652797728%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-string.html"><span>to</span><wbr></wbr><span><span>String</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="652797728%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="to-string.html"><span class="token function">toString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

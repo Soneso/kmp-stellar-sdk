@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>CallbackSignatureVerifier</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.common/CallbackSignatureVerifier///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.common</a><span class="delimiter">/</span><span class="current">CallbackSignatureVerifier</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Callback</span><wbr></wbr><span>Signature</span><wbr></wbr><span><span>Verifier</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">CallbackSignatureVerifier</a></div><p class="paragraph">Verifies callback signatures from SEP-12 and SEP-31 anchor servers.</p><p class="paragraph">Anchors sign outbound webhook requests with their <code class="lang-kotlin">SIGNING_KEY</code> so that the receiving party can prove authenticity of the inbound callback. Both SEP-12 (KYC customer status updates) and SEP-31 (cross-border payment status updates) define the same signing format, and this class serves both.</p><h2 class="">Signature header</h2><p class="paragraph">The anchor sends one of:</p><ul><li><p class="paragraph"><code class="lang-kotlin">Signature: t=&lt;unix-seconds&gt;, s=&lt;base64-signature&gt;</code> (preferred)</p></li><li><p class="paragraph"><code class="lang-kotlin">X-Stellar-Signature: t=&lt;unix-seconds&gt;, s=&lt;base64-signature&gt;</code> (legacy)</p></li></ul><p class="paragraph">When both headers are present the verifier always uses <code class="lang-kotlin">Signature</code>. A malformed <code class="lang-kotlin">Signature</code> returns <a href="-result/-malformed-header/index.html">Result.MalformedHeader</a> even if <code class="lang-kotlin">X-Stellar-Signature</code> would have verified — the preference for the non-deprecated header is firm and there is no silent fallback.</p><h2 class="">Canonical payload</h2><p class="paragraph">The signed bytes are <code class="lang-kotlin">&quot;$timestamp.$host.$body&quot;</code> encoded as UTF-8, where:</p><ul><li><p class="paragraph"><code class="lang-kotlin">timestamp</code> is the Unix seconds value from the header <code class="lang-kotlin">t=</code> parameter.</p></li><li><p class="paragraph"><code class="lang-kotlin">host</code> is derived from the URL passed to the constructor as <span data-unresolved-link="com.soneso.stellar.sdk.sep.common/CallbackSignatureVerifier//#kotlin.String#kotlin.String?#kotlin.Long#kotlin.time.Clock#kotlin.String?#kotlin.Boolean/PointingToCallableParameters(1)/">registeredCallbackUrl</span> (port is stripped).</p></li><li><p class="paragraph"><code class="lang-kotlin">body</code> is the byte-exact inbound request body, decoded as UTF-8.</p></li></ul><p class="paragraph">The host is taken from the constructor-supplied URL and never from any inbound HTTP header. This pins the verification to the URL the consumer previously registered with the anchor and prevents man-in-the-middle tampering with a <code class="lang-kotlin">Host</code> header.</p><h2 class="">Port stripping</h2><p class="paragraph">The verifier strips port from the host (e.g., <code class="lang-kotlin">myapp.com:8443</code> becomes <code class="lang-kotlin">myapp.com</code>). The SEP specifications do not say whether the port should be included in the signed payload, and the SDK pins to host-only for unambiguity. An anchor that signs with port included will fail with <a href="-result/-signature-mismatch/index.html">Result.SignatureMismatch</a>; file an upstream bug against that anchor.</p><h2 class="">Freshness window</h2><p class="paragraph">The default freshness window is 120 seconds, which matches the SEP-31 specification's recommendation. The verifier applies a two-sided check: <code class="lang-kotlin">abs(currentTime - timestamp) &gt; freshnessSeconds</code> is rejected. The specifications define a one-sided check that lets future-dated timestamps through; the two-sided form rejects them as well and is documented as the behavior of this class. <a href="-result/-stale/age-seconds.html">Result.Stale.ageSeconds</a> carries a signed value so callers can distinguish replay (positive age) from clock-skew or forgery (negative age) in logs.</p><p class="paragraph">Setting <span data-unresolved-link="com.soneso.stellar.sdk.sep.common/CallbackSignatureVerifier//#kotlin.String#kotlin.String?#kotlin.Long#kotlin.time.Clock#kotlin.String?#kotlin.Boolean/PointingToCallableParameters(2)/">freshnessSeconds</span> above 120 deviates from the spec recommendation and exists only for clock-skew tolerance in test environments. Production should keep the default.</p><h2 class="">stellar.toml</h2><p class="paragraph">The verifier does NOT fetch the anchor's <code class="lang-kotlin">stellar.toml</code>. The caller looks up the anchor's <code class="lang-kotlin">SIGNING_KEY</code> once and caches it for the lifetime of the connection:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val signingKey = StellarToml.fromDomain(&quot;anchor.example.org&quot;)<br>    .generalInformation.signingKey<br>    ?: error(&quot;Receiving Anchor stellar.toml has no SIGNING_KEY&quot;)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h2 class="">HTTPS requirement</h2><p class="paragraph">The constructor rejects non-HTTPS URLs unless the host is one of the IETF loopback authorities (<code class="lang-kotlin">localhost</code>, <code class="lang-kotlin">127.0.0.1</code>, <code class="lang-kotlin">[::1]</code>, each optionally with a port). The loopback exception exists so that callers can integrate against a local Anchor Platform instance during development without standing up a TLS-terminating proxy.</p><h2 class="">Thread safety</h2><p class="paragraph">Instances are immutable and safe to share across threads. Construct one verifier per registered callback URL and reuse it for every inbound callback against that URL.</p><h2 class="">Example: SEP-31 callback verification</h2><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val verifier = CallbackSignatureVerifier(<br>    signingKey = receivingAnchorSigningKey,<br>    registeredCallbackUrl = &quot;https://sending-anchor.example.org/sep31-callback&quot;,<br>)<br><br>when (val result = verifier.verify(<br>    signatureHeader = call.request.headers[&quot;Signature&quot;],<br>    xStellarSignatureHeader = call.request.headers[&quot;X-Stellar-Signature&quot;],<br>    body = call.receiveText(),<br>)) {<br>    CallbackSignatureVerifier.Result.Valid -&gt; processCallback()<br>    is CallbackSignatureVerifier.Result.Stale -&gt;<br>        log.warn(&quot;Callback stale by ${result.ageSeconds}s&quot;)<br>    CallbackSignatureVerifier.Result.SignatureMismatch,<br>    CallbackSignatureVerifier.Result.MalformedHeader,<br>    CallbackSignatureVerifier.Result.MissingHeader -&gt; reject()<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div></div></span></div><div><div class="title"><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012</a></p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-1019752003%2FConstructors%2F-2014708805" anchor-label="CallbackSignatureVerifier" id="-1019752003%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-callback-signature-verifier.html"><span>Callback</span><wbr></wbr><span>Signature</span><wbr></wbr><span><span>Verifier</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1019752003%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">signingKey<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">registeredCallbackUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">freshnessSeconds<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span>DEFAULT_FRESHNESS_SECONDS<span class="token punctuation">, </span></span><span class="parameter ">clock<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-clock/index.html">Clock</a><span class="token operator"> = </span>Clock.System</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Constructs a verifier for callbacks delivered to <span data-unresolved-link="com.soneso.stellar.sdk.sep.common/CallbackSignatureVerifier//#kotlin.String#kotlin.String#kotlin.Long#kotlin.time.Clock/PointingToCallableParameters(1)/">registeredCallbackUrl</span>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="-1609011809%2FClasslikes%2F-2014708805" anchor-label="Companion" id="-1609011809%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1609011809%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1432619526%2FClasslikes%2F-2014708805" anchor-label="Result" id="-1432619526%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-result/index.html"><span><span>Result</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1432619526%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">sealed </span><span class="token keyword">interface </span><a href="-result/index.html">Result</a></div><div class="brief "><p class="paragraph">Outcome of a <a href="verify.html">verify</a> call.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-2143209797%2FFunctions%2F-2014708805" anchor-label="verify" id="-2143209797%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="verify.html"><span><span>verify</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2143209797%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="verify.html"><span class="token function">verify</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">signatureHeader<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">xStellarSignatureHeader<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">body<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="-result/index.html">CallbackSignatureVerifier.Result</a></div><div class="brief "><p class="paragraph">Verifies a callback signature against the registered URL's host and the supplied body.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

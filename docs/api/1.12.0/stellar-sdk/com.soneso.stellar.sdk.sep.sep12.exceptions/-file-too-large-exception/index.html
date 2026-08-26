@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>FileTooLargeException</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep12.exceptions/FileTooLargeException///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep12.exceptions</a><span class="delimiter">/</span><span class="current">FileTooLargeException</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>File</span><wbr></wbr><span>Too</span><wbr></wbr><span>Large</span><wbr></wbr><span><span>Exception</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">FileTooLargeException</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>fileSize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span> : <a href="../-k-y-c-exception/index.html">KYCException</a></div><p class="paragraph">Exception thrown when an uploaded file exceeds the server's size limit (HTTP 413).</p><p class="paragraph">Indicates that the file being uploaded is too large. Different anchors may have different size limits for uploaded documents. This error typically occurs when:</p><ul><li><p class="paragraph">Document/image file exceeds maximum allowed size</p></li><li><p class="paragraph">Multiple files exceed cumulative size limit</p></li><li><p class="paragraph">Uncompressed or high-resolution images</p></li></ul><p class="paragraph">Recovery actions:</p><ul><li><p class="paragraph">Compress the file to reduce size</p></li><li><p class="paragraph">Resize images to lower resolution</p></li><li><p class="paragraph">Convert to more efficient format (e.g., JPEG instead of PNG)</p></li><li><p class="paragraph">Split large documents into multiple files</p></li><li><p class="paragraph">Contact anchor support to understand size limits</p></li></ul><p class="paragraph">Example - Handle file too large:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun uploadDocument(<br>    kycService: KYCService,<br>    documentBytes: ByteArray,<br>    jwt: String<br>): CustomerFileResponse {<br>    try {<br>        return kycService.postCustomerFile(documentBytes, jwt)<br>    } catch (e: FileTooLargeException) {<br>        println(&quot;File too large: ${e.fileSize} bytes&quot;)<br>        println(&quot;Please compress or resize the file&quot;)<br><br>        // Attempt to compress image<br>        val compressedBytes = compressImage(documentBytes)<br>        println(&quot;Compressed to: ${compressedBytes.size} bytes&quot;)<br><br>        // Retry with compressed file<br>        return kycService.postCustomerFile(compressedBytes, jwt)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Pre-check file size:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">fun validateFileSize(fileBytes: ByteArray, maxSizeMB: Int = 5): Boolean {<br>    val maxSizeBytes = maxSizeMB * 1024 * 1024<br>    if (fileBytes.size &gt; maxSizeBytes) {<br>        println(&quot;File too large: ${fileBytes.size} bytes (max: $maxSizeBytes)&quot;)<br>        return false<br>    }<br>    return true<br>}<br><br>suspend fun uploadWithValidation(<br>    kycService: KYCService,<br>    fileBytes: ByteArray,<br>    jwt: String<br>) {<br>    if (!validateFileSize(fileBytes, maxSizeMB = 5)) {<br>        throw FileTooLargeException(fileBytes.size.toLong())<br>    }<br><br>    kycService.postCustomerFile(fileBytes, jwt)<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Compress before upload:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun uploadImage(<br>    kycService: KYCService,<br>    imageBytes: ByteArray,<br>    jwt: String,<br>    maxSizeBytes: Long = 5_000_000 // 5 MB<br>): CustomerFileResponse {<br>    var bytes = imageBytes<br><br>    // Compress if too large<br>    if (bytes.size &gt; maxSizeBytes) {<br>        println(&quot;Image too large (${bytes.size} bytes), compressing...&quot;)<br>        bytes = compressImage(bytes, quality = 0.8)<br>        println(&quot;Compressed to ${bytes.size} bytes&quot;)<br>    }<br><br>    return try {<br>        kycService.postCustomerFile(bytes, jwt)<br>    } catch (e: FileTooLargeException) {<br>        // If still too large after compression, try lower quality<br>        println(&quot;Still too large, reducing quality further...&quot;)<br>        bytes = compressImage(imageBytes, quality = 0.5)<br>        kycService.postCustomerFile(bytes, jwt)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Show user-friendly error:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">fun showFileSizeError(exception: FileTooLargeException, filename: String) {<br>    val sizeMB = (exception.fileSize ?: 0) / (1024.0 * 1024.0)<br>    showError(<br>        title = &quot;File Too Large&quot;,<br>        message = buildString {<br>            append(&quot;The file '$filename' is too large &quot;)<br>            if (exception.fileSize != null) {<br>                val sizeFormatted = (sizeMB * 100).toInt() / 100.0<br>                append(&quot;($sizeFormatted MB).\n\n&quot;)<br>            } else {<br>                append(&quot;.\n\n&quot;)<br>            }<br>            append(&quot;Please try:\n&quot;)<br>            append(&quot;• Compressing the file\n&quot;)<br>            append(&quot;• Reducing image resolution\n&quot;)<br>            append(&quot;• Converting to a smaller format (JPEG)&quot;)<br>        }<br>    )<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="../-k-y-c-exception/index.html">KYCException</a> base class</p></li><li><p class="paragraph">CustomerFileResponse for successful uploads</p></li><li><p class="paragraph">PutCustomerInfoRequest for direct file upload (alternative)</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012 Specification</a></p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-197330229%2FConstructors%2F-2014708805" anchor-label="FileTooLargeException" id="-197330229%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-file-too-large-exception.html"><span>File</span><wbr></wbr><span>Too</span><wbr></wbr><span>Large</span><wbr></wbr><span><span>Exception</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-197330229%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">fileSize<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-654012527%2FProperties%2F-2014708805" anchor-label="cause" id="-654012527%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805"><span><span>cause</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-654012527%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805">cause</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="332739824%2FProperties%2F-2014708805" anchor-label="fileSize" id="332739824%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="file-size.html"><span>file</span><wbr></wbr><span><span>Size</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="332739824%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="file-size.html">fileSize</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The size of the file that was rejected, in bytes (null if unknown)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1824300659%2FProperties%2F-2014708805" anchor-label="message" id="1824300659%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805"><span><span>message</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1824300659%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805">message</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

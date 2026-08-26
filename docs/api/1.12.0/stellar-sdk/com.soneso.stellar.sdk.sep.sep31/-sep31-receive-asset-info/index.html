@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Sep31ReceiveAssetInfo</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep31</a><span class="delimiter">/</span><span class="current">Sep31ReceiveAssetInfo</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Sep31Receive</span><wbr></wbr><span>Asset</span><wbr></wbr><span><span>Info</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">Sep31ReceiveAssetInfo</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>sep12Info<span class="token operator">: </span><a href="../-sep31-sep12-types-info/index.html">Sep31Sep12TypesInfo</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>minAmount<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>maxAmount<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>feeFixed<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>feePercent<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>senderSep12Type<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>receiverSep12Type<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fields<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>quotesSupported<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>quotesRequired<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fundingMethods<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><p class="paragraph">Per-asset configuration advertised by a Receiving Anchor in <code class="lang-kotlin">GET /info</code>.</p><p class="paragraph">Bundles transaction limits, fee configuration, SEP-12 customer type requirements, SEP-38 quote availability, and supported funding methods for one Stellar asset the anchor accepts for cross-border payments.</p><p class="paragraph">Numeric configuration fields (<span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(1)/">minAmount</span>, <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(2)/">maxAmount</span>, <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(3)/">feeFixed</span>, <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(4)/">feePercent</span>) are parsed via <code class="lang-kotlin">doubleOrNull</code> so the SDK tolerates anchors that emit either JSON numbers (<code class="lang-kotlin">100</code>) or quoted strings (<code class="lang-kotlin">&quot;100&quot;</code>). These are anchor configuration values (limits and percentages), not transaction amounts; floating-point representation is acceptable for them. Transaction amount fields elsewhere in the SDK remain <code class="lang-kotlin">String?</code> to preserve decimal precision.</p><p class="paragraph">Memo-type and funding-method strings are kept verbatim. The SDK does not validate them against any allow-list because the SEP-31 spec is expected to introduce new values over time.</p><h2 class="">Usage</h2><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val info = sep31Service.info(jwt = jwt)<br>val usdc = info.receiveAssets[&quot;USDC&quot;] ?: error(&quot;Anchor does not accept USDC&quot;)<br>println(&quot;Limits: ${usdc.minAmount} - ${usdc.maxAmount}&quot;)<br>println(&quot;Fee: fixed=${usdc.feeFixed}, percent=${usdc.feePercent}&quot;)<br>println(&quot;Quotes required: ${usdc.quotesRequired}&quot;)<br>println(&quot;Funding methods: ${usdc.fundingMethods}&quot;)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div></div></span></div><div><div class="title"><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md#get-info">SEP-0031 GET Info</a></p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-109967765%2FConstructors%2F-2014708805" anchor-label="Sep31ReceiveAssetInfo" id="-109967765%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-sep31-receive-asset-info.html"><span>Sep31Receive</span><wbr></wbr><span>Asset</span><wbr></wbr><span><span>Info</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-109967765%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">sep12Info<span class="token operator">: </span><a href="../-sep31-sep12-types-info/index.html">Sep31Sep12TypesInfo</a><span class="token punctuation">, </span></span><span class="parameter ">minAmount<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">maxAmount<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">feeFixed<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">feePercent<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">senderSep12Type<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">receiverSep12Type<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">fields<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">quotesSupported<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">quotesRequired<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">fundingMethods<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="673896094%2FClasslikes%2F-2014708805" anchor-label="Companion" id="673896094%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="673896094%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-1997671659%2FProperties%2F-2014708805" anchor-label="feeFixed" id="-1997671659%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fee-fixed.html"><span>fee</span><wbr></wbr><span><span>Fixed</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1997671659%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fee-fixed.html">feeFixed</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Fixed fee component charged by the anchor; <code class="lang-kotlin">null</code> when the fee model does not decompose into fixed + percent.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="743108708%2FProperties%2F-2014708805" anchor-label="feePercent" id="743108708%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fee-percent.html"><span>fee</span><wbr></wbr><span><span>Percent</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="743108708%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fee-percent.html">feePercent</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Percentage fee component charged by the anchor (in percentage points); <code class="lang-kotlin">null</code> when the fee model does not decompose into fixed + percent.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-425358390%2FProperties%2F-2014708805" anchor-label="fields" id="-425358390%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fields.html"><span><span>fields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-425358390%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fields.html"><strike>fields</strike></a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span><span class="token operator">&gt;</span><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Deprecated per-transaction field requirements. Migrate to SEP-12 <code class="lang-kotlin">PUT /customer</code> instead.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1457956366%2FProperties%2F-2014708805" anchor-label="fundingMethods" id="1457956366%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="funding-methods.html"><span>funding</span><wbr></wbr><span><span>Methods</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1457956366%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="funding-methods.html">fundingMethods</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-list/index.html">List</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Methods the anchor supports for delivering the off-chain asset (for example <code class="lang-kotlin">SEPA</code>, <code class="lang-kotlin">SWIFT</code>). <code class="lang-kotlin">null</code> when the anchor does not advertise any.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="883682811%2FProperties%2F-2014708805" anchor-label="maxAmount" id="883682811%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="max-amount.html"><span>max</span><wbr></wbr><span><span>Amount</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="883682811%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="max-amount.html">maxAmount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Maximum amount the anchor accepts; <code class="lang-kotlin">null</code> when unlimited.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-779661491%2FProperties%2F-2014708805" anchor-label="minAmount" id="-779661491%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="min-amount.html"><span>min</span><wbr></wbr><span><span>Amount</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-779661491%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="min-amount.html">minAmount</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Minimum amount the anchor accepts; <code class="lang-kotlin">null</code> when unlimited.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1854554349%2FProperties%2F-2014708805" anchor-label="quotesRequired" id="1854554349%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="quotes-required.html"><span>quotes</span><wbr></wbr><span><span>Required</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1854554349%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="quotes-required.html">quotesRequired</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph"><code class="lang-kotlin">true</code> if the anchor requires a SEP-38 <code class="lang-kotlin">quote_id</code> for off-chain delivery.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="668533952%2FProperties%2F-2014708805" anchor-label="quotesSupported" id="668533952%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="quotes-supported.html"><span>quotes</span><wbr></wbr><span><span>Supported</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="668533952%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="quotes-supported.html">quotesSupported</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph"><code class="lang-kotlin">true</code> if the anchor optionally accepts a SEP-38 <code class="lang-kotlin">quote_id</code> for off-chain delivery.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1322949869%2FProperties%2F-2014708805" anchor-label="receiverSep12Type" id="1322949869%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="receiver-sep12-type.html"><span>receiver</span><wbr></wbr><span><span>Sep12Type</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1322949869%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="receiver-sep12-type.html"><strike>receiverSep12Type</strike></a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Deprecated single receiver SEP-12 type identifier. Use <a href="../-sep31-sep12-types-info/receiver-types.html">Sep31Sep12TypesInfo.receiverTypes</a> instead.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1820351027%2FProperties%2F-2014708805" anchor-label="senderSep12Type" id="1820351027%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="sender-sep12-type.html"><span>sender</span><wbr></wbr><span><span>Sep12Type</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1820351027%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="sender-sep12-type.html"><strike>senderSep12Type</strike></a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Deprecated single sender SEP-12 type identifier. Use <a href="../-sep31-sep12-types-info/sender-types.html">Sep31Sep12TypesInfo.senderTypes</a> instead.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1469391274%2FProperties%2F-2014708805" anchor-label="sep12Info" id="1469391274%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="sep12-info.html"><span><span>sep12Info</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1469391274%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="sep12-info.html">sep12Info</a><span class="token operator">: </span><a href="../-sep31-sep12-types-info/index.html">Sep31Sep12TypesInfo</a></div><div class="brief "><p class="paragraph">SEP-12 customer type requirements for sender and receiver. Defaults to empty sender/receiver maps when the anchor omits the per-asset <code class="lang-kotlin">sep12</code> object — anchors that require no KYC may leave it out entirely. Note: the SEP-31 spec marks the wire <code class="lang-kotlin">sep12</code> field &quot;(Deprecated, optional)&quot;, but the spec prose still recommends <code class="lang-kotlin">sep12.sender.types</code> / <code class="lang-kotlin">sep12.receiver.types</code> over the older flat <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(5)/">senderSep12Type</span> / <span data-unresolved-link="com.soneso.stellar.sdk.sep.sep31/Sep31ReceiveAssetInfo//#com.soneso.stellar.sdk.sep.sep31.Sep31Sep12TypesInfo#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.Double?#kotlin.String?#kotlin.String?#kotlin.collections.Map[kotlin.String,kotlin.Any?]?#kotlin.Boolean?#kotlin.Boolean?#kotlin.collections.List[kotlin.String]?/PointingToCallableParameters(6)/">receiverSep12Type</span> fields, and SEP-12 defers customer-type discovery back to the calling protocol with no alternative. The SDK therefore treats this field as canonical (not <code class="lang-kotlin">@Deprecated</code>) despite the schema marker.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

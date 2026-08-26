@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>com.soneso.stellar.sdk.horizon.requests</title>
+    <link href="../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../styles/style.css" rel="Stylesheet">
+<link href="../../styles/main.css" rel="Stylesheet">
+<link href="../../styles/prism.css" rel="Stylesheet">
+<link href="../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+                <button class="platform-tag platform-selector js-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/jsMain">js</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option js-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/jsMain"
+                                       data-filter=":stellar-sdk/jsMain"/>
+                                <span class="checkbox--icon"></span>
+                                js
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="package" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.horizon.requests////PointingToDeclaration//-1522268594">
+  <div class="breadcrumbs"><a href="../../index.html">stellar-sdk</a><span class="delimiter">/</span><span class="current">com.soneso.stellar.sdk.horizon.requests</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Package-level</span></span> <span><span>declarations</span></span></h1>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="TYPE">Types</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="432962566%2FClasslikes%2F-2014708805" anchor-label="AccountsRequestBuilder" id="432962566%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-accounts-request-builder/index.html"><span>Accounts</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="432962566%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-accounts-request-builder/index.html">AccountsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to accounts.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-778781815%2FClasslikes%2F-2014708805" anchor-label="AssetsRequestBuilder" id="-778781815%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-assets-request-builder/index.html"><span>Assets</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-778781815%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-assets-request-builder/index.html">AssetsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to assets.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1297780945%2FClasslikes%2F-2014708805" anchor-label="ClaimableBalancesRequestBuilder" id="1297780945%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-claimable-balances-request-builder/index.html"><span>Claimable</span><wbr></wbr><span>Balances</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1297780945%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-claimable-balances-request-builder/index.html">ClaimableBalancesRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to claimable balances.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1126970428%2FClasslikes%2F-2014708805" anchor-label="EffectsRequestBuilder" id="1126970428%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-effects-request-builder/index.html"><span>Effects</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1126970428%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-effects-request-builder/index.html">EffectsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to effects.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1898376324%2FClasslikes%2F-2014708805" anchor-label="EventListener" id="-1898376324%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-event-listener/index.html"><span>Event</span><wbr></wbr><span><span>Listener</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1898376324%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">interface </span><a href="-event-listener/index.html">EventListener</a><span class="token operator">&lt;</span><a href="-event-listener/index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Listener interface for Server-Sent Events (SSE) streams. Implement this interface to handle events and failures from streaming endpoints.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2050026059%2FClasslikes%2F615662557" anchor-label="EventSource" id="-2050026059%2FClasslikes%2F615662557" data-filterable-set=":stellar-sdk/jsMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-event-source/index.html"><span>Event</span><wbr></wbr><span><span>Source</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2050026059%2FClasslikes%2F615662557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-active="" data-toggle=":stellar-sdk/jsMain">js</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">external </span><span class="token keyword">class </span><a href="-event-source/index.html">EventSource</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">url<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">eventSourceInitDict<span class="token operator">: </span><a href="-event-source-init/index.html">EventSourceInit</a><span class="token operator"> = </span>definedExternally</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">External declaration for browser EventSource API.</p></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="418287749%2FClasslikes%2F615662557" anchor-label="EventSourceInit" id="418287749%2FClasslikes%2F615662557" data-filterable-set=":stellar-sdk/jsMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-event-source-init/index.html"><span>Event</span><wbr></wbr><span>Source</span><wbr></wbr><span><span>Init</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="418287749%2FClasslikes%2F615662557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-active="" data-toggle=":stellar-sdk/jsMain">js</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">external </span><span class="token keyword">interface </span><a href="-event-source-init/index.html">EventSourceInit</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1981887443%2FClasslikes%2F-2014708805" anchor-label="FeeStatsRequestBuilder" id="1981887443%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-fee-stats-request-builder/index.html"><span>Fee</span><wbr></wbr><span>Stats</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1981887443%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-fee-stats-request-builder/index.html">FeeStatsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to fee statistics.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1175610736%2FClasslikes%2F-2014708805" anchor-label="HealthRequestBuilder" id="-1175610736%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-health-request-builder/index.html"><span>Health</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1175610736%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-health-request-builder/index.html">HealthRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests for the health endpoint.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-184258540%2FClasslikes%2F-2014708805" anchor-label="LedgersRequestBuilder" id="-184258540%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-ledgers-request-builder/index.html"><span>Ledgers</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-184258540%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-ledgers-request-builder/index.html">LedgersRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to ledgers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1827421383%2FClasslikes%2F-2014708805" anchor-label="LiquidityPoolsRequestBuilder" id="1827421383%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-liquidity-pools-request-builder/index.html"><span>Liquidity</span><wbr></wbr><span>Pools</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1827421383%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-liquidity-pools-request-builder/index.html">LiquidityPoolsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to liquidity pools.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="399497755%2FClasslikes%2F615662557" anchor-label="MessageEventData" id="399497755%2FClasslikes%2F615662557" data-filterable-set=":stellar-sdk/jsMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-message-event-data/index.html"><span>Message</span><wbr></wbr><span>Event</span><wbr></wbr><span><span>Data</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="399497755%2FClasslikes%2F615662557"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-active="" data-toggle=":stellar-sdk/jsMain">js</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">external </span><span class="token keyword">interface </span><a href="-message-event-data/index.html">MessageEventData</a></div><div class="brief "><p class="paragraph">External declaration for MessageEvent data structure.</p></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1563750667%2FClasslikes%2F-2014708805" anchor-label="OffersRequestBuilder" id="-1563750667%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-offers-request-builder/index.html"><span>Offers</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1563750667%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-offers-request-builder/index.html">OffersRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to offers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1486673792%2FClasslikes%2F-2014708805" anchor-label="OperationsRequestBuilder" id="1486673792%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-operations-request-builder/index.html"><span>Operations</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1486673792%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-operations-request-builder/index.html">OperationsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to operations.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-946967033%2FClasslikes%2F-2014708805" anchor-label="OrderBookRequestBuilder" id="-946967033%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-order-book-request-builder/index.html"><span>Order</span><wbr></wbr><span>Book</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-946967033%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-order-book-request-builder/index.html">OrderBookRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to order books.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-118974753%2FClasslikes%2F-2014708805" anchor-label="PaymentsRequestBuilder" id="-118974753%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-payments-request-builder/index.html"><span>Payments</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-118974753%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-payments-request-builder/index.html">PaymentsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to payments.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1459868212%2FClasslikes%2F-2014708805" anchor-label="RequestBuilder" id="-1459868212%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-request-builder/index.html"><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1459868212%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">class </span><a href="-request-builder/index.html">RequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span><span class="token punctuation">, </span></span><span class="parameter ">defaultSegment<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Abstract base class for all Horizon API request builders. Provides common functionality for building and executing HTTP requests.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="637533962%2FClasslikes%2F-2014708805" anchor-label="RootRequestBuilder" id="637533962%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-root-request-builder/index.html"><span>Root</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="637533962%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-root-request-builder/index.html">RootRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests for the root endpoint.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="848125797%2FClasslikes%2F-2014708805" anchor-label="SSEStream" id="848125797%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-s-s-e-stream/index.html"><span><span>SSEStream</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="848125797%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-s-s-e-stream/index.html">SSEStream</a><span class="token operator">&lt;</span><a href="-s-s-e-stream/index.html">T</a><span class="token operator"> : </span><a href="../com.soneso.stellar.sdk.horizon.responses/-response/index.html">Response</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Manages a Server-Sent Events (SSE) stream from a Horizon API endpoint. Provides automatic reconnection, cursor management, and event delivery.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="972822072%2FClasslikes%2F-2014708805" anchor-label="StrictReceivePathsRequestBuilder" id="972822072%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-strict-receive-paths-request-builder/index.html"><span>Strict</span><wbr></wbr><span>Receive</span><wbr></wbr><span>Paths</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="972822072%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-strict-receive-paths-request-builder/index.html">StrictReceivePathsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to strict receive paths.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1196439137%2FClasslikes%2F-2014708805" anchor-label="StrictSendPathsRequestBuilder" id="1196439137%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-strict-send-paths-request-builder/index.html"><span>Strict</span><wbr></wbr><span>Send</span><wbr></wbr><span>Paths</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1196439137%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-strict-send-paths-request-builder/index.html">StrictSendPathsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to strict send paths.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1825135945%2FClasslikes%2F-2014708805" anchor-label="TradeAggregationsRequestBuilder" id="1825135945%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-trade-aggregations-request-builder/index.html"><span>Trade</span><wbr></wbr><span>Aggregations</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1825135945%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-trade-aggregations-request-builder/index.html">TradeAggregationsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span><span class="token punctuation">, </span></span><span class="parameter ">baseAssetType<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">baseAssetCode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">baseAssetIssuer<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">counterAssetType<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">counterAssetCode<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">counterAssetIssuer<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token punctuation">, </span></span><span class="parameter ">startTime<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">endTime<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">resolution<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span></span><span class="parameter ">offset<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to trade aggregations.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="624246269%2FClasslikes%2F-2014708805" anchor-label="TradesRequestBuilder" id="624246269%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-trades-request-builder/index.html"><span>Trades</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="624246269%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-trades-request-builder/index.html">TradesRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to trades.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-51473353%2FClasslikes%2F-2014708805" anchor-label="TransactionsRequestBuilder" id="-51473353%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-transactions-request-builder/index.html"><span>Transactions</span><wbr></wbr><span>Request</span><wbr></wbr><span><span>Builder</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-51473353%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="-transactions-request-builder/index.html">TransactionsRequestBuilder</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token punctuation">, </span></span><span class="parameter ">serverUri<span class="token operator">: </span><span data-unresolved-link="io.ktor.http/Url///PointingToDeclaration/">Url</span></span></span><span class="token punctuation">)</span> : <a href="-request-builder/index.html">RequestBuilder</a></div><div class="brief "><p class="paragraph">Builds requests connected to transactions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

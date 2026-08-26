@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Sep06Service</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep06/Sep06Service///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep06</a><span class="delimiter">/</span><span class="current">Sep06Service</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span><span>Sep06Service</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">Sep06Service</a></div><p class="paragraph">SEP-6 Programmatic Deposit and Withdrawal service client.</p><p class="paragraph">Provides non-interactive deposit and withdrawal flows with Stellar anchors. SEP-6 enables wallets to offer on/off ramp functionality through a standardized protocol where all required information is provided programmatically in API requests.</p><p class="paragraph">This service handles all communication with SEP-6 compliant anchors, including:</p><ul><li><p class="paragraph">Discovering anchor capabilities and supported assets via /info</p></li><li><p class="paragraph">Initiating programmatic deposit flows via /deposit and /deposit-exchange</p></li><li><p class="paragraph">Initiating programmatic withdrawal flows via /withdraw and /withdraw-exchange</p></li><li><p class="paragraph">Querying fee information via /fee (deprecated, use SEP-38)</p></li><li><p class="paragraph">Querying transaction status and history</p></li><li><p class="paragraph">Updating transaction information via PATCH</p></li></ul><p class="paragraph">Authentication:</p><ul><li><p class="paragraph">The /info endpoint may not require authentication depending on anchor configuration</p></li><li><p class="paragraph">All other endpoints require a valid SEP-10 JWT token</p></li></ul><p class="paragraph">Typical workflow:</p><ol><li><p class="paragraph">Create service instance via <a href="-companion/from-domain.html">fromDomain</a> or <a href="-companion/from-url.html">fromUrl</a></p></li><li><p class="paragraph">Call <a href="info.html">info</a> to discover supported assets and limits</p></li><li><p class="paragraph">Authenticate via SEP-10 WebAuth to obtain a JWT token</p></li><li><p class="paragraph">Call <a href="deposit.html">deposit</a> or <a href="withdraw.html">withdraw</a> to initiate a programmatic flow</p></li><li><p class="paragraph">Follow deposit instructions or send withdrawal payment</p></li><li><p class="paragraph">Poll <a href="transaction.html">transaction</a> to monitor completion</p></li></ol><p class="paragraph">Example - Complete deposit flow:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// 1. Initialize from domain<br>val sep06 = Sep06Service.fromDomain(&quot;anchor.example.com&quot;)<br><br>// 2. Check supported assets<br>val info = sep06.info()<br>val usdcEnabled = info.deposit?.get(&quot;USDC&quot;)?.enabled == true<br><br>// 3. Authenticate via SEP-10<br>val webAuth = WebAuth.fromDomain(&quot;anchor.example.com&quot;, network)<br>val jwt = webAuth.jwtToken(accountId, listOf(keyPair)).token<br><br>// 4. Initiate deposit<br>val response = sep06.deposit(Sep06DepositRequest(<br>    assetCode = &quot;USDC&quot;,<br>    account = keyPair.getAccountId(),<br>    jwt = jwt,<br>    amount = &quot;100&quot;<br>))<br><br>// 5. Follow deposit instructions<br>response.instructions?.forEach { (field, instruction) -&gt;<br>    println(&quot;$field: ${instruction.value} - ${instruction.description}&quot;)<br>}<br><br>// 6. Poll for completion<br>val tx = sep06.transaction(Sep06TransactionRequest(id = response.id, jwt = jwt))<br>println(&quot;Status: ${tx.transaction.status}&quot;)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Error handling:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">try {<br>    val response = sep06.deposit(request)<br>} catch (e: Sep06AuthenticationRequiredException) {<br>    // JWT expired, re-authenticate via SEP-10<br>} catch (e: Sep06CustomerInformationNeededException) {<br>    // Additional KYC fields required, submit via SEP-12<br>    println(&quot;Required fields: ${e.fields}&quot;)<br>} catch (e: Sep06CustomerInformationStatusException) {<br>    // KYC status prevents transaction<br>    println(&quot;KYC status: ${e.status}&quot;)<br>} catch (e: Sep06InvalidRequestException) {<br>    // Invalid parameters, check request<br>} catch (e: Sep06ServerErrorException) {<br>    // Anchor server error, retry with backoff<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - SEP-38 quote integration:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Get firm quote first<br>val quoteService = QuoteService.fromDomain(&quot;anchor.example.com&quot;)<br>val quote = quoteService.postQuote(<br>    Sep38QuoteRequest(<br>        context = &quot;sep6&quot;,<br>        sellAsset = &quot;iso4217:USD&quot;,<br>        buyAsset = &quot;stellar:USDC:GA...&quot;,<br>        sellAmount = &quot;100&quot;<br>    ),<br>    jwt<br>)<br><br>// Use quote in deposit-exchange<br>val response = sep06.depositExchange(Sep06DepositExchangeRequest(<br>    destinationAsset = &quot;USDC&quot;,<br>    sourceAsset = &quot;iso4217:USD&quot;,<br>    amount = quote.sellAmount,<br>    account = keyPair.getAccountId(),<br>    jwt = jwt,<br>    quoteId = quote.id<br>))</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="-companion/from-domain.html">fromDomain</a> for automatic configuration from stellar.toml</p></li><li><p class="paragraph"><a href="../-sep06-deposit-request/index.html">Sep06DepositRequest</a> for deposit parameters</p></li><li><p class="paragraph"><a href="../-sep06-withdraw-request/index.html">Sep06WithdrawRequest</a> for withdrawal parameters</p></li><li><p class="paragraph"><a href="../-sep06-transaction/index.html">Sep06Transaction</a> for transaction status and details</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0006.md">SEP-0006 Specification</a></p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="1330607624%2FClasslikes%2F-2014708805" anchor-label="Companion" id="1330607624%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1330607624%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-1515348409%2FFunctions%2F-2014708805" anchor-label="deposit" id="-1515348409%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="deposit.html"><span><span>deposit</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1515348409%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="deposit.html"><span class="token function">deposit</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-deposit-request/index.html">Sep06DepositRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-deposit-response/index.html">Sep06DepositResponse</a></div><div class="brief "><p class="paragraph">Initiates a programmatic deposit.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="908286951%2FFunctions%2F-2014708805" anchor-label="depositExchange" id="908286951%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="deposit-exchange.html"><span>deposit</span><wbr></wbr><span><span>Exchange</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="908286951%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="deposit-exchange.html"><span class="token function">depositExchange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-deposit-exchange-request/index.html">Sep06DepositExchangeRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-deposit-response/index.html">Sep06DepositResponse</a></div><div class="brief "><p class="paragraph">Initiates a programmatic deposit with asset conversion (SEP-38 exchange).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-969946425%2FFunctions%2F-2014708805" anchor-label="fee" id="-969946425%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fee.html"><span><span>fee</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-969946425%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="fee.html"><span class="token function">fee</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-fee-request/index.html">Sep06FeeRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-fee-response/index.html">Sep06FeeResponse</a></div><div class="brief "><p class="paragraph">Gets the fee for a deposit or withdrawal operation.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-284901644%2FFunctions%2F-2014708805" anchor-label="info" id="-284901644%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="info.html"><span><span>info</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-284901644%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="info.html"><span class="token function">info</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">language<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">jwt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-info-response/index.html">Sep06InfoResponse</a></div><div class="brief "><p class="paragraph">Gets anchor capabilities and supported assets.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="322414481%2FFunctions%2F-2014708805" anchor-label="patchTransaction" id="322414481%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="patch-transaction.html"><span>patch</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="322414481%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="patch-transaction.html"><span class="token function">patchTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-patch-transaction-request/index.html">Sep06PatchTransactionRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><span data-unresolved-link="io.ktor.client.statement/HttpResponse///PointingToDeclaration/">HttpResponse</span></div><div class="brief "><p class="paragraph">Updates a transaction with additional information requested by the anchor.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="620890311%2FFunctions%2F-2014708805" anchor-label="transaction" id="620890311%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="transaction.html"><span><span>transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="620890311%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="transaction.html"><span class="token function">transaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-transaction-request/index.html">Sep06TransactionRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-transaction-response/index.html">Sep06TransactionResponse</a></div><div class="brief "><p class="paragraph">Gets a single transaction by its identifier.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-395111473%2FFunctions%2F-2014708805" anchor-label="transactions" id="-395111473%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="transactions.html"><span><span>transactions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-395111473%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="transactions.html"><span class="token function">transactions</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-transactions-request/index.html">Sep06TransactionsRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-transactions-response/index.html">Sep06TransactionsResponse</a></div><div class="brief "><p class="paragraph">Gets transaction history for the authenticated account.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="118374841%2FFunctions%2F-2014708805" anchor-label="withdraw" id="118374841%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="withdraw.html"><span><span>withdraw</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="118374841%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="withdraw.html"><span class="token function">withdraw</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-withdraw-request/index.html">Sep06WithdrawRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-withdraw-response/index.html">Sep06WithdrawResponse</a></div><div class="brief "><p class="paragraph">Initiates a programmatic withdrawal.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1561968063%2FFunctions%2F-2014708805" anchor-label="withdrawExchange" id="1561968063%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="withdraw-exchange.html"><span>withdraw</span><wbr></wbr><span><span>Exchange</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1561968063%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="withdraw-exchange.html"><span class="token function">withdrawExchange</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../-sep06-withdraw-exchange-request/index.html">Sep06WithdrawExchangeRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-sep06-withdraw-response/index.html">Sep06WithdrawResponse</a></div><div class="brief "><p class="paragraph">Initiates a programmatic withdrawal with asset conversion (SEP-38 exchange).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

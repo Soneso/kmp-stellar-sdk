@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>ClientDomainSigningDelegate</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep10/ClientDomainSigningDelegate///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep10</a><span class="delimiter">/</span><span class="current">ClientDomainSigningDelegate</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Client</span><wbr></wbr><span>Domain</span><wbr></wbr><span>Signing</span><wbr></wbr><span><span>Delegate</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><span class="token keyword">interface </span><a href="index.html">ClientDomainSigningDelegate</a></div><p class="paragraph">Functional interface for delegating client domain transaction signing to external services.</p><p class="paragraph">This delegate is for signing with your WALLET'S domain key to prove wallet identity during SEP-10 authentication. This is NOT for user account signing - use the signers parameter for that.</p><p class="paragraph">This enables integration with wallet backend infrastructure that manages the wallet's domain signing key:</p><ul><li><p class="paragraph">Wallet backend servers - Your company's authentication server managing the wallet's domain key</p></li><li><p class="paragraph">Hardware Security Modules (HSMs) - Secure cryptographic key storage for wallet infrastructure</p></li><li><p class="paragraph">Cloud KMS services - AWS KMS, Google Cloud KMS for wallet backend key management</p></li><li><p class="paragraph">Multi-Party Computation (MPC) systems - Distributed key management for wallet infrastructure</p></li></ul><p class="paragraph">Use Cases:</p><ul><li><p class="paragraph">Wallet backends where the domain signing key is managed server-side</p></li><li><p class="paragraph">Enterprise wallet infrastructure requiring HSM-backed domain keys</p></li><li><p class="paragraph">Wallet companies with regulatory requirements for key custody</p></li><li><p class="paragraph">Multi-signature wallet domain accounts with threshold requirements</p></li></ul><p class="paragraph">Multi-Signature Support:</p><ul><li><p class="paragraph">Wallet domain accounts can have multiple signers with threshold requirements</p></li><li><p class="paragraph">The delegate can add multiple signatures to meet the wallet domain account's signing threshold</p></li><li><p class="paragraph">Common for enterprise wallet backends where master key is disabled (weight = 0)</p></li><li><p class="paragraph">Supports regulatory compliance requiring multi-custody signatures for wallet identity</p></li></ul><p class="paragraph">Security Considerations:</p><ul><li><p class="paragraph">The delegate receives the full transaction XDR (not just a hash) for transparency</p></li><li><p class="paragraph">Wallet backend can verify transaction contents before signing with domain key</p></li><li><p class="paragraph">Returned transaction must not be modified (only signatures added)</p></li><li><p class="paragraph">Network passphrase is embedded in transaction hash to prevent replay attacks</p></li><li><p class="paragraph">Only use with your own trusted wallet backend services</p></li></ul><p class="paragraph">Example - Wallet company HSM:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val signingDelegate = ClientDomainSigningDelegate { transactionXdr -&gt;<br>    // Parse transaction<br>    val tx = AbstractTransaction.fromEnvelopeXdr(transactionXdr, network) as Transaction<br><br>    // Sign with your wallet company's HSM (not user's HSM)<br>    tx.sign(walletDomainHsmKeyPair)<br><br>    // Return signed transaction<br>    tx.toEnvelopeXdrBase64()<br>}<br><br>val token = webAuth.jwtToken(<br>    clientAccountId = userAccountId,<br>    signers = listOf(userKeyPair),<br>    clientDomain = &quot;wallet.company.com&quot;,<br>    clientDomainSigningDelegate = signingDelegate<br>)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Multi-signature wallet domain account:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val signingDelegate = ClientDomainSigningDelegate { transactionXdr -&gt;<br>    val tx = AbstractTransaction.fromEnvelopeXdr(transactionXdr, network) as Transaction<br><br>    // Add multiple wallet domain signatures to meet threshold<br>    tx.sign(walletDomainSigner1KeyPair)<br>    tx.sign(walletDomainSigner2KeyPair)<br><br>    tx.toEnvelopeXdrBase64()<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Wallet backend server:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val signingDelegate = ClientDomainSigningDelegate { transactionXdr -&gt;<br>    // Send to your wallet's backend server for domain signing<br>    val response = httpClient.post(&quot;https://backend.wallet-company.com/sign-client-domain&quot;) {<br>        contentType(ContentType.Application.Json)<br>        setBody(&quot;&quot;&quot;{&quot;transaction&quot;: &quot;$transactionXdr&quot;}&quot;&quot;&quot;)<br>    }<br><br>    // Backend returns signed transaction<br>    response.body&lt;String&gt;()<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div></div></span></div><div><div class="title"><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md">SEP-10 Specification</a></p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-2018189709%2FFunctions%2F-2014708805" anchor-label="signTransaction" id="-2018189709%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="sign-transaction.html"><span>sign</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2018189709%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="sign-transaction.html"><span class="token function">signTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">transactionXdr<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Signs a transaction with the client domain signing key(s).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>XdrReader</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+                <button class="platform-tag platform-selector js-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/jsMain">js</button>
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/jvmMain">jvm</button>
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/nativeMain">native</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option js-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/jsMain"
+                                       data-filter=":stellar-sdk/jsMain"/>
+                                <span class="checkbox--icon"></span>
+                                js
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/jvmMain"
+                                       data-filter=":stellar-sdk/jvmMain"/>
+                                <span class="checkbox--icon"></span>
+                                jvm
+                            </label>
+                        </li>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/nativeMain"
+                                       data-filter=":stellar-sdk/nativeMain"/>
+                                <span class="checkbox--icon"></span>
+                                native
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.xdr/XdrReader///PointingToDeclaration//-559440866">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.xdr</a><span class="delimiter">/</span><span class="current">XdrReader</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Xdr</span><wbr></wbr><span><span>Reader</span></span></h1>
+    <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+      <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">class </span><a href="index.html">XdrReader</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">class </span><a href="index.html">XdrReader</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">class </span><a href="index.html">XdrReader</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">class </span><a href="index.html">XdrReader</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div>    </div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="1229988926%2FConstructors%2F-559440866" anchor-label="XdrReader" id="1229988926%2FConstructors%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-xdr-reader.html"><span>Xdr</span><wbr></wbr><span><span>Reader</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1229988926%2FConstructors%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">input<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></span></span><span class="token punctuation">)</span></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1786180643%2FFunctions%2F-559440866" anchor-label="enterRecursion" id="1786180643%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="enter-recursion.html"><span>enter</span><wbr></wbr><span><span>Recursion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1786180643%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="enter-recursion.html"><span class="token function">enterRecursion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">cap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Increments the recursion depth counter and throws if the depth exceeds <a href="enter-recursion.html">cap</a>.</p></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="enter-recursion.html"><span class="token function">enterRecursion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">cap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="enter-recursion.html"><span class="token function">enterRecursion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">cap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="enter-recursion.html"><span class="token function">enterRecursion</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">cap<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="952190183%2FFunctions%2F-559440866" anchor-label="exitRecursion" id="952190183%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="exit-recursion.html"><span>exit</span><wbr></wbr><span><span>Recursion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="952190183%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="exit-recursion.html"><span class="token function">exitRecursion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Decrements the recursion depth counter.</p></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="exit-recursion.html"><span class="token function">exitRecursion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="exit-recursion.html"><span class="token function">exitRecursion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="exit-recursion.html"><span class="token function">exitRecursion</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1937806759%2FFunctions%2F-559440866" anchor-label="readBoolean" id="-1937806759%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-boolean.html"><span>read</span><wbr></wbr><span><span>Boolean</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1937806759%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-boolean.html"><span class="token function">readBoolean</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-boolean.html"><span class="token function">readBoolean</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-boolean.html"><span class="token function">readBoolean</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-boolean.html"><span class="token function">readBoolean</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1131472584%2FFunctions%2F-559440866" anchor-label="readDouble" id="1131472584%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-double.html"><span>read</span><wbr></wbr><span><span>Double</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1131472584%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-double.html"><span class="token function">readDouble</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-double.html"><span class="token function">readDouble</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-double.html"><span class="token function">readDouble</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-double.html"><span class="token function">readDouble</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-double/index.html">Double</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1847816438%2FFunctions%2F-559440866" anchor-label="readFixedOpaque" id="-1847816438%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-fixed-opaque.html"><span>read</span><wbr></wbr><span>Fixed</span><wbr></wbr><span><span>Opaque</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1847816438%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-fixed-opaque.html"><span class="token function">readFixedOpaque</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-fixed-opaque.html"><span class="token function">readFixedOpaque</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-fixed-opaque.html"><span class="token function">readFixedOpaque</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-fixed-opaque.html"><span class="token function">readFixedOpaque</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">length<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-826083419%2FFunctions%2F-559440866" anchor-label="readFloat" id="-826083419%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-float.html"><span>read</span><wbr></wbr><span><span>Float</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-826083419%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-float.html"><span class="token function">readFloat</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-float.html"><span class="token function">readFloat</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-float.html"><span class="token function">readFloat</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-float.html"><span class="token function">readFloat</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-float/index.html">Float</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-651641230%2FFunctions%2F-559440866" anchor-label="readInt" id="-651641230%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-int.html"><span>read</span><wbr></wbr><span><span>Int</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-651641230%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-int.html"><span class="token function">readInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-int.html"><span class="token function">readInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-int.html"><span class="token function">readInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-int.html"><span class="token function">readInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1477140099%2FFunctions%2F-559440866" anchor-label="readLong" id="-1477140099%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-long.html"><span>read</span><wbr></wbr><span><span>Long</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1477140099%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-long.html"><span class="token function">readLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-long.html"><span class="token function">readLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-long.html"><span class="token function">readLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-long.html"><span class="token function">readLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="277891720%2FFunctions%2F-559440866" anchor-label="readString" id="277891720%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-string.html"><span>read</span><wbr></wbr><span><span>String</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="277891720%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-string.html"><span class="token function">readString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-string.html"><span class="token function">readString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-string.html"><span class="token function">readString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-string.html"><span class="token function">readString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-455941113%2FFunctions%2F-559440866" anchor-label="readUnsignedInt" id="-455941113%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-unsigned-int.html"><span>read</span><wbr></wbr><span>Unsigned</span><wbr></wbr><span><span>Int</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-455941113%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-unsigned-int.html"><span class="token function">readUnsignedInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-int/index.html">UInt</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-int.html"><span class="token function">readUnsignedInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-int/index.html">UInt</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-int.html"><span class="token function">readUnsignedInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-int/index.html">UInt</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-int.html"><span class="token function">readUnsignedInt</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-int/index.html">UInt</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="294596232%2FFunctions%2F-559440866" anchor-label="readUnsignedLong" id="294596232%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-unsigned-long.html"><span>read</span><wbr></wbr><span>Unsigned</span><wbr></wbr><span><span>Long</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="294596232%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-unsigned-long.html"><span class="token function">readUnsignedLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-long/index.html">ULong</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-long.html"><span class="token function">readUnsignedLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-long/index.html">ULong</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-long.html"><span class="token function">readUnsignedLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-long/index.html">ULong</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-unsigned-long.html"><span class="token function">readUnsignedLong</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-u-long/index.html">ULong</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-204426660%2FFunctions%2F-559440866" anchor-label="readVariableOpaque" id="-204426660%2FFunctions%2F-559440866" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/commonMain,:stellar-sdk/jsMain,:stellar-sdk/jvmMain,:stellar-sdk/nativeMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="read-variable-opaque.html"><span>read</span><wbr></wbr><span>Variable</span><wbr></wbr><span><span>Opaque</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-204426660%2FFunctions%2F-559440866"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted  with-platform-tabs" data-platform-hinted="data-platform-hinted">
+                    <div class="platform-bookmarks-row" data-toggle-list="data-toggle-list"><button class="platform-bookmark" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain" data-active="" data-toggle=":stellar-sdk/commonMain">common</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jsMain" data-filterable-set=":stellar-sdk/jsMain" data-toggle=":stellar-sdk/jsMain">js</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/jvmMain" data-filterable-set=":stellar-sdk/jvmMain" data-toggle=":stellar-sdk/jvmMain">jvm</button><button class="platform-bookmark" data-filterable-current=":stellar-sdk/nativeMain" data-filterable-set=":stellar-sdk/nativeMain" data-toggle=":stellar-sdk/nativeMain">native</button></div>
+<div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">fun </span><a href="read-variable-opaque.html"><span class="token function">readVariableOpaque</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jsMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-variable-opaque.html"><span class="token function">readVariableOpaque</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/jvmMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-variable-opaque.html"><span class="token function">readVariableOpaque</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div><div class="content sourceset-dependent-content" data-togglable=":stellar-sdk/nativeMain"><div class="symbol monospace"><span class="token keyword">actual </span><span class="token keyword">fun </span><a href="read-variable-opaque.html"><span class="token function">readVariableOpaque</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div></div>                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

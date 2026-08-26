@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>StandardKYCFields</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep09/StandardKYCFields///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep09</a><span class="delimiter">/</span><span class="current">StandardKYCFields</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Standard</span><wbr></wbr><span><span>KYCFields</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">StandardKYCFields</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>naturalPersonKYCFields<span class="token operator">: </span><a href="../-natural-person-k-y-c-fields/index.html">NaturalPersonKYCFields</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>organizationKYCFields<span class="token operator">: </span><a href="../-organization-k-y-c-fields/index.html">OrganizationKYCFields</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><p class="paragraph">Implements SEP-0009 - Standard KYC Fields for Stellar Ecosystem.</p><p class="paragraph">Defines standardized Know Your Customer (KYC) and Anti-Money Laundering (AML) fields for use across the Stellar ecosystem. Anchors, exchanges, and other regulated entities use these fields for consistent identity verification.</p><p class="paragraph">This class serves as the top-level container for all SEP-09 KYC information, supporting both individual and business customers.</p><p class="paragraph">Implementation version: SEP-0009 v1.18.0</p><p class="paragraph">Total fields: 76 across 4 categories</p><ul><li><p class="paragraph">Natural person: 34 fields (28 text + 6 binary)</p></li><li><p class="paragraph">Organization: 17 fields (15 text + 2 binary)</p></li><li><p class="paragraph">Financial account: 14 fields</p></li><li><p class="paragraph">Card payment: 11 fields</p></li></ul><p class="paragraph">Field categories:</p><ul><li><p class="paragraph">Natural person fields (individuals) - <a href="../-natural-person-k-y-c-fields/index.html">NaturalPersonKYCFields</a></p></li><li><p class="paragraph">Organization fields (businesses) - <a href="../-organization-k-y-c-fields/index.html">OrganizationKYCFields</a></p></li><li><p class="paragraph">Financial account fields (bank accounts, crypto addresses) - <a href="../-financial-account-k-y-c-fields/index.html">FinancialAccountKYCFields</a></p></li><li><p class="paragraph">Card payment fields (credit/debit cards) - <a href="../-card-k-y-c-fields/index.html">CardKYCFields</a></p></li></ul><p class="paragraph">Use cases:</p><ul><li><p class="paragraph">Anchor deposit/withdrawal identity verification</p></li><li><p class="paragraph">Exchange account registration</p></li><li><p class="paragraph">Compliance requirements for regulated transfers</p></li><li><p class="paragraph">Cross-border payment identity checks</p></li></ul><p class="paragraph">Example - Natural person:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Create KYC data for individual customer<br>val kyc = StandardKYCFields(<br>    naturalPersonKYCFields = NaturalPersonKYCFields(<br>        firstName = &quot;John&quot;,<br>        lastName = &quot;Doe&quot;,<br>        emailAddress = &quot;john@example.com&quot;,<br>        birthDate = LocalDate(1990, 1, 15),<br>        idType = &quot;passport&quot;,<br>        idNumber = &quot;123456789&quot;,<br>        financialAccountKYCFields = FinancialAccountKYCFields(<br>            bankName = &quot;Example Bank&quot;,<br>            bankAccountNumber = &quot;1234567890&quot;<br>        )<br>    )<br>)<br><br>// Extract all fields for submission<br>val allFields = kyc.fields()<br>val allFiles = kyc.files()</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Organization:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Create KYC data for business customer<br>val kyc = StandardKYCFields(<br>    organizationKYCFields = OrganizationKYCFields(<br>        name = &quot;Example Corp&quot;,<br>        VATNumber = &quot;123456789&quot;,<br>        registrationNumber = &quot;987654321&quot;,<br>        directorName = &quot;Jane Smith&quot;,<br>        email = &quot;contact@example.com&quot;,<br>        financialAccountKYCFields = FinancialAccountKYCFields(<br>            bankName = &quot;Corporate Bank&quot;,<br>            bankAccountNumber = &quot;9876543210&quot;<br>        )<br>    )<br>)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - With SEP-12 submission:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Create KYC fields<br>val kycFields = StandardKYCFields(<br>    naturalPersonKYCFields = NaturalPersonKYCFields(<br>        firstName = &quot;John&quot;,<br>        lastName = &quot;Doe&quot;,<br>        emailAddress = &quot;john@example.com&quot;<br>    )<br>)<br><br>// Submit to SEP-12 KYC service<br>val request = PutCustomerInfoRequest(<br>    jwt = authToken,<br>    kycFields = kycFields<br>)<br>val response = kycService.putCustomerInfo(request)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Field format standards:</p><ul><li><p class="paragraph">Date fields: ISO 8601 date-only (YYYY-MM-DD) via kotlinx.datetime.LocalDate</p></li><li><p class="paragraph">Country codes: ISO 3166-1 alpha-3 (3 characters, e.g., &quot;USA&quot;)</p></li><li><p class="paragraph">Language codes: ISO 639-1 (2 characters, e.g., &quot;en&quot;)</p></li><li><p class="paragraph">Phone numbers: E.164 format (e.g., &quot;+14155551234&quot;)</p></li><li><p class="paragraph">Occupation: ISCO08 code (3 characters)</p></li><li><p class="paragraph">Binary fields: ByteArray for document images (JPEG, PNG)</p></li></ul><p class="paragraph">Important notes:</p><ul><li><p class="paragraph">Fields follow ISO standards where applicable</p></li><li><p class="paragraph">Document images should be in common formats (JPEG, PNG, PDF)</p></li><li><p class="paragraph">Some fields may be required or optional depending on jurisdiction</p></li><li><p class="paragraph">Organization fields use &quot;organization.&quot; prefix</p></li><li><p class="paragraph">Card fields use &quot;card.&quot; prefix</p></li></ul><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="../-natural-person-k-y-c-fields/index.html">NaturalPersonKYCFields</a> for individual customer fields</p></li><li><p class="paragraph"><a href="../-organization-k-y-c-fields/index.html">OrganizationKYCFields</a> for business entity fields</p></li><li><p class="paragraph"><a href="../-financial-account-k-y-c-fields/index.html">FinancialAccountKYCFields</a> for bank account information</p></li><li><p class="paragraph"><a href="../-card-k-y-c-fields/index.html">CardKYCFields</a> for payment card information</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0009.md">SEP-0009 Specification</a></p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012 Specification</a> for Customer Info API</p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="1502111281%2FConstructors%2F-2014708805" anchor-label="StandardKYCFields" id="1502111281%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-standard-k-y-c-fields.html"><span>Standard</span><wbr></wbr><span><span>KYCFields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1502111281%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">naturalPersonKYCFields<span class="token operator">: </span><a href="../-natural-person-k-y-c-fields/index.html">NaturalPersonKYCFields</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">organizationKYCFields<span class="token operator">: </span><a href="../-organization-k-y-c-fields/index.html">OrganizationKYCFields</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-1835598888%2FProperties%2F-2014708805" anchor-label="naturalPersonKYCFields" id="-1835598888%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="natural-person-k-y-c-fields.html"><span>natural</span><wbr></wbr><span>Person</span><wbr></wbr><span><span>KYCFields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1835598888%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="natural-person-k-y-c-fields.html">naturalPersonKYCFields</a><span class="token operator">: </span><a href="../-natural-person-k-y-c-fields/index.html">NaturalPersonKYCFields</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">KYC fields for natural persons (individuals)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1592670263%2FProperties%2F-2014708805" anchor-label="organizationKYCFields" id="1592670263%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="organization-k-y-c-fields.html"><span>organization</span><wbr></wbr><span><span>KYCFields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1592670263%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="organization-k-y-c-fields.html">organizationKYCFields</a><span class="token operator">: </span><a href="../-organization-k-y-c-fields/index.html">OrganizationKYCFields</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">KYC fields for organizations (businesses)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="893307855%2FFunctions%2F-2014708805" anchor-label="fields" id="893307855%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fields.html"><span><span>fields</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="893307855%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="fields.html"><span class="token function">fields</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Converts all text KYC fields to a map for SEP-9 submission.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1974782181%2FFunctions%2F-2014708805" anchor-label="files" id="-1974782181%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="files.html"><span><span>files</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1974782181%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="files.html"><span class="token function">files</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-map/index.html">Map</a><span class="token operator">&lt;</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Converts all binary KYC fields to a map for SEP-9 submission.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

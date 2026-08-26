@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>SorobanServer</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.rpc/SorobanServer///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.rpc</a><span class="delimiter">/</span><span class="current">SorobanServer</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Soroban</span><wbr></wbr><span><span>Server</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">SorobanServer</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">serverUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token operator"> = </span>defaultHttpClient()</span></span><span class="token punctuation">)</span> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-auto-closeable/index.html">AutoCloseable</a></div><p class="paragraph">Main client class for connecting to a Soroban RPC instance and making requests.</p><p class="paragraph">Soroban RPC is Stellar's smart contract platform RPC server that provides APIs to:</p><ul><li><p class="paragraph">Simulate and submit smart contract transactions</p></li><li><p class="paragraph">Query contract state and ledger entries</p></li><li><p class="paragraph">Monitor transaction status and events</p></li><li><p class="paragraph">Fetch network metadata and fee statistics</p></li></ul><h2 class="">JSON-RPC 2.0 Protocol</h2><p class="paragraph">All Soroban RPC methods use JSON-RPC 2.0 over HTTP. This client handles:</p><ul><li><p class="paragraph">Request/response serialization</p></li><li><p class="paragraph">Error handling and exception mapping</p></li><li><p class="paragraph">Automatic request ID generation</p></li><li><p class="paragraph">HTTP connection management</p></li></ul><h2 class="">Basic Usage</h2><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// Create server instance<br>val server = SorobanServer(&quot;https://soroban-testnet.stellar.org:443&quot;)<br><br>// Check server health<br>val health = server.getHealth()<br>println(&quot;Server status: ${health.status}&quot;)<br><br>// Get account for transaction building<br>val account = server.getAccount(&quot;GABC...&quot;)<br><br>// Simulate a transaction<br>val simulation = server.simulateTransaction(transaction)<br><br>// Prepare transaction with simulation results<br>val prepared = server.prepareTransaction(transaction)<br><br>// Sign and submit<br>prepared.sign(keypair)<br>val response = server.sendTransaction(prepared)<br><br>// Poll for completion<br>val result = server.pollTransaction(response.hash!!)<br><br>// Close when done<br>server.close()</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h2 class="">Transaction Preparation Flow</h2><p class="paragraph">Soroban transactions require simulation before submission to:</p><ol><li><p class="paragraph">Calculate resource requirements (CPU, memory, storage)</p></li><li><p class="paragraph">Determine authorization entries needed</p></li><li><p class="paragraph">Estimate resource fees</p></li></ol><p class="paragraph">The typical flow is:</p><ol><li><p class="paragraph">Build transaction with <a href="../../com.soneso.stellar.sdk/-transaction-builder/index.html">com.soneso.stellar.sdk.TransactionBuilder</a></p></li><li><p class="paragraph">Call <a href="simulate-transaction.html">simulateTransaction</a> to get resource estimates</p></li><li><p class="paragraph">Call <a href="prepare-transaction.html">prepareTransaction</a> to apply estimates to transaction</p></li><li><p class="paragraph">Sign the prepared transaction</p></li><li><p class="paragraph">Submit with <a href="send-transaction.html">sendTransaction</a></p></li><li><p class="paragraph">Poll for completion with <a href="poll-transaction.html">pollTransaction</a></p></li></ol><p class="paragraph">Or use the simplified flow:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val prepared = server.prepareTransaction(transaction)  // Simulates internally<br>prepared.sign(keypair)<br>val response = server.sendTransaction(prepared)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h2 class="">Resource Management</h2><p class="paragraph">This class implements <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-auto-closeable/index.html">AutoCloseable</a> and should be closed when no longer needed to release HTTP client resources:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">SorobanServer(url).use { server -&gt;<br>    // Use server<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><h2 class="">Error Handling</h2><p class="paragraph">Methods throw:</p><ul><li><p class="paragraph"><a href="../../com.soneso.stellar.sdk.rpc.exception/-soroban-rpc-exception/index.html">SorobanRpcException</a> - RPC-level errors (server returns error response)</p></li><li><p class="paragraph"><a href="../../com.soneso.stellar.sdk.rpc.exception/-prepare-transaction-exception/index.html">PrepareTransactionException</a> - Transaction preparation failures</p></li><li><p class="paragraph"><span data-unresolved-link="kotlinx.coroutines/TimeoutCancellationException///PointingToDeclaration/">kotlinx.coroutines.TimeoutCancellationException</span> - Request timeout</p></li><li><p class="paragraph"><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-exception/index.html">Exception</a> - Network/connection errors</p></li></ul><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div></div></span></div><div><div class="title"><p class="paragraph"><a href="https://developers.stellar.org/docs/smart-contracts">Stellar Smart Contracts</a></p></div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="818847112%2FConstructors%2F-2014708805" anchor-label="SorobanServer" id="818847112%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-soroban-server.html"><span>Soroban</span><wbr></wbr><span><span>Server</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="818847112%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">serverUrl<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">httpClient<span class="token operator">: </span><span data-unresolved-link="io.ktor.client/HttpClient///PointingToDeclaration/">HttpClient</span><span class="token operator"> = </span>defaultHttpClient()</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="274310723%2FClasslikes%2F-2014708805" anchor-label="Companion" id="274310723%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="274310723%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1852773270%2FClasslikes%2F-2014708805" anchor-label="Durability" id="-1852773270%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-durability/index.html"><span><span>Durability</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1852773270%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">enum </span><a href="-durability/index.html">Durability</a> : <a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-enum/index.html">Enum</a><span class="token operator">&lt;</span><a href="-durability/index.html">SorobanServer.Durability</a><span class="token operator">&gt; </span></div><div class="brief "><p class="paragraph">Durability level for contract data storage.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="632460676%2FFunctions%2F-2014708805" anchor-label="close" id="632460676%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="close.html"><span><span>close</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="632460676%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="close.html"><span class="token function">close</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span></div><div class="brief "><p class="paragraph">Closes the HTTP client and releases resources.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-432974819%2FFunctions%2F-2014708805" anchor-label="getAccount" id="-432974819%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-account.html"><span>get</span><wbr></wbr><span><span>Account</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-432974819%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-account.html"><span class="token function">getAccount</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">address<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction-builder-account/index.html">TransactionBuilderAccount</a></div><div class="brief "><p class="paragraph">Fetches a minimal set of current info about a Stellar account.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1094749278%2FFunctions%2F-2014708805" anchor-label="getContractData" id="1094749278%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-contract-data.html"><span>get</span><wbr></wbr><span>Contract</span><wbr></wbr><span><span>Data</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1094749278%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-contract-data.html"><span class="token function">getContractData</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">contractId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">key<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a><span class="token punctuation">, </span></span><span class="parameter ">durability<span class="token operator">: </span><a href="-durability/index.html">SorobanServer.Durability</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-ledger-entries-response/-ledger-entry-result/index.html">GetLedgerEntriesResponse.LedgerEntryResult</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Reads contract data for a specific key.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1030264331%2FFunctions%2F-2014708805" anchor-label="getEvents" id="1030264331%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-events.html"><span>get</span><wbr></wbr><span><span>Events</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1030264331%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-events.html"><span class="token function">getEvents</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.requests/-get-events-request/index.html">GetEventsRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-events-response/index.html">GetEventsResponse</a></div><div class="brief "><p class="paragraph">Fetches all events matching the given filters.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-444136153%2FFunctions%2F-2014708805" anchor-label="getExternalRefWasmHash" id="-444136153%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-external-ref-wasm-hash.html"><span>get</span><wbr></wbr><span>External</span><wbr></wbr><span>Ref</span><wbr></wbr><span>Wasm</span><wbr></wbr><span><span>Hash</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-444136153%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-external-ref-wasm-hash.html"><span class="token function">getExternalRefWasmHash</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">ref<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-contract-executable-external-ref-xdr/index.html">ContractExecutableExternalRefXdr</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-byte-array/index.html">ByteArray</a></div><div class="brief "><p class="paragraph">Resolves a CAP-85 external reference to the 32-byte WASM hash it names.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2025178643%2FFunctions%2F-2014708805" anchor-label="getFeeStats" id="-2025178643%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-fee-stats.html"><span>get</span><wbr></wbr><span>Fee</span><wbr></wbr><span><span>Stats</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2025178643%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-fee-stats.html"><span class="token function">getFeeStats</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-fee-stats-response/index.html">GetFeeStatsResponse</a></div><div class="brief "><p class="paragraph">Gets statistics for charged inclusion fees.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1716457494%2FFunctions%2F-2014708805" anchor-label="getHealth" id="-1716457494%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-health.html"><span>get</span><wbr></wbr><span><span>Health</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1716457494%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-health.html"><span class="token function">getHealth</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-health-response/index.html">GetHealthResponse</a></div><div class="brief "><p class="paragraph">Performs a general node health check.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2121078218%2FFunctions%2F-2014708805" anchor-label="getLatestLedger" id="-2121078218%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-latest-ledger.html"><span>get</span><wbr></wbr><span>Latest</span><wbr></wbr><span><span>Ledger</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2121078218%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-latest-ledger.html"><span class="token function">getLatestLedger</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-latest-ledger-response/index.html">GetLatestLedgerResponse</a></div><div class="brief "><p class="paragraph">Fetches the latest ledger metadata.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="452093104%2FFunctions%2F-2014708805" anchor-label="getLedgerEntries" id="452093104%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-ledger-entries.html"><span>get</span><wbr></wbr><span>Ledger</span><wbr></wbr><span><span>Entries</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="452093104%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-ledger-entries.html"><span class="token function">getLedgerEntries</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">keys<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.collections/-collection/index.html">Collection</a><span class="token operator">&lt;</span><a href="../../com.soneso.stellar.sdk.xdr/-ledger-key-xdr/index.html">LedgerKeyXdr</a><span class="token operator">&gt;</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-ledger-entries-response/index.html">GetLedgerEntriesResponse</a></div><div class="brief "><p class="paragraph">Reads the current value of ledger entries directly.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2052006527%2FFunctions%2F-2014708805" anchor-label="getLedgers" id="2052006527%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-ledgers.html"><span>get</span><wbr></wbr><span><span>Ledgers</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2052006527%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-ledgers.html"><span class="token function">getLedgers</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.requests/-get-ledgers-request/index.html">GetLedgersRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-ledgers-response/index.html">GetLedgersResponse</a></div><div class="brief "><p class="paragraph">Gets a paginated list of ledgers.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2020879206%2FFunctions%2F-2014708805" anchor-label="getNetwork" id="2020879206%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-network.html"><span>get</span><wbr></wbr><span><span>Network</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2020879206%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-network.html"><span class="token function">getNetwork</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-network-response/index.html">GetNetworkResponse</a></div><div class="brief "><p class="paragraph">Fetches metadata about the network.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1799012615%2FFunctions%2F-2014708805" anchor-label="getSACBalance" id="1799012615%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-s-a-c-balance.html"><span>get</span><wbr></wbr><span><span>SACBalance</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1799012615%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-s-a-c-balance.html"><span class="token function">getSACBalance</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">contractId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">asset<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-asset/index.html">Asset</a><span class="token punctuation">, </span></span><span class="parameter ">network<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-network/index.html">Network</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-s-a-c-balance-response/index.html">GetSACBalanceResponse</a></div><div class="brief "><p class="paragraph">Fetches the balance of a Stellar Asset Contract (SAC).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1948959630%2FFunctions%2F-2014708805" anchor-label="getTransaction" id="1948959630%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-transaction.html"><span>get</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1948959630%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-transaction.html"><span class="token function">getTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hash<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-transaction-response/index.html">GetTransactionResponse</a></div><div class="brief "><p class="paragraph">Fetches the details of a submitted transaction.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="557987019%2FFunctions%2F-2014708805" anchor-label="getTransactions" id="557987019%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-transactions.html"><span>get</span><wbr></wbr><span><span>Transactions</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="557987019%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-transactions.html"><span class="token function">getTransactions</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">request<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.requests/-get-transactions-request/index.html">GetTransactionsRequest</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-transactions-response/index.html">GetTransactionsResponse</a></div><div class="brief "><p class="paragraph">Gets a paginated list of transactions.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-372461714%2FFunctions%2F-2014708805" anchor-label="getVersionInfo" id="-372461714%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="get-version-info.html"><span>get</span><wbr></wbr><span>Version</span><wbr></wbr><span><span>Info</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-372461714%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="get-version-info.html"><span class="token function">getVersionInfo</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-version-info-response/index.html">GetVersionInfoResponse</a></div><div class="brief "><p class="paragraph">Fetches version information about the RPC server and Captive Core.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-333578343%2FFunctions%2F-2014708805" anchor-label="loadContractCodeForContractId" id="-333578343%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="load-contract-code-for-contract-id.html"><span>load</span><wbr></wbr><span>Contract</span><wbr></wbr><span>Code</span><wbr></wbr><span>For</span><wbr></wbr><span>Contract</span><wbr></wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-333578343%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="load-contract-code-for-contract-id.html"><span class="token function">loadContractCodeForContractId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">contractId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-contract-code-entry-xdr/index.html">ContractCodeEntryXdr</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Loads the contract code entry (including WASM bytecode) for a given contract ID.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1468096939%2FFunctions%2F-2014708805" anchor-label="loadContractCodeForWasmId" id="1468096939%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="load-contract-code-for-wasm-id.html"><span>load</span><wbr></wbr><span>Contract</span><wbr></wbr><span>Code</span><wbr></wbr><span>For</span><wbr></wbr><span>Wasm</span><wbr></wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1468096939%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="load-contract-code-for-wasm-id.html"><span class="token function">loadContractCodeForWasmId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">wasmId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.xdr/-contract-code-entry-xdr/index.html">ContractCodeEntryXdr</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Loads the contract code entry (including WASM bytecode) for a given WASM ID.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1360532680%2FFunctions%2F-2014708805" anchor-label="loadContractInfoForContractId" id="-1360532680%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="load-contract-info-for-contract-id.html"><span>load</span><wbr></wbr><span>Contract</span><wbr></wbr><span>Info</span><wbr></wbr><span>For</span><wbr></wbr><span>Contract</span><wbr></wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1360532680%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="load-contract-info-for-contract-id.html"><span class="token function">loadContractInfoForContractId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">contractId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.contract/-soroban-contract-info/index.html">SorobanContractInfo</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Loads contract information (Environment Meta, Contract Spec, Contract Meta) for a given contract ID.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1008202954%2FFunctions%2F-2014708805" anchor-label="loadContractInfoForWasmId" id="1008202954%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="load-contract-info-for-wasm-id.html"><span>load</span><wbr></wbr><span>Contract</span><wbr></wbr><span>Info</span><wbr></wbr><span>For</span><wbr></wbr><span>Wasm</span><wbr></wbr><span><span>Id</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1008202954%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="load-contract-info-for-wasm-id.html"><span class="token function">loadContractInfoForWasmId</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">wasmId<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.contract/-soroban-contract-info/index.html">SorobanContractInfo</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Loads contract information (Environment Meta, Contract Spec, Contract Meta) for a given WASM ID.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="727655066%2FFunctions%2F-2014708805" anchor-label="pollTransaction" id="727655066%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="poll-transaction.html"><span>poll</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="727655066%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="poll-transaction.html"><span class="token function">pollTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hash<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token punctuation">, </span></span><span class="parameter ">maxAttempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token operator"> = </span><span class="token constant">30</span><span class="token punctuation">, </span></span><span class="parameter ">sleepStrategy<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator"> = </span>{ 1000L }</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-get-transaction-response/index.html">GetTransactionResponse</a></div><div class="brief "><p class="paragraph">Polls for transaction completion.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1432805976%2FFunctions%2F-2014708805" anchor-label="prepareTransaction" id="-1432805976%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="prepare-transaction.html"><span>prepare</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1432805976%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="prepare-transaction.html"><span class="token function">prepareTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">transaction<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a><span class="token punctuation">, </span></span><span class="parameter ">simulateResponse<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-simulate-transaction-response/index.html">SimulateTransactionResponse</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a></div><div class="brief "><p class="paragraph">Prepares a transaction using existing simulation results.</p></div><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="prepare-transaction.html"><span class="token function">prepareTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">transaction<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a><span class="token punctuation">, </span></span><span class="parameter ">useUpgradedAuth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a></div><div class="brief "><p class="paragraph">Prepares a transaction by simulating it and applying resource estimates.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1260653721%2FFunctions%2F-2014708805" anchor-label="sendTransaction" id="-1260653721%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="send-transaction.html"><span>send</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1260653721%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="send-transaction.html"><span class="token function">sendTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">transaction<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-send-transaction-response/index.html">SendTransactionResponse</a></div><div class="brief "><p class="paragraph">Submits a transaction to the Stellar network.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1062727130%2FFunctions%2F-2014708805" anchor-label="simulateTransaction" id="-1062727130%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="simulate-transaction.html"><span>simulate</span><wbr></wbr><span><span>Transaction</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1062727130%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="simulate-transaction.html"><span class="token function">simulateTransaction</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">transaction<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk/-transaction/index.html">Transaction</a><span class="token punctuation">, </span></span><span class="parameter ">resourceConfig<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.requests/-simulate-transaction-request/-resource-config/index.html">SimulateTransactionRequest.ResourceConfig</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">authMode<span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.requests/-simulate-transaction-request/-auth-mode/index.html">SimulateTransactionRequest.AuthMode</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">useUpgradedAuth<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span><span class="token boolean">true</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../com.soneso.stellar.sdk.rpc.responses/-simulate-transaction-response/index.html">SimulateTransactionResponse</a></div><div class="brief "><p class="paragraph">Simulates a transaction to preview its effects.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

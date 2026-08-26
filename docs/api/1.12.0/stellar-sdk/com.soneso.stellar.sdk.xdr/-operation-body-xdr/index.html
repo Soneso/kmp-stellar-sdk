@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>OperationBodyXdr</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.xdr/OperationBodyXdr///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.xdr</a><span class="delimiter">/</span><span class="current">OperationBodyXdr</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Operation</span><wbr></wbr><span>Body</span><wbr></wbr><span><span>Xdr</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">sealed </span><span class="token keyword">class </span><a href="index.html">OperationBodyXdr</a></div><p class="paragraph">XDR Source: union switch (OperationType type)     {     case CREATE_ACCOUNT:         CreateAccountOp createAccountOp;     case PAYMENT:         PaymentOp paymentOp;     case PATH_PAYMENT_STRICT_RECEIVE:         PathPaymentStrictReceiveOp pathPaymentStrictReceiveOp;     case MANAGE_SELL_OFFER:         ManageSellOfferOp manageSellOfferOp;     case CREATE_PASSIVE_SELL_OFFER:         CreatePassiveSellOfferOp createPassiveSellOfferOp;     case SET_OPTIONS:         SetOptionsOp setOptionsOp;     case CHANGE_TRUST:         ChangeTrustOp changeTrustOp;     case ALLOW_TRUST:         AllowTrustOp allowTrustOp;     case ACCOUNT_MERGE:         MuxedAccount destination;     case INFLATION:         void;     case MANAGE_DATA:         ManageDataOp manageDataOp;     case BUMP_SEQUENCE:         BumpSequenceOp bumpSequenceOp;     case MANAGE_BUY_OFFER:         ManageBuyOfferOp manageBuyOfferOp;     case PATH_PAYMENT_STRICT_SEND:         PathPaymentStrictSendOp pathPaymentStrictSendOp;     case CREATE_CLAIMABLE_BALANCE:         CreateClaimableBalanceOp createClaimableBalanceOp;     case CLAIM_CLAIMABLE_BALANCE:         ClaimClaimableBalanceOp claimClaimableBalanceOp;     case BEGIN_SPONSORING_FUTURE_RESERVES:         BeginSponsoringFutureReservesOp beginSponsoringFutureReservesOp;     case END_SPONSORING_FUTURE_RESERVES:         void;     case REVOKE_SPONSORSHIP:         RevokeSponsorshipOp revokeSponsorshipOp;     case CLAWBACK:         ClawbackOp clawbackOp;     case CLAWBACK_CLAIMABLE_BALANCE:         ClawbackClaimableBalanceOp clawbackClaimableBalanceOp;     case SET_TRUST_LINE_FLAGS:         SetTrustLineFlagsOp setTrustLineFlagsOp;     case LIQUIDITY_POOL_DEPOSIT:         LiquidityPoolDepositOp liquidityPoolDepositOp;     case LIQUIDITY_POOL_WITHDRAW:         LiquidityPoolWithdrawOp liquidityPoolWithdrawOp;     case INVOKE_HOST_FUNCTION:         InvokeHostFunctionOp invokeHostFunctionOp;     case EXTEND_FOOTPRINT_TTL:         ExtendFootprintTTLOp extendFootprintTTLOp;     case RESTORE_FOOTPRINT:         RestoreFootprintOp restoreFootprintOp;     }</p><h4 class="tableheader">Inheritors</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-create-account-op/index.html">CreateAccountOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-payment-op/index.html">PaymentOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-path-payment-strict-receive-op/index.html">PathPaymentStrictReceiveOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-manage-sell-offer-op/index.html">ManageSellOfferOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-create-passive-sell-offer-op/index.html">CreatePassiveSellOfferOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-set-options-op/index.html">SetOptionsOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-change-trust-op/index.html">ChangeTrustOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-allow-trust-op/index.html">AllowTrustOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-destination/index.html">Destination</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-manage-data-op/index.html">ManageDataOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-bump-sequence-op/index.html">BumpSequenceOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-manage-buy-offer-op/index.html">ManageBuyOfferOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-path-payment-strict-send-op/index.html">PathPaymentStrictSendOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-create-claimable-balance-op/index.html">CreateClaimableBalanceOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-claim-claimable-balance-op/index.html">ClaimClaimableBalanceOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-begin-sponsoring-future-reserves-op/index.html">BeginSponsoringFutureReservesOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-revoke-sponsorship-op/index.html">RevokeSponsorshipOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-clawback-op/index.html">ClawbackOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-clawback-claimable-balance-op/index.html">ClawbackClaimableBalanceOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-set-trust-line-flags-op/index.html">SetTrustLineFlagsOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-liquidity-pool-deposit-op/index.html">LiquidityPoolDepositOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-liquidity-pool-withdraw-op/index.html">LiquidityPoolWithdrawOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-invoke-host-function-op/index.html">InvokeHostFunctionOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-extend-footprint-t-t-l-op/index.html">ExtendFootprintTTLOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-restore-footprint-op/index.html">RestoreFootprintOp</a></div></span></div><div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-void/index.html">Void</a></div></span></div><div></div></div></div></div></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="TYPE">
+        <h2 class="tableheader">Types</h2>
+        <div class="table"><a data-name="16589784%2FClasslikes%2F-2014708805" anchor-label="AllowTrustOp" id="16589784%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-allow-trust-op/index.html"><span>Allow</span><wbr></wbr><span>Trust</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="16589784%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-allow-trust-op/index.html">AllowTrustOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-allow-trust-op-xdr/index.html">AllowTrustOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1363812338%2FClasslikes%2F-2014708805" anchor-label="BeginSponsoringFutureReservesOp" id="-1363812338%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-begin-sponsoring-future-reserves-op/index.html"><span>Begin</span><wbr></wbr><span>Sponsoring</span><wbr></wbr><span>Future</span><wbr></wbr><span>Reserves</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1363812338%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-begin-sponsoring-future-reserves-op/index.html">BeginSponsoringFutureReservesOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-begin-sponsoring-future-reserves-op-xdr/index.html">BeginSponsoringFutureReservesOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1767029104%2FClasslikes%2F-2014708805" anchor-label="BumpSequenceOp" id="-1767029104%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-bump-sequence-op/index.html"><span>Bump</span><wbr></wbr><span>Sequence</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1767029104%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-bump-sequence-op/index.html">BumpSequenceOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-bump-sequence-op-xdr/index.html">BumpSequenceOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1166206415%2FClasslikes%2F-2014708805" anchor-label="ChangeTrustOp" id="-1166206415%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-change-trust-op/index.html"><span>Change</span><wbr></wbr><span>Trust</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1166206415%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-change-trust-op/index.html">ChangeTrustOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-change-trust-op-xdr/index.html">ChangeTrustOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-639453065%2FClasslikes%2F-2014708805" anchor-label="ClaimClaimableBalanceOp" id="-639453065%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-claim-claimable-balance-op/index.html"><span>Claim</span><wbr></wbr><span>Claimable</span><wbr></wbr><span>Balance</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-639453065%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-claim-claimable-balance-op/index.html">ClaimClaimableBalanceOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-claim-claimable-balance-op-xdr/index.html">ClaimClaimableBalanceOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2095652795%2FClasslikes%2F-2014708805" anchor-label="ClawbackClaimableBalanceOp" id="2095652795%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-clawback-claimable-balance-op/index.html"><span>Clawback</span><wbr></wbr><span>Claimable</span><wbr></wbr><span>Balance</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2095652795%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-clawback-claimable-balance-op/index.html">ClawbackClaimableBalanceOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-clawback-claimable-balance-op-xdr/index.html">ClawbackClaimableBalanceOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1657635839%2FClasslikes%2F-2014708805" anchor-label="ClawbackOp" id="-1657635839%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-clawback-op/index.html"><span>Clawback</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1657635839%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-clawback-op/index.html">ClawbackOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-clawback-op-xdr/index.html">ClawbackOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2101783950%2FClasslikes%2F-2014708805" anchor-label="Companion" id="2101783950%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-companion/index.html"><span><span>Companion</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2101783950%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">object </span><a href="-companion/index.html">Companion</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1685118648%2FClasslikes%2F-2014708805" anchor-label="CreateAccountOp" id="-1685118648%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-create-account-op/index.html"><span>Create</span><wbr></wbr><span>Account</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1685118648%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-create-account-op/index.html">CreateAccountOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-create-account-op-xdr/index.html">CreateAccountOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="891853445%2FClasslikes%2F-2014708805" anchor-label="CreateClaimableBalanceOp" id="891853445%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-create-claimable-balance-op/index.html"><span>Create</span><wbr></wbr><span>Claimable</span><wbr></wbr><span>Balance</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="891853445%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-create-claimable-balance-op/index.html">CreateClaimableBalanceOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-create-claimable-balance-op-xdr/index.html">CreateClaimableBalanceOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2105937928%2FClasslikes%2F-2014708805" anchor-label="CreatePassiveSellOfferOp" id="2105937928%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-create-passive-sell-offer-op/index.html"><span>Create</span><wbr></wbr><span>Passive</span><wbr></wbr><span>Sell</span><wbr></wbr><span>Offer</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2105937928%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-create-passive-sell-offer-op/index.html">CreatePassiveSellOfferOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-create-passive-sell-offer-op-xdr/index.html">CreatePassiveSellOfferOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-376275828%2FClasslikes%2F-2014708805" anchor-label="Destination" id="-376275828%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-destination/index.html"><span><span>Destination</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-376275828%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-destination/index.html">Destination</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-muxed-account-xdr/index.html">MuxedAccountXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1000377280%2FClasslikes%2F-2014708805" anchor-label="ExtendFootprintTTLOp" id="1000377280%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-extend-footprint-t-t-l-op/index.html"><span>Extend</span><wbr></wbr><span>Footprint</span><wbr></wbr><span><span>TTLOp</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1000377280%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-extend-footprint-t-t-l-op/index.html">ExtendFootprintTTLOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-extend-footprint-t-t-l-op-xdr/index.html">ExtendFootprintTTLOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2020933233%2FClasslikes%2F-2014708805" anchor-label="InvokeHostFunctionOp" id="-2020933233%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-invoke-host-function-op/index.html"><span>Invoke</span><wbr></wbr><span>Host</span><wbr></wbr><span>Function</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2020933233%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-invoke-host-function-op/index.html">InvokeHostFunctionOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-invoke-host-function-op-xdr/index.html">InvokeHostFunctionOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="27929975%2FClasslikes%2F-2014708805" anchor-label="LiquidityPoolDepositOp" id="27929975%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-liquidity-pool-deposit-op/index.html"><span>Liquidity</span><wbr></wbr><span>Pool</span><wbr></wbr><span>Deposit</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="27929975%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-liquidity-pool-deposit-op/index.html">LiquidityPoolDepositOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-liquidity-pool-deposit-op-xdr/index.html">LiquidityPoolDepositOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-158165215%2FClasslikes%2F-2014708805" anchor-label="LiquidityPoolWithdrawOp" id="-158165215%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-liquidity-pool-withdraw-op/index.html"><span>Liquidity</span><wbr></wbr><span>Pool</span><wbr></wbr><span>Withdraw</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-158165215%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-liquidity-pool-withdraw-op/index.html">LiquidityPoolWithdrawOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-liquidity-pool-withdraw-op-xdr/index.html">LiquidityPoolWithdrawOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-289734292%2FClasslikes%2F-2014708805" anchor-label="ManageBuyOfferOp" id="-289734292%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-manage-buy-offer-op/index.html"><span>Manage</span><wbr></wbr><span>Buy</span><wbr></wbr><span>Offer</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-289734292%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-manage-buy-offer-op/index.html">ManageBuyOfferOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-manage-buy-offer-op-xdr/index.html">ManageBuyOfferOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="206297528%2FClasslikes%2F-2014708805" anchor-label="ManageDataOp" id="206297528%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-manage-data-op/index.html"><span>Manage</span><wbr></wbr><span>Data</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="206297528%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-manage-data-op/index.html">ManageDataOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-manage-data-op-xdr/index.html">ManageDataOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-2077837868%2FClasslikes%2F-2014708805" anchor-label="ManageSellOfferOp" id="-2077837868%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-manage-sell-offer-op/index.html"><span>Manage</span><wbr></wbr><span>Sell</span><wbr></wbr><span>Offer</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-2077837868%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-manage-sell-offer-op/index.html">ManageSellOfferOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-manage-sell-offer-op-xdr/index.html">ManageSellOfferOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-279721298%2FClasslikes%2F-2014708805" anchor-label="PathPaymentStrictReceiveOp" id="-279721298%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-path-payment-strict-receive-op/index.html"><span>Path</span><wbr></wbr><span>Payment</span><wbr></wbr><span>Strict</span><wbr></wbr><span>Receive</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-279721298%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-path-payment-strict-receive-op/index.html">PathPaymentStrictReceiveOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-path-payment-strict-receive-op-xdr/index.html">PathPaymentStrictReceiveOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="945742407%2FClasslikes%2F-2014708805" anchor-label="PathPaymentStrictSendOp" id="945742407%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-path-payment-strict-send-op/index.html"><span>Path</span><wbr></wbr><span>Payment</span><wbr></wbr><span>Strict</span><wbr></wbr><span>Send</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="945742407%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-path-payment-strict-send-op/index.html">PathPaymentStrictSendOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-path-payment-strict-send-op-xdr/index.html">PathPaymentStrictSendOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="249466483%2FClasslikes%2F-2014708805" anchor-label="PaymentOp" id="249466483%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-payment-op/index.html"><span>Payment</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="249466483%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-payment-op/index.html">PaymentOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-payment-op-xdr/index.html">PaymentOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2096911830%2FClasslikes%2F-2014708805" anchor-label="RestoreFootprintOp" id="2096911830%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-restore-footprint-op/index.html"><span>Restore</span><wbr></wbr><span>Footprint</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2096911830%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-restore-footprint-op/index.html">RestoreFootprintOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-restore-footprint-op-xdr/index.html">RestoreFootprintOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-876849911%2FClasslikes%2F-2014708805" anchor-label="RevokeSponsorshipOp" id="-876849911%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-revoke-sponsorship-op/index.html"><span>Revoke</span><wbr></wbr><span>Sponsorship</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-876849911%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-revoke-sponsorship-op/index.html">RevokeSponsorshipOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-revoke-sponsorship-op-xdr/index.html">RevokeSponsorshipOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-580699029%2FClasslikes%2F-2014708805" anchor-label="SetOptionsOp" id="-580699029%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-set-options-op/index.html"><span>Set</span><wbr></wbr><span>Options</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-580699029%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-set-options-op/index.html">SetOptionsOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-set-options-op-xdr/index.html">SetOptionsOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1823261092%2FClasslikes%2F-2014708805" anchor-label="SetTrustLineFlagsOp" id="-1823261092%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-set-trust-line-flags-op/index.html"><span>Set</span><wbr></wbr><span>Trust</span><wbr></wbr><span>Line</span><wbr></wbr><span>Flags</span><wbr></wbr><span><span>Op</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1823261092%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-set-trust-line-flags-op/index.html">SetTrustLineFlagsOp</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>value<span class="token operator">: </span><a href="../-set-trust-line-flags-op-xdr/index.html">SetTrustLineFlagsOpXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1997934740%2FClasslikes%2F-2014708805" anchor-label="Void" id="1997934740%2FClasslikes%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-void/index.html"><span><span>Void</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1997934740%2FClasslikes%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="-void/index.html">Void</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>discriminant<span class="token operator">: </span><a href="../-operation-type-xdr/index.html">OperationTypeXdr</a></span></span><span class="token punctuation">)</span> : <a href="index.html">OperationBodyXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="1746881074%2FProperties%2F-2014708805" anchor-label="discriminant" id="1746881074%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="discriminant.html"><span><span>discriminant</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1746881074%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">abstract </span><span class="token keyword">val </span><a href="discriminant.html">discriminant</a><span class="token operator">: </span><a href="../-operation-type-xdr/index.html">OperationTypeXdr</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="-461191157%2FFunctions%2F-2014708805" anchor-label="encode" id="-461191157%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="encode.html"><span><span>encode</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-461191157%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="encode.html"><span class="token function">encode</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">writer<span class="token operator">: </span><a href="../-xdr-writer/index.html">XdrWriter</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1151873428%2FFunctions%2F-2014708805" anchor-label="toXdrJson" id="1151873428%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span><span>Json</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1151873428%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json.html"><span class="token function">toXdrJson</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-721707350%2FFunctions%2F-2014708805" anchor-label="toXdrJsonElement" id="-721707350%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-xdr-json-element.html"><span>to</span><wbr></wbr><span>Xdr</span><wbr></wbr><span>Json</span><wbr></wbr><span><span>Element</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-721707350%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="to-xdr-json-element.html"><span class="token function">toXdrJsonElement</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><span data-unresolved-link="kotlinx.serialization.json/JsonElement///PointingToDeclaration/">JsonElement</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

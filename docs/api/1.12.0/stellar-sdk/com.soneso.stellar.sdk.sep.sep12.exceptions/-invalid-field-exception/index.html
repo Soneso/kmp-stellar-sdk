@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>InvalidFieldException</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep12.exceptions/InvalidFieldException///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep12.exceptions</a><span class="delimiter">/</span><span class="current">InvalidFieldException</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Invalid</span><wbr></wbr><span>Field</span><wbr></wbr><span><span>Exception</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">InvalidFieldException</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>fieldName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>fieldError<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span> : <a href="../-k-y-c-exception/index.html">KYCException</a></div><p class="paragraph">Exception thrown when field validation fails (HTTP 400).</p><p class="paragraph">Indicates that one or more fields contain invalid data. The server has rejected the request due to validation errors. This typically occurs when:</p><ul><li><p class="paragraph">Field format is incorrect (e.g., invalid email, phone number)</p></li><li><p class="paragraph">Field value is out of range or doesn't match expected pattern</p></li><li><p class="paragraph">Required field is missing</p></li><li><p class="paragraph">Field value doesn't match allowed choices</p></li><li><p class="paragraph">Date format is incorrect</p></li></ul><p class="paragraph">The exception contains information about which field failed and why, allowing applications to provide specific feedback to users.</p><p class="paragraph">Example - Handle validation errors:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun submitCustomerInfo(<br>    kycService: KYCService,<br>    request: PutCustomerInfoRequest<br>) {<br>    try {<br>        kycService.putCustomerInfo(request)<br>    } catch (e: InvalidFieldException) {<br>        val fieldName = e.fieldName ?: &quot;unknown field&quot;<br>        val error = e.fieldError ?: &quot;validation failed&quot;<br><br>        println(&quot;Invalid field: $fieldName&quot;)<br>        println(&quot;Error: $error&quot;)<br><br>        // Show user-friendly error message<br>        showFieldError(fieldName, error)<br>    }<br>}<br><br>fun showFieldError(fieldName: String, error: String) {<br>    when (fieldName) {<br>        &quot;email_address&quot; -&gt; showError(&quot;Invalid email address: $error&quot;)<br>        &quot;mobile_number&quot; -&gt; showError(&quot;Invalid phone number: $error&quot;)<br>        &quot;birth_date&quot; -&gt; showError(&quot;Invalid birth date: $error&quot;)<br>        else -&gt; showError(&quot;Invalid $fieldName: $error&quot;)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Validate before submission:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">data class ValidationError(val field: String, val message: String)<br><br>fun validateCustomerData(fields: NaturalPersonKYCFields): List&lt;ValidationError&gt; {<br>    val errors = mutableListOf&lt;ValidationError&gt;()<br><br>    // Validate email format<br>    fields.emailAddress?.let { email -&gt;<br>        if (!email.contains(&quot;@&quot;)) {<br>            errors.add(ValidationError(&quot;email_address&quot;, &quot;Invalid email format&quot;))<br>        }<br>    }<br><br>    // Validate phone format (E.164)<br>    fields.mobileNumber?.let { phone -&gt;<br>        if (!phone.matches(Regex(&quot;^\\+[1-9]\\d{1,14}$&quot;))) {<br>            errors.add(ValidationError(&quot;mobile_number&quot;, &quot;Invalid phone format (use E.164)&quot;))<br>        }<br>    }<br><br>    // Validate birth date (must be over 18)<br>    fields.birthDate?.let { birthDate -&gt;<br>        val age = LocalDate.now().year - birthDate.year<br>        if (age &lt; 18) {<br>            errors.add(ValidationError(&quot;birth_date&quot;, &quot;Must be at least 18 years old&quot;))<br>        }<br>    }<br><br>    return errors<br>}<br><br>suspend fun submitWithValidation(<br>    kycService: KYCService,<br>    fields: NaturalPersonKYCFields,<br>    jwt: String<br>) {<br>    // Pre-validate locally<br>    val errors = validateCustomerData(fields)<br>    if (errors.isNotEmpty()) {<br>        println(&quot;Validation errors:&quot;)<br>        errors.forEach { println(&quot;  ${it.field}: ${it.message}&quot;) }<br>        return<br>    }<br><br>    // Submit to server<br>    try {<br>        kycService.putCustomerInfo(<br>            PutCustomerInfoRequest(<br>                jwt = jwt,<br>                kycFields = StandardKYCFields(naturalPersonKYCFields = fields)<br>            )<br>        )<br>    } catch (e: InvalidFieldException) {<br>        println(&quot;Server validation failed: ${e.fieldName} - ${e.fieldError}&quot;)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Handle multiple field errors:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun submitCustomerWithRetry(<br>    kycService: KYCService,<br>    fields: NaturalPersonKYCFields,<br>    jwt: String<br>) {<br>    var currentFields = fields<br><br>    while (true) {<br>        try {<br>            kycService.putCustomerInfo(<br>                PutCustomerInfoRequest(<br>                    jwt = jwt,<br>                    kycFields = StandardKYCFields(naturalPersonKYCFields = currentFields)<br>                )<br>            )<br>            break // Success<br>        } catch (e: InvalidFieldException) {<br>            println(&quot;Field error: ${e.fieldName} - ${e.fieldError}&quot;)<br><br>            // Fix the specific field and retry<br>            currentFields = fixField(currentFields, e.fieldName, e.fieldError)<br>                ?: break // Cannot fix, give up<br>        }<br>    }<br>}<br><br>fun fixField(<br>    fields: NaturalPersonKYCFields,<br>    fieldName: String?,<br>    error: String?<br>): NaturalPersonKYCFields? {<br>    return when (fieldName) {<br>        &quot;mobile_number&quot; -&gt; {<br>            // Format phone number correctly<br>            val formattedPhone = formatPhoneToE164(fields.mobileNumber ?: &quot;&quot;)<br>            fields.copy(mobileNumber = formattedPhone)<br>        }<br>        &quot;email_address&quot; -&gt; {<br>            // Ask user to correct email<br>            val newEmail = promptUserForEmail()<br>            fields.copy(emailAddress = newEmail)<br>        }<br>        else -&gt; null // Cannot auto-fix<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="../-k-y-c-exception/index.html">KYCException</a> base class</p></li><li><p class="paragraph">GetCustomerInfoResponse for field requirements</p></li><li><p class="paragraph">PutCustomerInfoRequest for submitting customer data</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0009.md">SEP-0009 Specification</a> for field formats</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012 Specification</a></p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="-770559554%2FConstructors%2F-2014708805" anchor-label="InvalidFieldException" id="-770559554%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-invalid-field-exception.html"><span>Invalid</span><wbr></wbr><span>Field</span><wbr></wbr><span><span>Exception</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-770559554%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">fieldName<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">fieldError<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-654012527%2FProperties%2F-2014708805" anchor-label="cause" id="-654012527%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805"><span><span>cause</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-654012527%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805">cause</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1620462817%2FProperties%2F-2014708805" anchor-label="fieldError" id="-1620462817%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="field-error.html"><span>field</span><wbr></wbr><span><span>Error</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1620462817%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="field-error.html">fieldError</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">Human-readable description of the validation error (null if not specified)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1330499048%2FProperties%2F-2014708805" anchor-label="fieldName" id="1330499048%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="field-name.html"><span>field</span><wbr></wbr><span><span>Name</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1330499048%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="field-name.html">fieldName</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div><div class="brief "><p class="paragraph">The name of the field that failed validation (null if not specified)</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1824300659%2FProperties%2F-2014708805" anchor-label="message" id="1824300659%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805"><span><span>message</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1824300659%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805">message</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

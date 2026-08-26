@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>connectWallet</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="member" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.smartaccount.oz/OZWalletOperations/connectWallet/#com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations.ConnectWalletOptions/PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.smartaccount.oz</a><span class="delimiter">/</span><a href="index.html">OZWalletOperations</a><span class="delimiter">/</span><span class="current">connectWallet</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>connect</span><wbr></wbr><span><span>Wallet</span></span></h1>
+  </div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="connect-wallet.html"><span class="token function">connectWallet</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">options<span class="token operator">: </span><a href="-connect-wallet-options/index.html">OZWalletOperations.ConnectWalletOptions</a><span class="token operator"> = </span>ConnectWalletOptions()</span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-connect-wallet-result/index.html">ConnectWalletResult</a><span class="token operator">?</span></div><p class="paragraph">Connects to an existing smart account wallet.</p><p class="paragraph">Returns a <a href="../-connect-wallet-result/index.html">ConnectWalletResult</a> on successful connection, or null if no valid session exists and neither <a href="-connect-wallet-options/prompt.html">ConnectWalletOptions.prompt</a> nor <a href="-connect-wallet-options/fresh.html">ConnectWalletOptions.fresh</a> is set.</p><p class="paragraph">The non-null result is one of two sealed arms:</p><ul><li><p class="paragraph"><a href="../-connect-wallet-result/-connected/index.html">ConnectWalletResult.Connected</a>: a single contract was resolved, the kit's connected state has been set, and a session has been saved.</p></li><li><p class="paragraph"><a href="../-connect-wallet-result/-ambiguous/index.html">ConnectWalletResult.Ambiguous</a>: the indexer reported multiple contracts where the passkey is registered as a signer. The connected state has NOT been set; the caller must let the user pick a contract and re-call <code class="lang-kotlin">connectWallet(ConnectWalletOptions(credentialId, contractId = chosen))</code> to finalize.</p></li></ul><p class="paragraph">Connection flow:</p><ol><li><p class="paragraph">If credentialId/contractId provided: direct connect via <span data-unresolved-link="com.soneso.stellar.sdk.smartaccount.oz/OZWalletOperations/connectWithCredentials/#kotlin.String?#kotlin.String?/PointingToDeclaration/">connectWithCredentials</span>.</p></li><li><p class="paragraph">If fresh = true: skip session, trigger WebAuthn authentication.</p></li><li><p class="paragraph">Otherwise, check storage for a valid (non-expired) session. If a     valid session is found, verify the contract on-chain and reconnect.     If verification returns NotFound (contract is not on-chain), clear     the stale session and continue. Other exceptions during session     verification propagate (the saved session is preserved so the user     can retry once their network is healthy).</p></li><li><p class="paragraph">If no valid session and prompt = false: return null.</p></li><li><p class="paragraph">If no valid session and prompt = true: trigger WebAuthn authentication.</p></li><li><p class="paragraph">Resolve the contract via the cascade: storage → derivation → indexer.     Storage with FAILED deployment status throws with a recovery hint.     Derivation under the configured deployer is checked on-chain; if     the address has no contract, falls through to the indexer. Indexer     returns 0 / 1 / N>1 contracts mapping to NotFound / Connected /     Ambiguous respectively.</p></li><li><p class="paragraph">On Connected: save session, set kit connected state, return.     On Ambiguous: return early without saving a session.</p></li></ol><h2 class="">Connection Options</h2><p class="paragraph"><strong>Silent Session Check (default)</strong></p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val result = walletOps.connectWallet()<br>when (result) {<br>    null -&gt; println(&quot;No active session - show login UI&quot;)<br>    is ConnectWalletResult.Connected -&gt; println(&quot;Connected: ${result.contractId}&quot;)<br>    is ConnectWalletResult.Ambiguous -&gt; { /* unreachable for the silent path */}<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph"><strong>Session Check with WebAuthn Fallback</strong></p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val result = walletOps.connectWallet(<br>    ConnectWalletOptions(prompt = true)<br>)<br>when (result) {<br>    null -&gt; { /* unreachable when prompt = true */}<br>    is ConnectWalletResult.Connected -&gt; println(&quot;Connected: ${result.contractId}&quot;)<br>    is ConnectWalletResult.Ambiguous -&gt; showPicker(result.candidates)<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph"><strong>Direct Connection</strong></p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val result = walletOps.connectWallet(<br>    ConnectWalletOptions(<br>        credentialId = &quot;abc123...&quot;,<br>        contractId = &quot;CABC...&quot;<br>    )<br>)<br>// Explicit contractId bypasses the cascade. The non-null result is<br>// always Connected; Ambiguous is by-construction unreachable.</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph"><strong>Force Fresh Authentication</strong></p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val result = walletOps.connectWallet(<br>    ConnectWalletOptions(fresh = true)<br>)<br>// Always prompts WebAuthn, ignoring any saved session.</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">IMPORTANT: Requires a WebAuthnProvider to be configured in the kit config when WebAuthn authentication is needed (prompt = true or fresh = true).</p><span class="kdoc-tag"><h4 class="">Return</h4><p class="paragraph"><a href="../-connect-wallet-result/index.html">ConnectWalletResult</a> on success, or null if no session and prompt is false.</p></span><h4 class="tableheader">Parameters</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><u><span><span>options</span></span></u></div></span></div><div><div class="title"><p class="paragraph">Connection options controlling the flow behavior.</p></div></div></div></div></div><h4 class="tableheader">See also</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="-connect-wallet-options/index.html"><span>OZWallet</span><wbr></wbr><span>Operations.</span><wbr></wbr><span>Connect</span><wbr></wbr><span>Wallet</span><wbr></wbr><span><span>Options</span></span></a></div></span></div><div><div class="title"><p class="paragraph">for detailed option descriptions and the decision matrix.</p></div></div></div></div></div><h4 class="tableheader">Throws</h4><div class="table"><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-web-authn-exception/index.html"><span>Web</span><wbr></wbr><span>Authn</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if WebAuthn authentication fails or no provider is configured.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-wallet-exception/-not-found/index.html"><span>Wallet</span><wbr></wbr><span>Exception.</span><wbr></wbr><span>NotFound</span></a></div></span></div><div><div class="title"><p class="paragraph">if no contract can be resolved for the credential (e.g. a FAILED storage entry, no on-chain contract at the derived address, or the indexer reports zero contracts).</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-validation-exception/index.html"><span>Validation</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if options are invalid (e.g. contractId without credentialId), or if the configured deployer's public key is malformed.</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-transaction-exception/index.html"><span>Transaction</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if XDR encoding of the contract-id preimage fails (an internal SDK bug).</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><span>com.</span><wbr></wbr><span>soneso.</span><wbr></wbr><span>stellar.</span><wbr></wbr><span>sdk.</span><wbr></wbr><span>rpc.</span><wbr></wbr><span>Soroban</span><wbr></wbr><span>Rpc</span><wbr></wbr><span><span>Exception</span></span></div></span></div><div><div class="title"><p class="paragraph">if a Soroban RPC call (e.g. the on-chain <code class="lang-kotlin">verifyContractExists</code> check) fails for transport / server reasons. RPC errors propagate as their original type rather than being laundered to NotFound, so callers can distinguish &quot;contract is not on-chain&quot; from &quot;lookup was inconclusive.&quot;</p></div></div></div></div><div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain"><div class="main-subrow keyValue "><div class=""><span class="inline-flex"><div><a href="../../com.soneso.stellar.sdk.smartaccount.core/-indexer-exception/index.html"><span>Indexer</span><wbr></wbr><span><span>Exception</span></span></a></div></span></div><div><div class="title"><p class="paragraph">if the indexer call fails for transport / server reasons.</p></div></div></div></div></div></div></div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

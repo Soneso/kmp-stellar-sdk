@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>Sep38PermissionDeniedException</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.12.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.sep.sep38.exceptions/Sep38PermissionDeniedException///PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="../index.html">com.soneso.stellar.sdk.sep.sep38.exceptions</a><span class="delimiter">/</span><span class="current">Sep38PermissionDeniedException</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Sep38Permission</span><wbr></wbr><span>Denied</span><wbr></wbr><span><span>Exception</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">Sep38PermissionDeniedException</a><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>error<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span> : <a href="../-sep38-exception/index.html">Sep38Exception</a></div><p class="paragraph">Exception thrown when authentication fails (HTTP 403).</p><p class="paragraph">Indicates that the JWT token is invalid, expired, missing, or that the authenticated user lacks necessary permissions. Authentication is required for firm quote operations (postQuote, getQuote). This error typically occurs when:</p><ul><li><p class="paragraph">JWT token has expired</p></li><li><p class="paragraph">JWT token is malformed or tampered with</p></li><li><p class="paragraph">JWT token signature is invalid</p></li><li><p class="paragraph">Token was issued for a different account</p></li><li><p class="paragraph">SEP-10 authentication was not performed</p></li><li><p class="paragraph">User lacks required KYC status via SEP-12</p></li></ul><p class="paragraph">Recovery actions:</p><ul><li><p class="paragraph">Re-authenticate via SEP-10 WebAuth to obtain a fresh JWT token</p></li><li><p class="paragraph">Verify the token is being sent in the correct format</p></li><li><p class="paragraph">Check that the token matches the account being accessed</p></li><li><p class="paragraph">Ensure user has completed required KYC verification</p></li></ul><p class="paragraph">Example - Handle expired token with retry:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun postQuoteWithRetry(<br>    quoteService: Sep38QuoteService,<br>    webAuth: WebAuth,<br>    request: Sep38PostQuoteRequest,<br>    accountId: String,<br>    keyPair: KeyPair<br>): Sep38QuoteResponse? {<br>    var jwt = getCurrentJwt() // Get cached token<br><br>    try {<br>        return quoteService.postQuote(request, jwt)<br>    } catch (e: Sep38PermissionDeniedException) {<br>        println(&quot;Token expired or invalid, re-authenticating...&quot;)<br><br>        // Re-authenticate to get fresh token<br>        val authToken = webAuth.jwtToken(<br>            clientAccountId = accountId,<br>            signers = listOf(keyPair)<br>        )<br>        jwt = authToken.token<br>        saveJwt(jwt) // Cache new token<br><br>        // Retry with new token<br>        return try {<br>            quoteService.postQuote(request, jwt)<br>        } catch (e: Sep38PermissionDeniedException) {<br>            println(&quot;Permission denied after re-authentication: ${e.error}&quot;)<br>            null<br>        }<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Proactive token refresh:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">class Sep38Client(<br>    private val quoteService: Sep38QuoteService,<br>    private val webAuth: WebAuth<br>) {<br>    private var currentToken: String? = null<br>    private var tokenExpiry: Long = 0<br><br>    suspend fun ensureValidToken(accountId: String, keyPair: KeyPair): String {<br>        val now = Clock.System.now().toEpochMilliseconds() / 1000<br><br>        // Refresh if token expires in less than 5 minutes<br>        if (currentToken == null || tokenExpiry - now &lt; 300) {<br>            val authToken = webAuth.jwtToken(<br>                clientAccountId = accountId,<br>                signers = listOf(keyPair)<br>            )<br>            currentToken = authToken.token<br>            tokenExpiry = authToken.exp<br>        }<br><br>        return currentToken!!<br>    }<br><br>    suspend fun postQuote(<br>        request: Sep38PostQuoteRequest,<br>        accountId: String,<br>        keyPair: KeyPair<br>    ): Sep38QuoteResponse {<br>        val jwt = ensureValidToken(accountId, keyPair)<br>        return quoteService.postQuote(request, jwt)<br>    }<br><br>    suspend fun getQuote(<br>        quoteId: String,<br>        accountId: String,<br>        keyPair: KeyPair<br>    ): Sep38QuoteResponse {<br>        val jwt = ensureValidToken(accountId, keyPair)<br>        return quoteService.getQuote(quoteId, jwt)<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Handle KYC requirements:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">suspend fun postQuoteWithKYCCheck(<br>    quoteService: Sep38QuoteService,<br>    kycService: KYCService,<br>    request: Sep38PostQuoteRequest,<br>    jwt: String,<br>    accountId: String<br>): Sep38QuoteResponse? {<br>    try {<br>        return quoteService.postQuote(request, jwt)<br>    } catch (e: Sep38PermissionDeniedException) {<br>        println(&quot;Permission denied: ${e.error}&quot;)<br><br>        // Check KYC status<br>        try {<br>            val customerInfo = kycService.getCustomerInfo(<br>                GetCustomerInfoRequest(jwt = jwt, account = accountId)<br>            )<br><br>            if (customerInfo.status != &quot;ACCEPTED&quot;) {<br>                println(&quot;KYC not approved. Status: ${customerInfo.status}&quot;)<br>                println(&quot;Please complete KYC verification first&quot;)<br>                return null<br>            }<br>        } catch (kycError: Exception) {<br>            println(&quot;Failed to check KYC status: ${kycError.message}&quot;)<br>        }<br><br>        return null<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Example - Check token validity before use:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">fun isTokenValid(token: String): Boolean {<br>    return try {<br>        val authToken = AuthToken.parse(token)<br>        val now = Clock.System.now().toEpochMilliseconds() / 1000<br>        authToken.exp &gt; now<br>    } catch (e: Exception) {<br>        false<br>    }<br>}<br><br>suspend fun getQuote(<br>    quoteService: Sep38QuoteService,<br>    quoteId: String,<br>    jwt: String<br>): Sep38QuoteResponse? {<br>    if (!isTokenValid(jwt)) {<br>        println(&quot;Token expired, please re-authenticate&quot;)<br>        return null<br>    }<br><br>    try {<br>        return quoteService.getQuote(quoteId, jwt)<br>    } catch (e: Sep38PermissionDeniedException) {<br>        println(&quot;Permission denied: ${e.error}&quot;)<br>        return null<br>    }<br>}</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">See also:</p><ul><li><p class="paragraph"><a href="../-sep38-exception/index.html">Sep38Exception</a> base class</p></li><li><p class="paragraph">WebAuth for SEP-10 authentication</p></li><li><p class="paragraph">AuthToken for parsing JWT tokens</p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0010.md">SEP-0010 Specification</a></p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0012.md">SEP-0012 Specification</a></p></li><li><p class="paragraph"><a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md">SEP-0038 Specification</a></p></li></ul></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="tableheader">Constructors</h2>
+        <div class="table"><a data-name="1278916485%2FConstructors%2F-2014708805" anchor-label="Sep38PermissionDeniedException" id="1278916485%2FConstructors%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-togglable="CONSTRUCTOR" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-sep38-permission-denied-exception.html"><span>Sep38Permission</span><wbr></wbr><span>Denied</span><wbr></wbr><span><span>Exception</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1278916485%2FConstructors%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">error<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="tableheader">Properties</h2>
+        <div class="table"><a data-name="-654012527%2FProperties%2F-2014708805" anchor-label="cause" id="-654012527%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805"><span><span>cause</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-654012527%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#-654012527%2FProperties%2F-2014708805">cause</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1090021649%2FProperties%2F-2014708805" anchor-label="error" id="1090021649%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="error.html"><span><span>error</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1090021649%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="error.html">error</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div><div class="brief "><p class="paragraph">Error message from the anchor</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1824300659%2FProperties%2F-2014708805" anchor-label="message" id="1824300659%2FProperties%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805"><span><span>message</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1824300659%2FProperties%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">expect </span><span class="token keyword">open </span><span class="token keyword">val </span><a href="../../com.soneso.stellar.sdk.sep.sep45.exceptions/-sep45-unknown-response-exception/index.html#1824300659%2FProperties%2F-2014708805">message</a><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a><span class="token operator">?</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="1873737461%2FFunctions%2F-2014708805" anchor-label="toString" id="1873737461%2FFunctions%2F-2014708805" data-filterable-set=":stellar-sdk/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":stellar-sdk/commonMain" data-filterable-set=":stellar-sdk/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="to-string.html"><span>to</span><wbr></wbr><span><span>String</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1873737461%2FFunctions%2F-2014708805"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">open </span><span class="token keyword">override </span><span class="token keyword">fun </span><a href="to-string.html"><span class="token function">toString</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-string/index.html">String</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
