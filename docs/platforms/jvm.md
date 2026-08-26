@@ -2,6 +2,13 @@
 
 This guide covers JVM-specific setup and usage, including Android and server applications.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+```
+
 ## Table of Contents
 
 - [Platform Overview](#platform-overview)
@@ -134,7 +141,6 @@ application {
 
 ```kotlin
 // Default configuration (built-in)
-val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 // Custom HTTP client configuration
 val customClient = HttpClient(CIO) {
@@ -213,7 +219,7 @@ fun Application.stellarModule() {
                     PaymentOperation(
                         destination = request.destination,
                         amount = request.amount,
-                        asset = Asset.NATIVE
+                        asset = AssetTypeNative
                     )
                 )
                 .setBaseFee(100)
@@ -222,7 +228,7 @@ fun Application.stellarModule() {
 
             transaction.sign(sourceKeypair)
 
-            val response = horizonServer.submitTransaction(transaction)
+            val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             call.respond(response)
         }
     }
@@ -250,14 +256,14 @@ data class PaymentRequest(
 // WRONG:
 fun loadAccount() {
     val account = runBlocking {  // Don't do this on Android!
-        horizonServer.loadAccount("GABC...")
+        horizonServer.loadAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     }
 }
 
 // CORRECT:
 fun loadAccount() {
     lifecycleScope.launch {
-        val account = horizonServer.loadAccount("GABC...")
+        val account = horizonServer.loadAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
         updateUI(account)
     }
 }

@@ -11,6 +11,13 @@ SEP-5 defines how to derive multiple Stellar accounts from a single mnemonic phr
 
 **Note**: Most SEP-5 methods are `suspend` functions for JavaScript compatibility. Call them from a coroutine context (e.g., `launch { }`, `runBlocking { }`, or another suspend function).
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep05.*
+```
+
 ## Generating a Mnemonic Phrase
 
 ```kotlin

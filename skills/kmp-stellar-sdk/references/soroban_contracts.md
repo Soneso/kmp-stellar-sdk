@@ -2,6 +2,17 @@
 
 All code uses the KMP Stellar SDK. Import the SDK package:
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.responses.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
+```
+
 ```kotlin
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.*
@@ -38,6 +49,9 @@ import com.soneso.stellar.sdk.xdr.*
 ### Install WASM Code
 
 ```kotlin
+import java.io.File
+
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: ContractClient.install() returns a hex string, NOT a ByteArray
 // CORRECT: wasmId is a hex String ready to use with deployFromWasmId()
 val wasmId: String = ContractClient.install(
@@ -55,6 +69,9 @@ println("WASM hash: $wasmId")
 One-step deploy (uploads WASM + deploys contract + loads spec):
 
 ```kotlin
+import java.io.File
+
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val client: ContractClient = ContractClient.deploy(
     wasmBytes = File("contract.wasm").readBytes(),
     source = keyPair.getAccountId(),
@@ -68,6 +85,9 @@ println("Contract ID: ${client.contractId}")
 Two-step deploy (reuse WASM for multiple instances):
 
 ```kotlin
+import java.io.File
+
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // Step 1: Install WASM once
 val wasmId = ContractClient.install(
     wasmBytes = File("token.wasm").readBytes(),
@@ -113,8 +133,9 @@ or malformed tag entry), loads the spec from the resolved WASM, and returns a re
 client:
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val client = ContractClient.deployFromExternalRef(
-    executableOwner = "COWNER...",  // "C..." contract id holding the tag entry
+    executableOwner = "CAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAODX",  // "C..." contract id holding the tag entry
     tag = "token-v1",               // matched byte for byte, encoded as UTF-8
     constructorArgs = listOf(Scv.toUint32(7u)),  // List<SCValXdr>, as for deployFromWasmId
     source = keyPair.getAccountId(),
@@ -149,6 +170,9 @@ The one-step `deploy()` accepts constructor args as `Map<String, Any?>` with aut
 **Always match the exact type from contract introspection** -- do not guess based on convention:
 
 ```kotlin
+import java.io.File
+
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: using toSymbol because "token names are symbols" -- crashes
 // Scv.toSymbol("MyToken")  // WRONG if spec says String
 // CORRECT: spec says String -> use Scv.toString; spec says Symbol -> use Scv.toSymbol
@@ -174,8 +198,10 @@ val client = ContractClient.deploy(
 Create a client for an existing contract, then use `invoke()`:
 
 ```kotlin
+val amount = "100"
+// toLong: from the previous steps of this flow
 val client = ContractClient.forContract(
-    contractId = "CABC...",
+    contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",
     rpcUrl = "https://soroban-testnet.stellar.org:443",
     network = Network.TESTNET
 )
@@ -198,7 +224,7 @@ val result: SCValXdr = client.invoke<SCValXdr>(
     functionName = "transfer",
     arguments = mapOf(
         "from" to keyPair.getAccountId(),
-        "to" to "GDEST...",
+        "to" to "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
         "amount" to 1000000
     ),
     source = keyPair.getAccountId(),
@@ -222,7 +248,7 @@ val result2: SCValXdr = client.invoke<SCValXdr>(
     signer = keyPair,
     options = ClientOptions(
         sourceAccountKeyPair = keyPair,
-        contractId = "CABC...",
+        contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",
         network = Network.TESTNET,
         rpcUrl = "https://soroban-testnet.stellar.org:443",
         baseFee = 10000,
@@ -239,6 +265,9 @@ val methods: Set<String> = client.getMethodNames() // {"transfer", "balance", ..
 `funcResToNative` converts XDR results back to native Kotlin types using the contract spec:
 
 ```kotlin
+// rpcUrl: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val client = ContractClient.forContract(contractId, rpcUrl, Network.TESTNET)
 
 // Invoke and get raw XDR
@@ -285,6 +314,7 @@ Type mapping (Soroban -> Kotlin via funcResToNative):
 When a contract call requires authorization from multiple parties (e.g., a swap), use `buildInvoke()` and `signAuthEntries()`:
 
 ```kotlin
+// aliceKeyPair, bobKeyPair, rpcUrl, swapContractId, tokenAContractId, tokenBContractId: from the previous steps of this flow
 val client = ContractClient.forContract(swapContractId, rpcUrl, Network.TESTNET)
 
 val swapTx: AssembledTransaction<SCValXdr> = client.buildInvoke(
@@ -352,6 +382,9 @@ after signing to capture the footprint before submitting.
 **Adding memos or custom preconditions via buildInvoke:**
 
 ```kotlin
+// client, fromAccount, toAccount: from the previous steps of this flow
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val tx = client.buildInvoke<SCValXdr>(
     functionName = "transfer",
     arguments = mapOf(
@@ -377,8 +410,9 @@ tx.signAndSubmit(keyPair)
 Full control over simulation, signing, and submission. Use when you need custom transaction construction.
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val server = SorobanServer("https://soroban-testnet.stellar.org:443")
-val sender = KeyPair.fromSecretSeed("SXXXXX...")
+val sender = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val account = server.getAccount(sender.getAccountId())
 
 // 1. Build the invocation operation
@@ -387,7 +421,7 @@ val operation = InvokeHostFunctionOperation.invokeContractFunction(
     functionName = "transfer",
     parameters = listOf(
         Address(sender.getAccountId()).toSCVal(),
-        Address("GDEST...").toSCVal(),
+        Address("GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM").toSCVal(),
         Scv.toInt128(com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(1000000))
     )
 )
@@ -430,6 +464,8 @@ if (sendResp.status == SendTransactionStatus.PENDING) {
 **Low-level deployment** follows the same simulate -> sign -> poll pattern:
 
 ```kotlin
+// deployer, wasmBytes: from the previous steps of this flow
+val adminId = "GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE"
 // Upload WASM
 val uploadOp = InvokeHostFunctionOperation.uploadContractWasm(wasmBytes)
 // Build tx, simulate, sign, poll
@@ -510,11 +546,12 @@ import com.soneso.stellar.sdk.scval.Scv
 **Address construction** (use the `Address` class, not Scv):
 
 ```kotlin
+// scAddressXdr: from the previous steps of this flow
 // Account address
-val accountAddr: SCValXdr = Address("GABC...").toSCVal()
+val accountAddr: SCValXdr = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toSCVal()
 
 // Contract address
-val contractAddr: SCValXdr = Address("CABC...").toSCVal()
+val contractAddr: SCValXdr = Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC").toSCVal()
 
 // From SCAddress XDR
 val addr: SCValXdr = Scv.toAddress(scAddressXdr)
@@ -523,6 +560,7 @@ val addr: SCValXdr = Scv.toAddress(scAddressXdr)
 **BigInteger for 128/256-bit types** (uses com.ionspin.kotlin.bignum):
 
 ```kotlin
+// resultScVal: from the previous steps of this flow
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 val amount128 = Scv.toInt128(BigInteger.fromLong(1000000))
@@ -550,8 +588,8 @@ When using `ContractClient.invoke()` or `ContractClient.deploy()`, arguments are
 ```kotlin
 // Native Kotlin types -> XDR (automatic via ContractSpec)
 val args = mapOf(
-    "admin" to "GABC...",     // String -> Address (auto-detected by G prefix)
-    "token" to "CABC...",     // String -> Address (auto-detected by C prefix)
+    "admin" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",     // String -> Address (auto-detected by G prefix)
+    "token" to "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",     // String -> Address (auto-detected by C prefix)
     "amount" to 1000,         // Int -> i128 (or u32, etc. based on spec)
     "name" to "MyToken",      // String -> String or Symbol (based on spec)
     "enabled" to true,        // Boolean -> Bool
@@ -573,10 +611,11 @@ Address auto-detection rules:
 You can also use `funcArgsToXdrSCValues` directly for manual conversion:
 
 ```kotlin
+// client: from the previous steps of this flow
 val spec: ContractSpec? = client.getContractSpec()
 val xdrArgs: List<SCValXdr> = client.funcArgsToXdrSCValues("transfer", mapOf(
-    "from" to "GABC...",
-    "to" to "GDEST...",
+    "from" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
+    "to" to "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     "amount" to 1000
 ))
 ```
@@ -588,6 +627,7 @@ val xdrArgs: List<SCValXdr> = client.funcArgsToXdrSCValues("transfer", mapOf(
 When using the low-level API, extract typed results from `SCValXdr` sealed class variants:
 
 ```kotlin
+// txResponse: from the previous steps of this flow
 val result: SCValXdr? = txResponse.getResultValue()
 
 // Use Scv.from* helpers to extract values
@@ -650,6 +690,7 @@ when (result) {
 Read contract data directly from the ledger without invoking the contract:
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 
 val key = Scv.toSymbol("counter")
@@ -677,6 +718,7 @@ For querying multiple entries at once, see [RPC Reference](./rpc.md) (`getLedger
 Prevent contract data from being archived:
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val account = server.getAccount(keyPair.getAccountId())
 
@@ -706,6 +748,9 @@ When simulation returns a `restorePreamble`, entries must be restored before inv
 **With low-level SorobanServer (manual):**
 
 ```kotlin
+// tx: from the previous steps of this flow
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val sim = server.simulateTransaction(tx)
 
 if (sim.restorePreamble != null) {
@@ -742,6 +787,7 @@ if (sim.restorePreamble != null) {
 Wrap a classic Stellar asset for use in Soroban. The KMP SDK derives the SAC contract ID from the asset:
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 // Get the SAC contract ID for an asset (does NOT deploy -- just computes the ID)
 val usdcAsset = AssetTypeCreditAlphaNum4("USDC", issuerAccountId)
 val sacContractId: String = usdcAsset.getContractId(Network.TESTNET)  // suspend fun
@@ -754,6 +800,7 @@ val xlmSacId: String = xlmAsset.getContractId(Network.TESTNET)
 To deploy the SAC, use the low-level approach with `ContractIDPreimageXdr.FromAsset`:
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val asset = AssetTypeCreditAlphaNum4("USDC", issuerAccountId)
 val preimage = ContractIDPreimageXdr.FromAsset(asset.toXdr())
 // WRONG: ContractExecutableXdr.StellarAsset -- no such variant name
@@ -779,11 +826,14 @@ Parse a contract's spec to discover its functions, types, and events programmati
 ### Loading Contract Info
 
 ```kotlin
+import java.io.File
+import com.soneso.stellar.sdk.contract.SorobanContractParser
+import com.soneso.stellar.sdk.contract.SorobanContractInfo
+
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // WRONG: import com.soneso.stellar.sdk.SorobanContractParser -- does NOT exist at sdk root
 // WRONG: import com.soneso.stellar.sdk.SorobanContractInfo  -- does NOT exist at sdk root
 // CORRECT: both are in com.soneso.stellar.sdk.contract (covered by the contract.* wildcard)
-import com.soneso.stellar.sdk.contract.SorobanContractParser
-import com.soneso.stellar.sdk.contract.SorobanContractInfo
 // Note: com.soneso.stellar.sdk.* does NOT cover sub-packages like .contract
 
 // From local WASM bytecode (offline)
@@ -819,6 +869,7 @@ See `rpc.md` > the contract loading section for `getExternalRefWasmHash()`.
 Build a `ContractSpec` for richer query methods:
 
 ```kotlin
+// contractInfo: from the previous steps of this flow
 val spec = ContractSpec(contractInfo.specEntries)
 
 // List functions
@@ -918,6 +969,7 @@ for (event in spec.events()) {
 When passing union-typed arguments to contracts or reading union results:
 
 ```kotlin
+// result: from the previous steps of this flow
 // Void case (no associated values)
 val success = NativeUnionVal.VoidCase("Success")
 
@@ -954,6 +1006,8 @@ All contract exceptions extend `ContractException` and carry the `AssembledTrans
 
 ```kotlin
 import com.soneso.stellar.sdk.contract.exception.*
+val amount = "100"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 try {
     val result = client.invoke<SCValXdr>(

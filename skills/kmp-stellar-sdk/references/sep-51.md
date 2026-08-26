@@ -5,6 +5,13 @@
 **SDK Class:** every generated XDR type in `com.soneso.stellar.sdk.xdr`
 **Specification:** SEP-0051 v2.0.1, Draft status
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.xdr.*
+import com.soneso.stellar.sdk.scval.Scv
+```
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -175,7 +182,7 @@ The value below is pinned in both wire forms by `Sep51RollbackRehearsalTest`. It
 
 Base64 XDR, wrapped here for reading — it is one unbroken string:
 
-```
+```text
 AAAAAgAAAAAREREREREREREREREREREREREREREREREREREREREREQAAAMgAAAADAAAAAQAAAAEA
 AAAAAAAAAAAAAABkAAAAAAAAAQAAAAVoZWxsbwAAAAAAAAIAAAAAAAAAAQAAAAAiIiIiIiIiIiIi
 IiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAAAFVU0QAAAAAADMzMzMzMzMzMzMzMzMzMzMzMzMzMzMz
@@ -350,6 +357,7 @@ fun record(
 ### Read back out of a larger document
 
 ```kotlin
+// transaction: from the previous steps of this flow
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -463,6 +471,10 @@ SCValTypeXdr.fromXdrJson("\"u32\"")
 ```
 
 ```kotlin
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+
+val value = SCValXdr.fromXdrBase64("AAAADwAAAAh0cmFuc2Zlcg==")
 // WRONG: assuming toXdrJson() indents, or that the SDK exposes a pretty-printer
 val pretty = value.toXdrJson() // always compact, single line
 // CORRECT: use your own Json instance on the element form
@@ -471,6 +483,8 @@ val indented = Json { prettyPrint = true }
 ```
 
 ```kotlin
+val value = SCValXdr.fromXdrBase64("AAAADwAAAAh0cmFuc2Zlcg==")
+val element = value.toXdrJsonElement()
 // WRONG: reaching for the shared runtime — XdrJson is internal to the SDK
 XdrJson.encodeToString(element) // not visible to consumers
 // CORRECT: the four members on the type are the whole public surface
@@ -478,6 +492,7 @@ value.toXdrJson()
 ```
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // WRONG: submitting the JSON form to the network
 server.submitTransaction(transaction.toEnvelopeXdr().toXdrJson())
 // CORRECT: the wire format stays base64 XDR; JSON is for inspection, storage and interchange

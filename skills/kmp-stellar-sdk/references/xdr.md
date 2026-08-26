@@ -39,6 +39,7 @@ println("Signed XDR: $xdrBase64")
 Parse a base64 XDR string back into a transaction object:
 
 ```kotlin
+// xdrBase64: from the previous steps of this flow
 val decoded: AbstractTransaction = AbstractTransaction.fromEnvelopeXdr(xdrBase64, Network.TESTNET)
 
 when (decoded) {
@@ -58,7 +59,7 @@ when (decoded) {
 }
 ```
 
-```
+```kotlin
 // WRONG: AbstractTransaction.fromEnvelopeXdrString(xdr) — no such method
 // CORRECT: AbstractTransaction.fromEnvelopeXdr(xdr, network) — requires Network parameter
 
@@ -70,7 +71,7 @@ when (decoded) {
 
 The `Scv` object provides factory methods for creating and reading Soroban contract values. All methods use **full type names** (not abbreviations).
 
-```
+```kotlin
 // WRONG: Scv.toU32(42u) — abbreviated names do NOT exist
 // CORRECT: Scv.toUint32(42u) — use full type name
 // WRONG: Scv.toI64(100L) — abbreviated names do NOT exist
@@ -116,7 +117,7 @@ The `Scv` object provides factory methods for creating and reading Soroban contr
 // BigInteger is com.ionspin.kotlin.bignum.integer.BigInteger
 ```
 
-```
+```kotlin
 // WRONG: Scv.toUint32(42) — UInt required, not Int
 // CORRECT: Scv.toUint32(42u) — use unsigned literal
 // WRONG: Scv.toUint64(100L) — ULong required, not Long
@@ -140,7 +141,7 @@ val map: SCValXdr = Scv.toMap(linkedMapOf(
 ))
 ```
 
-```
+```kotlin
 // WRONG: Scv.toMap(mapOf(...)) — requires LinkedHashMap, not Map
 // CORRECT: Scv.toMap(linkedMapOf(...)) — use linkedMapOf for deterministic ordering
 ```
@@ -150,7 +151,7 @@ val map: SCValXdr = Scv.toMap(linkedMapOf(
 SCValXdr is a sealed class. Pattern-match on its subclasses to extract values, or use `Scv.from*()` methods for type-safe extraction:
 
 ```kotlin
-val resultVal: SCValXdr = // from contract invocation result
+val resultVal: SCValXdr = Scv.toSymbol("example") // stands in for a contract invocation result
 
 // Using Scv convenience methods (recommended — throws on type mismatch)
 val boolVal: Boolean = Scv.fromBoolean(resultVal)
@@ -187,7 +188,7 @@ when (resultVal) {
 }
 ```
 
-```
+```kotlin
 // WRONG: resultVal.sym — SCValXdr does NOT have property accessors
 // CORRECT: (resultVal as SCValXdr.Sym).value.value — pattern match first
 // CORRECT: Scv.fromSymbol(resultVal) — use Scv convenience method
@@ -213,7 +214,7 @@ val restored: SCValXdr = SCValXdr.fromXdrBase64(base64)
 println(Scv.fromSymbol(restored)) // "hello"
 ```
 
-```
+```kotlin
 // WRONG: original.toBase64EncodedXdrString() — no such method
 // CORRECT: original.toXdrBase64() — extension function from XdrExtensions.kt
 
@@ -227,9 +228,9 @@ The `Address` class provides a high-level way to work with Stellar addresses and
 
 ```kotlin
 // Parse from string (auto-detects type)
-val accountAddr = Address("GABC...")     // G... account
-val contractAddr = Address("CABC...")    // C... contract
-val muxedAddr = Address("MABC...")       // M... muxed account
+val accountAddr = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")     // G... account
+val contractAddr = Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")    // C... contract
+val muxedAddr = Address("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6")       // M... muxed account
 
 // Convert to SCAddressXdr (for low-level XDR construction)
 val scAddress: SCAddressXdr = accountAddr.toSCAddress()
@@ -245,7 +246,7 @@ val strKey: String = restored.getEncodedAddress() // G... or C... format
 val fromVal = Address.fromSCVal(addressArg)
 ```
 
-```
+```kotlin
 // WRONG: XdrSCAddress.forAccountId("GABC...") — no such class
 // CORRECT: Address("GABC...").toSCAddress() — use Address class
 
@@ -263,12 +264,12 @@ import com.soneso.stellar.sdk.xdr.toXdrBase64
 // Account
 val accountKey = LedgerKeyXdr.Account(
     LedgerKeyAccountXdr(
-        accountId = KeyPair.fromAccountId("GABC...").getXdrAccountId()
+        accountId = KeyPair.fromAccountId("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").getXdrAccountId()
     )
 )
 
 // Trustline — must convert AssetXdr to TrustLineAssetXdr manually
-val assetXdr = Asset.create("USDC:GABC...").toXdr() // returns AssetXdr
+val assetXdr = Asset.create("USDC:GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toXdr() // returns AssetXdr
 val trustLineAsset = when (assetXdr) {
     is AssetXdr.AlphaNum4 -> TrustLineAssetXdr.AlphaNum4(assetXdr.value)
     is AssetXdr.AlphaNum12 -> TrustLineAssetXdr.AlphaNum12(assetXdr.value)
@@ -276,7 +277,7 @@ val trustLineAsset = when (assetXdr) {
 }
 val trustKey = LedgerKeyXdr.TrustLine(
     LedgerKeyTrustLineXdr(
-        accountId = KeyPair.fromAccountId("GABC...").getXdrAccountId(),
+        accountId = KeyPair.fromAccountId("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").getXdrAccountId(),
         asset = trustLineAsset
     )
 )
@@ -284,7 +285,7 @@ val trustKey = LedgerKeyXdr.TrustLine(
 // Contract data
 val contractDataKey = LedgerKeyXdr.ContractData(
     LedgerKeyContractDataXdr(
-        contract = Address("CABC...").toSCAddress(),
+        contract = Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC").toSCAddress(),
         key = Scv.toSymbol("counter"),
         durability = ContractDataDurabilityXdr.PERSISTENT
     )
@@ -293,7 +294,7 @@ val contractDataKey = LedgerKeyXdr.ContractData(
 // Contract instance (metadata)
 val instanceKey = LedgerKeyXdr.ContractData(
     LedgerKeyContractDataXdr(
-        contract = Address("CABC...").toSCAddress(),
+        contract = Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC").toSCAddress(),
         key = Scv.toLedgerKeyContractInstance(),
         durability = ContractDataDurabilityXdr.PERSISTENT
     )
@@ -344,7 +345,7 @@ if (txData != null) {
 val parsedData = SorobanTransactionDataXdr.fromXdrBase64(base64SorobanData)
 ```
 
-```
+```kotlin
 // WRONG: resources.instructions.uint32 — Uint32Xdr does NOT have .uint32
 // CORRECT: resources.instructions.value — Uint32Xdr.value is UInt
 
@@ -415,7 +416,7 @@ val signedBase64: String = signedEntry.toXdrBase64()
 // Return signedBase64 to invoker...
 ```
 
-```
+```kotlin
 // WRONG: authEntry.toBase64EncodedXdrString() — no such method
 // CORRECT: authEntry.toXdrBase64() — extension function
 
@@ -437,6 +438,7 @@ valid only on Protocol 27+. `Address` and `AddressV2` wrap
 ```kotlin
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 
+val authEntry: SorobanAuthorizationEntryXdr = TODO("an auth entry from simulation")
 val address = when (val creds = authEntry.credentials) {
     is SorobanCredentialsXdr.Void -> null
     is SorobanCredentialsXdr.Address -> creds.value.address
@@ -506,6 +508,7 @@ listed above. `kotlinx-serialization-json` is an `api` dependency of the SDK, so
 already on the consumer compile classpath.
 
 ```kotlin
+// envelopeBase64: from the previous steps of this flow
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
 import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import com.soneso.stellar.sdk.xdr.toXdrBase64
@@ -549,6 +552,7 @@ Output is deterministic: compact, keys in declaration order, hexadecimal lowerca
 `Json` instance on the element form when you want it indented:
 
 ```kotlin
+// envelope: from the previous steps of this flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
@@ -578,7 +582,7 @@ more than 128 containers deep are all rejected. The repeated-key rule covers one
 so separate objects may share a key name. It applies to `fromXdrJson`: a `JsonObject` passed to
 `fromXdrJsonElement` resolved any repetition before the decoder saw it.
 
-```
+```kotlin
 // WRONG: expecting an unset optional to be absent, or a void union arm to be null
 // CORRECT: an unset optional is null with its key present ({"source_account":null});
 //          a void union arm is a bare string ({"body":"inflation"})

@@ -6,6 +6,16 @@
 **KYC Fields Package:** `com.soneso.stellar.sdk.sep.sep09`
 **Standard KYC Fields:** See [sep-09.md](sep-09.md) for all field classes, properties, constants, and prefix behavior
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep12.*
+import com.soneso.stellar.sdk.sep.sep12.exceptions.*
+import com.soneso.stellar.sdk.sep.sep09.*
+import kotlinx.datetime.LocalDate
+```
+
 ## Table of Contents
 
 - [Service initialization](#service-initialization)
@@ -35,9 +45,9 @@
 `KYCService.fromDomain()` is a `suspend` function that fetches the anchor's `stellar.toml`, reads `KYC_SERVER` (falls back to `TRANSFER_SERVER`), and returns a configured `KYCService`. Throws `IllegalStateException` if neither field is found.
 
 ```kotlin
+// myClient: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep12.KYCService
 
-val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
 // With custom HTTP client and headers
 val kycService = KYCService.fromDomain(
@@ -66,7 +76,8 @@ import com.soneso.stellar.sdk.sep.sep12.KYCService
 val kycService = KYCService("https://api.anchor.com/kyc")
 
 // With optional custom client and headers
-val kycService = KYCService(
+val myClient = io.ktor.client.HttpClient()
+val kycServiceCustom = KYCService(
     serviceAddress = "https://api.anchor.com/kyc",
     httpClient = myClient,
     httpRequestHeaders = mapOf("X-Custom" to "value")
@@ -90,6 +101,7 @@ Retrieve a customer's current verification status and the fields the anchor need
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -97,7 +109,7 @@ val request = GetCustomerInfoRequest(
     jwt = jwtToken          // required: JWT from SEP-10 or SEP-45
     // Optional identification parameters:
     // id = customerId,              // anchor-assigned customer ID from a previous PUT
-    // account = "GABC...",          // Stellar account (deprecated, inferred from JWT sub)
+    // account = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",          // Stellar account (deprecated, inferred from JWT sub)
     // memo = "12345",               // integer memo for shared/omnibus accounts
     // memoType = "id",              // deprecated; memos should always be type id
     // type = "sep31-sender",        // e.g. sep6-deposit, sep31-sender, sep31-receiver
@@ -160,6 +172,7 @@ All KYC field classes use constructor parameters. Date fields use `kotlinx.datet
 import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
 import kotlinx.datetime.LocalDate
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -234,6 +247,7 @@ All organization fields are automatically sent with the `organization.` prefix p
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -274,6 +288,8 @@ Attach financial account details to a natural person or organization.
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
 val financialFields = FinancialAccountKYCFields(
     // Traditional bank account
@@ -299,7 +315,7 @@ val financialFields = FinancialAccountKYCFields(
     mobileMoneyProvider = "M-Pesa",
 
     // Crypto payout address
-    cryptoAddress = "GDJKZLTXCKVQYIGJQIYSNFJ3CEKIIZ6HIAZEDE2KBPCSEPBVH4GNDLTJ"
+    cryptoAddress = "GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6"
 )
 
 // Attach to natural person
@@ -334,6 +350,8 @@ Attach payment card details to a natural person or organization. All card field 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
 val cardFields = CardKYCFields(
     number = "4111111111111111",
@@ -376,6 +394,8 @@ import com.soneso.stellar.sdk.sep.sep09.*
 import com.soneso.stellar.sdk.sep.sep12.*
 import kotlinx.datetime.LocalDate
 import java.io.File
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -438,6 +458,8 @@ For anchor-specific fields not covered by SEP-9, use `customFields` (text) and `
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
 import java.io.File
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -468,6 +490,8 @@ The deprecated endpoint is supported for backwards compatibility:
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -494,6 +518,9 @@ Return type is `GetCustomerInfoResponse`, **not** `PutCustomerInfoResponse`.
 **Preferred approach** (submit verification codes via `putCustomerInfo`):
 
 ```kotlin
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = jwtToken,
     id = customerId,
@@ -515,15 +542,17 @@ Register a URL to receive POST notifications when a customer's status changes. T
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
 import io.ktor.client.statement.*
-
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+
 
 val request = PutCustomerCallbackRequest(
     jwt = jwtToken,
     url = "https://myapp.com/kyc-callback",   // required
     id = customerId                            // preferred: use anchor-assigned ID
     // OR identify by account:
-    // account = "GABC...",
+    // account = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     // memo = "12345"    // for shared accounts
 )
 
@@ -595,6 +624,7 @@ The verifier:
 Once verification passes, decode the body — the anchor posts the same JSON shape as `GET /customer` responses:
 
 ```kotlin
+// requestBody: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep12.GetCustomerInfoResponse
 import kotlinx.serialization.json.Json
 
@@ -614,6 +644,8 @@ Upload a file and receive a `fileId` to reference in subsequent `PUT /customer` 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
 import java.io.File
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -661,6 +693,8 @@ Retrieve information about uploaded files, either by file ID or customer ID.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -705,6 +739,8 @@ Delete all personal data stored by the anchor for a given Stellar account. Used 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
 import io.ktor.client.statement.*
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -744,6 +780,8 @@ All methods throw typed exceptions from `com.soneso.stellar.sdk.sep.sep12.except
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep12.*
 import com.soneso.stellar.sdk.sep.sep12.exceptions.*
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
@@ -894,6 +932,8 @@ if (field.status == FieldStatus.VERIFICATION_REQUIRED) { ... }
 **WRONG: birthDate, idIssueDate, idExpirationDate expect strings -- not LocalDate**
 
 ```kotlin
+import kotlinx.datetime.LocalDate
+
 // WRONG: strings are not accepted — these properties are typed as LocalDate?
 val person = NaturalPersonKYCFields(
     birthDate = "1990-05-15",           // compile error: String not LocalDate
@@ -902,8 +942,6 @@ val person = NaturalPersonKYCFields(
 )
 
 // CORRECT: LocalDate objects
-import kotlinx.datetime.LocalDate
-
 val person = NaturalPersonKYCFields(
     birthDate = LocalDate(1990, 5, 15),
     idIssueDate = LocalDate(2020, 1, 15),
@@ -932,7 +970,7 @@ val org = OrganizationKYCFields(
 )
 
 // CORRECT: ISO 8601 string
-val org = OrganizationKYCFields(
+val orgCorrect = OrganizationKYCFields(
     registrationDate = "2010-06-15"
 )
 // (Unlike NaturalPersonKYCFields.birthDate which IS a LocalDate)
@@ -943,6 +981,8 @@ val org = OrganizationKYCFields(
 All SEP-12 request and response classes are Kotlin data classes with `val` properties. There are no setters, no `getX()` methods, and no empty constructors — required fields must be supplied at construction time.
 
 ```kotlin
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: empty constructor + property assignment — required fields have no default,
 // and val properties have no setter
 val request = GetCustomerInfoRequest()
@@ -971,6 +1011,7 @@ val size: Long = fileResponse.size
 **WRONG: putCustomerVerification() returns PutCustomerInfoResponse**
 
 ```kotlin
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // WRONG: treating return value as PutCustomerInfoResponse
 @Suppress("DEPRECATION")
 val response = kycService.putCustomerVerification(request)
@@ -978,23 +1019,28 @@ println(response.id)  // This is GetCustomerInfoResponse.id (String?), not PutCu
 
 // CORRECT: return type is GetCustomerInfoResponse — use response.status
 @Suppress("DEPRECATION")
-val response = kycService.putCustomerVerification(request)
 println(response.status)  // CustomerStatus enum: ACCEPTED, NEEDS_INFO, etc.
 ```
 
 **WRONG: deleteCustomer() first parameter is the customer UUID**
 
 ```kotlin
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // WRONG: passing the anchor-assigned customer UUID
 kycService.deleteCustomer(account = customerId, jwt = jwtToken)  // 404
 
 // CORRECT: first argument is the Stellar account G... address
-kycService.deleteCustomer(account = "GABC...stellarAccountId", jwt = jwtToken)
+kycService.deleteCustomer(account = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", jwt = jwtToken)
 ```
 
 **WRONG: deleteCustomer() and putCustomerCallback() return parsed response objects**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // WRONG: treating return as a parsed response object
 val response: GetCustomerInfoResponse = kycService.deleteCustomer(...)  // compile error
 val cbResponse: PutCustomerInfoResponse = kycService.putCustomerCallback(...)  // compile error
@@ -1022,6 +1068,7 @@ try {
 **WRONG: using customFields for file references -- use fileReferences**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: file references go in fileReferences, not customFields
 val request = PutCustomerInfoRequest(
     jwt = jwtToken,
@@ -1029,7 +1076,7 @@ val request = PutCustomerInfoRequest(
 )
 
 // CORRECT: use the dedicated fileReferences parameter
-val request = PutCustomerInfoRequest(
+val requestWithFiles = PutCustomerInfoRequest(
     jwt = jwtToken,
     fileReferences = mapOf("photo_id_front_file_id" to fileId)
 )

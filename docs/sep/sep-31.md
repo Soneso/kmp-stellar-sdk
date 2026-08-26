@@ -1,5 +1,13 @@
 # SEP-31: Cross-Border Payments
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep31.*
+import com.soneso.stellar.sdk.sep.sep31.exceptions.*
+```
+
 ## Overview
 
 [SEP-31](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0031.md) defines an API a Sending Anchor uses to deliver a cross-border payment through a Receiving Anchor. The Sending Anchor authenticates with SEP-10, discovers the Receiving Anchor's supported assets through `GET /info`, optionally collects SEP-12 KYC and a SEP-38 firm quote, then `POST /transactions` to obtain the on-chain Stellar account, memo, and memo type that route the payment to a single transaction record on the Receiving Anchor.
@@ -428,7 +436,7 @@ import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionResponse
 import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionStatus
 import kotlinx.coroutines.delay
 
-private val terminalStatuses = setOf(
+val terminalStatuses = setOf(
     Sep31TransactionStatus.COMPLETED,
     Sep31TransactionStatus.REFUNDED,
     Sep31TransactionStatus.EXPIRED,
@@ -699,6 +707,8 @@ suspend fun errorMatrix() {
 Every exception that surfaces anchor response content also exposes a sibling `rawResponseBody: String?` field that preserves the original body **without** JWT redaction. The field is intended for local debugging, for example when an anchor returns an error whose meaning depends on the token it rejected. The 1024-char cap and the control-character scrub still apply, so the field is log-injection-safe; only JWT redaction is disabled.
 
 ```kotlin
+// localDebugMode, request, sep31: from the previous steps of this flow
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 try {
     sep31.postTransactions(request, jwt)
 } catch (e: Sep31BadRequestException) {

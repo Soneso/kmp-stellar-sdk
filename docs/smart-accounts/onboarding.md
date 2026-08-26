@@ -6,6 +6,15 @@ No prior knowledge of smart accounts, WebAuthn, or Soroban is required. Familiar
 
 ---
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+import com.soneso.stellar.sdk.scval.Scv
+```
+
 ## 1. The Problem with Traditional Stellar Accounts
 
 A traditional Stellar account is controlled by a single Ed25519 secret key (an `S...` string). Every transaction must be signed with that key. If the key is lost, the account and its funds are permanently inaccessible. Traditional accounts do support basic multi-signature through signer keys and weight thresholds, but they lack account recovery, spending limits, context-specific rules, or alternative signature schemes like passkeys. Key storage and backup falls entirely on the user or the application developer.
@@ -58,7 +67,7 @@ On-chain representation: `Vec([Symbol("Delegated"), Address(address)])`
 
 SDK method:
 ```kotlin
-kit.signerManager.addDelegated(contextRuleId = 0u, address = "GA7QYNF7...")
+kit.signerManager.addDelegated(contextRuleId = 0u, address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
 ```
 
 **Passkey (External)**: A WebAuthn public key verified by a verifier contract. The signer stores the verifier's contract address alongside a `keyData` blob containing the public key from the passkey registration concatenated with the credential ID.
@@ -80,7 +89,7 @@ On-chain representation: `Vec([Symbol("External"), Address(verifier), Bytes(publ
 
 SDK method:
 ```kotlin
-kit.signerManager.addEd25519(contextRuleId = 0u, verifierAddress = "<C-address of the Ed25519 verifier>", publicKey = ed25519PublicKey)
+kit.signerManager.addEd25519(contextRuleId = 0u, verifierAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA", publicKey = ed25519PublicKey)
 ```
 
 ---
@@ -107,11 +116,11 @@ Because a `CreateContract` rule is identified by a 32-byte WASM hash only, autom
 SDK methods:
 ```kotlin
 // Add a rule for a specific contract.
-// Signer objects are created using DelegatedSigner("GA7Q...") or
+// Signer objects are created using DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ") or
 // ExternalSigner.webAuthn(...) -- see the Signers section above and
 // the SDK guide for full construction details.
 kit.contextRuleManager.addContextRule(
-    contextType = ContextRuleType.CallContract("<C-address of the target contract>"),
+    contextType = ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
     name = "TokenTransfers",
     signers = listOf(delegatedSigner, passkeySigner)
 )
@@ -137,7 +146,7 @@ On-chain: stores `threshold: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "<C-address>", threshold = 2u)
+kit.policyManager.addSimpleThreshold(contextRuleId = 0u, policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z", threshold = 2u)
 ```
 
 **Spending Limit**: Limits the total token amount spent within a rolling window of ledgers. For example, 1000 tokens per day (approximately 17,280 ledgers at 5 seconds per ledger). The spending limit policy intercepts any contract call where the function name is `transfer` and extracts the amount from the third argument. In practice this is almost always a token contract's `transfer` function. If a non-token contract has a function named `transfer`, the policy will attempt to apply the limit to it as well, so scope spending limit policies to specific token contracts using context rules when this is a concern. Other function names are not subject to spending limits.
@@ -146,7 +155,7 @@ On-chain: stores `spending_limit: i128, period_ledgers: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addSpendingLimit(contextRuleId = 0u, policyAddress = "<C-address>", spendingLimit = "1000", periodLedgers = Util.LEDGERS_PER_DAY.toUInt())
+kit.policyManager.addSpendingLimit(contextRuleId = 0u, policyAddress = "CAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAKAL", spendingLimit = "1000", periodLedgers = Util.LEDGERS_PER_DAY.toUInt())
 ```
 
 **Weighted Threshold**: Each signer has a weight (vote power). The sum of weights from valid signatures must meet or exceed a threshold. For example, signer A has weight 50, signer B has weight 30, signer C has weight 20, and the threshold is 80. A+B or A+C would pass; B+C would not.
@@ -155,7 +164,10 @@ On-chain: stores `signer_weights: Map<Signer, u32>, threshold: u32`
 
 SDK method:
 ```kotlin
-kit.policyManager.addWeightedThreshold(contextRuleId = 0u, policyAddress = "<C-address>", signerWeights = mapOf(signerA to 50u, signerB to 30u, signerC to 20u), threshold = 80u)
+val signerA = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+val signerB = DelegatedSigner("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
+val signerC = DelegatedSigner("GCUZ6YLL5RQBTYLTTQLPCM73C5XAIUGK2TIMWQH7HPSGWVS2KJ2F3CHS")
+kit.policyManager.addWeightedThreshold(contextRuleId = 0u, policyAddress = "CAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAODX", signerWeights = mapOf(signerA to 50u, signerB to 30u, signerC to 20u), threshold = 80u)
 ```
 
 The policy interface is generic: any Soroban contract that implements the required `enforce()`, `install()`, and `uninstall()` functions can be used as a policy. Use `addPolicy` to install one:
@@ -163,7 +175,7 @@ The policy interface is generic: any Soroban contract that implements the requir
 ```kotlin
 kit.policyManager.addPolicy(
     contextRuleId = 0u,
-    policyAddress = "CCUSTOMPOLICY...",
+    policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z",
     installParams = Scv.toMap(linkedMapOf(
         Scv.toSymbol("my_param") to Scv.toUint32(42u)
     ))
@@ -217,7 +229,10 @@ Relayer authentication and rate limiting are implementation-specific. The SDK su
 SDK configuration:
 ```kotlin
 val config = OZSmartAccountConfig(
-    // ...required fields...
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     relayerUrl = "https://relayer.example.com"
 )
 ```
@@ -235,8 +250,10 @@ External signers (both passkey and Ed25519 types) store a reference to their ver
 The WebAuthn verifier contract address is a required configuration parameter:
 ```kotlin
 val config = OZSmartAccountConfig(
-    // ...other fields...
-    webauthnVerifierAddress = "CVERIFIER..."
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
 ```
 
@@ -253,7 +270,10 @@ With an indexer, `connectWallet()` falls back to it when derivation under the co
 SDK configuration:
 ```kotlin
 val config = OZSmartAccountConfig(
-    // ...other fields...
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     indexerUrl = "https://indexer.example.com"
 )
 ```
@@ -262,7 +282,7 @@ val config = OZSmartAccountConfig(
 
 How the components fit together:
 
-```
+```text
 User (biometric) --> Passkey --> SDK --> Smart Account Contract --> Verifier Contract
                                                |
                                                +--> Policy Contracts
@@ -302,7 +322,7 @@ Because smart accounts are contracts, not traditional accounts, they interact wi
 7. On-chain, Soroban calls the smart account contract's `__check_auth` function. It verifies the passkey signature via the verifier contract and evaluates all policies attached to the matching context rule (spending limits, thresholds, etc.).
 8. If verification passes and all policies are satisfied, the transfer executes.
 
-```
+```text
 App builds tx --> SDK simulates --> Passkey signs auth entry --> SDK assembles tx --> Submit
                                                                                        |
                                                                            On-chain: __check_auth

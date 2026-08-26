@@ -1,6 +1,12 @@
 # Architecture Guide
 
-This document provides a comprehensive overview of the Stellar KMP SDK's architecture, design decisions, and implementation details.
+This document provides an overview of the Stellar KMP SDK's architecture, design decisions, and implementation details.
+
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
 
 ## Table of Contents
 
@@ -16,7 +22,7 @@ This document provides a comprehensive overview of the Stellar KMP SDK's archite
 
 ## Project Structure
 
-```
+```text
 kmp-stellar-sdk/
 ├── stellar-sdk/                    # Main SDK library
 │   ├── src/
@@ -93,8 +99,8 @@ The SDK uses Kotlin's expect/actual mechanism for platform-specific implementati
 expect object Ed25519 {
     suspend fun generatePrivateKey(): ByteArray
     suspend fun derivePublicKey(privateKey: ByteArray): ByteArray
-    suspend fun sign(message: ByteArray, privateKey: ByteArray): ByteArray
-    suspend fun verify(message: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean
+    suspend fun sign(data: ByteArray, privateKey: ByteArray): ByteArray
+    suspend fun verify(data: ByteArray, signature: ByteArray, publicKey: ByteArray): Boolean
 }
 
 // jvmMain - Implementation
@@ -357,6 +363,7 @@ The SDK employs a fluent builder pattern for constructing type-safe queries agai
 
 Architectural flow:
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Builder constructs query parameters progressively
 server.accounts()
     .forSigner(signerKey)      // Add signer filter
@@ -435,6 +442,8 @@ The architecture separates concerns between Horizon (account/transaction data) a
 Used extensively for transaction construction:
 
 ```kotlin
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val network = Network.TESTNET
 val transaction = TransactionBuilder(account, network)
     .addOperation(PaymentOperation(...))
     .addOperation(CreateAccountOperation(...))
@@ -515,10 +524,10 @@ All platforms use battle-tested libraries with:
 **Decision**: Use suspend functions for all crypto operations
 
 **Consequences**:
-- ✅ Consistent API across platforms
-- ✅ Zero overhead on JVM/Native
-- ✅ Future-proof for async hardware wallets
-- ⚠️ Requires coroutine context
+- Consistent API across platforms
+- Zero overhead on JVM/Native
+- Future-proof for async hardware wallets
+- Trade-off: requires a coroutine context
 
 ### ADR-002: Production Crypto Only
 
@@ -529,10 +538,10 @@ All platforms use battle-tested libraries with:
 **Decision**: Only use audited, production crypto libraries
 
 **Consequences**:
-- ✅ High security confidence
-- ✅ Avoid custom crypto pitfalls
-- ✅ Community trust
-- ⚠️ Platform-specific dependencies
+- High security confidence
+- Avoids custom crypto pitfalls
+- Community trust
+- Trade-off: platform-specific dependencies
 
 ### ADR-003: Immutable Public API
 
@@ -543,10 +552,10 @@ All platforms use battle-tested libraries with:
 **Decision**: All public API objects are immutable
 
 **Consequences**:
-- ✅ Thread-safe by default
-- ✅ Predictable behavior
-- ✅ Easier to reason about
-- ⚠️ More object creation
+- Thread-safe by default
+- Predictable behavior
+- Easier to reason about
+- Trade-off: more object creation
 
 ---
 

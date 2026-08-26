@@ -4,6 +4,14 @@
 **Prerequisites:** Requires SEP-01 stellar.toml (provides `WEB_AUTH_FOR_CONTRACTS_ENDPOINT`, `WEB_AUTH_CONTRACT_ID`, `SIGNING_KEY`)
 **SEP-45 vs SEP-10:** SEP-45 is for contract accounts (C...). SEP-10 is for traditional accounts (G... and M...).
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep45.*
+import com.soneso.stellar.sdk.sep.sep45.exceptions.*
+```
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -23,12 +31,13 @@
 ## Quick Start
 
 ```kotlin
+// contractSignerSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
 // Your contract account (C... address) -- must implement __check_auth
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 
 // Signer registered in your contract's __check_auth -- must have private key
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
@@ -74,7 +83,7 @@ try {
 ```
 
 Signature:
-```
+```kotlin
 suspend fun fromDomain(
     domain: String,
     network: Network,
@@ -93,7 +102,7 @@ import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
 val webAuth = WebAuthForContracts(
     authEndpoint = "https://auth.anchor.example.com/sep45",
-    webAuthContractId = "CCALHRGH5RXIDJDRLPPG4ZX2S563TB2QKKJR4STWKVQCYB6JVPYQXHRG", // C...
+    webAuthContractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5", // C...
     serverSigningKey = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",   // G...
     serverHomeDomain = "anchor.example.com",
     network = Network.TESTNET,
@@ -101,7 +110,7 @@ val webAuth = WebAuthForContracts(
 ```
 
 Constructor signature:
-```
+```kotlin
 class WebAuthForContracts(
     val authEndpoint: String,         // WEB_AUTH_FOR_CONTRACTS_ENDPOINT -- must be a valid URL
     val webAuthContractId: String,    // WEB_AUTH_CONTRACT_ID -- must start with 'C'
@@ -117,6 +126,7 @@ class WebAuthForContracts(
 The `init` block throws `IllegalArgumentException` if any parameter is invalid (wrong prefix, bad URL, blank domain).
 
 ```kotlin
+val domain = "testanchor.stellar.org"
 // WRONG: webAuthContractId and serverSigningKey are swapped
 WebAuthForContracts(
     authEndpoint = endpoint,
@@ -172,7 +182,7 @@ the matching hash preimage automatically. This is transparent: there is no API
 change for callers.
 
 Method signature:
-```
+```kotlin
 suspend fun jwtToken(
     clientAccountId: String,                                       // C... contract address to authenticate
     signers: List<KeyPair> = emptyList(),                          // keypairs with private keys; can be empty
@@ -187,13 +197,14 @@ suspend fun jwtToken(
 Returns `Sep45AuthToken` containing the JWT token string and parsed claims. Throws on any failure -- see [Error Handling](#error-handling).
 
 ```kotlin
+// contractSignerSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
 val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
 
 // Simple: auto-expiration, default home domain
@@ -218,6 +229,7 @@ val authToken2 = webAuth.jwtToken(
 Some contracts implement `__check_auth` without requiring signature verification. Pass an empty list for signers:
 
 ```kotlin
+// serverSigningKey, webAuthContractId: from the previous steps of this flow
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
@@ -225,7 +237,7 @@ val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTN
 
 // Empty signers list -- no signatures added, no Soroban RPC call made
 val authToken = webAuth.jwtToken(
-    clientAccountId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ",
+    clientAccountId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     signers = emptyList(),
 )
 ```
@@ -247,7 +259,7 @@ import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
 val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
 val clientDomainKeyPair = KeyPair.fromSecretSeed(walletSigningSecretSeed)
 
@@ -265,6 +277,7 @@ val authToken = webAuth.jwtToken(
 When the client domain signing key is on a separate server, provide a `Sep45ClientDomainSigningDelegate`. The delegate receives a base64-encoded `SorobanAuthorizationEntryXdr` (the client domain entry) and must return it signed as base64.
 
 ```kotlin
+// contractSignerSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep45.Sep45ClientDomainSigningDelegate
@@ -279,7 +292,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
 
 // Delegate receives and returns base64-encoded SorobanAuthorizationEntryXdr
@@ -322,6 +335,7 @@ fun interface Sep45ClientDomainSigningDelegate {
 ```
 
 ```kotlin
+// signedEntryXdr: from the previous steps of this flow
 // WRONG: SEP-10 delegate pattern -- receives/returns transaction XDR string
 val sep10Delegate: (String) -> String = { transactionXdr -> /* ... */ }
 
@@ -335,6 +349,9 @@ val sep45Delegate = Sep45ClientDomainSigningDelegate { entryXdr ->
 When `clientDomain` is provided, you must supply either `clientDomainAccountKeyPair` or `clientDomainSigningDelegate`. Providing neither throws `Sep45MissingClientDomainException`.
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
+// contractId, signer, walletKeyPair, webAuth: from the previous steps of this flow
 // WRONG: clientDomain provided without either signing means -- throws Sep45MissingClientDomainException
 webAuth.jwtToken(
     clientAccountId = contractId,
@@ -357,6 +374,8 @@ webAuth.jwtToken(
 You also cannot provide both at the same time:
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: both clientDomainAccountKeyPair and clientDomainSigningDelegate -- throws Sep45MissingClientDomainException
 webAuth.jwtToken(
     clientAccountId = contractId,
@@ -381,7 +400,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
 val homeDomain = "anchor.example.com"
 
@@ -433,7 +452,7 @@ try {
 
 ### Method signatures for low-level access
 
-```
+```kotlin
 suspend fun getChallenge(
     clientAccountId: String,
     homeDomain: String? = null,    // defaults to serverHomeDomain
@@ -476,6 +495,7 @@ By default the SDK submits signed challenges as `application/x-www-form-urlencod
 To switch to JSON, set the public field:
 
 ```kotlin
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Default: form-urlencoded (useFormUrlEncoded = true)
 webAuth.useFormUrlEncoded = true
 
@@ -497,6 +517,7 @@ Returned by `getChallenge()`. Contains the authorization entries to decode, vali
 | `networkPassphrase` | `String?` | Optional -- server's network passphrase for validation |
 
 ```kotlin
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 val challengeResponse = webAuth.getChallenge(contractId)
 val xdr = challengeResponse.authorizationEntries  // may be null
 val passphrase = challengeResponse.networkPassphrase  // may be null
@@ -514,6 +535,7 @@ Internal response from the token POST endpoint. `jwtToken()` extracts the token 
 | `error` | `String?` | Error message on failure (JSON field: `error`) |
 
 ```kotlin
+// contractSignerSeed: from the previous steps of this flow
 // WRONG: the JSON field is 'token', not 'jwt_token'
 // CORRECT: Sep45TokenResponse.token reads the 'token' JSON field
 ```
@@ -532,6 +554,8 @@ Returned by `jwtToken()` and `sendSignedChallenge()`. Parses the JWT token and e
 | `clientDomain` | `String?` | Present when client domain verification was performed |
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 val authToken = webAuth.jwtToken(contractId, listOf(signer))
 
 // Access parsed claims
@@ -549,6 +573,7 @@ val bearerToken = "Bearer $authToken"
 ```
 
 ```kotlin
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // WRONG: accessing .jwt or .jwtToken on Sep45AuthToken
 authToken.jwt       // does not exist
 authToken.jwtToken  // does not exist
@@ -573,7 +598,7 @@ import com.soneso.stellar.sdk.sep.sep45.WebAuthForContracts
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
 
 val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
-val contractId = "CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ"
+val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val signer = KeyPair.fromSecretSeed(contractSignerSeed)
 
 try {
@@ -684,7 +709,7 @@ try {
 
 ### Exception hierarchy
 
-```
+```text
 Sep45Exception (base -- extends Exception)
 ├── Sep45ChallengeRequestException       (statusCode: Int?, errorMessage: String?)
 ├── Sep45ChallengeValidationException    (sealed)
@@ -743,16 +768,20 @@ Sep45Exception (base -- extends Exception)
 **WRONG: passing a G... or M... address to jwtToken()**
 
 ```kotlin
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: jwtToken() requires a C... contract address -- throws IllegalArgumentException
 webAuth.jwtToken("GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP", listOf(signer))
 
 // CORRECT: pass the C... contract address
-webAuth.jwtToken("CCIBUCGPOHWMMMFPFTDWBSVHQRT4DIBJ7AD6BZJYDITBK2LCVBYW7HUQ", listOf(signer))
+webAuth.jwtToken("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC", listOf(signer))
 ```
 
 **WRONG: signers must contain KeyPairs with private keys**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // WRONG: KeyPair.fromAccountId() has no private key and cannot sign
 val publicOnly = KeyPair.fromAccountId(accountId)
 webAuth.jwtToken(contractId, listOf(publicOnly))
@@ -781,6 +810,8 @@ webAuth.jwtToken(contractId, listOf(signer))
 **WRONG: network mismatch between WebAuthForContracts and the anchor**
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val domain = "testanchor.stellar.org"
 // WRONG: pubnet WebAuthForContracts against a testnet anchor
 val webAuth = WebAuthForContracts(
     authEndpoint = endpoint,
@@ -792,7 +823,7 @@ val webAuth = WebAuthForContracts(
 // -> Sep45InvalidServerSignatureException or Sep45InvalidNetworkPassphraseException
 
 // CORRECT: match the network to the anchor's actual network
-val webAuth = WebAuthForContracts(
+val webAuthCorrect = WebAuthForContracts(
     authEndpoint = endpoint,
     webAuthContractId = contractId,
     serverSigningKey = signingKey,
@@ -804,6 +835,7 @@ val webAuth = WebAuthForContracts(
 **WRONG: wrong constructor parameter order (positional)**
 
 ```kotlin
+val domain = "testanchor.stellar.org"
 // WRONG: confusing webAuthContractId (C...) and serverSigningKey (G...)
 WebAuthForContracts(endpoint, serverSigningKey, webAuthContractId, domain, Network.TESTNET)
 // -> IllegalArgumentException: webAuthContractId must be a contract address starting with 'C'
@@ -823,6 +855,7 @@ WebAuthForContracts(
 `fromDomain()` uses its own `HttpClient` for the stellar.toml fetch. After `fromDomain()` returns, the internal client is already set. For testing, always construct `WebAuthForContracts` manually and pass the mock via the `httpClient` parameter.
 
 ```kotlin
+val domain = "testanchor.stellar.org"
 // WRONG: fromDomain() uses real network for stellar.toml -- mock arrives too late
 val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // no way to inject mock after construction
@@ -841,6 +874,7 @@ val webAuth = WebAuthForContracts(
 **WRONG: Sep45ChallengeRequestException field names**
 
 ```kotlin
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // WRONG: no 'code' or 'body' fields on Sep45ChallengeRequestException
 println(e.code)    // does not exist
 println(e.body)    // does not exist
@@ -876,6 +910,9 @@ println(e.body)   // String: raw response body
 **WRONG: expecting jwtToken() to return a String**
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
+// contractId, signer, webAuth: from the previous steps of this flow
 // WRONG: jwtToken() returns Sep45AuthToken, not String
 val token: String = webAuth.jwtToken(contractId, listOf(signer))
 
@@ -887,6 +924,7 @@ val jwtString: String = authToken.token
 **WRONG: forgetting suspend context**
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // WRONG: calling suspend functions outside a coroutine
 fun authenticate() {
     val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET) // ERROR

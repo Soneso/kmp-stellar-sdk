@@ -8,6 +8,16 @@ OpenZeppelin Smart Account Kit for Stellar/Soroban. This reference documents all
 
 ---
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
+```
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
@@ -194,6 +204,7 @@ val indexerClient: OZIndexerClient?
 Indexer client for credential-to-contract discovery. Null only when no indexer URL is configured and no built-in default exists for the network (testnet and mainnet have defaults; see `effectiveIndexerUrl()`). Use for looking up contracts by credential ID or signer address, and for retrieving contract details (rules, signers, policies).
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // Discover contracts associated with a credential
 val contracts = kit.indexerClient?.lookupByCredentialId(credentialId)
 
@@ -356,7 +367,7 @@ val config = OZSmartAccountConfig.builder(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "abc123...",
-    webauthnVerifierAddress = "CBCD1234..."
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
     .sessionExpiryMs(86400000L)  // 1 day
     .relayerUrl("https://relayer.example.com")
@@ -506,6 +517,8 @@ The non-null result is one of two arms (see [ConnectWalletResult](#connectwallet
 **Example**:
 
 ```kotlin
+import com.soneso.stellar.sdk.smartaccount.oz.OZWalletOperations.ConnectWalletOptions
+
 // Phase 1: Silent restore at app launch (returns null if no session)
 when (val result = walletOps.connectWallet()) {
     null -> {
@@ -544,7 +557,7 @@ walletOps.connectWallet(ConnectWalletOptions(fresh = true))
 walletOps.connectWallet(
     ConnectWalletOptions(
         credentialId = "abc123...",
-        contractId = "CBCD..."
+        contractId = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
     )
 )
 ```
@@ -577,7 +590,7 @@ Intended for backends and autonomous signers (for example a reference agent hold
 
 ```kotlin
 // Backend or autonomous signer: attach to a known smart account, no passkey
-val contractId = kit.walletOperations.connectToContract("CABC...")
+val contractId = kit.walletOperations.connectToContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 println("Headless: ${kit.isHeadless}") // true
 
 // Register an Ed25519 signer and sign through the multi-signer pipeline
@@ -796,8 +809,8 @@ Transfers tokens from the smart account to a recipient. The amount is a decimal 
 
 ```kotlin
 val result = kit.transactionOperations.transfer(
-    tokenContract = "CBCD1234...",
-    recipient = "GA7QYNF7SOWQ...",
+    tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    recipient = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
     amount = "100.5"
 )
 
@@ -879,8 +892,8 @@ Use this for external contract interactions (e.g., token approve, DeFi protocol 
 ```kotlin
 // Approve a token allowance directly on the token contract
 val smartAccountAddress = kit.contractId!!
-val spenderAddress = "GSPENDER..."
-val tokenContractId = "CTOKEN..."
+val spenderAddress = "GBVPKXWMAB3FIUJB6T7LF66DABKKA2ZHRHDOQZ25GBAEFZVHTBPJNOJI"
+val tokenContractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 val expirationLedger = 2_000_000u  // absolute ledger number
 
 val result = kit.transactionOperations.contractCall(
@@ -940,7 +953,7 @@ For the multi-signer equivalent, see [multiSignerExecuteAndSubmit](#multisignere
 ```kotlin
 // Update a threshold policy via the smart account's execute() entry point
 val ruleId = 1u
-val thresholdPolicyAddress = "CPOLICY..."
+val thresholdPolicyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"
 val newThreshold = 3u
 
 val contextRuleScVal = kit.contextRuleManager.getContextRule(ruleId)
@@ -1407,16 +1420,16 @@ Adds a delegated signer (account or contract) to a context rule.
 // Single-signer (default)
 val result = kit.signerManager.addDelegated(
     contextRuleId = 0u,
-    address = "GA7Q..."
+    address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 )
 
 // Multi-signer
-val result = kit.signerManager.addDelegated(
+val multiResult = kit.signerManager.addDelegated(
     contextRuleId = 0u,
-    address = "GA7Q...",
+    address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
     selectedSigners = listOf(
         SelectedSigner.Passkey(credentialId = credIdStr, credentialIdBytes = credIdBytes, keyData = keyData),
-        SelectedSigner.Wallet("GA7Q...")
+        SelectedSigner.Wallet("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
     )
 )
 ```
@@ -1540,7 +1553,7 @@ Convenience overload that resolves the on-chain signer ID internally. Fetches th
 ```kotlin
 val result = kit.signerManager.removeSigner(
     contextRuleId = 1u,
-    signer = DelegatedSigner(address = "GA7Q...")
+    signer = DelegatedSigner(address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
 )
 ```
 
@@ -1631,7 +1644,7 @@ val installParams = Scv.toVec(
 
 val result = kit.policyManager.addPolicy(
     contextRuleId = 0u,
-    policyAddress = "CBCD1234...",
+    policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z",
     installParams = installParams
 )
 
@@ -1676,7 +1689,7 @@ Adds a simple threshold policy (M-of-N signers).
 ```kotlin
 val result = kit.policyManager.addSimpleThreshold(
     contextRuleId = 1u,
-    policyAddress = "CTHRESHOLD...",
+    policyAddress = "CAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAODX",
     threshold = 2u
 )
 ```
@@ -1717,12 +1730,12 @@ Adds a weighted threshold policy with configurable signer weights.
 **Example**:
 
 ```kotlin
-val signer1 = DelegatedSigner(address = "GA7Q...")
-val signer2 = DelegatedSigner(address = "GBXYZ...")
+val signer1 = DelegatedSigner(address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
+val signer2 = DelegatedSigner(address = "GCVSEBHB6CTMEHUHIUY4DDFMWQ7PJTHFZGOK2JUD5EG2ARNVS6S22E3K")
 
 val result = kit.policyManager.addWeightedThreshold(
     contextRuleId = 1u,
-    policyAddress = "CWEIGHTED...",
+    policyAddress = "CAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAKAL",
     signerWeights = mapOf(signer1 to 3u, signer2 to 2u),
     threshold = 4u
 )
@@ -1769,7 +1782,7 @@ Adds a spending limit policy. The amount is supplied as a positive decimal strin
 // Add 1000 XLM per day limit
 val result = kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
-    policyAddress = "CBCD1234...",
+    policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z",
     spendingLimit = "1000",
     periodLedgers = 17280u
 )
@@ -1851,7 +1864,7 @@ Convenience overload that resolves the on-chain policy ID internally. Fetches th
 ```kotlin
 val result = kit.policyManager.removePolicy(
     contextRuleId = 1u,
-    policyAddress = "CPOLICY..."
+    policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"
 )
 ```
 
@@ -1909,15 +1922,15 @@ suspend fun addContextRule(
 
 ```kotlin
 val result = kit.contextRuleManager.addContextRule(
-    contextType = ContextRuleType.CallContract("CBCD1234..."),
+    contextType = ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
     name = "TokenTransfers",
     validUntil = null,
     signers = listOf(
         ExternalSigner.webAuthn(verifier, pubkey, credId),
-        DelegatedSigner("GA7Q...")
+        DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
     ),
     policies = mapOf(
-        "CBCD5678..." to policyParams
+        "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z" to policyParams
     )
 )
 ```
@@ -2112,7 +2125,7 @@ sealed class ContextRuleType {
 ContextRuleType.Default
 
 // Specific contract: applies to calls to this contract
-ContextRuleType.CallContract("CBCD1234...")
+ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC")
 
 // Deployment: applies to contract deployments with this WASM hash
 ContextRuleType.CreateContract(wasmHashBytes)
@@ -2156,7 +2169,7 @@ Creates a CallContract context rule type for a specific contract.
 **Example**:
 
 ```kotlin
-val contextType = OZBuilders.createCallContractContextType("CTOKEN...")
+val contextType = OZBuilders.createCallContractContextType("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC")
 val result = kit.contextRuleManager.addContextRule(
     contextType = contextType,
     name = "Token operations",
@@ -2387,8 +2400,8 @@ The caller explicitly lists every signer. There is no implicit connected passkey
 // Signers are obtained from context rule discovery (client-side).
 // All three signer kinds may appear in the same list.
 val result = kit.multiSignerManager.multiSignerTransfer(
-    tokenContract = "CBCD...",
-    recipient = "GBXYZ...",
+    tokenContract = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
+    recipient = "GCVSEBHB6CTMEHUHIUY4DDFMWQ7PJTHFZGOK2JUD5EG2ARNVS6S22E3K",
     amount = "50",
     selectedSigners = listOf(
         SelectedSigner.Passkey(
@@ -2396,9 +2409,9 @@ val result = kit.multiSignerManager.multiSignerTransfer(
             credentialIdBytes = credIdBytes,
             keyData = signer.keyData
         ),
-        SelectedSigner.Wallet("GA7Q..."),
+        SelectedSigner.Wallet("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"),
         SelectedSigner.Ed25519(
-            verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            verifierAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA",
             publicKey = ed25519PublicKeyBytes   // 32 bytes
         )
     )
@@ -2455,7 +2468,7 @@ val result = kit.multiSignerManager.multiSignerContractCall(
             credentialIdBytes = credIdBytes,
             keyData = signer.keyData
         ),
-        SelectedSigner.Wallet("GA7Q...")
+        SelectedSigner.Wallet("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
     )
 )
 ```
@@ -2507,7 +2520,7 @@ val result = kit.multiSignerManager.multiSignerExecuteAndSubmit(
             credentialIdBytes = credIdBytes,
             keyData = signer.keyData
         ),
-        SelectedSigner.Wallet("GA7Q...")
+        SelectedSigner.Wallet("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
     )
 )
 ```
@@ -2570,12 +2583,12 @@ val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, v
 val kit = OZSmartAccountKit.create(config)
 
 // Wallet in-memory custody model: register a secret seed at runtime
-val walletAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+val walletAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 // Ed25519 in-memory custody model: register a raw 32-byte seed at runtime
 val ed25519PublicKey = kit.externalSigners.addEd25519FromRawKey(
     secretKeyBytes = rawSeedBytes,   // exactly 32 bytes
-    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    verifierAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA"
 )
 ```
 
@@ -2757,7 +2770,7 @@ val seedHex = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
 val seedBytes = seedHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 val derivedPublicKey = kit.externalSigners.addEd25519FromRawKey(
     secretKeyBytes = seedBytes,
-    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    verifierAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA"
 )
 // derivedPublicKey is 32 bytes — verify it matches the on-chain signer's publicKey
 ```
@@ -2882,10 +2895,10 @@ val kit = OZSmartAccountKit.create(config)
 val contracts = kit.indexerClient?.lookupByCredentialId(credentialId)
 
 // Discover contracts by signer address
-val contracts = kit.indexerClient?.lookupByAddress("GABC...")
+val contractsByAddress = kit.indexerClient?.lookupByAddress("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
 
 // Get full contract details (rules, signers, policies)
-val details = kit.indexerClient?.getContract("CABC...")
+val details = kit.indexerClient?.getContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 
 // Health and stats
 val healthy = kit.indexerClient?.isHealthy()
@@ -2899,7 +2912,7 @@ val stats = kit.indexerClient?.getStats()
 val indexer = OZIndexerClient.forNetwork("Test SDF Network ; September 2015")
 
 // Or with a custom URL
-val indexer = OZIndexerClient(
+val customIndexer = OZIndexerClient(
     indexerUrl = "https://testnet.mercurydata.app/rest/smart-account-indexer",
     timeoutMs = 10000
 )
@@ -3144,7 +3157,10 @@ When the relayer is configured, all transaction submissions use it automatically
 
 ```kotlin
 val config = OZSmartAccountConfig(
-    // ... other config
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     relayerUrl = "https://my-relayer-proxy.example.com"
 )
 val kit = OZSmartAccountKit.create(config)
@@ -3301,9 +3317,11 @@ object SmartAccountAuth {
 
     suspend fun buildSourceAccountAuthPayloadHash(
         entry: SorobanAuthorizationEntryXdr,
+        address: SCAddressXdr,
         nonce: Int64Xdr,
         expirationLedger: UInt,
-        networkPassphrase: String
+        networkPassphrase: String,
+        useUpgradedAuth: Boolean = true
     ): ByteArray
 
     suspend fun signAuthEntry(
@@ -3325,7 +3343,7 @@ object SmartAccountAuth {
 
 - `buildAuthDigest(signaturePayload, contextRuleIds)` — computes `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
 - `buildAuthPayloadHash(entry, expirationLedger, networkPassphrase)` — computes the `HashIdPreimage::SorobanAuthorization` hash that must be signed to authorize an entry with address credentials.
-- `buildSourceAccountAuthPayloadHash(entry, nonce, expirationLedger, networkPassphrase)` — variant for source-account credentials, typically used when converting them to address credentials for relayer fee sponsoring.
+- `buildSourceAccountAuthPayloadHash(entry, address, nonce, expirationLedger, networkPassphrase, useUpgradedAuth = true)` — variant for source-account credentials, typically used when converting them to address credentials for relayer fee sponsoring. `useUpgradedAuth` selects the arm: true (the default) hashes the ADDRESS_V2 address-bound preimage, false the legacy ADDRESS preimage.
 - `signAuthEntry(entry, signer, signature, expirationLedger, contextRuleIds)` — attaches a pre-computed signature to an authorization entry. Does NOT perform cryptographic signing. Returns a fresh entry; when `contextRuleIds` is non-empty it overrides any existing identifiers in the payload.
 - `addRawSignatureMapEntry(entry, signerKey, signatureValue, contextRuleIds)` — adds a raw key/value entry to the auth entry's signature map. Used for delegated-signer placeholders where the value is `Bytes` rather than a signature.
 

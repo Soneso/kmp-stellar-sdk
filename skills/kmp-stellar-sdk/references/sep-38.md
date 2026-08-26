@@ -5,6 +5,14 @@
 **Package:** `com.soneso.stellar.sdk.sep.sep38`
 **Spec:** SEP-0038
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep38.*
+import com.soneso.stellar.sdk.sep.sep38.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Creating the Service](#1-creating-the-service)
@@ -105,6 +113,7 @@ Returns all assets the anchor supports for exchange, with optional delivery meth
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -164,6 +173,7 @@ You must provide exactly one of `sellAsset` or `buyAsset`, not both. When `sellA
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -183,6 +193,7 @@ response.buyAssets?.forEach { buyAsset ->
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -202,6 +213,7 @@ response.sellAssets?.forEach { sellAsset ->
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -256,6 +268,7 @@ Returns an indicative price for a specific asset pair with fee details. You must
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -279,6 +292,7 @@ println("Fee total:               ${response.fee.total} ${response.fee.asset}")
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -299,6 +313,7 @@ println("You will receive: ${response.buyAmount} BRL")
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -319,6 +334,7 @@ The response always includes a `Sep38Fee` object. The optional `details` list co
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 
 val response = quoteService.price(
     context = "sep6",
@@ -372,6 +388,7 @@ A firm quote is a binding commitment from the anchor to exchange assets at the g
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
 import com.soneso.stellar.sdk.sep.sep38.Sep38QuoteRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -403,6 +420,8 @@ import com.soneso.stellar.sdk.sep.sep38.Sep38QuoteRequest
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 
 // WRONG: expireAfter is a String (ISO 8601), not a DateTime object
 // CORRECT: pass an ISO 8601 string
@@ -424,6 +443,8 @@ Include delivery method names (from `info()`) when exchanging off-chain assets:
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.Sep38QuoteRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 
 val request = Sep38QuoteRequest(
     context = "sep6",
@@ -471,6 +492,7 @@ Retrieves a previously-created firm quote by its ID. Authentication is **require
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -547,7 +569,7 @@ fee.details?.forEach { detail ->
 
 ### Sep38DeliveryMethod
 
-The KMP SDK uses a single `Sep38DeliveryMethod` class for both sell and buy delivery methods (unlike the Flutter SDK which has separate classes).
+The KMP SDK uses a single `Sep38DeliveryMethod` class for both sell and buy delivery methods.
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -557,6 +579,7 @@ The KMP SDK uses a single `Sep38DeliveryMethod` class for both sell and buy deli
 Use the `name` value as the `sellDeliveryMethod` or `buyDeliveryMethod` parameter in `prices()`, `price()`, and `Sep38QuoteRequest`.
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 // Discover delivery methods from info, then use the name in subsequent calls
 val info = quoteService.info()
 
@@ -580,6 +603,7 @@ All exception types extend `Sep38Exception`. Wrap quote service calls in `try-ca
 import com.soneso.stellar.sdk.sep.sep38.QuoteService
 import com.soneso.stellar.sdk.sep.sep38.Sep38QuoteRequest
 import com.soneso.stellar.sdk.sep.sep38.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val quoteService = QuoteService.fromDomain("anchor.example.com")
 
@@ -647,23 +671,24 @@ All `Sep38*` exceptions extend `Sep38Exception` (which extends `Exception`) and 
 
 The relationship between price, totalPrice, amounts, and fees:
 
-```
+```text
 sell_amount = total_price * buy_amount
 ```
 
 When the fee is denominated in the **sell** asset:
-```
+```text
 sell_amount - fee.total = price * buy_amount
 ```
 
 When the fee is denominated in the **buy** asset:
-```
+```text
 sell_amount = price * (buy_amount + fee.total)
 ```
 
 `totalPrice` always includes fees. `price` is the raw exchange rate before fees.
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 // Example: selling 542 BRL to buy 100 USDC, fee = 42.00 BRL (in sell asset)
 // totalPrice = "5.42", price = "5.00"
 // Verification: sell_amount = total_price * buy_amount => 542 = 5.42 * 100
@@ -684,7 +709,7 @@ val effectiveSell = totalPriceNum * buyAmountNum
 
 ## 11. Common Pitfalls
 
-**Wrong: using `SEP38QuoteService` (Flutter class name) instead of `QuoteService`**
+**Wrong: using `SEP38QuoteService` instead of `QuoteService`**
 
 ```kotlin
 // WRONG: the KMP SDK class is QuoteService, not SEP38QuoteService
@@ -697,6 +722,7 @@ val service = QuoteService.fromDomain("anchor.example.com")
 **Wrong: providing both sellAmount and buyAmount**
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 // WRONG: throws IllegalArgumentException before the HTTP call
 quoteService.price(
     context = "sep6",
@@ -718,16 +744,18 @@ quoteService.price(
 **Wrong: providing both sellAsset and buyAsset to `prices()`**
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
+// quoteService: from the previous steps of this flow
 // WRONG: prices() requires exactly one of sellAsset or buyAsset, not both
 quoteService.prices(
-    sellAsset = "stellar:USDC:GA5ZS...",
+    sellAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     buyAsset = "iso4217:BRL",
     sellAmount = "100"
 ) // throws IllegalArgumentException
 
 // CORRECT: provide only sellAsset (to get buy options) or buyAsset (to get sell options)
 quoteService.prices(
-    sellAsset = "stellar:USDC:GA5ZS...",
+    sellAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     sellAmount = "100"
 )
 ```
@@ -735,15 +763,16 @@ quoteService.prices(
 **Wrong: treating expiresAt as a DateTime object**
 
 ```kotlin
-// WRONG: expiresAt is String in the KMP SDK (NOT DateTime like the Flutter SDK)
+import kotlinx.datetime.Instant
+import kotlinx.datetime.Clock
+
+// WRONG: expiresAt is String in the KMP SDK, not a DateTime
 val expiresAt: DateTime = quote.expiresAt  // type error
 
 // CORRECT: expiresAt is a String in ISO 8601 format
 println(quote.expiresAt) // e.g. "2026-04-30T07:42:23Z"
 
 // To compare against current time, parse it:
-import kotlinx.datetime.Instant
-import kotlinx.datetime.Clock
 
 val expiresAt = Instant.parse(quote.expiresAt)
 val isValid = Clock.System.now() < expiresAt
@@ -756,16 +785,16 @@ val isValid = Clock.System.now() < expiresAt
 val request = Sep38QuoteRequest(
     context = "sep6",
     sellAsset = "iso4217:USD",
-    buyAsset = "stellar:USDC:GA5ZS...",
+    buyAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     sellAmount = "100",
     expireAfter = Clock.System.now().plus(30, DateTimeUnit.MINUTE)  // type error
 )
 
 // CORRECT: pass an ISO 8601 UTC string
-val request = Sep38QuoteRequest(
+val requestCorrect = Sep38QuoteRequest(
     context = "sep6",
     sellAsset = "iso4217:USD",
-    buyAsset = "stellar:USDC:GA5ZS...",
+    buyAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     sellAmount = "100",
     expireAfter = "2026-04-30T07:42:23Z"
 )
@@ -774,6 +803,7 @@ val request = Sep38QuoteRequest(
 **Wrong: assuming fee.details is always present**
 
 ```kotlin
+// quoteService: from the previous steps of this flow
 // WRONG: details is null when the anchor omits the itemized breakdown
 for (detail in quote.fee.details!!) { /* NullPointerException if details is null */ }
 
@@ -811,11 +841,11 @@ suspend fun setup(): QuoteService {
 val quoteService = QuoteService("https://anchor.example.com/sep38")
 ```
 
-**Wrong: using Sep38SellDeliveryMethod / Sep38BuyDeliveryMethod (Flutter class names)**
+**Wrong: assuming separate sell/buy delivery-method classes**
 
 ```kotlin
-// WRONG: the KMP SDK uses a single Sep38DeliveryMethod class, not separate sell/buy classes
-val method: Sep38SellDeliveryMethod = ...  // does not exist
+// WRONG: separate sell/buy delivery-method classes do not exist
+val sellMethod: Sep38SellDeliveryMethod = TODO()  // unresolved reference
 
 // CORRECT: both sell and buy delivery methods use Sep38DeliveryMethod
 asset.sellDeliveryMethods?.forEach { method: Sep38DeliveryMethod ->
@@ -829,14 +859,15 @@ asset.buyDeliveryMethods?.forEach { method: Sep38DeliveryMethod ->
 **Wrong: accessing `buyAssets` on `Sep38PricesResponse` without considering `sellAssets`**
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
+// price: from the previous steps of this flow
 // WRONG: assuming buyAssets is always populated -- it depends on the query direction
-val prices = quoteService.prices(buyAsset = "stellar:USDC:GA5ZS...", buyAmount = "100")
+val prices = quoteService.prices(buyAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN", buyAmount = "100")
 prices.buyAssets!!.forEach { ... } // NullPointerException -- buyAssets is null when querying by buyAsset
 
 // CORRECT: check which list is populated based on query direction
 // Querying by sellAsset -> response has buyAssets
 // Querying by buyAsset -> response has sellAssets
-val prices = quoteService.prices(buyAsset = "stellar:USDC:GA5ZS...", buyAmount = "100")
 prices.sellAssets?.forEach { sellAsset ->
     println("${sellAsset.asset}: ${sellAsset.price}")
 }

@@ -11,6 +11,14 @@ Stellar Web Authentication for Contract Accounts provides secure authentication 
 - Enable smart wallet authentication workflows
 - Support custom authentication policies via contract logic
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep45.*
+import com.soneso.stellar.sdk.sep.sep45.exceptions.*
+```
+
 ## Basic Authentication
 
 ```kotlin
@@ -21,7 +29,7 @@ val webAuth = WebAuthForContracts.fromDomain("testanchor.stellar.org", Network.T
 val contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 
 // Signer keypair (contract's authentication key)
-val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG...")
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 // Authenticate and get JWT token
 val authToken = webAuth.jwtToken(
@@ -37,6 +45,9 @@ val authToken = webAuth.jwtToken(
 ## Using the JWT Token
 
 ```kotlin
+// httpClient, signers: from the previous steps of this flow
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // Authenticate and get JWT token
 val authToken = webAuth.jwtToken(contractId, signers)
 
@@ -59,6 +70,8 @@ println("Token expires at: ${authToken.expiresAt}")
 ## Contracts Without Signature Requirements
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // Some contracts implement __check_auth without requiring signatures
 // (e.g., always-pass contracts for testing, or time-based access)
 val authToken = webAuth.jwtToken(
@@ -70,10 +83,12 @@ val authToken = webAuth.jwtToken(
 ## Multi-Signature Authentication
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // Authenticate with multiple signers for threshold contracts
-val signer1 = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7...")
-val signer2 = KeyPair.fromSecretSeed("SBFGFF27YOBQHL6RKE...")
-val signer3 = KeyPair.fromSecretSeed("SDSQ3CVNKDW2CDRJNE...")
+val signer1 = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val signer2 = KeyPair.fromSecretSeed("SABAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAFNE7")
+val signer3 = KeyPair.fromSecretSeed("SABQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGC45")
 
 val authToken = webAuth.jwtToken(
     clientAccountId = contractId,
@@ -84,6 +99,9 @@ val authToken = webAuth.jwtToken(
 ## Client Domain Verification
 
 ```kotlin
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // Prove your wallet identity to receive premium benefits from the anchor
 // clientDomainSeed from your wallet's stellar.toml SIGNING_KEY
 val clientDomainKeyPair = KeyPair.fromSecretSeed(clientDomainSeed)
@@ -102,6 +120,17 @@ println("Client Domain: ${authToken.clientDomain}")
 ## Client Domain with External Signing (Wallet Backend)
 
 ```kotlin
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // When wallet domain key is managed by your backend server
 val signingDelegate = Sep45ClientDomainSigningDelegate { entryXdr ->
     // Send authorization entry to your wallet's backend server for signing
@@ -128,6 +157,10 @@ val authToken = webAuth.jwtToken(
 ## Custom Signature Expiration
 
 ```kotlin
+// currentLedger: from the previous steps of this flow
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 // By default, signatures expire at current ledger + 10 (~50-60 seconds)
 // Specify custom expiration for longer validity
 val authToken = webAuth.jwtToken(
@@ -144,6 +177,9 @@ Most developers should use `jwtToken()` for authentication. Use the low-level AP
 > Challenge entries are validated and signed across all three Soroban credential arms — legacy `ADDRESS`, `ADDRESS_V2`, and `ADDRESS_WITH_DELEGATES` (CAP-71) — and the matching hash preimage is selected automatically. This is transparent: no API change is required for any of the calls below.
 
 ```kotlin
+// currentLedger: from the previous steps of this flow
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // Manual control over each authentication step
 val webAuth = WebAuthForContracts.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
@@ -180,6 +216,9 @@ val authToken = webAuth.sendSignedChallenge(signedEntries)
 ## Error Handling
 
 ```kotlin
+// signers: from the previous steps of this flow
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val webAuth = WebAuthForContracts.fromDomain("anchor.example.com", Network.TESTNET)
 try {
     val authToken = webAuth.jwtToken(contractId, signers)
 } catch (e: Sep45ChallengeRequestException) {

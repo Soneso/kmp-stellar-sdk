@@ -1,6 +1,12 @@
 # Advanced Features
 
-Less common but important patterns. All code assumes `import com.soneso.stellar.sdk.*` and runs inside a `suspend` context (coroutine).
+Less common but important patterns. All code runs inside a `suspend` context (coroutine) and assumes these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+import com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse
+```
 
 ## Table of Contents
 
@@ -18,10 +24,10 @@ Less common but important patterns. All code assumes `import com.soneso.stellar.
 **IMPORTANT:** Always add signers and set thresholds in a SINGLE transaction. Setting thresholds first in a separate transaction may lock you out if the new thresholds require signatures you haven't added yet.
 
 ```kotlin
-val server = HorizonServer("https://horizon-testnet.stellar.org")
 val network = Network.TESTNET
+val primaryKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
-val primaryKeyPair = KeyPair.fromSecretSeed("SXXXXX...")
 val secondaryKeyPair = KeyPair.random()
 val primaryId = primaryKeyPair.getAccountId()
 
@@ -68,7 +74,7 @@ val paymentTx = TransactionBuilder(
 )
     .addOperation(
         PaymentOperation(
-            destination = "GDESTINATION...",
+            destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
             asset = AssetTypeNative,
             amount = "50.0"
         )
@@ -92,6 +98,8 @@ println("Multi-sig tx hash: ${payResponse.hash}")
 When co-signers are on different machines, use XDR serialization to pass the transaction:
 
 ```kotlin
+// signerAKeyPair, signerBKeyPair: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Signer A: Build and share unsigned XDR
 val account = server.accounts().account(signerAId)
 val tx = TransactionBuilder(
@@ -100,7 +108,7 @@ val tx = TransactionBuilder(
 )
     .addOperation(
         PaymentOperation(
-            destination = "GDESTINATION...",
+            destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
             asset = AssetTypeNative,
             amount = "100.0"
         )
@@ -129,6 +137,8 @@ println("Multi-sig submitted: ${response.successful}")
 Build the inner transaction with a low base fee, then wrap it in a fee bump with a higher fee:
 
 ```kotlin
+// innerAccountId, innerKeyPair: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Step 1: Build inner transaction with low fee
 val innerAccount = server.accounts().account(innerAccountId)
 val innerTx = TransactionBuilder(
@@ -137,7 +147,7 @@ val innerTx = TransactionBuilder(
 )
     .addOperation(
         PaymentOperation(
-            destination = "GDESTINATION...",
+            destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
             asset = AssetTypeNative,
             amount = "10.0"
         )
@@ -167,6 +177,8 @@ println("Fee bump success: ${response.successful}")
 **Alternative:** Use the static factory method directly instead of the builder:
 
 ```kotlin
+// innerTx: from the previous steps of this flow
+val feePayerKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 // createWithBaseFee calculates total fee as: baseFee * (numInnerOperations + 1)
 val feeBump = FeeBumpTransaction.createWithBaseFee(
     feeSource = feePayerKeyPair.getAccountId(),
@@ -187,10 +199,11 @@ feeBump.sign(feePayerKeyPair)
 Use the "sandwich" pattern: Begin → sponsored operations → End.
 
 ```kotlin
-val server = HorizonServer("https://horizon-testnet.stellar.org")
 val network = Network.TESTNET
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
-val sponsorKeyPair = KeyPair.fromSecretSeed("SXXXXX...")
+val sponsorKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val sponsoredKeyPair = KeyPair.random()
 val sponsorId = sponsorKeyPair.getAccountId()
 val sponsoredId = sponsoredKeyPair.getAccountId()
@@ -242,6 +255,9 @@ println("Sponsored account sponsor: ${sponsored.sponsor}")
 Use `RevokeSponsorshipOperation` with the appropriate `Sponsorship` sealed class variant:
 
 ```kotlin
+// issuerId: from the previous steps of this flow
+val signerAccountId = "GBVPKXWMAB3FIUJB6T7LF66DABKKA2ZHRHDOQZ25GBAEFZVHTBPJNOJI"
+val sponsoredId = "GDWUSKGGFDI4FRXK5EBTRECZSVQSSWJHHJOGH6JWG3AUMFFMQ435DIAG"
 // Revoke sponsorship of an account
 val revokeOp = RevokeSponsorshipOperation(
     sponsorship = Sponsorship.Account(accountId = sponsoredId)
@@ -277,12 +293,12 @@ val revokeSignerOp = RevokeSponsorshipOperation(
 ### Create a Claimable Balance
 
 ```kotlin
-val server = HorizonServer("https://horizon-testnet.stellar.org")
+val claimantId = "GCUZ6YLL5RQBTYLTTQLPCM73C5XAIUGK2TIMWQH7HPSGWVS2KJ2F3CHS"
 val network = Network.TESTNET
+val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
-val senderKeyPair = KeyPair.fromSecretSeed("SXXXXX...")
 val senderId = senderKeyPair.getAccountId()
-val claimantId = "GCLAIMANT..."
 
 val account = server.accounts().account(senderId)
 
@@ -327,6 +343,10 @@ After submitting, extract the balance ID by querying effects for the transaction
 ```kotlin
 import com.soneso.stellar.sdk.horizon.responses.effects.ClaimableBalanceCreatedEffectResponse
 
+val balanceId = "00000000929b20b72e5890ab51c24f1cc46fa01c4f318d8d33367d24dd614cfdf5491072" // 72-char hex id from Horizon
+// response: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
+
 // ClaimableBalanceCreatedEffectResponse is in the effects sub-package (not covered by sdk.* wildcard)
 val effects = server.effects().forTransaction(response.hash).execute()
 var balanceId: String? = null
@@ -342,6 +362,8 @@ println("Balance ID: $balanceId")
 ### Claim a Claimable Balance
 
 ```kotlin
+// claimantKeyPair: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query claimable balances for the claimant
 val balances = server.claimableBalances()
     .forClaimant(claimantId)
@@ -403,10 +425,11 @@ ClaimPredicate.Or(
 ### Deposit into a Liquidity Pool
 
 ```kotlin
-val server = HorizonServer("https://horizon-testnet.stellar.org")
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val network = Network.TESTNET
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
-val keyPair = KeyPair.fromSecretSeed("SXXXXX...")
 val accountId = keyPair.getAccountId()
 
 val assetA: Asset = AssetTypeNative
@@ -468,6 +491,8 @@ println("Deposited to pool: $poolId")
 ### Withdraw from a Liquidity Pool
 
 ```kotlin
+// currentSequence: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 val withdrawTx = TransactionBuilder(
     sourceAccount = Account(accountId, currentSequence),
     network = network
@@ -504,10 +529,11 @@ val price2 = Price.fromString("1.5") // becomes 3/2
 Muxed accounts are virtual sub-accounts sharing a single G... account, identified by a ULong ID and an M... address.
 
 ```kotlin
+// innerTx: from the previous steps of this flow
 // Create a muxed account (virtual sub-account under a G... account)
-// WRONG: MuxedAccount("GABC...", BigInt.from(12345)) — no BigInt in KMP SDK
-// CORRECT: MuxedAccount("GABC...", 12345UL) — use ULong
-val muxed = MuxedAccount("GABC...", 12345UL)
+// WRONG: MuxedAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", BigInt.from(12345)) — no BigInt in KMP SDK
+// CORRECT: MuxedAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 12345UL) — use ULong
+val muxed = MuxedAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 12345UL)
 println("Muxed address: ${muxed.address}")        // M... address
 println("Base account: ${muxed.accountId}")        // G... address (alias: ed25519AccountId)
 println("Sub ID: ${muxed.id}")                     // ULong?
@@ -519,7 +545,7 @@ println("Decoded sub ID: ${fromAddress.id}")
 
 // Use in payment (muxed as source account override)
 val payment = PaymentOperation(
-    destination = "GDESTINATION...",
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     asset = AssetTypeNative,
     amount = "10.0"
 )
@@ -537,6 +563,7 @@ val feeBump = FeeBumpTransactionBuilder(innerTx)
 Submit without waiting for ingestion (returns immediately):
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // WRONG: server.submitAsyncTransaction(tx) — no such method name
 // CORRECT: server.submitTransactionAsync(tx.toEnvelopeXdrBase64())
 val asyncResponse = server.submitTransactionAsync(tx.toEnvelopeXdrBase64())

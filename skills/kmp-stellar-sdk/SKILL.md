@@ -24,7 +24,7 @@ dependencies {
 }
 ```
 
-> All code examples below assume `import com.soneso.stellar.sdk.*` and run inside a `suspend` context (coroutine).
+> All code examples below run inside a `suspend` context (coroutine) and assume these imports: `com.soneso.stellar.sdk.*`, `com.soneso.stellar.sdk.horizon.*`, `com.soneso.stellar.sdk.contract.*`, and `com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order`.
 >
 > If you can't find a constructor or method in this file or the topic references, grep `references/api_reference.md`.
 
@@ -101,11 +101,10 @@ if (usdc is AssetTypeCreditAlphaNum) {
     val code: String = usdc.code
     val issuer: String = usdc.issuer
 }
-// toString() returns canonical form: "native" for XLM, "USDC:GISSUER..." for custom
+// toString() returns canonical form: "native" for XLM, "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN" for custom
 
 // Network passphrases: Network.TESTNET, Network.PUBLIC, Network.FUTURENET
 // Horizon servers: construct with URL string
-val server = HorizonServer("https://horizon-testnet.stellar.org")
 val publicServer = HorizonServer("https://horizon.stellar.org")
 ```
 
@@ -117,6 +116,7 @@ Query patterns for retrieving blockchain data. All request builders support `.cu
 
 ```kotlin
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder.Order
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -137,6 +137,8 @@ for (acct in bySigner.records) {
 ### Query Transactions
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 val txPage = server.transactions()
     .forAccount(accountId)
     .order(Order.DESC)
@@ -171,6 +173,8 @@ import com.soneso.stellar.sdk.horizon.requests.EventListener
 import com.soneso.stellar.sdk.horizon.requests.SSEStream
 import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 // SSE stream pattern — callback-based with EventListener interface
 val stream = server.payments().forAccount(accountId).cursor("now")
@@ -199,8 +203,8 @@ Complete transaction lifecycle: Build -> Sign -> Submit.
 ### Transaction Lifecycle
 
 ```kotlin
+// getAccountId, senderSecret: from the previous steps of this flow
 val server = HorizonServer("https://horizon-testnet.stellar.org")
-val network = Network.TESTNET
 
 // 1. Load sender keypair (suspend function)
 val senderKeyPair = KeyPair.fromSecretSeed(senderSecret)
@@ -251,6 +255,7 @@ if (response.successful) {
 **Change Trust (Establish Trustline):**
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val usdc = Asset.createNonNativeAsset("USDC", issuerAccountId)
 val trustline = ChangeTrustOperation(asset = usdc) // default limit = max
 // With custom limit: ChangeTrustOperation(asset = usdc, limit = "1000.00")
@@ -259,6 +264,7 @@ val trustline = ChangeTrustOperation(asset = usdc) // default limit = max
 **Manage Sell Offer (DEX):**
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val selling = AssetTypeNative
 val buying = Asset.createNonNativeAsset("USDC", issuerAccountId)
 
@@ -295,6 +301,7 @@ Contract deployment and invocation using the high-level `ContractClient`.
 ### Deploy Contract
 
 ```kotlin
+// getAccountId, secretSeed, wasmBytes: from the previous steps of this flow
 import com.soneso.stellar.sdk.contract.ContractClient
 
 val keyPair = KeyPair.fromSecretSeed(secretSeed)
@@ -322,16 +329,21 @@ val client2 = ContractClient.deployFromWasmId(
 ### Invoke Contract Function
 
 ```kotlin
+val amount = "100"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val rpcUrl = "https://soroban-testnet.stellar.org"
+val fromAddr = "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR"
+val toAddr = "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U"
 // Create client for an existing contract (loads spec from network)
 val client = ContractClient.forContract(
-    contractId = "CABC...",
+    contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",
     rpcUrl = rpcUrl,
     network = Network.TESTNET
 )
 
-// Invoke with automatic type conversion (recommended)
+// Invoke with automatic type conversion (recommended); name the result type
 // Read calls return immediately; write calls auto-sign and submit
-val result = client.invoke(
+val result: UInt = client.invoke(
     functionName = "get_count",
     arguments = emptyMap(),
     source = keyPair.getAccountId(),
@@ -339,7 +351,7 @@ val result = client.invoke(
 )
 
 // Write call with arguments
-val writeResult = client.invoke(
+val writeResult: UInt = client.invoke(
     functionName = "increment",
     arguments = mapOf("value" to 5),
     source = keyPair.getAccountId(),
@@ -347,7 +359,7 @@ val writeResult = client.invoke(
 )
 
 // Advanced: get AssembledTransaction for manual control (multi-sig workflows)
-val tx = client.buildInvoke(
+val tx = client.buildInvoke<Unit>(
     functionName = "transfer",
     arguments = mapOf("from" to fromAddr, "to" to toAddr, "amount" to 1000),
     source = keyPair.getAccountId(),
@@ -374,6 +386,7 @@ XDR (External Data Representation) is Stellar's binary serialization format.
 ### Transaction XDR Roundtrip
 
 ```kotlin
+// transaction: from the previous steps of this flow
 // Encode: Transaction -> base64 XDR
 val xdrBase64: String = transaction.toEnvelopeXdrBase64()
 
@@ -393,13 +406,13 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 
 // Factory methods: toBoolean(), toUint32(), toInt64(), toString(), toSymbol(), toVoid()
 val symVal  = Scv.toSymbol("transfer")
-val addrVal = Scv.toAddress(Address("GABC...").toSCAddress())
+val addrVal = Scv.toAddress(Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toSCAddress())
 val vecVal  = Scv.toVec(listOf(Scv.toUint32(1u), Scv.toUint32(2u)))
 val mapVal  = Scv.toMap(linkedMapOf(symVal to Scv.toUint32(42u)))
 
 // WRONG: Scv.toU32() / Scv.fromU32() — those method names do NOT exist
 // CORRECT: Scv.toUint32() / Scv.fromUint32() — full type name, not abbreviated
-// WRONG: XdrSCVal.forSymbol("transfer") — that is the Flutter SDK API
+// WRONG: XdrSCVal.forSymbol("transfer") — no such API in this SDK
 // CORRECT: Scv.toSymbol("transfer") — KMP uses the Scv utility object
 
 // Read back: fromBoolean(), fromUint32(), fromInt64(), fromString(), fromSymbol()
@@ -413,55 +426,26 @@ For all Scv factory methods and type mapping:
 
 ## 9. Error Handling & Troubleshooting
 
-### Horizon Errors
-
 ```kotlin
 import com.soneso.stellar.sdk.horizon.exceptions.*
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 try {
     val account = server.accounts().account(accountId)
 } catch (e: BadRequestException) {
-    // HTTP 4xx error: e.code (404, 400, etc.), e.body
-    println("Horizon error ${e.code}: ${e.body}")
+    println("Horizon error ${e.code}: ${e.body}")   // HTTP 4xx: 404, 400, ...
 } catch (e: TooManyRequestsException) {
-    // Rate limiting (429)
-    println("Rate limited: ${e.code}")
+    println("Rate limited: ${e.code}")              // 429
 } catch (e: ConnectionErrorException) {
-    // Network/connectivity error
-    println("Connection error: ${e.message}")
-}
-```
-
-### Transaction Submission Errors
-
-```kotlin
-// submitTransaction returns TransactionResponse — check .successful
-val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
-if (!response.successful) {
-    // Inspect resultXdr for error details
-    println("Result XDR: ${response.resultXdr}")
-    // Common: tx_failed (check operation results), tx_bad_seq (reload account)
+    println("Connection error: ${e.message}")       // network/connectivity
 }
 
-// WRONG: response.success — property does NOT exist
-// CORRECT: response.successful — Boolean property
+// WRONG: response.success — property does NOT exist on TransactionResponse
+// CORRECT: response.successful — Boolean; on failure inspect response.resultXdr
 ```
 
-### Soroban RPC Errors
-
-```kotlin
-import com.soneso.stellar.sdk.rpc.responses.GetHealthResponse
-
-val health = rpcServer.getHealth()
-if (health.status != "healthy") { /* server unhealthy */ }
-
-// Contract exceptions (10 types in com.soneso.stellar.sdk.contract.exception)
-// SimulationFailedException, SendTransactionFailedException,
-// TransactionFailedException, ExpiredStateException, etc.
-```
-
-For the full error catalog and solutions:
-[Troubleshooting Guide](./references/troubleshooting.md)
+A rejected `submitTransaction` raises `BadRequestException` (result codes in the body); a returned `TransactionResponse` reports `successful` and `resultXdr` (`tx_failed`: check operation results; `tx_bad_seq`: reload the account). Soroban contract failures raise the 10 exception types in `com.soneso.stellar.sdk.contract.exception` (SimulationFailedException, SendTransactionFailedException, TransactionFailedException, ExpiredStateException, ...); check RPC health with `SorobanServer.getHealth()` (`status != "healthy"`). Full error catalog and solutions: [Troubleshooting Guide](./references/troubleshooting.md)
 
 ## 10. Security Best Practices
 

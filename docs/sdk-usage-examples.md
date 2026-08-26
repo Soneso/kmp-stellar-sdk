@@ -4,6 +4,27 @@
 
 This guide provides practical code examples for common Stellar SDK operations. Each section demonstrates real-world usage patterns to help you integrate the SDK into your application.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+import com.soneso.stellar.sdk.horizon.requests.*
+import com.soneso.stellar.sdk.horizon.responses.*
+import com.soneso.stellar.sdk.horizon.responses.operations.*
+import com.soneso.stellar.sdk.horizon.responses.effects.*
+import com.soneso.stellar.sdk.horizon.exceptions.*
+import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.requests.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
+import com.soneso.stellar.sdk.Asset
+import com.soneso.stellar.sdk.Price
+import com.soneso.stellar.sdk.LiquidityPool
+import com.soneso.stellar.sdk.Claimant
+```
+
 ## Table of Contents
 
 - [Keypairs & Accounts](#keypairs--accounts)
@@ -77,8 +98,8 @@ val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 // Load account from Horizon
 try {
-    val account = server.loadAccount("GABC...")
-    println("Sequence: ${account.sequence}")
+    val account = server.accounts().account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
+    println("Sequence: ${account.sequenceNumber}")
     println("Balances: ${account.balances.map { "${it.balance} ${it.assetCode}" }}")
 } catch (e: BadRequestException) {
     // Account doesn't exist yet - fund it first using Friendbot or CreateAccountOperation
@@ -89,6 +110,7 @@ try {
 ### Funding Testnet Accounts
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Fund account using Friendbot (testnet only)
 val keypair = KeyPair.random()
 val accountId = keypair.getAccountId()
@@ -97,9 +119,9 @@ val success = FriendBot.fundTestnetAccount(accountId)
 if (success) {
     println("Account funded with 10,000 XLM")
 
-    // Now the account exists and can be loaded
-    val account = server.loadAccount(accountId)
-    println("Balance: ${account.balances.first().balance}")
+    // Now the account exists and its details can be read
+    val details = server.accounts().account(accountId)
+    println("Balance: ${details.balances.first().balance}")
 } else {
     println("Funding failed")
 }
@@ -151,36 +173,38 @@ val account = server.loadAccount(keypair.getAccountId())
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .addOperation(
         PaymentOperation(
-            destination = "GDEF...",
+            destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
             amount = "100.50",
-            asset = Asset.NATIVE
+            asset = AssetTypeNative
         )
     )
-    .addMemo(Memo.text("Payment for services"))
+    .addMemo(MemoText("Payment for services"))
     .build()
 
 // Sign and submit
 transaction.sign(keypair)
-val response = server.submitTransaction(transaction)
+val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
 ```
 
 ### Multi-Operation Transactions
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
+val keypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+val account = server.loadAccount(keypair.getAccountId())
 // Multi-operation transaction for complete account onboarding
 // All operations succeed together or fail together (atomic)
 val newAccountKeypair = KeyPair.random()
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .addOperations(listOf(
         // 1. Create the account with sufficient XLM balance
         CreateAccountOperation(newAccountKeypair.getAccountId(), "5"),
         // 2. Establish trustline for USDC (requires the account to exist)
-        ChangeTrustOperation(
-            asset = ChangeTrustAsset.create(usdcAsset),
+        ChangeTrustOperation(asset = usdcAsset).apply {
             sourceAccount = newAccountKeypair.getAccountId()
-        ),
+        },
         // 3. Send initial USDC to the new account (requires trustline)
         PaymentOperation(
             destination = newAccountKeypair.getAccountId(),
@@ -194,12 +218,12 @@ val transaction = TransactionBuilder(account, Network.TESTNET)
 transaction.sign(keypair)
 transaction.sign(newAccountKeypair)
 
-// Submit transaction to Horizon
-val response = server.submitTransaction(transaction)
-if (response.isSuccess) {
+// Submit transaction to Horizon; a rejected transaction raises BadRequestException
+try {
+    val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
     println("Success! Hash: ${response.hash}")
-} else {
-    println("Failed: ${response.extras?.resultCodes}")
+} catch (e: BadRequestException) {
+    println("Failed: ${e.message}")
 }
 ```
 
@@ -211,28 +235,28 @@ Payment operations transfer assets between accounts. Add these to a TransactionB
 
 ```kotlin
 // Define assets used in examples
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
-val eurocAsset = Asset.createNonNativeAsset("EUROC", "GISSUER...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
+val eurocAsset = Asset.createNonNativeAsset("EUROC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 
 // Simple XLM payment
 PaymentOperation(
-    destination = "GDEF...",
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     amount = "100",
-    asset = Asset.NATIVE
+    asset = AssetTypeNative
 )
 
 // Custom asset payment
 PaymentOperation(
-    destination = "GDEF...",
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     amount = "50",
     asset = usdcAsset
 )
 
 // Path payment: send exactly 100 XLM, receive at least 95 USDC (converted via EUROC)
 PathPaymentStrictSendOperation(
-    sendAsset = Asset.NATIVE,
+    sendAsset = AssetTypeNative,
     sendAmount = "100",
-    destination = "GDEST...",
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     destAsset = usdcAsset,
     destMin = "95",  // Accept minimum 95 USDC
     path = listOf(eurocAsset)  // Through EUROC
@@ -240,9 +264,9 @@ PathPaymentStrictSendOperation(
 
 // Path payment: receive exactly 100 USDC, send at most 105 XLM
 PathPaymentStrictReceiveOperation(
-    sendAsset = Asset.NATIVE,
+    sendAsset = AssetTypeNative,
     sendMax = "105",  // Send maximum 105 XLM
-    destination = "GDEST...",
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     destAsset = usdcAsset,
     destAmount = "100",  // Receive exactly 100 USDC
     path = listOf()
@@ -254,7 +278,7 @@ PathPaymentStrictReceiveOperation(
 ```kotlin
 // Create new account (funds transferred from source account)
 CreateAccountOperation(
-    destination = "GNEW...",
+    destination = "GDWUSKGGFDI4FRXK5EBTRECZSVQSSWJHHJOGH6JWG3AUMFFMQ435DIAG",
     startingBalance = "10"  // 10 XLM minimum
 )
 
@@ -264,16 +288,15 @@ BumpSequenceOperation(
 )
 
 // Configure account settings (multi-signature and security)
-SetOptionsOperation()
-    .setHomeDomain("stellar.example.com")
-    .setMasterKeyWeight(20)
-    .setLowThreshold(5)
-    .setMediumThreshold(10)
-    .setHighThreshold(15)
-    .setSigner(
-        SignerKey.ed25519PublicKey("GSIGNER..."),
-        10  // Weight
-    )
+SetOptionsOperation(
+    homeDomain = "stellar.example.com",
+    masterKeyWeight = 20,
+    lowThreshold = 5,
+    mediumThreshold = 10,
+    highThreshold = 15,
+    signer = SignerKey.ed25519PublicKey("GBVPKXWMAB3FIUJB6T7LF66DABKKA2ZHRHDOQZ25GBAEFZVHTBPJNOJI"),
+    signerWeight = 10
+)
 
 // Store data on-chain (key-value storage)
 ManageDataOperation(
@@ -289,7 +312,7 @@ ManageDataOperation(
 
 // Merge account (transfer all XLM and close)
 AccountMergeOperation(
-    destination = "GDEST..."
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
 )
 ```
 
@@ -297,35 +320,36 @@ AccountMergeOperation(
 
 ```kotlin
 // Define asset used in examples
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 
 // Establish trustline to receive custom asset (required before receiving USDC)
 ChangeTrustOperation(
-    asset = ChangeTrustAsset.create(usdcAsset),
+    asset = usdcAsset,
     limit = "10000"  // Maximum 10,000 USDC
 )
 
 // Remove trustline (set limit to 0, account must have zero balance)
 ChangeTrustOperation(
-    asset = ChangeTrustAsset.create(usdcAsset),
+    asset = usdcAsset,
     limit = "0"
 )
 
 // Issuer authorizes trustline (issuer can control who holds their asset)
 SetTrustLineFlagsOperation(
-    trustor = "GTRUSTOR...",
+    trustor = "GCFIOX77D2ZYIUKXPLGVV7XEAVCWK2G5PSE6BEEGHICVPPD26SPRPPVB",
     asset = usdcAsset,
-    setFlags = setOf(TrustLineFlag.AUTHORIZED),
-    clearFlags = setOf(TrustLineFlag.AUTHORIZED_TO_MAINTAIN_LIABILITIES)
+    setFlags = TrustLineFlagsXdr.AUTHORIZED_FLAG.value,
+    clearFlags = TrustLineFlagsXdr.AUTHORIZED_TO_MAINTAIN_LIABILITIES_FLAG.value
 )
 ```
 
 ### Trading Operations
 
 ```kotlin
+// usdcAsset: from the previous steps of this flow
 // Create sell offer on DEX (sell 100 XLM for USDC at 0.20 USDC per XLM)
 ManageSellOfferOperation(
-    selling = Asset.NATIVE,
+    selling = AssetTypeNative,
     buying = usdcAsset,
     amount = "100",
     price = Price.fromString("0.20")
@@ -333,7 +357,7 @@ ManageSellOfferOperation(
 
 // Create buy offer (receive exactly 50 USDC, price is maximum willing to pay)
 ManageBuyOfferOperation(
-    selling = Asset.NATIVE,
+    selling = AssetTypeNative,
     buying = usdcAsset,
     buyAmount = "50",
     price = Price.fromString("0.20")
@@ -341,7 +365,7 @@ ManageBuyOfferOperation(
 
 // Create passive offer (won't immediately match existing offers, useful for market making)
 CreatePassiveSellOfferOperation(
-    selling = Asset.NATIVE,
+    selling = AssetTypeNative,
     buying = usdcAsset,
     amount = "100",
     price = Price.fromString("0.20")
@@ -349,7 +373,7 @@ CreatePassiveSellOfferOperation(
 
 // Update existing offer (change price or amount)
 ManageSellOfferOperation(
-    selling = Asset.NATIVE,
+    selling = AssetTypeNative,
     buying = usdcAsset,
     amount = "150",  // New amount
     price = Price.fromString("0.25"),  // New price
@@ -358,7 +382,7 @@ ManageSellOfferOperation(
 
 // Cancel offer (set amount to 0)
 ManageSellOfferOperation(
-    selling = Asset.NATIVE,
+    selling = AssetTypeNative,
     buying = usdcAsset,
     amount = "0",  // Setting to 0 cancels the offer
     price = Price.fromString("0.20"),
@@ -372,17 +396,17 @@ ManageSellOfferOperation(
 // Send funds with claim conditions (useful for escrow, scheduled payments, or pre-authorized transactions)
 CreateClaimableBalanceOperation(
     amount = "100",
-    asset = Asset.NATIVE,
+    asset = AssetTypeNative,
     claimants = listOf(
         // Immediate claim allowed
         Claimant(
-            destination = "GCLAIM...",
-            predicate = Predicate.unconditional()
+            destination = "GBWMCCC3NHSKLAOJDBKKYW7SSH2PFTTNVFKWSGLWGDLEBKLOVP5JLBBP",
+            predicate = ClaimPredicate.Unconditional
         ),
         // Can claim within 1 hour from balance creation (expires after)
         Claimant(
-            destination = "GCLAIM2...",
-            predicate = Predicate.relativeTime(3600)
+            destination = "GCUZ6YLL5RQBTYLTTQLPCM73C5XAIUGK2TIMWQH7HPSGWVS2KJ2F3CHS",
+            predicate = ClaimPredicate.BeforeRelativeTime(3600)
         )
     )
 )
@@ -428,8 +452,8 @@ Before participating in an AMM liquidity pool, you must first establish a trustl
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 // Define the assets that make up the liquidity pool
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
-val eurocAsset = Asset.createNonNativeAsset("EUROC", "GISSUER2...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
+val eurocAsset = Asset.createNonNativeAsset("EUROC", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX")
 
 // Create liquidity pool object (assets must be in lexicographic order)
 val liquidityPool = LiquidityPool(
@@ -446,7 +470,7 @@ val poolTrustlineOp = ChangeTrustOperation(
 )
 
 // Complete workflow: trustline, then deposit to earn trading fees
-val userKeypair = KeyPair.fromSecretSeed("SUSER...")
+val userKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val userAccount = server.loadAccount(userKeypair.getAccountId())
 
 // Step 1: Create trustline for pool shares
@@ -454,7 +478,7 @@ val trustlineTx = TransactionBuilder(userAccount, Network.TESTNET)
     .addOperation(poolTrustlineOp)
     .build()
 trustlineTx.sign(userKeypair)
-server.submitTransaction(trustlineTx)
+server.submitTransaction(trustlineTx.toEnvelopeXdrBase64())
 
 // Step 2: Deposit liquidity to the pool (requires trustline from Step 1)
 // Get the pool ID (suspend function, so we need to use it in a coroutine context)
@@ -472,7 +496,7 @@ val depositTx = TransactionBuilder(userAccount, Network.TESTNET)
     )
     .build()
 depositTx.sign(userKeypair)
-server.submitTransaction(depositTx)
+server.submitTransaction(depositTx.toEnvelopeXdrBase64())
 
 // For regular asset trustlines, use ChangeTrustAsset with the asset
 // (See Asset Operations section for more examples)
@@ -487,6 +511,12 @@ val regularAssetTrustline = ChangeTrustOperation(
 Sponsorship allows one account to pay base reserves for another account's ledger entries, enabling user onboarding without requiring them to hold XLM.
 
 ```kotlin
+val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
+val sponsorSequence = 1L // current sequence of the sponsor account
+val issuerId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val userKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val userId = userKeypair.getAccountId()
+
 // Example 1: Create a sponsored account (0 XLM required)
 // Sponsor pays reserve costs, enabling zero-balance account creation
 val sponsorKeypair = KeyPair.random()
@@ -586,54 +616,45 @@ horizonServer.submitTransaction(revokeAccountTx.toEnvelopeXdrBase64())
 Soroban operations differ fundamentally from Classic Stellar operations. They require a simulation step to determine resource requirements, authorization entries, and transaction data before submission. For most use cases, the `ContractClient` API (see [Smart Contracts](#smart-contracts) section) handles this workflow automatically.
 
 ```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+
 // Example: Invoke contract function (low-level approach)
 // For simpler workflows, use ContractClient API (see Smart Contracts section)
+
 
 val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
 
 // 1. Create operation
 val invokeOp = InvokeHostFunctionOperation.invokeContractFunction(
-    contractAddress = "CCREATE...",
+    contractAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     functionName = "transfer",
     parameters = listOf(
-        Scv.toAddress("GFROM..."),
-        Scv.toAddress("GTO..."),
-        Scv.toInt128(BigInteger.valueOf(1000))
+        Scv.toAddress(Address("GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR").toSCAddress()),
+        Scv.toAddress(Address("GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U").toSCAddress()),
+        Scv.toInt128(BigInteger.fromLong(1000))
     )
 )
 
 // 2. Build transaction (SorobanServer has getAccount method)
+val sourceAccountId = sourceKeypair.getAccountId()
 val account = sorobanServer.getAccount(sourceAccountId)
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .addOperation(invokeOp)
     .build()
 
-// 3. Simulate to get resource requirements (REQUIRED for Soroban)
+// 3. Simulate to check the invocation succeeds (REQUIRED for Soroban)
 val simulationResult = sorobanServer.simulateTransaction(transaction)
-if (!simulationResult.isSuccess) {
+if (simulationResult.error != null) {
     throw Exception("Simulation failed: ${simulationResult.error}")
 }
 
-// 4. Apply simulation results (resource fees, footprint, auth)
-transaction.setSorobanData(simulationResult.transactionData)
-transaction.addResourceFees(simulationResult.minResourceFee)
+// 4. Prepare: applies footprint, resource fees, and auth from simulation
+val prepared = sorobanServer.prepareTransaction(transaction)
 
-// 5. Sign authorization entries if required
-if (simulationResult.authEntries.isNotEmpty()) {
-    val signedAuth = Auth.authorizeEntries(
-        entries = simulationResult.authEntries,
-        signer = sourceKeypair,
-        validUntilLedgerSeq = simulationResult.latestLedger + 100,
-        network = Network.TESTNET
-    )
-    transaction.setSorobanAuth(signedAuth)
-}
-
-// 6. Sign transaction
-transaction.sign(sourceKeypair)
-
-// 7. Submit
-val response = sorobanServer.sendTransaction(transaction)
+// 5. Sign and submit
+prepared.sign(sourceKeypair)
+val response = sorobanServer.sendTransaction(prepared)
 println("Transaction hash: ${response.hash}")
 ```
 
@@ -641,7 +662,7 @@ Other Soroban operations:
 
 ```kotlin
 // Upload contract WASM (use ByteArray for cross-platform compatibility)
-val wasmBytes: ByteArray = // ... load WASM file
+val wasmBytes: ByteArray = java.io.File("contract.wasm").readBytes() // JVM; use your platform's file APIs elsewhere
 InvokeHostFunctionOperation.uploadContractWasm(wasmBytes)
 
 // Extend storage lifetime (prevent contract data expiration)
@@ -657,25 +678,25 @@ RestoreFootprintOperation()
 
 ## Querying Horizon Data
 
-Horizon provides comprehensive APIs for querying blockchain data. This section demonstrates common query patterns for retrieving accounts, transactions, operations, and more.
+Horizon provides APIs for querying blockchain data. This section demonstrates common query patterns for retrieving accounts, transactions, operations, and more.
 
 ```kotlin
 // Initialize Horizon server (reuse this instance across queries)
-val server = HorizonServer("https://horizon-testnet.stellar.org")
 ```
 
 ### Account Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Load specific account with full details (balances, signers, thresholds)
-val account = server.accounts().account("GABC...")
+val account = server.accounts().account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
 println("Sequence: ${account.sequenceNumber}")
 println("Balances: ${account.balances.map { "${it.balance} ${it.assetCode}" }}")
 
 // Query multiple accounts with filters (useful for discovering sponsored accounts or asset holders)
 val accounts = server.accounts()
-    .forSponsor("GSPONSOR...")  // Find accounts sponsored by this address
-    .forAsset("USDC", "GISSUER...")  // Find USDC holders (separate parameters: code, issuer)
+    .forSponsor("GBUCAAMD7DYS7226CWUUOZ5Y2QF4JBJWIYU3UWJAFDGJVCR6EU5NJM5H")  // Find accounts sponsored by this address
+    .forAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")  // Find USDC holders (separate parameters: code, issuer)
     .cursor("12345")  // Pagination cursor from previous response
     .limit(50)  // Max 200, default 10
     .order(RequestBuilder.Order.DESC)  // DESC for newest first, ASC for oldest first
@@ -690,6 +711,7 @@ accounts.records.forEach { account ->
 ### Transaction Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Get specific transaction by hash (useful for checking transaction status after submission)
 val transaction = server.transactions().transaction("abc123...")
 println("Result: ${transaction.successful}")
@@ -697,7 +719,7 @@ println("Fee charged: ${transaction.feeCharged}")
 
 // Query transactions with filters (useful for transaction history, auditing, monitoring)
 val transactions = server.transactions()
-    .forAccount("GABC...")  // All transactions involving this account
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")  // All transactions involving this account
     .includeFailed(true)  // Include failed transactions (default: false, only successful)
     .limit(20)
     .order(RequestBuilder.Order.DESC)  // Newest first
@@ -726,13 +748,14 @@ val poolTxs = server.transactions()
 ### Operation Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Get specific operation by ID
 val operation = server.operations().operation(12345678)
 println("Type: ${operation.type}")
 
 // Query operations with filters (useful for tracking specific actions, building activity feeds)
 val operations = server.operations()
-    .forAccount("GABC...")  // All operations involving this account
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")  // All operations involving this account
     .limit(50)
     .order(RequestBuilder.Order.DESC)
     .execute()
@@ -768,10 +791,11 @@ val poolOps = server.operations()
 ### Effect Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query effects for an account (useful for detailed activity tracking, notifications)
 // Effects show the specific changes that occurred (e.g., balance changes, trustline changes)
 val effects = server.effects()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .limit(50)
     .order(RequestBuilder.Order.DESC)
     .execute()
@@ -804,6 +828,8 @@ val poolEffects = server.effects()
 ### Ledger Queries
 
 ```kotlin
+// transactionCount: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Get specific ledger by sequence (useful for analyzing specific blocks)
 val ledger = server.ledgers().ledger(12345678)
 println("Closed at: ${ledger.closedAt}")
@@ -824,10 +850,11 @@ ledgers.records.forEach { ledger ->
 ### Payment Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query payments for an account (useful for payment history, accounting)
 // Payment queries return only payment-related operations (Payment, PathPayment, CreateAccount, AccountMerge)
 val payments = server.payments()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .limit(50)
     .order(RequestBuilder.Order.DESC)
     .execute()
@@ -835,12 +862,13 @@ val payments = server.payments()
 payments.records.forEach { payment ->
     when (payment) {
         is PaymentOperationResponse -> {
-            println("Payment: ${payment.amount} ${payment.asset.code}")
+            println("Payment: ${payment.amount} ${payment.assetCode ?: "XLM"}")
             println("From: ${payment.from}, To: ${payment.to}")
         }
         is CreateAccountOperationResponse -> {
             println("Account funded: ${payment.startingBalance} XLM")
         }
+        else -> { /* other operation kinds */ }
     }
 }
 
@@ -858,9 +886,10 @@ val ledgerPayments = server.payments()
 ### Trade Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query trades for an account (useful for trading history, PnL calculation)
 val trades = server.trades()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .limit(50)
     .order(RequestBuilder.Order.DESC)
     .execute()
@@ -873,7 +902,7 @@ trades.records.forEach { trade ->
 // Query trades for specific asset pair (useful for price discovery, charting)
 val pairTrades = server.trades()
     .forBaseAsset("native")  // XLM as base
-    .forCounterAsset("credit_alphanum4", "USDC", "GISSUER...")  // USDC as counter
+    .forCounterAsset("credit_alphanum4", "USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")  // USDC as counter
     .limit(100)
     .execute()
 
@@ -898,6 +927,7 @@ val poolTrades = server.trades()
 ### Asset Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query assets with filters (useful for discovering tradeable assets)
 val assets = server.assets()
     .forAssetCode("USDC")  // All USDC assets from different issuers
@@ -906,28 +936,29 @@ val assets = server.assets()
 
 assets.records.forEach { asset ->
     println("Asset: ${asset.assetCode} issued by ${asset.assetIssuer}")
-    println("Accounts: ${asset.numAccounts}, Supply: ${asset.amount}")
+    println("Authorized holders: ${asset.accounts.authorized}")
 }
 
 // Query assets by issuer (find all assets from a specific issuer)
 val issuerAssets = server.assets()
-    .forAssetIssuer("GISSUER...")
+    .forAssetIssuer("GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
     .execute()
 
 // Query assets by code and issuer (specific asset lookup)
 val specificAsset = server.assets()
     .forAssetCode("USDC")
-    .forAssetIssuer("GISSUER...")
+    .forAssetIssuer("GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
     .execute()
 ```
 
 ### Order Book Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Get order book for asset pair (useful for DEX trading, price discovery)
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val orderBook = server.orderBook()
-    .sellingAsset(Asset.NATIVE)  // Selling XLM
+    .sellingAsset(AssetTypeNative)  // Selling XLM
     .buyingAsset(usdcAsset)  // Buying USDC
     .execute()
 
@@ -946,49 +977,50 @@ orderBook.asks.forEach { ask ->
 ### Payment Path Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Find payment paths (strict send) - know how much you're sending, discover destinations
 val sendPaths = server.strictSendPaths()
     .sourceAsset("native")  // Sending XLM
     .sourceAmount("100")  // Sending exactly 100 XLM
-    .destinationAccount("GDEST...")  // To this account
+    .destinationAccount("GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM")  // To this account
     .execute()
 
 sendPaths.records.forEach { path ->
     println("Destination asset: ${path.destinationAssetCode}")
     println("Destination amount: ${path.destinationAmount}")
-    println("Path: ${path.path.map { it.code }}")
+    println("Path: ${path.path.joinToString()}")
 }
 
 // Find payment paths with specific destination assets (useful for multi-currency scenarios)
 val multiAssetPaths = server.strictSendPaths()
-    .sourceAsset("credit_alphanum4", "USDC", "GISSUER...")
+    .sourceAsset("credit_alphanum4", "USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
     .sourceAmount("100")
     .destinationAssets(listOf(
-        Triple("credit_alphanum4", "EUROC", "GISSUER2..."),
-        Triple("credit_alphanum4", "GBPT", "GISSUER3...")
+        Triple("credit_alphanum4", "EUROC", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX"),
+        Triple("credit_alphanum4", "GBPT", "GBBHQ7H4V6RRORKYLHTCAWP6MOHNORRFJSDPXDFYDGJB2LPZUFPXUEW3")
     ))
     .execute()
 
 // Find payment paths (strict receive) - know how much you want to receive, discover costs
 val receivePaths = server.strictReceivePaths()
-    .sourceAccount("GABC...")  // From this account
-    .destinationAsset("credit_alphanum4", "EUROC", "GISSUER...")  // Receiving EUROC
+    .sourceAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")  // From this account
+    .destinationAsset("credit_alphanum4", "EUROC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")  // Receiving EUROC
     .destinationAmount("50")  // Receiving exactly 50 EUROC
     .execute()
 
 receivePaths.records.forEach { path ->
     println("Source asset: ${path.sourceAssetCode}")
     println("Source amount: ${path.sourceAmount}")
-    println("Path: ${path.path.map { it.code }}")
+    println("Path: ${path.path.joinToString()}")
 }
 
 // Find paths with specific source assets (useful for multi-currency wallets)
 val multiSourcePaths = server.strictReceivePaths()
     .sourceAssets(listOf(
         Triple("native", null, null),
-        Triple("credit_alphanum4", "USDC", "GISSUER...")
+        Triple("credit_alphanum4", "USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
     ))
-    .destinationAsset("credit_alphanum4", "EUROC", "GISSUER2...")
+    .destinationAsset("credit_alphanum4", "EUROC", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX")
     .destinationAmount("100")
     .execute()
 ```
@@ -996,26 +1028,27 @@ val multiSourcePaths = server.strictReceivePaths()
 ### Claimable Balance Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query claimable balances with filters (useful for finding pending payments, airdrops)
 val claimableBalances = server.claimableBalances()
-    .forClaimant("GABC...")  // Balances this account can claim
+    .forClaimant("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")  // Balances this account can claim
     .limit(20)
     .execute()
 
 claimableBalances.records.forEach { balance ->
     println("Balance ID: ${balance.id}")
-    println("Asset: ${balance.asset}, Amount: ${balance.amount}")
+    println("Asset: ${balance.assetString}, Amount: ${balance.amount}")
     println("Sponsor: ${balance.sponsor}")
 }
 
 // Query by sponsor (find balances sponsored by this account)
 val sponsoredBalances = server.claimableBalances()
-    .forSponsor("GSPONSOR...")
+    .forSponsor("GBUCAAMD7DYS7226CWUUOZ5Y2QF4JBJWIYU3UWJAFDGJVCR6EU5NJM5H")
     .execute()
 
 // Query by asset (find all claimable balances for a specific asset)
 val assetBalances = server.claimableBalances()
-    .forAsset("credit_alphanum4", "USDC", "GISSUER...")  // Asset type, code, issuer
+    .forAsset("credit_alphanum4", "USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")  // Asset type, code, issuer
     .execute()
 
 // Get specific claimable balance by ID
@@ -1026,6 +1059,7 @@ println("Amount: ${balance.amount}, Claimants: ${balance.claimants.size}")
 ### Liquidity Pool Queries
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Query liquidity pools (useful for discovering AMM pools)
 val pools = server.liquidityPools()
     .limit(20)
@@ -1038,14 +1072,14 @@ pools.records.forEach { pool ->
 }
 
 // Query pools by reserves (find pools containing specific assets)
-val usdcAsset = Asset.createNonNativeAsset("USDC", "GISSUER...")
+val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val usdcPools = server.liquidityPools()
-    .forReserves(listOf(Asset.NATIVE, usdcAsset))  // XLM/USDC pools
+    .forReserves("native", "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")  // XLM/USDC pools
     .execute()
 
 // Query pools by account (find pools an account participates in)
 val accountPools = server.liquidityPools()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .execute()
 
 // Get specific pool by ID
@@ -1061,9 +1095,11 @@ println("Type: ${pool.type}")  // constant_product
 The `invoke()` method provides the simplest API for contract interaction with automatic execution. Use `invoke()` for simple use cases with a single signer where auto-execution is desired. For multi-signature workflows or transaction customization (memos, preconditions), use `buildInvoke()` instead (covered in the next section).
 
 ```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
 // Loads contract spec from network for automatic type conversion and validation
 val client = ContractClient.forContract(
-    contractId = "CCREATE...",
+    contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     rpcUrl = "https://soroban-testnet.stellar.org",
     network = Network.TESTNET
 )
@@ -1072,8 +1108,8 @@ val client = ContractClient.forContract(
 // Use when you need specific type conversion or custom parsing logic
 val balance = client.invoke<BigInteger>(
     functionName = "balance",
-    arguments = mapOf("account" to "GABC..."),  // SDK auto-converts native types to XDR
-    source = "GABC...",
+    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),  // SDK auto-converts native types to XDR
+    source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null,  // No signer needed for read-only calls
     parseResultXdrFn = { scval ->
         Scv.fromInt128(scval)  // Returns BigInteger per SDK type mapping
@@ -1085,20 +1121,20 @@ println("Balance: $balance")
 // Use when contract spec provides complete type information
 val balanceXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GABC..."),
-    source = "GABC...",
+    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null
 )
 val parsedBalance = client.funcResToNative("balance", balanceXdr) as BigInteger
 println("Balance: $parsedBalance")
 
 // Write operation with native types (auto-signs and submits)
-val sourceAccount = KeyPair.fromSecretSeed("SXXX...")  // Source account keypair
+val sourceAccount = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")  // Source account keypair
 client.invoke<Unit>(
     functionName = "transfer",
     arguments = mapOf(
-        "from" to "GFROM...",
-        "to" to "GTO...",
+        "from" to "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR",
+        "to" to "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U",
         "amount" to 1000L
     ),
     source = sourceAccount.getAccountId(),
@@ -1113,13 +1149,14 @@ println("Transfer complete!")
 The `buildInvoke()` method provides full control over the transaction lifecycle when you need to manage authorization workflows for atomic swaps, escrow, multi-party transfers, or other scenarios requiring signatures from multiple accounts:
 
 ```kotlin
+// client: from the previous steps of this flow
 // Initialize accounts and keypairs
-val sourceKeypair = KeyPair.fromSecretSeed("SXXX...")
-val fromAddress = "GFROM..."
-val toAddress = "GTO..."
-val account1Keypair = KeyPair.fromSecretSeed("SXXX...")
+val sourceKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val fromAddress = "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR"
+val toAddress = "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U"
+val account1Keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val account1Id = account1Keypair.getAccountId()
-val account2Keypair = KeyPair.fromSecretSeed("SXXX...")
+val account2Keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val account2Id = account2Keypair.getAccountId()
 
 // Multi-signature workflow: Transfer requires authorization from multiple parties
@@ -1162,7 +1199,7 @@ val result = assembled.signAndSubmit(sourceKeypair)
 
 ```kotlin
 // Initialize deployer keypair
-val deployer = KeyPair.fromSecretSeed("SXXX...")  // Deployer account keypair
+val deployer = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")  // Deployer account keypair
 
 // Load WASM bytes (platform-compatible approach)
 // On JVM: File("token.wasm").readBytes()
@@ -1258,8 +1295,8 @@ The SDK automatically converts between XDR and native Kotlin types:
 val xdrArgs = client.funcArgsToXdrSCValues(
     functionName = "transfer",
     arguments = mapOf(
-        "from" to "GABC...",
-        "to" to "GDEF...",
+        "from" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
+        "to" to "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
         "amount" to 1000L
     )
 )
@@ -1267,7 +1304,7 @@ val xdrArgs = client.funcArgsToXdrSCValues(
 // Parse XDR results to native types (inverse of funcArgsToXdrSCValues for bidirectional conversion)
 val resultXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GABC..."),
+    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
     source = sourceAccount,
     signer = null
 )
@@ -1276,7 +1313,7 @@ val balance = client.funcResToNative("balance", resultXdr) as BigInteger
 // Create contract values manually using low-level Scv API
 // This is useful for custom types, low-level control, or performance-critical code where
 // you need direct XDR manipulation without automatic conversion
-val addressScVal = Address("GABC...").toSCVal()  // Convert string address to SCValXdr
+val addressScVal = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toSCVal()  // Convert string address to SCValXdr
 val params = listOf(
     addressScVal,                            // Account address
     Scv.toUint128(BigInteger("1000000")),   // Amount
@@ -1331,10 +1368,10 @@ For complete authorization workflows (multi-signature, atomic swaps), see the [A
 val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
 val currentLedger = sorobanServer.getLatestLedger().sequence
 
-// Assume you have an auth entry from contract simulation
-val entry: SorobanAuthorizationEntryXdr = // ... from simulation
+// entry: the SorobanAuthorizationEntryXdr returned by contract simulation
+val entry: SorobanAuthorizationEntryXdr = TODO("take this from your simulation result")
 
-val userKeypair = KeyPair.fromSecretSeed("SXXX...")
+val userKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 val signedEntry = Auth.authorizeEntry(
     entry = entry,
@@ -1349,7 +1386,6 @@ val signedEntry = Auth.authorizeEntry(
 
 // Example 2: Build custom authorization from scratch
 // Use case: Complex permission models, custom invocation trees, nested contract calls
-val contractId = "CCXXX..."
 val contractAddress = Address(contractId).toSCAddress()
 val invocation = SorobanAuthorizedInvocationXdr(
     function = SorobanAuthorizedFunctionXdr.ContractFn(
@@ -1357,16 +1393,16 @@ val invocation = SorobanAuthorizedInvocationXdr(
             contractAddress = contractAddress,
             functionName = SCSymbolXdr("transfer"),
             args = listOf(
-                Scv.toAddress("GFROM..."),
-                Scv.toAddress("GTO..."),
-                Scv.toInt128(1000L)
+                Scv.toAddress(Address("GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR").toSCAddress()),
+                Scv.toAddress(Address("GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U").toSCAddress()),
+                Scv.toInt128(com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(1000))
             )
         )
     ),
     subInvocations = emptyList()  // Nested contract calls if needed
 )
 
-val keypair = KeyPair.fromSecretSeed("SXXX...")
+val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val validUntil = currentLedger + 100
 
 val customAuth = Auth.authorizeInvocation(
@@ -1380,8 +1416,10 @@ val customAuth = Auth.authorizeInvocation(
 // Use case: Ledger, Trezor, HSM integration for cold storage security
 class LedgerSigner : Auth.Signer {
     override suspend fun sign(preimage: HashIDPreimageXdr): Auth.Signature {
-        // 1. Convert preimage to payload
-        val payload = Util.hash(preimage.toXdrByteArray())
+        // 1. Hash the XDR-encoded preimage
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val payload = com.soneso.stellar.sdk.crypto.getSha256Crypto().hash(writer.toByteArray())
 
         // 2. Send payload to your signing device (e.g., Ledger hardware wallet)
         // val signature = ledgerDevice.sign(payload)  // Your device-specific code
@@ -1398,28 +1436,27 @@ class LedgerSigner : Auth.Signer {
 
 // Use custom signer with AssembledTransaction (recommended):
 val client = ContractClient.forContract(
-    server = SorobanServer("https://soroban-testnet.stellar.org"),
-    network = Network.TESTNET,
-    contractId = "CCXXX...",
-    sourceAccount = "GSOURCE..."
+    contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    network = Network.TESTNET
 )
 
 val assembled = client.buildInvoke<Unit>(
     functionName = "transfer",
-    parameters = mapOf("from" to "GFROM...", "to" to "GTO...", "amount" to 1000L),
-    source = "GSOURCE..."
+    parameters = mapOf("from" to "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR", "to" to "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U", "amount" to 1000L),
+    source = "GDFJHLAXAUMHA4OWPOB4P7YO72AQR2HMIUYFOXLXE2DZGM633K7HZDQP"
 )
 
 // Sign with custom hardware wallet signer
 assembled.signAuthEntries(
-    authEntriesSigner = KeyPair.fromAccountId("GHARDWARE..."),  // Public key only
+    authEntriesSigner = KeyPair.fromAccountId("GBXHUHG5FGYLPD6RHL2MKWMP572O6KUXCZXDZJXS4T57ZTMAKBN7DWXN"),  // Public key only
     authorizeEntryDelegate = { entry, network ->
         Auth.authorizeEntry(entry, LedgerSigner(), currentLedger + 100, network)
     }
 )
 
 // Complete the transaction signing and submission
-val sourceKeypair = KeyPair.fromSecretSeed("SSOURCE...")
+val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 assembled.signAndSubmit(sourceKeypair)
 ```
 
@@ -1438,7 +1475,7 @@ val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Stream transactions for an account
 // Eliminates polling overhead - events arrive instantly as they happen on-chain
 server.transactions()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .stream(
         serializer = TransactionResponse.serializer(),
         listener = object : EventListener<TransactionResponse> {
@@ -1456,7 +1493,7 @@ server.transactions()
 // Stream payments for an account
 // Critical for payment processors requiring sub-second notification latency
 server.payments()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .stream(
         serializer = OperationResponse.serializer(),
         listener = object : EventListener<OperationResponse> {
@@ -1483,7 +1520,7 @@ server.payments()
 // Stream operations for an account
 // Captures all account activity - trustlines, offers, payments, contract calls
 server.operations()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .stream(
         serializer = OperationResponse.serializer(),
         listener = object : EventListener<OperationResponse> {
@@ -1500,7 +1537,7 @@ server.operations()
 // Stream effects for an account
 // Tracks granular state changes (balance updates, signer changes, trust authorized)
 server.effects()
-    .forAccount("GABC...")
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .stream(
         serializer = EffectResponse.serializer(),
         listener = object : EventListener<EffectResponse> {
@@ -1535,6 +1572,8 @@ server.ledgers()
 ### Soroban RPC Operations
 
 ```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
 val sorobanServer = SorobanServer("https://soroban-testnet.stellar.org")
 
 // Check server health before making requests to verify connectivity and sync status
@@ -1542,17 +1581,17 @@ val health = sorobanServer.getHealth()
 println("Status: ${health.status}")
 
 // Build a Soroban transaction (e.g., invoke contract)
-val sourceKeypair = KeyPair.fromSecretSeed("SXXX...")
+val sourceKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val sourceAccount = sorobanServer.getAccount(sourceKeypair.getAccountId())
 val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
     .addOperation(
         InvokeHostFunctionOperation.invokeContractFunction(
-            contractAddress = "CCREATE...",
+            contractAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
             functionName = "transfer",
             parameters = listOf(
-                Scv.toAddress("GFROM..."),
-                Scv.toAddress("GTO..."),
-                Scv.toInt128(BigInteger.valueOf(1000))
+                Scv.toAddress(Address("GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR").toSCAddress()),
+                Scv.toAddress(Address("GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U").toSCAddress()),
+                Scv.toInt128(BigInteger.fromLong(1000))
             )
         )
     )
@@ -1582,7 +1621,7 @@ if (simulation.error == null) {
 // Use TEMPORARY for cache-like data (can be archived if not accessed)
 val balanceKey = Scv.toSymbol("balance")
 val data = sorobanServer.getContractData(
-    contractId = "CCREATE...",
+    contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     key = balanceKey,
     durability = SorobanServer.Durability.PERSISTENT
 )
@@ -1594,8 +1633,8 @@ val events = sorobanServer.getEvents(
     GetEventsRequest(
         startLedger = 1000,
         filters = listOf(
-            EventFilter(
-                contractIds = listOf("CCREATE..."),  // List, not Set
+            GetEventsRequest.EventFilter(
+                contractIds = listOf("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),  // List, not Set
                 topics = listOf(listOf(Scv.toSymbol("transfer").toXdrBase64()))
             )
         )
@@ -1611,13 +1650,16 @@ events.events.forEach { event ->
 ### Transaction Submission
 
 ```kotlin
+import kotlinx.coroutines.delay
+
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // Build and sign a transaction first
 val sourceAccount = server.loadAccount(sourceKeypair.getAccountId())
 val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
     .addOperation(
         PaymentOperation(
-            destination = "GDEST...",
-            asset = Asset.NATIVE,
+            destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
+            asset = AssetTypeNative,
             amount = "10.0"
         )
     )
@@ -1721,6 +1763,8 @@ Stellar Asset Contracts (SAC) wrap classic Stellar assets (XLM, issued assets) a
 ```kotlin
 // Get contract ID for Stellar Asset Contract
 // This derives a deterministic contract address for the asset on the specified network
+import com.ionspin.kotlin.bignum.integer.BigInteger
+val usdc = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val contractId = usdc.getContractId(Network.TESTNET)
 println("SAC Contract ID: $contractId")
 
@@ -1773,7 +1817,7 @@ println("Token: $name, Balance: $balance")
 //     arguments = mapOf(
 //         "from" to sourceAddress,
 //         "to" to destinationAddress,
-//         "amount" to BigInteger.valueOf(1000000)
+//         "amount" to BigInteger.fromLong(1000000)
 //     ),
 //     source = sourceAddress,
 //     signer = sourceKeypair,  // Required for write operations

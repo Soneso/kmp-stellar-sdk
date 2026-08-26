@@ -9,6 +9,14 @@ SEP-8 defines a protocol for assets that require issuer approval before transact
 - Stablecoins subject to sanctions screening or geographic restrictions
 - Assets with daily transfer limits or tiered access controls
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep08.*
+import com.soneso.stellar.sdk.horizon.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -34,8 +42,8 @@ suspend fun regulatedAssetExample() {
 
     // Build a payment transaction involving the regulated asset
     val server = HorizonServer("https://horizon-testnet.stellar.org")
-    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
-    val sourceAccount = server.accounts().account(senderKeyPair.getAccountId())
+    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+    val sourceAccount = server.loadAccount(senderKeyPair.getAccountId())
     val destination = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
 
     val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
@@ -107,6 +115,7 @@ val sep08 = Sep08Service.fromDomain(
 When you already have the stellar.toml data and regulated asset list:
 
 ```kotlin
+// regulatedAsset, stellarToml: from the previous steps of this flow
 val sep08 = Sep08Service(
     tomlData = stellarToml,
     regulatedAssets = listOf(regulatedAsset),
@@ -142,6 +151,7 @@ val assetXdr = asset.toXdr()        // Returns AssetXdr
 Verify that the issuer account has both `auth_required` and `auth_revocable` flags set.
 
 ```kotlin
+// approvalServer, sep08: from the previous steps of this flow
 // In a coroutine scope
 val asset = sep08.regulatedAssets.first()
 val isConfigured = sep08.authorizationRequired(asset)
@@ -167,8 +177,8 @@ suspend fun approvalFlowExample() {
 
     // Build the transaction
     val server = HorizonServer("https://horizon-testnet.stellar.org")
-    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
-    val sourceAccount = server.accounts().account(senderKeyPair.getAccountId())
+    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+    val sourceAccount = server.loadAccount(senderKeyPair.getAccountId())
     val destination = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
 
     val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
@@ -195,6 +205,7 @@ The approval server returns one of five response types. Use a `when` expression 
 The transaction was approved without modifications. Submit `response.tx` to the Stellar network.
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 when (response) {
     is Sep08PostTransactionResponse.Success -> {
         // response.tx contains the approved (possibly co-signed) transaction XDR
@@ -260,6 +271,8 @@ is Sep08PostTransactionResponse.Rejected -> {
 ### Exhaustive Handling
 
 ```kotlin
+// delay: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 when (response) {
     is Sep08PostTransactionResponse.Success -> {
         server.submitTransaction(response.tx)
@@ -290,6 +303,7 @@ when (response) {
 When `actionMethod` is `"GET"` (the default), open the URL in a browser or webview. After the user completes the action (e.g., a KYC form), resubmit the original transaction.
 
 ```kotlin
+// asset, response, sep08: from the previous steps of this flow
 // In a coroutine scope
 val actionRequired = response as Sep08PostTransactionResponse.ActionRequired
 
@@ -310,6 +324,7 @@ if (actionRequired.actionMethod == "GET") {
 When `actionMethod` is `"POST"`, submit the required fields programmatically using `postAction()`.
 
 ```kotlin
+// asset, response, sep08: from the previous steps of this flow
 // In a coroutine scope
 val actionRequired = response as Sep08PostTransactionResponse.ActionRequired
 
@@ -347,9 +362,9 @@ For asset issuers configuring their accounts for SEP-8, the `AUTH_REQUIRED` and 
 import com.soneso.stellar.sdk.xdr.AccountFlagsXdr
 
 suspend fun configureIssuer() {
-    val issuerKeyPair = KeyPair.fromSecretSeed("SISSUER...")
+    val issuerKeyPair = KeyPair.fromSecretSeed("SBGWSG6BTNCKCOB3DIFBGCVMUPQFYPA2G4O34RMTB343OYPXU5DJDVMN")
     val server = HorizonServer("https://horizon-testnet.stellar.org")
-    val issuerAccount = server.accounts().account(issuerKeyPair.getAccountId())
+    val issuerAccount = server.loadAccount(issuerKeyPair.getAccountId())
 
     val setFlagsTransaction = TransactionBuilder(issuerAccount, Network.TESTNET)
         .addOperation(
@@ -370,6 +385,7 @@ The issuer must also publish the regulated asset in their stellar.toml with `reg
 ## Error Handling
 
 ```kotlin
+// txXdr: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep08.exceptions.*
 
 suspend fun errorHandlingExample() {

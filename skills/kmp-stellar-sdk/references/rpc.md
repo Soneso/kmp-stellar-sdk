@@ -2,18 +2,20 @@
 
 Complete guide to Soroban RPC methods with the KMP Stellar SDK.
 
-All code assumes the standard SDK import and a `SorobanServer` instance:
+All code runs in a `suspend` context and assumes these imports:
 
 ```kotlin
 import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.requests.*
 import com.soneso.stellar.sdk.rpc.responses.*
-import com.soneso.stellar.sdk.xdr.*
+import com.soneso.stellar.sdk.rpc.exception.*
+import com.soneso.stellar.sdk.contract.*
 import com.soneso.stellar.sdk.scval.Scv
-
-val server = SorobanServer("https://soroban-testnet.stellar.org:443")
-// Public: SorobanServer("https://mainnet.sorobanrpc.com")
+import com.soneso.stellar.sdk.xdr.*
 ```
+
+Examples construct the server with `SorobanServer("https://soroban-testnet.stellar.org:443")`; on public network use `SorobanServer("https://mainnet.sorobanrpc.com")`.
 
 `SorobanServer` communicates via JSON-RPC 2.0 over HTTP using the Ktor client. It is separate from `HorizonServer`. It implements `AutoCloseable` -- call `server.close()` when done, or use `server.use { ... }`.
 
@@ -57,6 +59,7 @@ All methods are `suspend` functions and must be called from a coroutine scope.
 Check if the RPC server is operational.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val health = server.getHealth()
 
 if (health.status == "healthy") {
@@ -80,6 +83,7 @@ if (health.status == "healthy") {
 Retrieve network passphrase, protocol version, and friendbot URL.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val network = server.getNetwork()
 
 println("Passphrase: ${network.passphrase}")
@@ -98,6 +102,7 @@ if (network.friendbotUrl != null) {
 Get the most recent ledger known to the server.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val latest = server.getLatestLedger()
 
 println("Sequence: ${latest.sequence}")
@@ -114,6 +119,7 @@ println("Protocol version: ${latest.protocolVersion}")
 Get RPC server and Captive Core version details.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val info = server.getVersionInfo()
 
 println("RPC version: ${info.version}")
@@ -130,6 +136,7 @@ println("Protocol: ${info.protocolVersion}")
 Get fee statistics for recent transactions.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val stats = server.getFeeStats()
 
 val sorobanFee = stats.sorobanInclusionFee
@@ -156,6 +163,8 @@ println("Classic fee p50: ${classicFee.p50} stroops")
 `SorobanServer.getAccount()` fetches account info for transaction building, but it **throws** instead of returning null:
 
 ```kotlin
+// op: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // CORRECT: getAccount() returns TransactionBuilderAccount, throws on not found
 try {
     val account: TransactionBuilderAccount = server.getAccount(accountId)
@@ -191,6 +200,8 @@ try {
 Simulate a transaction to estimate resources and preview results. Required before submitting any Soroban transaction.
 
 ```kotlin
+// sourceAccountId: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Load account for sequence number
 val account = server.getAccount(sourceAccountId)
 
@@ -263,6 +274,9 @@ if (simResponse.error != null) {
 Convenience method that simulates and applies results in one step. This is the **recommended approach** for most use cases.
 
 ```kotlin
+// tx: from the previous steps of this flow
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Simple: simulate + apply results in one call
 val prepared = server.prepareTransaction(tx)
 // prepared is a new Transaction with footprint and fees populated
@@ -279,6 +293,8 @@ val prepared2 = server.prepareTransaction(tx, simulation)
 `prepareTransaction` throws `PrepareTransactionException` if simulation fails:
 
 ```kotlin
+// tx: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 try {
     val prepared = server.prepareTransaction(tx)
     prepared.sign(keyPair)
@@ -292,7 +308,9 @@ try {
 There is also a top-level `assembleTransaction()` function for manual assembly:
 
 ```kotlin
+// tx: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.assembleTransaction
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 
 val simulation = server.simulateTransaction(tx)
 val assembled = assembleTransaction(tx, simulation)
@@ -306,6 +324,8 @@ val assembled = assembleTransaction(tx, simulation)
 Submit a signed transaction to the network. Returns immediately; poll `getTransaction` or use `pollTransaction` for results.
 
 ```kotlin
+// tx: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val prepared = server.prepareTransaction(tx)
 prepared.sign(keyPair)
 
@@ -339,6 +359,8 @@ if (sendResponse.status == SendTransactionStatus.ERROR) {
 Poll for the status and result of a submitted transaction.
 
 ```kotlin
+// txHash: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val txResponse = server.getTransaction(txHash)
 
 when (txResponse.status) {
@@ -382,6 +404,8 @@ when (txResponse.status) {
 Built-in polling method that repeatedly calls `getTransaction` until the transaction reaches a final state (SUCCESS or FAILED) or max attempts is reached. This is the **recommended approach** instead of writing a manual polling loop.
 
 ```kotlin
+// sendResponse: from the previous steps of this flow
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Poll with defaults (30 attempts, 1 second between each)
 val result = server.pollTransaction(sendResponse.hash!!)
 
@@ -425,6 +449,8 @@ val result2 = server.pollTransaction(
 Read specific ledger entries by their XDR-encoded keys. Takes `Collection<LedgerKeyXdr>` (typed XDR objects, not base64 strings).
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Build a ledger key for contract data
 val ledgerKey = LedgerKeyXdr.ContractData(
     LedgerKeyContractDataXdr(
@@ -481,6 +507,8 @@ Each `LedgerEntryResult` has:
 **Account entry example:**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Build a ledger key for an account entry
 val accountLedgerKey = LedgerKeyXdr.Account(
     LedgerKeyAccountXdr(
@@ -515,6 +543,8 @@ if (!accountResponse.entries.isNullOrEmpty()) {
 Convenience method to read a single contract data entry.
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val entry = server.getContractData(
     contractId = contractId,
     key = Scv.toSymbol("counter"),
@@ -554,6 +584,7 @@ if (entry != null) {
 Retrieve a paginated list of transactions from ledger history.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val request = GetTransactionsRequest(
     startLedger = 1000,
     pagination = GetTransactionsRequest.Pagination(limit = 50)
@@ -592,6 +623,7 @@ Each `TransactionInfo` has: `status` (TransactionStatus -- SUCCESS or FAILED), `
 Retrieve a paginated list of ledgers from ledger history.
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val request = GetLedgersRequest(
     startLedger = 1000,
     pagination = GetLedgersRequest.Pagination(limit = 10)
@@ -623,6 +655,8 @@ Each `LedgerInfo` has: `hash`, `sequence`, `ledgerCloseTime`, `headerXdr`, `meta
 Fetch the balance of a Stellar Asset Contract (SAC) for a given contract address.
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 val balanceResponse = server.getSACBalance(
     contractId = contractId,
     asset = AssetTypeNative,
@@ -656,6 +690,8 @@ Retrieve contract events within a ledger range with optional filters.
 
 ```kotlin
 import com.soneso.stellar.sdk.rpc.requests.GetEventsRequest
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 
 // Get events from a specific contract
 val filter = GetEventsRequest.EventFilter(
@@ -736,6 +772,7 @@ if (response.cursor != null) {
 `SorobanServer` includes convenience methods for loading contract bytecode and metadata:
 
 ```kotlin
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 // Load contract bytecode by deployed contract ID
 val codeEntry: ContractCodeEntryXdr? = server.loadContractCodeForContractId(contractId)
 if (codeEntry != null) {
@@ -774,9 +811,11 @@ For full introspection details (enumerating parameters, UDTs, events), see [Soro
 `SorobanServer` methods throw exceptions instead of returning error response objects:
 
 ```kotlin
+// tx: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
+val server = SorobanServer("https://soroban-testnet.stellar.org:443")
 
 try {
     val health = server.getHealth()

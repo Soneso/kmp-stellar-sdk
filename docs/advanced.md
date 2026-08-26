@@ -2,6 +2,24 @@
 
 > This guide covers complex scenarios and production patterns using the Stellar KMP SDK. It assumes you're familiar with [Getting Started](getting-started.md), [Demo App](demo-app.md), [Architecture](architecture.md), and [SDK Usage Examples](sdk-usage-examples.md).
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+import com.soneso.stellar.sdk.horizon.requests.*
+import com.soneso.stellar.sdk.horizon.responses.*
+import com.soneso.stellar.sdk.horizon.exceptions.*
+import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.responses.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
+import com.soneso.stellar.sdk.Asset
+import com.soneso.stellar.sdk.Price
+import com.soneso.stellar.sdk.Claimant
+```
+
 ## Table of Contents
 
 1. [Advanced Contract Operations](#advanced-contract-operations)
@@ -33,17 +51,20 @@ The SDK provides the `Auth.Signer` interface for custom signing logic:
 
 ```kotlin
 import com.soneso.stellar.sdk.Auth
-import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.crypto.getSha256Crypto
 import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
+import com.soneso.stellar.sdk.xdr.XdrWriter
 
 // Implement custom signer for hardware wallet integration
 class HardwareWalletSigner(
     private val publicKey: String,
-    private val deviceInterface: MyHardwareWallet
+    private val deviceInterface: MyHardwareWallet // your device integration
 ) : Auth.Signer {
     override suspend fun sign(preimage: HashIDPreimageXdr): Auth.Signature {
-        // Hash the preimage as required by protocol
-        val payload = Util.hash(preimage.toXdrByteArray())
+        // Hash the XDR-encoded preimage as required by protocol
+        val writer = XdrWriter()
+        preimage.encode(writer)
+        val payload = getSha256Crypto().hash(writer.toByteArray())
 
         // Request signature from hardware device
         val signature = deviceInterface.signPayload(payload)
@@ -53,7 +74,7 @@ class HardwareWalletSigner(
 }
 
 // Use custom signer with authorization
-val signer = HardwareWalletSigner("G...", hardwareDevice)
+val signer = HardwareWalletSigner("GBXHUHG5FGYLPD6RHL2MKWMP572O6KUXCZXDZJXS4T57ZTMAKBN7DWXN", hardwareDevice)
 val signedEntry = Auth.authorizeEntry(
     entry = authEntryFromSimulation,
     signer = signer,
@@ -83,6 +104,7 @@ to the legacy `Address` arm (`useUpgradedAuth = false`, `authV2 = false`).
 whatever the arm:
 
 ```kotlin
+// aliceKeyPair, authEntryFromSimulation, currentLedger: from the previous steps of this flow
 val signed = Auth.authorizeEntry(
     entry = authEntryFromSimulation,
     signer = aliceKeyPair,
@@ -98,6 +120,7 @@ legacy entries. Pass `false` to request legacy `Address` entries — required on
 a network below Protocol 27, where V2 entries invalidate the transaction:
 
 ```kotlin
+// transaction: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.SorobanServer
 
 val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -116,6 +139,7 @@ that returns legacy `Address` entries: `Auth.authorizeInvocation` builds the
 address-bound `AddressV2` arm by default:
 
 ```kotlin
+// aliceKeyPair, currentLedger, invocationFromSimulation: from the previous steps of this flow
 val signed = Auth.authorizeInvocation(
     signer = aliceKeyPair,
     validUntilLedgerSeq = currentLedger + 100L,
@@ -133,6 +157,7 @@ assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and
 `DelegateDescriptor`, then sign each node with `AuthOptions(forAddress = ...)`:
 
 ```kotlin
+// authEntryFromSimulation, currentLedger, delegateKeyPair: from the previous steps of this flow
 import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.DelegateDescriptor
 
@@ -168,6 +193,8 @@ account, its `__check_auth` runs only in the enforcing pass, and the storage it
 reads (plus any delegate account entries) must be in the footprint.
 
 ```kotlin
+// operation, signedEntries, sorobanServer, sourceKeyPair: from the previous steps of this flow
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 val signedOp = InvokeHostFunctionOperation(
     hostFunction = operation.hostFunction,
     auth = signedEntries
@@ -197,6 +224,7 @@ Use `buildInvoke` for complex multi-signature scenarios:
 ```kotlin
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.xdr.*
+val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 
 // Step 1: Build transaction without signing (for multi-sig coordination)
 val assembled = contractClient.buildInvoke<Map<String, Any>>(
@@ -252,6 +280,7 @@ trees, reports every unsigned delegate node alongside the top-level address.
 delegate node matches the signer:
 
 ```kotlin
+// aliceKeyPair, delegateKeyPair, invokerAccount, invokerKeyPair, swapClient, swapParams: from the previous steps of this flow
 val assembled = swapClient.buildInvoke<Unit>(
     functionName = "swap",
     arguments = swapParams,
@@ -365,7 +394,7 @@ import com.soneso.stellar.sdk.contract.SorobanContractParser
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.contract.SorobanContractParserException
 
-val bytecode: ByteArray = // load .wasm file bytes
+val bytecode: ByteArray = java.io.File("contract.wasm").readBytes() // JVM; use your platform's file APIs elsewhere
 
 try {
     val contractInfo: SorobanContractInfo = SorobanContractParser.parseContractByteCode(bytecode)
@@ -393,6 +422,7 @@ try {
 `SorobanContractInfo` provides typed accessors for each spec entry kind:
 
 ```kotlin
+// contractInfo: from the previous steps of this flow
 // Exported functions
 val functions: List<SCSpecFunctionV0Xdr> = contractInfo.funcs
 for (func in functions) {
@@ -541,7 +571,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.secureRandomBytes
 
 suspend fun predictContractId() {
-    val deployer = Address("GABC...")
+    val deployer = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     val salt = secureRandomBytes(32)
 
     val futureContractId = Address.deriveContractId(deployer, salt, Network.TESTNET)
@@ -562,16 +592,29 @@ import com.soneso.stellar.sdk.TransactionPreconditions
 import com.soneso.stellar.sdk.TimeBounds
 import com.soneso.stellar.sdk.LedgerBounds
 import com.soneso.stellar.sdk.SignerKey
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val network = Network.TESTNET
+val backupSigner = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+val payment = PaymentOperation(
+    destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
+    asset = AssetTypeNative,
+    amount = "10"
+)
+@OptIn(ExperimentalTime::class)
+val nowSeconds = Clock.System.now().epochSeconds
 
 // Complex preconditions for time-locked transactions
 val preconditions = TransactionPreconditions(
     timeBounds = TimeBounds(
-        minTime = Clock.System.now().epochSeconds,
-        maxTime = Clock.System.now().epochSeconds + 3600
+        minTime = nowSeconds,
+        maxTime = nowSeconds + 3600
     ),
     ledgerBounds = LedgerBounds(
-        minLedger = 1000000U,
-        maxLedger = 1001000U
+        minLedger = 1000000,
+        maxLedger = 1001000
     ),
     minSequenceNumber = account.sequenceNumber + 1,
     minSequenceAge = 60, // 60 seconds minimum age
@@ -592,6 +635,7 @@ val transaction = TransactionBuilder(account, network)
 Increase fees for stuck transactions:
 
 ```kotlin
+// feePayerAccount, feePayerKeypair, horizonServer, loadTransactionFromDb: from the previous steps of this flow
 import com.soneso.stellar.sdk.FeeBumpTransactionBuilder
 import com.soneso.stellar.sdk.FeeBumpTransaction
 
@@ -611,7 +655,7 @@ val feeBumpTx = FeeBumpTransactionBuilder(originalTx)
 feeBumpTx.sign(feePayerKeypair)
 
 // Submit fee bump transaction
-val response = horizonServer.submitTransaction(feeBumpTx)
+val response = horizonServer.submitTransaction(feeBumpTx.toEnvelopeXdrBase64())
 ```
 
 ### Complex Multi-Operation Transactions
@@ -619,46 +663,56 @@ val response = horizonServer.submitTransaction(feeBumpTx)
 Build transactions with multiple interdependent operations:
 
 ```kotlin
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val network = Network.TESTNET
+@OptIn(ExperimentalTime::class)
+val nowSeconds = Clock.System.now().epochSeconds
+val partyA = "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR"
+val partyB = "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U"
+val usdcIssuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val eurIssuer = "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX"
+val usdIssuer = "GBBHQ7H4V6RRORKYLHTCAWP6MOHNORRFJSDPXDFYDGJB2LPZUFPXUEW3"
 
 // Atomic swap with multiple operations
 val atomicSwap = TransactionBuilder(account, network)
     // Create claimable balance for party A
     .addOperation(
-        CreateClaimableBalanceOperation.Builder(
-            asset = AssetTypeCreditAlphaNum4("USDC", issuer),
+        CreateClaimableBalanceOperation(
+            asset = AssetTypeCreditAlphaNum4("USDC", usdcIssuer),
             amount = "100.00",
             claimants = listOf(
                 Claimant(
                     destination = partyB,
                     predicate = ClaimPredicate.And(
                         left = ClaimPredicate.Not(
-                            ClaimPredicate.BeforeAbsoluteTime(Clock.System.now().epochSeconds)
+                            ClaimPredicate.BeforeAbsoluteTime(nowSeconds)
                         ),
-                        right = ClaimPredicate.BeforeAbsoluteTime(Clock.System.now().epochSeconds + 86400)
+                        right = ClaimPredicate.BeforeAbsoluteTime(nowSeconds + 86400)
                     )
                 )
             )
-        ).build()
+        )
     )
     // Path payment from party B to party A
     .addOperation(
-        PathPaymentStrictReceiveOperation.Builder(
-            sendAsset = AssetTypeNative(),
+        PathPaymentStrictReceiveOperation(
+            sendAsset = AssetTypeNative,
             sendMax = "50.00",
             destination = partyA,
             destAsset = AssetTypeCreditAlphaNum4("EUR", eurIssuer),
             destAmount = "45.00",
             path = listOf(AssetTypeCreditAlphaNum4("USD", usdIssuer))
-        ).setSourceAccount(partyB).build()
+        ).apply { sourceAccount = partyB }
     )
     // Manage data for swap metadata
     .addOperation(
-        ManageDataOperation.Builder(
+        ManageDataOperation(
             name = "swap_id",
-            // Application-specific: Use platform-specific UUID or timestamp
-            value = "swap_id_${System.currentTimeMillis()}".toByteArray()
-        ).build()
+            value = "swap-2026-08-25".encodeToByteArray() // your app's swap identifier
+        )
     )
     .setBaseFee(300) // Higher fee for complex transaction
     .setTimeout(300)
@@ -682,18 +736,16 @@ fun buildCustomContractData(
     contractId: String,
     key: SCValXdr,
     value: SCValXdr
-): LedgerEntryXdr {
+): LedgerEntryDataXdr {
     val contractData = ContractDataEntryXdr(
         ext = ExtensionPointXdr.Void,
-        contract = SCAddressXdr.Contract(
-            HashXdr(Address(contractId).contractIdBytes)
-        ),
+        contract = Address(contractId).toSCAddress(),
         key = key,
         durability = ContractDataDurabilityXdr.PERSISTENT,
-        val_ = value
+        `val` = value
     )
 
-    return LedgerEntryXdr.ContractData(contractData)
+    return LedgerEntryDataXdr.ContractData(contractData)
 }
 
 // Parse XDR from base64
@@ -710,24 +762,29 @@ fun parseTransactionMeta(metaXdr: String): TransactionMetaXdr {
 Convert between native types and Soroban contract values:
 
 ```kotlin
+// toInt, toLong: from the previous steps of this flow
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.Address
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Convert native types to SCVal
 val scMap = Scv.toMap(linkedMapOf(
     Scv.toSymbol("name") to Scv.toString("MyToken"),
     Scv.toSymbol("decimals") to Scv.toUint32(7U),
-    Scv.toSymbol("admin") to Scv.toAddress("G...")
+    Scv.toSymbol("admin") to Scv.toAddress(
+        Address("GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE").toSCAddress()
+    )
 ))
 
 val scVec = Scv.toVec(listOf(
-    Scv.toInt128(BigInteger.valueOf(1000000)),
+    Scv.toInt128(BigInteger.fromLong(1000000)),
     Scv.toBytes(byteArrayOf(1, 2, 3, 4))
 ))
 
 // Convert SCVal to native types
 fun parseContractResult(scVal: SCValXdr): Any? {
     return when (scVal) {
-        is SCValXdr.Bool -> scVal.value
+        is SCValXdr.B -> scVal.value
         is SCValXdr.I32 -> scVal.value
         is SCValXdr.I64 -> scVal.value
         is SCValXdr.U32 -> scVal.value.toInt()
@@ -882,7 +939,7 @@ class TransactionRetryManager(
 
         repeat(maxAttempts) { attempt ->
             try {
-                return@coroutineScope horizonServer.submitTransaction(transaction)
+                return@coroutineScope horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             } catch (e: BadRequestException) {
                 when (e.problem?.extras?.resultCodes?.transaction) {
                     "tx_bad_seq" -> {
@@ -947,7 +1004,7 @@ class ParallelOperationsExecutor(
                             .build()
 
                         tx.sign(payment.signer)
-                        horizonServer.submitTransaction(tx)
+                        horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
                     }
                 }
             }
@@ -969,7 +1026,7 @@ class StreamProcessor(private val horizonServer: HorizonServer) {
         val eventSource = horizonServer.transactions()
             .forAccount(account)
             .cursor("now")
-            .stream(object : EventListener<TransactionResponse> {
+            .stream(TransactionResponse.serializer(), object : EventListener<TransactionResponse> {
                 override fun onEvent(transaction: TransactionResponse) {
                     // Process in flow - use trySend() in callbackFlow
                     trySend(transaction)
@@ -1005,7 +1062,7 @@ class BatchSubmitter(
             val chunkResults = chunk.map { tx ->
                 async {
                     try {
-                        val response = horizonServer.submitTransaction(tx)
+                        val response = horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
                         SubmissionResult.Success(tx.hash(), response)
                     } catch (e: Exception) {
                         SubmissionResult.Failure(tx.hash(), e)
@@ -1064,7 +1121,8 @@ class SecureKeyManager {
 Coordinate multi-signature transactions securely:
 
 ```kotlin
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.time.Duration.Companion.hours
 
 class MultiSigCoordinator(
@@ -1123,15 +1181,13 @@ suspend fun authorizeCustomInvocation(
 ): SorobanAuthorizationEntryXdr {
     val invocation = SorobanAuthorizedInvocationXdr(
         function = SorobanAuthorizedFunctionXdr.ContractFn(
-            SorobanAuthorizedContractFunctionXdr(
-                contractAddress = SCAddressXdr.Contract(
-                    HashXdr(Address(contractId).contractIdBytes)
-                ),
-                functionName = Scv.toSymbol(functionName),
-                args = SCVecXdr(listOf(args))
+            InvokeContractArgsXdr(
+                contractAddress = Address(contractId).toSCAddress(),
+                functionName = SCSymbolXdr(functionName),
+                args = listOf(args)
             )
         ),
-        subInvocations = SCVecXdr(emptyList())
+        subInvocations = emptyList()
     )
 
     // Get current ledger sequence from network
@@ -1171,7 +1227,7 @@ class RobustStreamManager(
                 horizonServer.transactions()
                     .forAccount(account)
                     .cursor(cursor)
-                    .stream(object : EventListener<TransactionResponse> {
+                    .stream(TransactionResponse.serializer(), object : EventListener<TransactionResponse> {
                         override fun onEvent(transaction: TransactionResponse) {
                             cursor = transaction.pagingToken
                             onTransaction(transaction)
@@ -1341,6 +1397,7 @@ suspend fun customPolling() {
 Query Soroban contract events with sophisticated filtering for monitoring and debugging:
 
 ```kotlin
+// sym, u32: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.requests.GetEventsRequest
 import com.soneso.stellar.sdk.scval.Scv
 
@@ -1354,7 +1411,7 @@ suspend fun advancedEventQuerying() {
         filters = listOf(
             GetEventsRequest.EventFilter(
                 type = GetEventsRequest.EventFilterType.CONTRACT,  // Optional: SYSTEM, CONTRACT, or null for all
-                contractIds = listOf("CDZJ..."),  // Optional: up to 5 contract IDs
+                contractIds = listOf("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"),  // Optional: up to 5 contract IDs
                 topics = null  // No topic filtering
             )
         ),
@@ -1374,7 +1431,7 @@ suspend fun advancedEventQuerying() {
         filters = listOf(
             GetEventsRequest.EventFilter(
                 type = null,  // null matches all types (SYSTEM, CONTRACT, DIAGNOSTIC)
-                contractIds = listOf("CDZJ..."),
+                contractIds = listOf("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"),
                 topics = listOf(
                     // Example 1: Match events with "COUNTER" as first topic and any remaining topics
                     listOf(counterTopic, "**"),  // "**" matches zero or more segments (end only)
@@ -1437,7 +1494,9 @@ suspend fun advancedEventQuerying() {
 Build Soroban transaction data for advanced resource configuration:
 
 ```kotlin
-import com.soneso.stellar.sdk.SorobanDataBuilder
+import com.soneso.stellar.sdk.rpc.SorobanDataBuilder
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val network = Network.TESTNET
 
 // Use when you need manual control over transaction resources
 // (most users should rely on automatic simulation)
@@ -1475,6 +1534,8 @@ Different platforms have different concurrency models. Here are platform-optimiz
 #### JVM (Android/Desktop)
 
 ```kotlin
+import kotlinx.coroutines.runBlocking
+
 // On JVM platforms, use runBlocking for top-level calls
 fun jvmNetworkExample() {
     runBlocking {
@@ -1489,6 +1550,7 @@ fun jvmNetworkExample() {
 #### JavaScript (Browser/Node.js)
 
 ```kotlin
+// console: from the previous steps of this flow
 // In JavaScript, all operations are inherently async
 suspend fun jsNetworkExample() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -1549,8 +1611,8 @@ class ContractIntegrationTest {
         val destination = KeyPair.random()
 
         // Fund accounts
-        FriendBot.fundAccount(source.accountId)
-        FriendBot.fundAccount(destination.accountId)
+        FriendBot.fundTestnetAccount(source.accountId)
+        FriendBot.fundTestnetAccount(destination.accountId)
 
         // Deploy test contract
         val contractClient = ContractClient.forContract(

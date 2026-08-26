@@ -11,6 +11,14 @@ Stellar Web Authentication provides secure authentication for wallets and applic
 - Prove wallet identity to receive premium service benefits
 - Enable multi-signature authentication workflows
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep10.*
+import com.soneso.stellar.sdk.sep.sep10.exceptions.*
+```
+
 ## Basic Authentication
 
 ```kotlin
@@ -34,6 +42,9 @@ val authToken = webAuth.jwtToken(
 ## Using the JWT Token
 
 ```kotlin
+// httpClient, signers: from the previous steps of this flow
+val clientAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Authenticate and get JWT token
 val authToken = webAuth.jwtToken(clientAccountId, signers)
 
@@ -56,8 +67,10 @@ println("Token expires at: ${authToken.exp}")
 ## Muxed Account Authentication
 
 ```kotlin
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Authenticate with muxed account (M... address)
-val muxedAccountAddress = "MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITKNOG"
+val muxedAccountAddress = "MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6"
 
 val authToken = webAuth.jwtToken(
     clientAccountId = muxedAccountAddress,
@@ -68,6 +81,9 @@ val authToken = webAuth.jwtToken(
 ## Memo-Based Sub-Account Authentication
 
 ```kotlin
+// custodialAccountId: from the previous steps of this flow
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // For custodial services using memos to identify users
 val authToken = webAuth.jwtToken(
     clientAccountId = custodialAccountId,
@@ -84,6 +100,9 @@ println("Memo: ${authToken.memo}")
 ## Client Domain Verification
 
 ```kotlin
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Prove your wallet identity to receive premium benefits from the anchor
 // clientDomainSeed from your wallet's stellar.toml SIGNING_KEY
 val clientDomainKeyPair = KeyPair.fromSecretSeed(clientDomainSeed)
@@ -102,6 +121,14 @@ println("Client Domain: ${authToken.clientDomain}")
 ## Client Domain with External Signing (Wallet Backend)
 
 ```kotlin
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
+
 // When wallet domain key is managed by your backend server
 val signingDelegate = ClientDomainSigningDelegate { transactionXdr ->
     // Send transaction to your wallet's backend server for signing
@@ -127,6 +154,8 @@ val authToken = webAuth.jwtToken(
 ## Multi-Signature Authentication
 
 ```kotlin
+// multiSigAccountId: from the previous steps of this flow
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Authenticate with multiple signers for multi-sig account
 val signer1 = KeyPair.random()
 val signer2 = KeyPair.random()
@@ -143,6 +172,8 @@ val authToken = webAuth.jwtToken(
 Most developers should use `jwtToken()` for authentication. Use the low-level API only when you need custom validation logic, multi-step user approval flows, or integration with external signing systems.
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // Manual control over each authentication step
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
@@ -168,6 +199,9 @@ val authToken = webAuth.sendSignedChallenge(signedChallenge)
 ## Error Handling
 
 ```kotlin
+// signers: from the previous steps of this flow
+val clientAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 try {
     val authToken = webAuth.jwtToken(clientAccountId, signers)
 } catch (e: ChallengeRequestException) {

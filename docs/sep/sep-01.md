@@ -10,6 +10,13 @@ Stellar TOML allows organizations to publish information about their Stellar int
 - Find supported currencies and their properties
 - Locate service endpoints for authentication, transfers, and quotes
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep01.*
+```
+
 ## Fetching stellar.toml from a Domain
 
 ```kotlin
@@ -76,7 +83,7 @@ stellarToml.currencies?.forEach { currency ->
 ```kotlin
 // Verify an account belongs to a domain
 val stellarToml = StellarToml.fromDomain("example.com")
-val accountToVerify = "GXYZ..."
+val accountToVerify = "GCVSEBHB6CTMEHUHIUY4DDFMWQ7PJTHFZGOK2JUD5EG2ARNVS6S22E3K"
 
 val isVerified = stellarToml.generalInformation.accounts.contains(accountToVerify)
 if (isVerified) {

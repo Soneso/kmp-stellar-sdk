@@ -7,6 +7,14 @@
 
 Use SEP-06 when you can collect all user information programmatically. Use SEP-24 (`references/sep-24.md`) when the anchor requires an interactive KYC flow.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep06.*
+import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Service Initialization](#1-service-initialization)
@@ -92,13 +100,14 @@ val sep06 = Sep06Service.fromDomain(
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
 // Optional: pass JWT and/or language code
 val info = sep06.info(jwt = jwtToken, language = "en")
 // Or without arguments:
-val info = sep06.info()
+val defaultInfo = sep06.info()
 ```
 
 Signature:
@@ -268,6 +277,8 @@ Sep06DepositRequest(
 import com.soneso.stellar.sdk.sep.sep06.Sep06DepositRequest
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -336,6 +347,8 @@ try {
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep06.Sep06DepositRequest
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -399,6 +412,8 @@ Sep06DepositExchangeRequest(
 import com.soneso.stellar.sdk.sep.sep06.Sep06DepositExchangeRequest
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -462,6 +477,8 @@ Sep06WithdrawRequest(
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06WithdrawRequest
 import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -555,6 +572,7 @@ Sep06WithdrawExchangeRequest(
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06WithdrawExchangeRequest
 import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -599,6 +617,7 @@ Sep06FeeRequest(
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep06.Sep06FeeRequest
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 val info = sep06.info()
@@ -644,6 +663,8 @@ Sep06TransactionsRequest(
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06TransactionsRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -691,6 +712,7 @@ At least one of `id`, `stellarTransactionId`, or `externalTransactionId` must be
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06TransactionRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -773,6 +795,7 @@ Sep06PatchTransactionRequest(
 import com.soneso.stellar.sdk.sep.sep06.Sep06PatchTransactionRequest
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06TransactionRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep06 = Sep06Service.fromDomain("anchor.example.com")
 
@@ -967,6 +990,7 @@ kind?.isWithdrawal() // false
 Six exception types are thrown for different error conditions. All extend `Sep06Exception`.
 
 ```kotlin
+// request: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep06.Sep06Service
 import com.soneso.stellar.sdk.sep.sep06.Sep06DepositRequest
 import com.soneso.stellar.sdk.sep.sep06.exceptions.*
@@ -1029,7 +1053,7 @@ try {
 
 **WRONG: KMP SDK uses `String` for amount and fee fields, not `Double`**
 
-In the Flutter SDK, some response fields use `double`. In the KMP SDK, amounts and fees are consistently `String?` in both requests and responses.
+Amounts and fees are consistently `String?` in both requests and responses; none of them are numeric types.
 
 ```kotlin
 // WRONG: treating response amounts as numeric types
@@ -1042,10 +1066,11 @@ val amountNum: Double? = response.feeFixed?.toDoubleOrNull()
 
 **WRONG: KMP uses `Boolean` for `claimableBalanceSupported`, not `String`**
 
-In the Flutter SDK, `claimableBalanceSupported` is a `String?` ("true"/"false"). In the KMP SDK, it is `Boolean?`.
+`claimableBalanceSupported` is a `Boolean?`, not a string flag.
 
 ```kotlin
-// WRONG (Flutter pattern): passing as string
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// WRONG: passing as string
 Sep06DepositRequest(assetCode = "USD", account = id, jwt = jwt,
     claimableBalanceSupported = "true")  // compile error
 
@@ -1110,11 +1135,13 @@ info.withdraw?.get("USDC")?.types?.forEach { (typeName, withdrawType) ->
 **WRONG: treating `patchTransaction` response as a typed SDK object**
 
 ```kotlin
+import io.ktor.client.statement.HttpResponse
+
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 // WRONG: patchTransaction returns Ktor HttpResponse, not a typed object
 val r: Sep06DepositResponse = sep06.patchTransaction(patchRequest) // compile error
 
 // CORRECT: returns io.ktor.client.statement.HttpResponse -- check status
-import io.ktor.client.statement.HttpResponse
 val response: HttpResponse = sep06.patchTransaction(patchRequest)
 println(response.status.value) // 200 = success
 ```
@@ -1122,7 +1149,8 @@ println(response.status.value) // 200 = success
 **WRONG: confusing `Sep06TransactionsRequest.noOlderThan` type with `DateTime`**
 
 ```kotlin
-// WRONG (Flutter pattern): passing a DateTime object
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// WRONG: passing a DateTime object
 Sep06TransactionsRequest(
     assetCode = "USD", account = id, jwt = jwt,
     noOlderThan = Clock.System.now()  // compile error -- expects String
@@ -1138,6 +1166,7 @@ Sep06TransactionsRequest(
 **WRONG: `jwt` is required (not optional) on deposit, withdraw, and their exchange variants**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: jwt is a required parameter in Sep06DepositRequest
 Sep06DepositRequest(assetCode = "USD", account = id)  // compile error -- missing jwt
 
@@ -1148,6 +1177,7 @@ Sep06DepositRequest(assetCode = "USD", account = id, jwt = jwtToken)
 **WRONG: `type` is required on `Sep06WithdrawRequest` and `Sep06WithdrawExchangeRequest`**
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: type is required, not optional (even though it is deprecated)
 Sep06WithdrawRequest(assetCode = "USDC", jwt = jwt)  // compile error -- missing type
 

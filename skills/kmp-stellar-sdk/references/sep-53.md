@@ -4,6 +4,12 @@
 **Prerequisites:** None
 **SDK Class:** `KeyPair`
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
+
 ## Overview
 
 SEP-53 enables proof-of-ownership and off-chain authentication by defining a standard signing procedure for arbitrary messages. The four methods are instance methods on `KeyPair`:
@@ -22,6 +28,7 @@ All four methods are `suspend` functions. `canSign()` is not a suspend function.
 ## Quick Start
 
 ```kotlin
+// bytesToHex: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -137,6 +144,7 @@ suspend fun verifyString() {
 ### Verify Binary Data
 
 ```kotlin
+// hexToBytes: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -203,7 +211,7 @@ suspend fun serializationExample() {
 
 ## Cross-SDK Interoperability
 
-Signatures produced by the KMP SDK are compatible with other Stellar SDKs (Java, Flutter, Python, etc.) implementing SEP-53. To verify a signature received from another SDK:
+Signatures produced by the KMP SDK are compatible with other Stellar SDKs implementing SEP-53, such as the Java and Python SDKs. To verify a signature received from another SDK:
 
 ```kotlin
 import com.soneso.stellar.sdk.KeyPair
@@ -231,7 +239,7 @@ SEP-53 defines the signing procedure as:
 2. **Hash:** SHA-256 hash the concatenated payload
 3. **Sign:** Ed25519 sign the hash with the private key
 
-```
+```text
 signature = Ed25519.sign(privateKey, SHA256("Stellar Signed Message:\n" + message))
 ```
 
@@ -241,7 +249,7 @@ The prefix provides domain separation — message signatures cannot be confused 
 
 These vectors from the SEP-53 specification can be used to validate interoperability:
 
-```
+```text
 Secret seed: SAKICEVQLYWGSOJS4WW7HZJWAHZVEEBS527LHK5V4MLJALYKICQCJXMW
 Account ID:  GBXFXNDLV4LSWA4VB7YIL5GBD7BVNR22SGBTDKMO2SBZZHDXSKZYCP7L
 
@@ -278,6 +286,7 @@ suspend fun errorHandling() {
 ## Common Pitfalls
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: using signMessageString — this method does NOT exist in the KMP SDK
 val sig = keyPair.signMessageString("Hello") // compilation error
 
@@ -304,6 +313,7 @@ val good = verifier.verifyMessage("Hello", sig)
 ```
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: using sign() directly for message signing (bypasses the SEP-53 prefix/hash)
 val sig = keyPair.sign("Hello".encodeToByteArray())
 
@@ -312,6 +322,7 @@ val sig = keyPair.signMessage("Hello")
 ```
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: assuming verifyMessage throws on invalid signature
 try {
     keyPair.verifyMessage("msg", badSignature) // does NOT throw
@@ -323,6 +334,7 @@ if (!valid) { /* handle invalid signature */ }
 ```
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: calling signMessage or verifyMessage outside a coroutine/suspend context
 // They are suspend functions and must be called from a coroutine or another suspend function
 val sig = keyPair.signMessage("Hello") // compile error outside suspend context

@@ -6,7 +6,16 @@
 [![codecov](https://codecov.io/gh/Soneso/kmp-stellar-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/Soneso/kmp-stellar-sdk)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Soneso/kmp-stellar-sdk)
 
-A comprehensive Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
+A Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
+
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.responses.*
+```
 
 ## Platform Support
 
@@ -58,7 +67,7 @@ See the [demo app](demo/README.md) for examples.
 
 ## Features
 
-The SDK provides comprehensive Stellar functionality:
+The SDK provides:
 
 - **Cryptography** - Ed25519 keypairs, signing, verification with production-ready libraries (BouncyCastle, libsodium)
 - **Transaction Building** - TransactionBuilder with fluent API, all 27 Stellar operations, memos, time bounds, multi-signature support
@@ -149,8 +158,8 @@ import com.soneso.stellar.sdk.horizon.HorizonServer
 
 suspend fun sendPayment() {
     val server = HorizonServer("https://horizon-testnet.stellar.org")
-    val sourceKeypair = KeyPair.fromSecretSeed("SXXX...")
-    val sourceAccount = server.accounts().account(sourceKeypair.getAccountId())
+    val sourceKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+    val sourceAccount = server.loadAccount(sourceKeypair.getAccountId())
 
     val destination = "GDUKMGUGDZQK6YHYA5Z6AY2G4XDSZPSZ3SW5UN3ARVMO6QSRDWP5YLEX"
 
@@ -173,7 +182,7 @@ suspend fun sendPayment() {
 
 ```kotlin
 import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.rpc.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 
 suspend fun fetchTransactionData() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -206,10 +215,14 @@ The SDK provides a high-level ContractClient API with automatic type conversion:
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.scval.Scv
 
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val amount = "100"
+// accountAddress, fromAddress, keypair, sourceAccount, toAddress, toLong: from the previous steps of this flow
+
 suspend fun callContract() {
     // Load contract spec from network
     val client = ContractClient.forContract(
-        contractId = "CDLZ...",
+        contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
         rpcUrl = "https://soroban-testnet.stellar.org:443",
         network = Network.TESTNET
     )
@@ -243,9 +256,22 @@ suspend fun callContract() {
 
 **Multi-signature workflows** with buildInvoke for manual control:
 ```kotlin
+val amount = "100"
+val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+val rpcUrl = "https://soroban-testnet.stellar.org"
+// getKeypairFor: your app's lookup from signer address to KeyPair
 suspend fun multiSigContractCall() {
     val client = ContractClient.forContract(contractId, rpcUrl, Network.TESTNET)
-    val assembled = client.buildInvoke<String>(...)
+    val assembled = client.buildInvoke<Unit>(
+        functionName = "transfer",
+        arguments = mapOf(
+            "from" to sourceKeypair.getAccountId(),
+            "to" to "GCVSEBHB6CTMEHUHIUY4DDFMWQ7PJTHFZGOK2JUD5EG2ARNVS6S22E3K",
+            "amount" to 10L
+        ),
+        source = sourceKeypair.getAccountId(),
+        signer = null // sign later, after collecting the other signatures
+    )
 
     // Detect and sign for additional signers
     val whoNeedsToSign = assembled.needsNonInvokerSigningBy()
@@ -263,7 +289,7 @@ This repository includes two demo applications that showcase different aspects o
 
 ### SDK Demo
 
-The [demo app](demo/README.md) showcases SDK usage across all platforms with 11 comprehensive features:
+The [demo app](demo/README.md) showcases SDK usage across all platforms with 11 features:
 
 1. **Key Generation** - Generate and manage Ed25519 keypairs
 2. **Fund Testnet Account** - Get free test XLM from Friendbot
@@ -307,7 +333,7 @@ This SDK uses **production-ready, audited cryptographic libraries** on all platf
 - **iOS/macOS**: libsodium (native C interop)
 - **JavaScript**: libsodium-wrappers-sumo (WebAssembly)
 
-All implementations provide constant-time operations, proper memory safety, and comprehensive input validation. No experimental or custom cryptography.
+All implementations provide constant-time operations, proper memory safety, and strict input validation. No experimental or custom cryptography.
 
 ## Testing
 
@@ -336,5 +362,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the f
 - Built with [Kotlin Multiplatform](https://kotlinlang.org/docs/multiplatform.html)
 - Cryptography powered by [BouncyCastle](https://www.bouncycastle.org/), [libsodium](https://libsodium.org/), and [libsodium.js](https://github.com/jedisct1/libsodium.js)
 - Network communication via [Ktor](https://ktor.io/)
-- Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk) and the [Flutter Stellar SDK](https://github.com/Soneso/stellar_flutter_sdk)
+- Inspired by the [Java Stellar SDK](https://github.com/stellar/java-stellar-sdk)
 - Built with [Claude Code](https://claude.com/claude-code) - AI-powered development assistant

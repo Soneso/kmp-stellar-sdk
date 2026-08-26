@@ -2,6 +2,12 @@
 
 This guide covers JavaScript-specific setup and usage for both Browser and Node.js environments.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
+
 ## Table of Contents
 
 - [Platform Overview](#platform-overview)
@@ -176,7 +182,7 @@ fun main() = runBlocking {
 
     try {
         // Fund on testnet
-        val funded = FriendBot.fundAccount(
+        val funded = FriendBot.fundTestnetAccount(
             keypair.getAccountId(),
             Network.TESTNET
         )

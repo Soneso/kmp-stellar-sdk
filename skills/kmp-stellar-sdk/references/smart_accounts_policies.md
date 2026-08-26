@@ -5,13 +5,12 @@ Signers, context rules, policies, and multi-signer operations for an existing sm
 Standard imports:
 
 ```kotlin
+import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import com.soneso.stellar.sdk.smartaccount.core.*
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.*
 import com.ionspin.kotlin.bignum.integer.BigInteger
 ```
 
@@ -23,7 +22,7 @@ For a flat signature index of every public class referenced here, see [api_refer
 
 On-chain authorization for an OZ smart account is arranged in three layers:
 
-```
+```text
 Smart Account (C-address)
   |
   +-- Context Rule #0 (Default, created at deploy)
@@ -62,7 +61,7 @@ Kit sub-managers covered here:
 // CORRECT: kit.signerManager  — property access (no parentheses)
 ```
 
-Rule limits: 15 signers, 5 policies, 20-byte name. Full `OZConstants` table: [smart_accounts.md — Contract Limits](./smart_accounts.md#contract-limits).
+Rule limits: 15 signers, 5 policies, 20-byte name. Full `OZConstants` table: [smart_accounts.md — Contract Limits](./smart_accounts.md#limits-and-defaults).
 
 ---
 
@@ -168,7 +167,7 @@ val accountRes = kit.signerManager.addDelegated(
 // Add another contract as a signer (custom account contract)
 val contractRes = kit.signerManager.addDelegated(
     contextRuleId = 0u,
-    address = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH"
+    address = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
 ```
 
@@ -220,7 +219,7 @@ val rule  = rules.first { it.id == 0u }
 
 // ParsedContextRule.signers and ParsedContextRule.signerIds are positionally aligned
 val idx = rule.signers.indexOfFirst { signer ->
-    signer is DelegatedSigner && signer.address == "GA7QYNF7..."
+    signer is DelegatedSigner && signer.address == "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 }
 if (idx >= 0) {
     kit.signerManager.removeSigner(
@@ -292,19 +291,19 @@ sealed class ContextRuleType {
 
 On-chain SCVal encoding:
 
-```
+```text
 Default         ->  Vec([Symbol("Default")])
 CallContract    ->  Vec([Symbol("CallContract"), Address(contractAddress)])
 CreateContract  ->  Vec([Symbol("CreateContract"), Bytes(wasmHash)])
 ```
 
 ```kotlin
-// WRONG: ContextRuleType.CallContract.new("CBCD...")   — no such syntax
-// CORRECT: ContextRuleType.CallContract("CBCD...")     — data-class constructor
+// WRONG: ContextRuleType.CallContract.new("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")   — no such syntax
+// CORRECT: ContextRuleType.CallContract("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")     — data-class constructor
 
-// WRONG: ContextRuleType.CallContract(Address("CBCD..."))
+// WRONG: ContextRuleType.CallContract(Address("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"))
 //        — parameter is a String (C-address), NOT an Address object
-// CORRECT: ContextRuleType.CallContract("CBCD...")
+// CORRECT: ContextRuleType.CallContract("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")
 
 // WRONG: ContextRuleType.CreateContract("abcd...")     — parameter is ByteArray, not hex string
 // CORRECT: ContextRuleType.CreateContract(wasmHashBytes)  — raw 32-byte ByteArray
@@ -316,7 +315,7 @@ The `OZBuilders` helpers wrap construction with validation:
 
 ```kotlin
 val defaultCtx = OZBuilders.createDefaultContextType()                  // Default
-val callCtx    = OZBuilders.createCallContractContextType("CBCD...")    // validates C-address
+val callCtx    = OZBuilders.createCallContractContextType("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")    // validates C-address
 val createCtx1 = OZBuilders.createCreateContractContextType("abc123...") // hex String, 64 chars (0x-prefix ok)
 val createCtx2 = OZBuilders.createCreateContractContextType(wasmHash32Bytes) // ByteArray, 32 bytes
 ```
@@ -339,7 +338,7 @@ Example — create a rule that applies to a specific token contract, signed by t
 
 ```kotlin
 val signerA = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
-val signerB = DelegatedSigner("GC3C4MCEADMY26BVBPJIIUOKD5WZEZW5XI2LSU5F4QDZARBVAM4UTZEL")
+val signerB = DelegatedSigner("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
 
 // Build the install params with the typed builder (validated, correct encoding)
 val spendingLimitParams = PolicyInstallParams.SpendingLimit(
@@ -351,7 +350,7 @@ val result = kit.contextRuleManager.addContextRule(
     contextType = ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
     name = "XlmDailyLimit",
     signers = listOf(signerA, signerB),
-    policies = mapOf("CPOLICYSPENDLIMIT0000..." to spendingLimitParams)
+    policies = mapOf("CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z" to spendingLimitParams)
 )
 if (result.success) println("Rule added, tx ${result.hash}")
 ```
@@ -389,8 +388,8 @@ data class ParsedContextRule(
 ### listContextRules / getAllContextRules / getContextRule
 
 ```kotlin
-suspend fun listContextRules(maxScanId: UInt = config.maxContextRuleScanId): List<ParsedContextRule>
-suspend fun getAllContextRules(maxScanId: UInt = config.maxContextRuleScanId): List<SCValXdr>
+suspend fun listContextRules(maxScanId: UInt = kit.config.maxContextRuleScanId): List<ParsedContextRule>
+suspend fun getAllContextRules(maxScanId: UInt = kit.config.maxContextRuleScanId): List<SCValXdr>
 suspend fun getContextRule(id: UInt): SCValXdr
 suspend fun getContextRulesCount(): UInt
 ```
@@ -447,7 +446,7 @@ suspend fun updateValidUntil(
 // from the config's rpcUrl to read the current ledger.
 val soroban = SorobanServer(kit.config.rpcUrl)
 val latest = soroban.getLatestLedger().sequence.toUInt()
-val inAWeek = latest + (7 * Util.LEDGERS_PER_DAY.toUInt())
+val inAWeek = latest + 7u * Util.LEDGERS_PER_DAY.toUInt()
 kit.contextRuleManager.updateValidUntil(id = 1u, validUntil = inAWeek)
 
 // Remove expiration
@@ -549,7 +548,7 @@ val dev   = DelegatedSigner("GADEV1234567890...")
 
 val result = kit.policyManager.addWeightedThreshold(
     contextRuleId = 1u,
-    policyAddress = "CWEIGHTEDTHRESHOLD000...",
+    policyAddress = "CAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAKAL",
     signerWeights = mapOf(
         admin to 50u,
         lead  to 30u,
@@ -560,8 +559,8 @@ val result = kit.policyManager.addWeightedThreshold(
 ```
 
 ```kotlin
-// WRONG: signerWeights = mapOf("GAADMIN..." to 50u)  — keys must be SmartAccountSigner, not String
-// CORRECT: signerWeights = mapOf(DelegatedSigner("GAADMIN...") to 50u)
+// WRONG: signerWeights = mapOf("GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE" to 50u)  — keys must be SmartAccountSigner, not String
+// CORRECT: signerWeights = mapOf(DelegatedSigner("GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE") to 50u)
 
 // WRONG: a signer in signerWeights is not also on the context rule's signers list
 //        — even if weights add up to threshold, the signer cannot sign, and the
@@ -656,7 +655,7 @@ suspend fun addPolicy(
 val installParams = Scv.toMap(linkedMapOf(
     Scv.toSymbol("allowed_contracts") to Scv.toVec(listOf(
         Scv.toAddress(Address("CALLOWED1...").toSCAddress()),
-        Scv.toAddress(Address("CALLOWED2...").toSCAddress())
+        Scv.toAddress(Address("CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA").toSCAddress())
     )),
     Scv.toSymbol("max_per_tx") to Scv.toUint32(10u)
 ))
@@ -787,8 +786,8 @@ val passkeySigner = SelectedSigner.Passkey(
 ```
 
 ```kotlin
-// WRONG: SelectedSigner.Wallet(address = "CBCD...")  — wallet signers must be G-addresses
-// CORRECT: SelectedSigner.Wallet(address = "GA7Q...")  — delegated wallet G-address
+// WRONG: SelectedSigner.Wallet(address = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")  — wallet signers must be G-addresses
+// CORRECT: SelectedSigner.Wallet(address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")  — delegated wallet G-address
 ```
 
 ### Building SelectedSigner lists from on-chain rules
@@ -860,6 +859,7 @@ suspend fun multiSignerTransfer(
 Example — a 2-of-2 transfer with the connected passkey plus an external Freighter wallet:
 
 ```kotlin
+val amount = "100"
 val passkey = SelectedSigner.Passkey(
     credentialId      = kit.credentialId,
     credentialIdBytes = kit.credentialId?.let { Util.base64urlDecode(it) },
@@ -869,7 +869,7 @@ val wallet = SelectedSigner.Wallet("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGX
 
 val result = kit.multiSignerManager.multiSignerTransfer(
     tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-    recipient     = "GBRECIPIENT1234567890...",
+    recipient     = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     amount        = "100",
     selectedSigners = listOf(passkey, wallet)
 )
@@ -898,12 +898,12 @@ suspend fun multiSignerContractCall(
 val currentLedger = SorobanServer(kit.config.rpcUrl).use { it.getLatestLedger().sequence.toUInt() }
 val args = listOf(
     Scv.toAddress(Address(kit.contractId!!).toSCAddress()),
-    Scv.toAddress(Address("<C-address of the spender>").toSCAddress()),
+    Scv.toAddress(Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC").toSCAddress()), // the spender (dex) contract
     Scv.toInt128(OZTransactionOperations.amountToBaseUnits("100", decimals = 7)),
     Scv.toUint32(currentLedger + Util.LEDGERS_PER_HOUR.toUInt())
 )
 kit.multiSignerManager.multiSignerContractCall(
-    target = "CTOKEN1234...",
+    target = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
     targetFn = "approve",
     targetArgs = args,
     selectedSigners = listOf(passkey, wallet)
@@ -936,7 +936,7 @@ val result = kit.multiSignerManager.multiSignerExecuteAndSubmit(
     ),
     selectedSigners = listOf(
         SelectedSigner.Wallet("GAVOTER1..."),
-        SelectedSigner.Wallet("GAVOTER2...")
+        SelectedSigner.Wallet("GCUZ6YLL5RQBTYLTTQLPCM73C5XAIUGK2TIMWQH7HPSGWVS2KJ2F3CHS")
     )
 )
 ```
@@ -1021,6 +1021,7 @@ Three worked end-to-end flows that combine the building blocks above. Each one a
 **Flow.** Register a fresh passkey on the new device, persist it locally with the known contract ID, connect directly to the contract using the new credential + contract pair, then add the new passkey on-chain authorized by the backup signer, and finally remove the old passkey signer.
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // The old credential ID must be available from out-of-band storage
 // (server-side record, encrypted backup, etc.) so step 5 can locate the
 // old passkey's signer entry on the Default rule.
@@ -1059,7 +1060,7 @@ val connected = kit.walletOperations.connectWallet(
 
 // 3. Identify the backup signer on the Default rule. For a delegated G-address
 //    held by the user's external wallet:
-val backup = SelectedSigner.Wallet("GBACKUP1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ234567890ABCDE")
+val backup = SelectedSigner.Wallet("GBPHPX7SZKYEDV5CVOA5JOJE2RHJJDCJMRWMV4KBOIE5VSDJ6VAESR2W")
 
 // 4. Add the new passkey on-chain, authorized by the backup signer. The
 //    non-empty `selectedSigners` list is load-bearing: with an empty list the
@@ -1164,6 +1165,7 @@ kit.signerManager.removeSigner(
 **Flow.** The simulation error message contains the host error surfaced by RPC — typically of the form `...Error(Contract, #3004)...` for a smart-account error or `...Error(Contract, #3221)...` for a policy error. Pass the exception's message to `ContractErrorCodes.decodeFromMessage`, which extracts and decodes the first known marker in one step, and act on the result.
 
 ```kotlin
+val amount = "100"
 try {
     kit.transactionOperations.transfer(
         tokenContract = nativeSac,

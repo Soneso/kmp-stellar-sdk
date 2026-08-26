@@ -17,6 +17,16 @@ SEP-6 enables programmatic (non-interactive) deposit and withdrawal flows with S
 | Best for | Automated systems, backend services | Wallet apps, user-facing UIs |
 | Complexity | Higher (manage KYC separately) | Lower (anchor handles KYC UI) |
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep06.*
+import com.soneso.stellar.sdk.sep.sep06.exceptions.*
+import com.soneso.stellar.sdk.sep.sep10.*
+import com.soneso.stellar.sdk.sep.sep38.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -32,7 +42,7 @@ info.deposit?.forEach { (code, assetInfo) ->
 }
 
 // Authenticate via SEP-10 (required for all operations)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 val jwtToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
@@ -63,7 +73,6 @@ println("Status: ${tx.transaction.status}")
 
 ```kotlin
 // Discovers TRANSFER_SERVER from stellar.toml
-val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 ```
 
 ### Direct Initialization
@@ -78,7 +87,7 @@ val sep06 = Sep06Service.fromUrl("https://testanchor.stellar.org/sep6")
 All SEP-6 endpoints except `/info` require a SEP-10 JWT token. Authenticate before initiating deposits or withdrawals.
 
 ```kotlin
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 val authResponse = webAuth.jwtToken(
@@ -97,6 +106,7 @@ val jwtToken = authResponse.token
 Discover supported assets, limits, and anchor capabilities. Authentication is optional.
 
 ```kotlin
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val info = sep06.info()
 
 // Check deposit assets
@@ -150,6 +160,9 @@ info.features?.let { features ->
 Start a programmatic deposit flow. Returns deposit instructions.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep06.deposit(Sep06DepositRequest(
     assetCode = "USDC",
     account = userKeyPair.getAccountId(),
@@ -205,6 +218,8 @@ response.how?.let { println("Instructions: $it") }
 Start a programmatic withdrawal flow. Returns anchor account and memo for Stellar payment.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val response = sep06.withdraw(Sep06WithdrawRequest(
     assetCode = "USDC",
     type = "bank_account",
@@ -261,6 +276,9 @@ println("ETA: ${response.eta} seconds")
 Deposit with asset conversion using SEP-38 quotes. Allows depositing one off-chain asset and receiving a different Stellar asset.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // First, get a quote from SEP-38
 val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val quote = quoteService.postQuote(
@@ -305,6 +323,8 @@ response.instructions?.forEach { (field, instruction) ->
 Withdraw with asset conversion using SEP-38 quotes. Allows sending one Stellar asset and receiving a different off-chain asset.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 // First, get a quote from SEP-38
 val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val quote = quoteService.postQuote(
@@ -348,6 +368,9 @@ println("Memo: ${response.memo} (${response.memoType})")
 Query a single transaction by its identifier.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 val response = sep06.transaction(Sep06TransactionRequest(
     id = transactionId,
     jwt = jwtToken
@@ -364,6 +387,8 @@ tx.message?.let { println("Message: $it") }
 Query by Stellar transaction hash:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val response = sep06.transaction(Sep06TransactionRequest(
     stellarTransactionId = "abc123...",
     jwt = jwtToken
@@ -373,6 +398,8 @@ val response = sep06.transaction(Sep06TransactionRequest(
 Query by external transaction ID:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val response = sep06.transaction(Sep06TransactionRequest(
     externalTransactionId = "BANK-REF-456",
     jwt = jwtToken
@@ -393,6 +420,9 @@ At least one of `id`, `stellarTransactionId`, or `externalTransactionId` must be
 Query transaction history for the authenticated account.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep06.transactions(Sep06TransactionsRequest(
     assetCode = "USDC",
     account = userKeyPair.getAccountId(),
@@ -411,6 +441,9 @@ response.transactions.forEach { tx ->
 Filter by date:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep06.transactions(Sep06TransactionsRequest(
     assetCode = "USDC",
     account = userKeyPair.getAccountId(),
@@ -422,6 +455,9 @@ val response = sep06.transactions(Sep06TransactionsRequest(
 Paginate results:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // First page
 val firstPage = sep06.transactions(Sep06TransactionsRequest(
     assetCode = "USDC",
@@ -456,6 +492,9 @@ val nextPage = sep06.transactions(Sep06TransactionsRequest(
 Update a transaction with additional information when requested by the anchor.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 // Transaction requires additional info (status: pending_transaction_info_update)
 val tx = sep06.transaction(Sep06TransactionRequest(id = transactionId, jwt = jwtToken))
     .transaction
@@ -492,6 +531,7 @@ if (tx.status == "pending_transaction_info_update") {
 Query fee for an operation. This endpoint is deprecated; use SEP-38 quotes instead.
 
 ```kotlin
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val feeResponse = sep06.fee(Sep06FeeRequest(
     operation = "deposit",
     assetCode = "USDC",
@@ -534,6 +574,9 @@ SEP-6 transactions progress through various states before reaching a terminal st
 ### Status Helpers
 
 ```kotlin
+// handlePendingStatus, handleSuccess, handleUnknownStatus, promptUserToEstablishTrustline, promptUserToSendFunds, txId: from the previous steps of this flow
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val tx = sep06.transaction(Sep06TransactionRequest(id = txId, jwt = jwtToken))
     .transaction
 
@@ -577,6 +620,8 @@ when (kind) {
 ### Polling for Completion
 
 ```kotlin
+// delay, depositResponse: from the previous steps of this flow
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 suspend fun pollTransaction(
     sep06: Sep06Service,
     transactionId: String,
@@ -636,6 +681,10 @@ when (finalTx.getStatusEnum()) {
 ## Error Handling
 
 ```kotlin
+// request, signers: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 try {
     val response = sep06.deposit(request)
 } catch (e: Sep06AuthenticationRequiredException) {
@@ -694,12 +743,13 @@ try {
 Full workflow from authentication to transaction completion:
 
 ```kotlin
+// delay: from the previous steps of this flow
 // 1. Initialize services
 val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 // 2. User keypair (in production, load from secure storage)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val accountId = userKeyPair.getAccountId()
 
 // 3. Discover supported assets and validate
@@ -826,6 +876,9 @@ repeat(maxAttempts) { attempt ->
 Anchors can send deposits as claimable balances, allowing users to receive funds without a pre-existing trustline.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep06.deposit(Sep06DepositRequest(
     assetCode = "USDC",
     account = userKeyPair.getAccountId(),
@@ -848,6 +901,9 @@ tx.claimableBalanceId?.let { balanceId ->
 Receive transaction status updates via webhook instead of polling.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep06.deposit(Sep06DepositRequest(
     assetCode = "USDC",
     account = userKeyPair.getAccountId(),
@@ -864,6 +920,9 @@ val response = sep06.deposit(Sep06DepositRequest(
 When a transaction requires additional information:
 
 ```kotlin
+// txId: from the previous steps of this flow
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep06 = Sep06Service.fromDomain("testanchor.stellar.org")
 val tx = sep06.transaction(Sep06TransactionRequest(id = txId, jwt = jwtToken))
     .transaction
 
