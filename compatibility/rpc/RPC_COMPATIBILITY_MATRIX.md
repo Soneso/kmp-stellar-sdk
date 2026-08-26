@@ -1,22 +1,23 @@
 # Soroban RPC vs KMP Stellar SDK Compatibility Matrix
 
-**RPC Version:** v27.1.1 (released 2026-07-07)  
-**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v27.1.1](https://github.com/stellar/stellar-rpc/releases/tag/v27.1.1)  
-**SDK Version:** 1.11.0  
-**Generated:** 2026-08-10 11:01:13
+**RPC Version:** v28.0.0 (released 2026-08-17)  
+**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v28.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v28.0.0)  
+**SDK Version:** 1.12.0  
+**Generated:** 2026-08-26 11:28:39
 
 ## Overall Coverage
 
 **Coverage:** 100.0%
 
-- ✅ **Fully Supported:** 11/11
-- ⚠️ **Partially Supported:** 0/11
-- ❌ **Not Supported:** 0/11
+- ✅ **Fully Supported:** 12/12
+- ⚠️ **Partially Supported:** 0/12
+- ❌ **Not Supported:** 0/12
 
 ## Method Comparison
 
 | RPC Method | Status | Kotlin Method | Required Params | Response Fields | Notes |
 |------------|--------|---------------|-----------------|-----------------|-------|
+| `getEvents` | ✅ Fully Supported | `getEvents` | 1/1 | 6/6 | All parameters and response fields implemented |
 | `getFeeStats` | ✅ Fully Supported | `getFeeStats` | N/A | 3/3 | All parameters and response fields implemented |
 | `getHealth` | ✅ Fully Supported | `getHealth` | N/A | 6/6 | All parameters and response fields implemented |
 | `getLatestLedger` | ✅ Fully Supported | `getLatestLedger` | N/A | 6/6 | All parameters and response fields implemented |
@@ -35,6 +36,7 @@ Detailed breakdown of response field support per method.
 
 | RPC Method | RPC Fields | SDK Fields | Missing Fields |
 |------------|------------|------------|----------------|
+| `getEvents` | 6 | 6 | - |
 | `getFeeStats` | 3 | 3 | - |
 | `getHealth` | 6 | 6 | - |
 | `getLatestLedger` | 6 | 6 | - |

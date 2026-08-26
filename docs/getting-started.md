@@ -39,7 +39,7 @@ Add the SDK as a Maven dependency (recommended for most projects):
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 }
 ```
 
@@ -51,7 +51,7 @@ includeBuild("/path/to/kmp-stellar-sdk")
 
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 }
 ```
 
@@ -125,7 +125,7 @@ targets: [
 
 ```kotlin
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 }
 ```
 

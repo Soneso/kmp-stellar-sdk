@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2026-08-26
+
+Migration guide: [docs/migration/1.12.0.md](docs/migration/1.12.0.md)
 
 ### Added
 - `ClaimableBalanceId` reads a claimable balance id in whichever spelling it is
@@ -147,13 +149,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ADDRESS` arm for wallet software that cannot sign the address-bound preimage
   type. The relayer source-account conversion in `fundWallet` likewise builds
   `ADDRESS_V2` credentials carrying the temporary account address;
-  `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes that address and
-  hashes the address-bound preimage. The new optional parameter changes the JVM
-  binary signatures of the `OZSmartAccountConfig` constructor and its generated
-  `copy()`.
+  `SmartAccountAuth.buildSourceAccountAuthPayloadHash` gains a required
+  `address` parameter (second position) and hashes the address-bound preimage —
+  a source-breaking signature change: every existing call site must supply the
+  address. The new optional config parameter changes the JVM binary signatures
+  of the `OZSmartAccountConfig` constructor and its generated `copy()`.
 - `OZSmartAccountConfig.useUpgradedAuth` (default true) governs the credential arm
   of the OZ kit's internal simulations and of the `fundWallet` source-account
-  conversion. Both asked for `ADDRESS_V2` unconditionally. Set the flag to false and
+  conversion. Both previously requested and built legacy `ADDRESS` credentials. Set the flag to false and
   the kit requests legacy entries from simulation and converts funding credentials to
   the legacy `ADDRESS` arm, for relayer services that cannot parse protocol-27 auth
   XDR. `SmartAccountAuth.buildSourceAccountAuthPayloadHash` takes the same flag and
@@ -194,7 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every target reaches the same verdict on the same strkey. JVM and Android
   accepted whitespace and lowercase base32 where JavaScript and Native rejected
   the identical string. The exception type is uniform as well: `"========"` raised
-  `ArrayIndexOutOfBoundsException` on JVM and Native but `IllegalArgumentException`
+  an `IndexOutOfBoundsException` on JVM and Native but `IllegalArgumentException`
   on JavaScript, and `IndexOutOfBoundsException` no longer escapes any decode
   entry point on any platform.
 - Signed payload strkeys (`P...`) are checked against the framing the XDR wire

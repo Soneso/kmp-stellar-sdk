@@ -1,9 +1,9 @@
 # Horizon API vs KMP Stellar SDK Compatibility Matrix
 
-**Horizon Version:** v27.0.0 (released 2026-06-11)  
-**Horizon Source:** [v27.0.0](https://github.com/stellar/stellar-horizon/releases/tag/v27.0.0)  
-**SDK Version:** 1.11.0  
-**Generated:** 2026-08-10 11:00:49
+**Horizon Version:** v28.0.0 (released 2026-08-20)  
+**Horizon Source:** [v28.0.0](https://github.com/stellar/stellar-horizon/releases/tag/v28.0.0)  
+**SDK Version:** 1.12.0  
+**Generated:** 2026-08-26 11:28:30
 
 **Horizon Endpoints Discovered:** 52  
 **Public API Endpoints (in matrix):** 50
@@ -118,7 +118,7 @@
 | Endpoint | Method | Status | SDK Method | Streaming | Notes |
 |----------|--------|--------|------------|-----------|-------|
 | `/ledgers` | GET | ✅ | `ledgers` | ✓ | Full implementation with all features supported. Implemented via LedgersRequestBuilder |
-| `/ledgers/{ledger_id}` | GET | ✅ | `ledgers.ledger` |  | Full implementation with all features supported. Implemented via TransactionsRequestBuilder |
+| `/ledgers/{ledger_id}` | GET | ✅ | `ledgers.ledger` |  | Full implementation with all features supported. Implemented via LedgersRequestBuilder |
 | `/ledgers/{ledger_id}/effects` | GET | ✅ | `effects.forLedger` | ✓ | Full implementation with all features supported. Implemented via EffectsRequestBuilder |
 | `/ledgers/{ledger_id}/operations` | GET | ✅ | `operations.forLedger` | ✓ | Full implementation with all features supported. Implemented via OperationsRequestBuilder |
 | `/ledgers/{ledger_id}/payments` | GET | ✅ | `payments.forLedger` | ✓ | Full implementation with all features supported. Implemented via PaymentsRequestBuilder |
