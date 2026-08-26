@@ -3,6 +3,14 @@
 **Purpose:** Recover access to Stellar accounts when the owner loses their private key. Recovery servers act as cosigners: register your account with one or more servers, then call on them to sign a key-rotation transaction if you ever lose your private key.
 **Prerequisites:** Requires JWT from SEP-10 (see `sep-10.md`) for registration and updates. Recovery (signing) uses a JWT from the server's alternate auth flow (email/phone/stellar_address).
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep30.*
+import com.soneso.stellar.sdk.sep.sep30.exceptions.*
+```
+
 ## Table of Contents
 
 1. [How Recovery Works](#1-how-recovery-works)
@@ -35,14 +43,15 @@
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep30.Sep30Service
+import io.ktor.client.*
 
 // Basic: service URL only
 val service = Sep30Service("https://recovery.example.com")
 
-// With custom HTTP client and headers
-import io.ktor.client.*
 
-val service = Sep30Service(
+// With custom HTTP client and headers
+
+val serviceWithClient = Sep30Service(
     serviceUrl = "https://recovery.example.com",
     httpClient = HttpClient(),
     httpRequestHeaders = mapOf("X-Custom-Header" to "value")
@@ -50,7 +59,7 @@ val service = Sep30Service(
 ```
 
 Constructor signature:
-```
+```kotlin
 Sep30Service(
     serviceUrl: String,
     httpClient: HttpClient? = null,
@@ -110,6 +119,9 @@ try {
 Multiple identities (e.g., sender + receiver for shared accounts):
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// accountId, jwtToken: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 val senderIdentity = Sep30RequestIdentity(
     role = "sender",
     authMethods = listOf(
@@ -132,7 +144,7 @@ val response = service.registerAccount(accountId, request, jwtToken)
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun registerAccount(address: String, request: Sep30Request, jwt: String): Sep30AccountResponse
 ```
 
@@ -152,7 +164,7 @@ val accountKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U
 // Signer key comes from the registerAccount() response
 val signerKey = response.signers[0].key
 
-val account = horizonServer.accounts().account(accountKeyPair.getAccountId())
+val account = horizonServer.loadAccount(accountKeyPair.getAccountId())
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .setBaseFee(100)
     .addOperation(
@@ -191,6 +203,7 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.sep.sep30.*
 import kotlin.io.encoding.Base64
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val service = Sep30Service("https://recovery.example.com")
 val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
@@ -204,7 +217,7 @@ val signingAddress = accountDetails.signers[0].key
 val newKeyPair = KeyPair.random()
 
 // Step 3: Build the recovery transaction (uses the lost account's current sequence)
-val account = horizonServer.accounts().account(accountId)
+val account = horizonServer.loadAccount(accountId)
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .setBaseFee(100)
     .addOperation(
@@ -241,7 +254,7 @@ println("Store this seed securely!")
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun signTransaction(address: String, signingAddress: String, transaction: String, jwt: String): Sep30SignatureResponse
 ```
 
@@ -281,7 +294,7 @@ for (identity in response.identities) {
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun updateIdentitiesForAccount(address: String, request: Sep30Request, jwt: String): Sep30AccountResponse
 ```
 
@@ -292,6 +305,7 @@ suspend fun updateIdentitiesForAccount(address: String, request: Sep30Request, j
 Retrieve the current registration state: identities, authentication status, and signer keys.
 
 ```kotlin
+// jwtToken: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep30.*
 
 val service = Sep30Service("https://recovery.example.com")
@@ -315,7 +329,7 @@ val signingAddress = response.signers[0].key
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun accountDetails(address: String, jwt: String): Sep30AccountResponse
 ```
 
@@ -327,6 +341,7 @@ List all accounts the authenticated identity has access to. Results are paginate
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep30.*
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 
 val service = Sep30Service("https://recovery.example.com")
 
@@ -352,7 +367,7 @@ if (response.accounts.isNotEmpty()) {
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun accounts(jwt: String, after: String? = null): Sep30AccountsResponse
 ```
 
@@ -369,6 +384,10 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.sep.sep30.*
 
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// accountId, jwtToken: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+
 val service = Sep30Service("https://recovery.example.com")
 val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -382,7 +401,7 @@ println("Deleted from recovery server.")
 
 // Remove the signer from the Stellar account (signerWeight = 0 removes a signer)
 val accountKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
-val account = horizonServer.accounts().account(accountId)
+val account = horizonServer.loadAccount(accountId)
 val transaction = TransactionBuilder(account, Network.TESTNET)
     .setBaseFee(100)
     .addOperation(
@@ -399,7 +418,7 @@ println("Recovery signer removed from Stellar account.")
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun deleteAccount(address: String, jwt: String): Sep30AccountResponse
 ```
 
@@ -482,13 +501,12 @@ All exceptions extend `Sep30Exception` which extends `Exception`. Access the err
 Single authentication method for an identity.
 
 ```kotlin
-// Constructor -- data class with named parameters
-Sep30AuthMethod(type: String, value: String)
+// Constructor: Sep30AuthMethod(type: String, value: String)
 
 // Standard types
 Sep30AuthMethod(type = "email", value = "person@example.com")
 Sep30AuthMethod(type = "phone_number", value = "+10000000001")   // E.164 format: +[country][number], no spaces
-Sep30AuthMethod(type = "stellar_address", value = "GBUCA...H")  // G... Stellar address
+Sep30AuthMethod(type = "stellar_address", value = "GBUCAAMD7DYS7226CWUUOZ5Y2QF4JBJWIYU3UWJAFDGJVCR6EU5NJM5H")  // G... Stellar address
 
 // Access properties directly
 method.type   // String
@@ -514,6 +532,7 @@ Common roles: `"owner"` (single user), `"sender"` / `"receiver"` (account sharin
 Container for one or more identities. Serializes to `{"identities": [...]}`.
 
 ```kotlin
+// identities, request: from the previous steps of this flow
 // Constructor -- data class with named parameters
 Sep30Request(identities: List<Sep30RequestIdentity>)
 
@@ -549,6 +568,7 @@ signer.key  // String -- G... public key to add as a signer on the Stellar accou
 Returned by `signTransaction()`.
 
 ```kotlin
+// response: from the previous steps of this flow
 response.signature         // String -- base64-encoded signature bytes
 response.networkPassphrase // String -- e.g. "Test SDF Network ; September 2015"
 ```
@@ -568,6 +588,8 @@ response.accounts  // List<Sep30AccountResponse>
 **Wrong: re-registering instead of updating**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: calling registerAccount() on an already-registered account throws Sep30ConflictException
 service.registerAccount(accountId, request, jwt)
 
@@ -578,6 +600,8 @@ service.updateIdentitiesForAccount(accountId, request, jwt)
 **Wrong: passing the Transaction object instead of base64 XDR to signTransaction()**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: signTransaction() expects a String, not a Transaction object
 service.signTransaction(accountId, signingAddress, transaction, jwt)
 
@@ -589,6 +613,8 @@ service.signTransaction(accountId, signingAddress, txBase64, jwt)
 **Wrong: using the account address instead of the signing address for the signature hint**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+// accountId, signatureResponse, signingAddress, transaction: from the previous steps of this flow
 // WRONG: using the account address to derive the hint
 val wrongKey = KeyPair.fromAccountId(accountId).getPublicKey()
 val hint = wrongKey.copyOfRange(wrongKey.size - 4, wrongKey.size)
@@ -604,6 +630,7 @@ transaction.signatures.add(decoratedSig)
 **Wrong: using SetOptionsOperationBuilder (does not exist in KMP SDK)**
 
 ```kotlin
+// signerKey: from the previous steps of this flow
 // WRONG: there is no SetOptionsOperationBuilder in the KMP SDK
 SetOptionsOperationBuilder().setSigner(...).build()
 
@@ -617,6 +644,7 @@ SetOptionsOperation(
 **Wrong: phone number format**
 
 ```kotlin
+// signer: from the previous steps of this flow
 // WRONG: spaces, missing +, or missing country code
 Sep30AuthMethod(type = "phone_number", value = "415 555 1234")     // missing + and country code
 Sep30AuthMethod(type = "phone_number", value = "+1 415 555 1234")  // has spaces
@@ -640,6 +668,10 @@ if (identity.authenticated ?: false) { ... }  // null-coalescing with Elvis oper
 **Wrong: forgetting to remove server signer after deleteAccount()**
 
 ```kotlin
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// account, accountId, jwt, service, signerKey: from the previous steps of this flow
 // WRONG: deleting from the recovery server but leaving the signer on-chain
 // The signer still exists on the Stellar account and could be misused.
 service.deleteAccount(accountId, jwt)
@@ -665,6 +697,8 @@ The PUT operation is not additive. If you have two identities and call `updateId
 **Note: JWT is passed without "Bearer " prefix -- the SDK adds it**
 
 ```kotlin
+// request, service: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 // WRONG: including the prefix yourself
 service.registerAccount(accountId, request, "Bearer eyJhbGci...")
 
@@ -675,6 +709,9 @@ service.registerAccount(accountId, request, "eyJhbGci...")
 **Note: all service methods are suspend functions**
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// jwt, request, service: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 // WRONG: calling from non-suspend context without a coroutine scope
 val response = service.registerAccount(accountId, request, jwt) // compile error
 

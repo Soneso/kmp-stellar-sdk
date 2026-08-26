@@ -8,6 +8,15 @@ Anchor RFQ (Request for Quote) API enables price discovery and firm quotes for e
 - Compare prices across delivery methods (bank transfer, PIX, cash)
 - Build exchange interfaces with real-time pricing
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep38.*
+import com.soneso.stellar.sdk.sep.sep38.exceptions.*
+import com.soneso.stellar.sdk.sep.sep10.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -30,7 +39,7 @@ val price = quoteService.price(
 println("Rate: ${price.price}, Fee: ${price.fee.total}")
 
 // Request firm quote (requires SEP-10 authentication)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 val jwtToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
@@ -53,7 +62,6 @@ println("Quote ID: ${quote.id}, Expires: ${quote.expiresAt}")
 
 ```kotlin
 // Discovers ANCHOR_QUOTE_SERVER from stellar.toml
-val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 ```
 
 ### Direct Initialization
@@ -72,6 +80,7 @@ val quoteService = QuoteService(
 Discover supported assets and delivery methods.
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val info = quoteService.info()
 
 info.assets.forEach { asset ->
@@ -108,6 +117,7 @@ Get indicative prices for multiple assets. Provide either `sellAsset` or `buyAss
 **Selling an asset** (what can I buy?):
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val prices = quoteService.prices(
     sellAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     sellAmount = "100",
@@ -123,6 +133,7 @@ prices.buyAssets?.forEach { buyAsset ->
 **Buying an asset** (what do I need to sell?):
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val prices = quoteService.prices(
     buyAsset = "stellar:USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
     buyAmount = "100",
@@ -147,6 +158,7 @@ prices.sellAssets?.forEach { sellAsset ->
 Get indicative price for a specific asset pair. Provide either `sellAmount` or `buyAmount`, but not both.
 
 ```kotlin
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val price = quoteService.price(
     context = "sep6",
     sellAsset = "iso4217:BRL",
@@ -180,7 +192,7 @@ price.fee.details?.forEach { detail ->
   - `details` - Optional list of `Sep38FeeDetail`
 
 **Price Formulas**:
-```
+```text
 sell_amount = total_price * buy_amount
 
 // When fee is in sell asset:
@@ -195,6 +207,9 @@ sell_amount = price * (buy_amount + fee)
 Create a binding quote with guaranteed rate. **Requires SEP-10 authentication**.
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // Authenticate via SEP-10
 val jwtToken = webAuth.jwtToken(accountId, signers).token
 
@@ -240,6 +255,9 @@ println("Buy: ${quote.buyAmount} ${quote.buyAsset}")
 Retrieve an existing quote by ID. **Requires SEP-10 authentication**.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
+// jwtToken, quoteService: from the previous steps of this flow
 val quoteId = "de762cda-a193-4961-861e-57b31fed6eb3"
 val quote = quoteService.getQuote(quoteId, jwtToken)
 
@@ -264,6 +282,7 @@ Assets use a scheme-based format: `<scheme>:<identifier>`
 ## Error Handling
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 try {
     val quote = quoteService.postQuote(request, jwtToken)
 } catch (e: Sep38BadRequestException) {
@@ -293,12 +312,13 @@ try {
 Full workflow for a SEP-6 deposit with firm quote:
 
 ```kotlin
-// 1. Initialize services
 val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
+// jwtToken: from the previous steps of this flow
+// 1. Initialize services
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 // 2. Authenticate with user's keypair
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val jwtToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
     signers = listOf(userKeyPair)

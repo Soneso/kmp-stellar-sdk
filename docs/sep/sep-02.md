@@ -8,6 +8,14 @@ SEP-2 maps Stellar addresses to account information. It resolves email-like addr
 - Reverse lookups: find addresses from account IDs or transaction IDs
 - Forward payments to other networks or financial institutions
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep02.*
+import com.soneso.stellar.sdk.sep.sep02.exceptions.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -103,25 +111,26 @@ suspend fun sendPayment() {
 
     // Build the payment transaction
     val server = HorizonServer("https://horizon.stellar.org")
-    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
-    val sourceAccount = server.accounts().account(senderKeyPair.getAccountId())
+    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+    val sourceAccount = server.loadAccount(senderKeyPair.getAccountId())
 
     val txBuilder = TransactionBuilder(sourceAccount, Network.PUBLIC)
         .addOperation(
             PaymentOperation(
                 destination = response.accountId,
-                asset = AssetTypeNative(),
+                asset = AssetTypeNative,
                 amount = "10"
             )
         )
 
     // Attach memo if required
-    if (response.memoType != null && response.memo != null) {
+    val memo = response.memo
+    if (response.memoType != null && memo != null) {
         when (response.memoType) {
-            "text" -> txBuilder.addMemo(MemoText(response.memo))
-            "id" -> txBuilder.addMemo(MemoId(response.memo.toULong()))
+            "text" -> txBuilder.addMemo(MemoText(memo))
+            "id" -> txBuilder.addMemo(MemoId(memo.toULong()))
             "hash" -> {
-                val bytes = kotlin.io.encoding.Base64.decode(response.memo)
+                val bytes = kotlin.io.encoding.Base64.decode(memo)
                 txBuilder.addMemo(MemoHash(bytes))
             }
         }
@@ -183,6 +192,7 @@ println("Forward to: ${response.accountId}")
 ### Remittance Center Example
 
 ```kotlin
+// service: from the previous steps of this flow
 val response = service.resolveForward(mapOf(
     "forward_type" to "remittance_center",
     "first_name" to "Jhun",
@@ -206,6 +216,7 @@ Validate and parse a Stellar address into username and domain components.
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep02.FederationService
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02InvalidAddressException
+val domain = "testanchor.stellar.org"
 
 fun parseAddress(address: String) {
     try {
@@ -294,7 +305,7 @@ suspend fun exhaustiveErrorHandling() {
 
 Federation servers must set the following HTTP header to enable CORS:
 
-```
+```text
 Access-Control-Allow-Origin: *
 ```
 
@@ -334,25 +345,26 @@ suspend fun completeExample() {
 
     // 3. Build the payment transaction
     val server = HorizonServer("https://horizon.stellar.org")
-    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
-    val sourceAccount = server.accounts().account(senderKeyPair.getAccountId())
+    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+    val sourceAccount = server.loadAccount(senderKeyPair.getAccountId())
 
     val txBuilder = TransactionBuilder(sourceAccount, Network.PUBLIC)
         .addOperation(
             PaymentOperation(
                 destination = federationResponse.accountId,
-                asset = AssetTypeNative(),
+                asset = AssetTypeNative,
                 amount = "10"
             )
         )
 
     // 4. Attach memo if required
-    if (federationResponse.memoType != null && federationResponse.memo != null) {
+    val memo = federationResponse.memo
+    if (federationResponse.memoType != null && memo != null) {
         when (federationResponse.memoType) {
-            "text" -> txBuilder.addMemo(MemoText(federationResponse.memo))
-            "id" -> txBuilder.addMemo(MemoId(federationResponse.memo.toULong()))
+            "text" -> txBuilder.addMemo(MemoText(memo))
+            "id" -> txBuilder.addMemo(MemoId(memo.toULong()))
             "hash" -> {
-                val bytes = kotlin.io.encoding.Base64.decode(federationResponse.memo)
+                val bytes = kotlin.io.encoding.Base64.decode(memo)
                 txBuilder.addMemo(MemoHash(bytes))
             }
             else -> {

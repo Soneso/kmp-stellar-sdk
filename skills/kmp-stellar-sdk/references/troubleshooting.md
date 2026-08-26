@@ -6,8 +6,11 @@ All code assumes the standard SDK import and a suspend context:
 
 ```kotlin
 import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.*
 import com.soneso.stellar.sdk.horizon.exceptions.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.responses.*
+import com.soneso.stellar.sdk.rpc.exception.*
 ```
 
 ## Table of Contents
@@ -63,6 +66,10 @@ try {
 // Also thrown by: KeyPair.fromSecretSeed(), amount parsing (e.g. PaymentOperation with bad amount)
 ```
 
+A strkey is only accepted in canonical form: `=` padding, whitespace and
+lowercase all produce `IllegalArgumentException` on every platform. Trim input
+arriving from a UI or an external system; the full rules are in security.md.
+
 ### Soroban RPC Exceptions
 
 | Exception | Trigger | Key Properties |
@@ -96,6 +103,7 @@ All extend `ContractException`:
 ```kotlin
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.exceptions.*
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -211,7 +219,9 @@ fun parseHorizonErrorSimple(body: String?) {
 The async endpoint returns `SubmitTransactionAsyncResponse` with status codes instead of throwing:
 
 ```kotlin
+// transaction: from the previous steps of this flow
 import com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse.TransactionStatus
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 val response = server.submitTransactionAsync(transaction.toEnvelopeXdrBase64())
 
@@ -270,6 +280,8 @@ when (response.txStatus) {
 **Solution:** Check the source balance before building the transaction:
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 val account = server.accounts().account(accountId)
 for (balance in account.balances) {
     if (balance.assetType == "native") {
@@ -287,9 +299,10 @@ Account minimum balance = `(2 + subentryCount) * 0.5 XLM`. Funds below this mini
 **Solution:** The recipient must establish a trustline before receiving the asset:
 
 ```kotlin
-val recipientKeyPair = KeyPair.fromSecretSeed("SRECIPIENT...")
+val server = HorizonServer("https://horizon-testnet.stellar.org")
+val recipientKeyPair = KeyPair.fromSecretSeed("SAWDHXQG6ROJSU4QGCW7NSTYFHPTPIVC2NC7QKVTO7PZCSO2WEBGM54W")
 val recipientAccount = server.loadAccount(recipientKeyPair.getAccountId())
-val asset = AssetTypeCreditAlphaNum4("USD", "GISSUER...")
+val asset = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 
 val tx = TransactionBuilder(recipientAccount, Network.TESTNET)
     .setBaseFee(100)
@@ -324,6 +337,9 @@ if (funded) {
 **Key behavior:** `TransactionBuilder.build()` calls `sourceAccount.getIncrementedSequenceNumber()` and then sets the account's sequence to that value. After `build()`, the account object's sequence is incremented internally. This means:
 
 ```kotlin
+// op, op1, op2: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // CORRECT: load account, build() increments sequence internally
 val account = server.loadAccount(accountId) // on-chain seq N
 val tx = TransactionBuilder(account, Network.TESTNET)
@@ -379,6 +395,9 @@ suspend fun fetchWithRetry(
 **Solution:** Add a memo to the transaction:
 
 ```kotlin
+// op, tx: from the previous steps of this flow
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 try {
     server.submitTransaction(tx.toEnvelopeXdrBase64())
 } catch (e: AccountRequiresMemoException) {
@@ -398,6 +417,8 @@ try {
 To skip this check (e.g., for known contracts):
 
 ```kotlin
+// tx: from the previous steps of this flow
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // WRONG: server.submitTransaction(xdr) -- always checks memo
 // CORRECT: pass skipMemoRequiredCheck = true
 server.submitTransaction(tx.toEnvelopeXdrBase64(), skipMemoRequiredCheck = true)
@@ -452,6 +473,8 @@ try {
 `prepareTransaction(transaction)` simulates and applies results in one step. It throws `PrepareTransactionException` on simulation failure:
 
 ```kotlin
+// transaction: from the previous steps of this flow
+val rpcServer = SorobanServer("https://soroban-testnet.stellar.org")
 try {
     val prepared = rpcServer.prepareTransaction(transaction)
     prepared.sign(keyPair)
@@ -465,7 +488,9 @@ try {
 ### SendTransaction Status Codes
 
 ```kotlin
+// prepared: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+val rpcServer = SorobanServer("https://soroban-testnet.stellar.org")
 
 val sendResponse = rpcServer.sendTransaction(prepared)
 
@@ -499,11 +524,13 @@ when (sendResponse.status) {
 `pollTransaction` polls `getTransaction` with configurable attempts and sleep:
 
 ```kotlin
+val rpcServer = SorobanServer("https://soroban-testnet.stellar.org")
+val txHash = "3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8889"
 // Default: 30 attempts, 1 second apart
 val result = rpcServer.pollTransaction(txHash)
 
 // Custom: 60 attempts with exponential backoff
-val result = rpcServer.pollTransaction(
+val resultCustom = rpcServer.pollTransaction(
     hash = txHash,
     maxAttempts = 60,
     sleepStrategy = { attempt -> minOf(1000L * attempt, 10000L) }
@@ -538,6 +565,7 @@ when (result.status) {
 **Resource limits exceeded:** If simulation succeeds but `sendTransaction` returns `ERROR`, add a buffer to `minResourceFee`:
 
 ```kotlin
+val rpcServer = SorobanServer("https://soroban-testnet.stellar.org")
 val simResponse = rpcServer.simulateTransaction(transaction)
 // Add 15% buffer to resource fee
 val bufferedFee = ((simResponse.minResourceFee ?: 0L) * 1.15).toLong()
@@ -563,8 +591,12 @@ val bufferedFee = ((simResponse.minResourceFee ?: 0L) * 1.15).toLong()
 The high-level `ContractClient` and `AssembledTransaction` API throws specific contract exceptions:
 
 ```kotlin
+// destAddress, rpcUrl, sourceAddress: from the previous steps of this flow
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.exception.*
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val network = Network.TESTNET
 
 try {
     val client = ContractClient.forContract(contractId, rpcUrl, network)

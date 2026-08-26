@@ -2,7 +2,17 @@
 
 **Looking for a quick start? See [Quick Start](quick-start.md) to get running in 30 minutes.**
 
-This comprehensive guide covers platform-specific details, best practices, and advanced usage patterns for the Stellar KMP SDK.
+This guide covers platform-specific details, best practices, and advanced usage patterns for the Stellar KMP SDK.
+
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+import com.soneso.stellar.sdk.horizon.responses.*
+import com.soneso.stellar.sdk.Asset
+import com.soneso.stellar.sdk.Price
+```
 
 ## Table of Contents
 
@@ -160,7 +170,6 @@ Stellar has two main networks:
 import com.soneso.stellar.sdk.Network
 
 // Use testnet for development
-val network = Network.TESTNET
 
 // Use mainnet for production
 val network = Network.PUBLIC
@@ -179,19 +188,20 @@ All cryptographic operations in the SDK use Kotlin's `suspend` functions:
 ```kotlin
 // Always use in a coroutine context
 suspend fun example() {
+    val data = "message to sign".encodeToByteArray()
     val keypair = KeyPair.random()
     val signature = keypair.sign(data)
 }
 
-// Or with runBlocking for simple scripts
-fun main() = runBlocking {
+// Or with runBlocking for simple scripts (JVM)
+fun main() = kotlinx.coroutines.runBlocking {
     val keypair = KeyPair.random()
 }
 ```
 
 ## Demo Applications
 
-The SDK includes comprehensive demo applications showcasing real-world usage patterns across all platforms. These are excellent learning resources:
+The SDK includes demo applications showcasing real-world usage patterns across all platforms. These are excellent learning resources:
 
 - **Android**: Jetpack Compose UI with 11 feature demonstrations
 - **iOS**: SwiftUI wrapper around shared Compose UI
@@ -272,7 +282,7 @@ suspend fun createMainnetAccount(
     transaction.sign(sourceKeypair)
 
     // Submit to network
-    val response = server.submitTransaction(transaction)
+    val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
     println("Transaction hash: ${response.hash}")
 }
 ```
@@ -282,14 +292,15 @@ suspend fun createMainnetAccount(
 ### Multiple Operations
 
 ```kotlin
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 suspend fun complexTransaction() {
     val transaction = TransactionBuilder(account, Network.TESTNET)
         // Payment
         .addOperation(
             PaymentOperation(
-                destination = "GABC...",
+                destination = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
                 amount = "50",
-                asset = Asset.NATIVE
+                asset = AssetTypeNative
             )
         )
         // Create trustline for USDC
@@ -321,6 +332,9 @@ suspend fun complexTransaction() {
 import com.soneso.stellar.sdk.contract.ContractClient
 import java.io.File
 
+val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
+// sourceKeypair: from the previous steps of this flow
+
 suspend fun deployContract() {
     // Read WASM file
     val wasmBytes = File("path/to/contract.wasm").readBytes()
@@ -328,7 +342,7 @@ suspend fun deployContract() {
     // Deploy contract with constructor arguments; returns a client for the new contract
     val client = ContractClient.deploy(
         wasmBytes = wasmBytes,
-        constructorArgs = mapOf("admin" to "GABC..."),
+        constructorArgs = mapOf("admin" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
         source = sourceKeypair.getAccountId(),
         signer = sourceKeypair,
         network = Network.TESTNET,
@@ -354,13 +368,13 @@ val testServer = HorizonServer("https://horizon-testnet.stellar.org")
 // Connect to mainnet
 val mainServer = HorizonServer("https://horizon.stellar.org")
 
-// Load account information
-val account = testServer.loadAccount("GABC...")
-println("Balance: ${account.balances[0].balance}")
+// Load account details
+val details = testServer.accounts().account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
+println("Balance: ${details.balances[0].balance}")
 
 // Query transactions
-val transactions = testServer.getTransactions()
-    .forAccount("GABC...")
+val transactions = testServer.transactions()
+    .forAccount("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     .limit(10)
     .execute()
 
@@ -404,10 +418,16 @@ Interact with Soroban smart contracts using the high-level ContractClient API:
 ```kotlin
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.contract.ContractClient
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.ionspin.kotlin.bignum.integer.BigInteger
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val amount = "100"
 
+val sourceKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // Create contract client (automatically loads contract spec)
 val client = ContractClient.forContract(
-    contractId = "CCXX...",
+    contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC",
     rpcUrl = "https://soroban-testnet.stellar.org",
     network = Network.TESTNET
 )
@@ -415,8 +435,8 @@ val client = ContractClient.forContract(
 // Invoke read-only function (auto-executes and returns result)
 val balance = client.invoke<Long>(
     functionName = "balance",
-    arguments = mapOf("account" to "GABC..."),
-    source = "GABC...",
+    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null,  // Read-only, no signing needed
     parseResultXdrFn = { Scv.fromInt128(it).longValue() }
 )
@@ -426,8 +446,8 @@ println("Balance: $balance")
 client.invoke<Unit>(
     functionName = "transfer",
     arguments = mapOf(
-        "from" to "GABC...",
-        "to" to "GXYZ...",
+        "from" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
+        "to" to "GCVSEBHB6CTMEHUHIUY4DDFMWQ7PJTHFZGOK2JUD5EG2ARNVS6S22E3K",
         "amount" to 1000L
     ),
     source = sourceKeypair.getAccountId(),
@@ -438,8 +458,8 @@ client.invoke<Unit>(
 // Alternative: Use automatic type conversion
 val balanceXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GABC..."),
-    source = "GABC...",
+    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null
 )
 // Convert XDR result to native type using contract spec
@@ -601,9 +621,10 @@ fun main() {
 
 ## Error Handling
 
-Always handle potential errors:
+Constructors and factories that take encoded values, such as `KeyPair.fromSecretSeed` and `KeyPair.fromAccountId`, verify their input and throw `IllegalArgumentException` for anything malformed. The examples in these guides call the API directly when the input is a fixed, known-good value; a failure there is a programming error. Wrap the call in `try`/`catch` where the value arrives at runtime, such as user input, or check it first with `StrKey.isValidEd25519PublicKey` or `StrKey.isValidEd25519SecretSeed` (the seed check takes a `CharArray`).
 
 ```kotlin
+val network = Network.TESTNET
 suspend fun robustExample() {
     try {
         val keypair = KeyPair.fromSecretSeed("INVALID")
@@ -613,10 +634,10 @@ suspend fun robustExample() {
 
     try {
         val server = HorizonServer("https://horizon-testnet.stellar.org")
-        val account = server.loadAccount("GINVALID...")
-    } catch (e: AccountNotFoundException) {
-        println("Account doesn't exist on network")
-    } catch (e: NetworkException) {
+        val account = server.loadAccount("GDWUSKGGFDI4FRXK5EBTRECZSVQSSWJHHJOGH6JWG3AUMFFMQ435DIAG") // valid format, not funded
+    } catch (e: com.soneso.stellar.sdk.horizon.exceptions.BadRequestException) {
+        println("Account doesn't exist on network (404)")
+    } catch (e: com.soneso.stellar.sdk.horizon.exceptions.NetworkException) {
         println("Network error: ${e.message}")
     }
 }

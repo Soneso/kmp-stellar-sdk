@@ -4,6 +4,14 @@ Platform-specific classes that supply `WebAuthnProvider` and `StorageAdapter` to
 
 Imports:
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+```
+
 ```kotlin
 // Common interfaces and result types (all platforms)
 import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
@@ -254,7 +262,7 @@ Serve with HTTPS, `Content-Type: application/json`, and no redirects.
 
 3. Verify the file resolves via Google's Asset Links API:
 
-```
+```text
 https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://your-domain.com&relation=delegate_permission/common.get_login_creds
 ```
 
@@ -357,7 +365,7 @@ class MainActivity : ComponentActivity() {
             rpcUrl = "https://soroban-testnet.stellar.org",
             networkPassphrase = "Test SDF Network ; September 2015",
             accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-            webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
+            webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
             webauthnProvider = webauthn,
             storage = storage
         )
@@ -419,11 +427,11 @@ No extra dependency is needed for WebAuthn — `AppleWebAuthnProvider` uses the 
 
 1. In Xcode: Target > Signing & Capabilities > `+ Capability` > "Associated Domains". Add:
 
-```
+```text
 webcredentials:your-domain.com
 ```
 
-```
+```text
 // WRONG: webcredentials:https://your-domain.com
 // CORRECT: webcredentials:your-domain.com        — bare domain, no scheme
 // For development: webcredentials:your-domain.com?mode=developer   — bypasses Apple CDN cache

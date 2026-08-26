@@ -5,9 +5,12 @@ Complete guide to Horizon streaming (Server-Sent Events) with the KMP Stellar SD
 All code examples assume these imports and run inside a `suspend` context (coroutine):
 ```kotlin
 import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.*
 import com.soneso.stellar.sdk.horizon.requests.EventListener
 import com.soneso.stellar.sdk.horizon.requests.SSEStream
+import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
+import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
+import com.soneso.stellar.sdk.horizon.responses.operations.*
 ```
 
 ## Table of Contents
@@ -29,13 +32,15 @@ Horizon supports real-time updates via Server-Sent Events (SSE). The SDK wraps S
 Every streaming-capable request builder inherits a `stream()` method from `RequestBuilder`. It requires a `serializer` and an `EventListener<T>`. Use `cursor("now")` to receive only new events. Always store the returned `SSEStream` to `close()` later.
 
 ```kotlin
-val server = HorizonServer("https://horizon-testnet.stellar.org")
-
 import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+
+val server = HorizonServer("https://horizon-testnet.stellar.org")
+
 
 // WRONG: server.payments().forAccount(accountId).cursor("now").stream().listen { ... }
-//   -- This is the Flutter/Dart API. KMP does NOT return a Dart Stream.
+//   -- Dart-style API. This SDK does NOT return a Dart Stream.
 // CORRECT: .stream(serializer, listener) -- callback-based via EventListener interface
 
 val stream: SSEStream<OperationResponse> = server.payments()
@@ -84,6 +89,7 @@ All resources follow the same pattern: `server.<resource>()[.forAccount(id)].cur
 
 ```kotlin
 import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -146,6 +152,7 @@ val stream: SSEStream<LedgerResponse> = server.ledgers()
 ```kotlin
 import com.soneso.stellar.sdk.horizon.responses.effects.EffectResponse
 import com.soneso.stellar.sdk.horizon.responses.effects.AccountCreditedEffectResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -174,6 +181,7 @@ val stream: SSEStream<EffectResponse> = server.effects()
 
 ```kotlin
 import com.soneso.stellar.sdk.horizon.responses.TradeResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 
@@ -198,6 +206,7 @@ val stream: SSEStream<TradeResponse> = server.trades()
 Use `cursor("now")` for real-time events, or a saved paging token to resume from a known position:
 
 ```kotlin
+// accountId: from the previous steps of this flow
 import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
 
@@ -251,6 +260,8 @@ You do not need to implement manual reconnection. The SDK reconnects transparent
 
 ```kotlin
 import kotlin.time.Duration.Companion.seconds
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 val stream: SSEStream<TransactionResponse> = server.transactions()
     .forAccount(accountId)
@@ -280,6 +291,8 @@ Stream errors are delivered through the `onFailure` callback. Common errors:
 ```kotlin
 import com.soneso.stellar.sdk.horizon.responses.operations.OperationResponse
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 val stream: SSEStream<OperationResponse> = server.payments()
     .forAccount(accountId)

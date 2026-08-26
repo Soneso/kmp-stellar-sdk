@@ -29,7 +29,7 @@ unzip kmp-stellar-sdk.zip -d .codex/skills/
 
 ## Skill structure
 
-```
+```text
 kmp-stellar-sdk/
   SKILL.md                       # Core patterns and API overview (loaded when skill activates)
   references/                    # Detailed docs (loaded on demand by the agent)

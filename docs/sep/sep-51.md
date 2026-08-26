@@ -366,6 +366,9 @@ Types that already have a text form use it, rather than rendering their internal
 | `AssetCode` | rendered as its `AssetCode4` or `AssetCode12` arm |
 | `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string |
 
+Reading a strkey applies the same rules the codec applies everywhere else. A strkey
+whose prefix does not match the arm being read is rejected.
+
 ```kotlin
 import com.soneso.stellar.sdk.xdr.AssetCode12Xdr
 import com.soneso.stellar.sdk.xdr.AssetCode4Xdr
@@ -434,7 +437,7 @@ A `$schema` property is accepted anywhere an object is read, ignored, and never 
 
 An XDR `string` member is text: the SDK holds it as a Kotlin `String`, so the wire bytes are decoded as UTF-8 when the value is built. Wire bytes that are not valid UTF-8 have already become the Unicode replacement character by the time the JSON is produced, and the escape ladder is applied to the replacement rather than to the original byte. Round-tripping such a value through JSON therefore does not restore the original bytes — and neither does round-tripping it through binary XDR, since the loss happens at the type boundary rather than in the JSON layer.
 
-Members that must preserve arbitrary bytes exactly are typed `ByteArray`, not `String`. Asset codes are the case that matters in practice: `AssetCode4` and `AssetCode12` hold bytes, so a code that is not valid UTF-8 renders and restores exactly.
+Members that must preserve arbitrary bytes exactly are typed `ByteArray`, not `String`, even where the XDR declares a string: asset codes (`AssetCode4`, `AssetCode12`) and the CAP-85 executable tag (`SCValXdr.ExecutableTag`, `ContractExecutableExternalRefXdr.tag`) hold bytes, so a value that is not valid UTF-8 renders and restores exactly.
 
 ### Zero-Length Signed Payloads
 

@@ -3,6 +3,14 @@
 **Purpose:** Resolve human-readable Stellar addresses (`name*domain.com`) to account IDs and memo instructions; perform reverse lookups and forward routing.
 **Prerequisites:** None (auto-discovers federation server via SEP-01 for address lookups)
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep02.*
+import com.soneso.stellar.sdk.sep.sep02.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Resolve Stellar Address (name lookup)](#1-resolve-stellar-address-name-lookup)
@@ -290,6 +298,7 @@ When constructing `FederationService` directly, pass the parameters to the
 constructor:
 
 ```kotlin
+// client: from the previous steps of this flow
 val service = FederationService(
     federationServerUrl = "https://api.example.com/federation",
     httpClient = client,
@@ -422,6 +431,7 @@ val response2 = service2.resolveAccountId("G...")
 **Not attaching the memo when one is required:**
 
 ```kotlin
+// sourceAccount: from the previous steps of this flow
 // WRONG: omitting the memo causes unroutable payments at many exchanges
 val fed = FederationService.resolveStellarAddress("alice*exchange.com")
 TransactionBuilder(sourceAccount, Network.TESTNET)
@@ -465,6 +475,7 @@ val memo = MemoId(fed.memo!!.toULong())
 **Treating memo as a number -- it is always String:**
 
 ```kotlin
+// fed: from the previous steps of this flow
 // WRONG: response.memo is String? -- there is no numeric field
 val memoId: Int = fed.memo // compile error
 
@@ -477,6 +488,7 @@ if (fed.memoType == "id") {
 **Assuming all FederationResponse fields are non-null:**
 
 ```kotlin
+// fed, length: from the previous steps of this flow
 // WRONG: forward lookups do not return stellarAddress; it will be null
 println(fed.stellarAddress!!.length) // throws NullPointerException if null
 
@@ -490,6 +502,8 @@ println(fed.accountId) // accountId is non-null String (always present)
 **Forgetting that FederationService methods are suspend functions:**
 
 ```kotlin
+import kotlinx.coroutines.runBlocking
+
 // WRONG: calling suspend function outside a coroutine scope
 fun lookup() {
     val response = FederationService.resolveStellarAddress("bob*soneso.com") // compile error
@@ -501,7 +515,6 @@ suspend fun lookup() {
 }
 
 // Or from a coroutine scope
-import kotlinx.coroutines.runBlocking
 fun main() = runBlocking {
     val response = FederationService.resolveStellarAddress("bob*soneso.com")
     println(response.accountId)
@@ -517,6 +530,7 @@ mocking, your `MockEngine` must handle both URLs or the lookup will fail.
 **Submitting transactions -- pass the XDR string, not the Transaction object:**
 
 ```kotlin
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 // WRONG: HorizonServer.submitTransaction does NOT accept a Transaction object
 // server.submitTransaction(transaction) // compile error
 
@@ -527,6 +541,8 @@ val result = server.submitTransaction(transaction.toEnvelopeXdrBase64())
 **Constructing TransactionBuilder -- requires both sourceAccount and network:**
 
 ```kotlin
+// sequenceNumber: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 // WRONG: TransactionBuilder takes two arguments, not one
 // val tx = TransactionBuilder(account).addOperation(op).build()
 

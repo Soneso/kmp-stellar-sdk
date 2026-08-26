@@ -1,6 +1,6 @@
 # Testing Guide
 
-The SDK includes comprehensive test coverage across all supported platforms: JVM, JavaScript (Node.js and Browser), macOS native, and iOS simulator.
+The SDK includes test coverage across all supported platforms: JVM, JavaScript (Node.js and Browser), macOS native, and iOS simulator.
 
 ## Test Organization
 

@@ -12,6 +12,15 @@ SEP-12 defines a standard API for collecting Know Your Customer (KYC) informatio
 - Receive status updates via webhooks
 - Delete customer data for GDPR compliance
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep12.*
+import com.soneso.stellar.sdk.sep.sep09.*
+import kotlinx.datetime.LocalDate
+```
+
 ## Quick Start
 
 ```kotlin
@@ -24,7 +33,7 @@ import kotlinx.datetime.LocalDate
 
 // 1. Authenticate with SEP-10 to get JWT token
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34STKSMREMR3EOFO3SQ7LP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val authToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
     signers = listOf(userKeyPair)
@@ -66,13 +75,12 @@ Initialize `KYCService` from a domain's stellar.toml file:
 
 ```kotlin
 // Automatic discovery from stellar.toml
-val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
 // Direct initialization with known endpoint
 val kycService = KYCService("https://testanchor.stellar.org/kyc")
 
 // With custom HTTP headers (for API keys, etc.)
-val kycService = KYCService.fromDomain(
+val kycServiceFromToml = KYCService.fromDomain(
     domain = "testanchor.stellar.org",
     httpRequestHeaders = mapOf("X-API-Key" to "your-api-key")
 )
@@ -83,33 +91,36 @@ val kycService = KYCService.fromDomain(
 Use `getCustomerInfo` to check KYC requirements and current status:
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // Check requirements for a new customer
 val request = GetCustomerInfoRequest(
-    jwt = authToken.token,
+    jwt = jwt,
     type = "sep31-sender"  // Optional: specific KYC type
 )
 val response = kycService.getCustomerInfo(request)
 
 // Check existing customer by ID
-val request = GetCustomerInfoRequest(
-    jwt = authToken.token,
+val requestById = GetCustomerInfoRequest(
+    jwt = jwt,
     id = customerId
 )
-val response = kycService.getCustomerInfo(request)
 
 // With transaction context (may require additional fields based on amount)
-val request = GetCustomerInfoRequest(
-    jwt = authToken.token,
+val requestWithTx = GetCustomerInfoRequest(
+    jwt = jwt,
     id = customerId,
     transactionId = "tx-123",
     lang = "en"  // Language for field descriptions
 )
-val response = kycService.getCustomerInfo(request)
 ```
 
 ### Processing the Response
 
 ```kotlin
+// request: from the previous steps of this flow
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val response = kycService.getCustomerInfo(request)
 
 when (response.status) {
@@ -158,6 +169,8 @@ Use `putCustomerInfo` to submit customer data. The request supports SEP-9 standa
 ### Basic Information
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
     kycFields = StandardKYCFields(
@@ -183,6 +196,8 @@ val customerId = response.id  // Save for future requests
 ### Organization KYC
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
     type = "sep31-receiver",
@@ -207,6 +222,9 @@ val response = kycService.putCustomerInfo(request)
 ### Updating Existing Customer
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // Use ID from previous response to update information
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
@@ -226,6 +244,8 @@ val response = kycService.putCustomerInfo(request)
 For anchor-specific fields not defined in SEP-9:
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
     customFields = mapOf(
@@ -244,6 +264,9 @@ val response = kycService.putCustomerInfo(request)
 Binary fields (documents, photos) can be included directly in `PutCustomerInfoRequest`:
 
 ```kotlin
+// passportBackBytes, passportFrontBytes, utilityBillBytes: from the previous steps of this flow
+// authToken: AuthToken from the SEP-10 authentication step above
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
     kycFields = StandardKYCFields(
@@ -265,6 +288,10 @@ val response = kycService.putCustomerInfo(request)
 Upload files separately, then reference them:
 
 ```kotlin
+// idBackBytes, idFrontBytes: from the previous steps of this flow
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // Step 1: Upload files
 val idFrontFile = kycService.postCustomerFile(idFrontBytes, authToken.token)
 val idBackFile = kycService.postCustomerFile(idBackBytes, authToken.token)
@@ -289,6 +316,10 @@ val response = kycService.putCustomerInfo(request)
 ### Query Uploaded Files
 
 ```kotlin
+// fileId: from the previous steps of this flow
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // Get all files for a customer
 val filesResponse = kycService.getCustomerFiles(
     jwt = authToken.token,
@@ -314,6 +345,9 @@ val fileInfo = kycService.getCustomerFiles(
 When a field requires verification (email, phone), the anchor sends a code that must be submitted:
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // Check if verification is required
 val response = kycService.getCustomerInfo(GetCustomerInfoRequest(jwt = authToken.token, id = customerId))
 
@@ -337,6 +371,9 @@ val verifyResponse = kycService.putCustomerInfo(verifyRequest)
 Multiple verifications can be submitted at once:
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerInfoRequest(
     jwt = authToken.token,
     id = customerId,
@@ -354,6 +391,9 @@ val response = kycService.putCustomerInfo(request)
 Register a webhook URL to receive KYC status updates:
 
 ```kotlin
+// authToken: AuthToken from the SEP-10 authentication step above
+val customerId = "d1ce2f48-3ff1-495d-9b96-eb2e3b6d3aec" // id from a previous putCustomer call
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 val request = PutCustomerCallbackRequest(
     jwt = authToken.token,
     url = "https://myapp.com/webhooks/kyc-status",
@@ -374,6 +414,7 @@ import com.soneso.stellar.sdk.sep.sep12.GetCustomerInfoResponse
 import kotlinx.serialization.json.Json
 
 // In your webhook handler
+@OptIn(kotlin.time.ExperimentalTime::class)
 suspend fun handleKYCCallback(
     signatureHeader: String?,            // value of "Signature" header
     xStellarSignatureHeader: String?,    // value of legacy "X-Stellar-Signature" header
@@ -416,6 +457,10 @@ Signature header format: `t=<timestamp>, s=<base64_signature>`. The verifier han
 Delete customer data for privacy compliance:
 
 ```kotlin
+// sharedAccountId: from the previous steps of this flow
+// authToken: AuthToken from the SEP-10 authentication step above
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
+val userAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 kycService.deleteCustomer(
     account = userAccountId,
     jwt = authToken.token
@@ -433,7 +478,9 @@ kycService.deleteCustomer(
 ## Error Handling
 
 ```kotlin
+// request: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep12.exceptions.*
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 
 try {
     val response = kycService.putCustomerInfo(request)

@@ -8,13 +8,19 @@ SEP-53 defines how to sign and verify arbitrary messages with Stellar Ed25519 ke
 - Authenticate users in off-chain systems using their Stellar key
 - Produce portable proofs that can be verified by any Stellar SDK
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
+
 ## Quick Start
 
 ```kotlin
 import com.soneso.stellar.sdk.KeyPair
 
 suspend fun quickExample() {
-    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     // Sign a message
     val signature = keypair.signMessage("Hello, Stellar!")
@@ -33,7 +39,7 @@ Pass a UTF-8 string directly. The SDK handles encoding internally.
 
 ```kotlin
 suspend fun signStringMessage() {
-    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     val signature = keypair.signMessage("I agree to the terms of service.")
     println("Signature: ${signature.size} bytes") // 64 bytes
@@ -46,7 +52,7 @@ Pass raw bytes for non-text payloads such as file hashes or protocol buffers.
 
 ```kotlin
 suspend fun signBinaryMessage() {
-    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     val binaryData = byteArrayOf(0x01, 0x02, 0x03, 0x04)
     val signature = keypair.signMessage(binaryData)
@@ -58,7 +64,7 @@ Both overloads produce identical results when the string and byte array represen
 
 ```kotlin
 suspend fun equivalentSignatures() {
-    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val keypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     val fromString = keypair.signMessage("Hello")
     val fromBytes = keypair.signMessage("Hello".encodeToByteArray())
@@ -71,8 +77,9 @@ suspend fun equivalentSignatures() {
 ### String Messages
 
 ```kotlin
+// getSignatureFromSomewhere: from the previous steps of this flow
 suspend fun verifyStringMessage() {
-    val verifier = KeyPair.fromAccountId("GCFMEYRERP6OTOF6GI2GQ2QLHFHNE7ZEPITKFCJ7GNFPEV3YKK6RBOA")
+    val verifier = KeyPair.fromAccountId("GC2BKLYOOYPDEFJKLKY6FNNRQMGFLVHJKQRGNSSRRGSMPGF32LHCQVGF")
     val signature: ByteArray = getSignatureFromSomewhere()
 
     val isValid = verifier.verifyMessage("I agree to the terms of service.", signature)
@@ -83,8 +90,9 @@ suspend fun verifyStringMessage() {
 ### Binary Messages
 
 ```kotlin
+// getSignatureFromSomewhere: from the previous steps of this flow
 suspend fun verifyBinaryMessage() {
-    val verifier = KeyPair.fromAccountId("GCFMEYRERP6OTOF6GI2GQ2QLHFHNE7ZEPITKFCJ7GNFPEV3YKK6RBOA")
+    val verifier = KeyPair.fromAccountId("GC2BKLYOOYPDEFJKLKY6FNNRQMGFLVHJKQRGNSSRRGSMPGF32LHCQVGF")
     val binaryData = byteArrayOf(0x01, 0x02, 0x03, 0x04)
     val signature: ByteArray = getSignatureFromSomewhere()
 
@@ -100,7 +108,7 @@ Verification requires only the public key. A keypair created with `fromAccountId
 ```kotlin
 suspend fun verifyWithPublicOnlyKeypair() {
     // Signer has the secret seed
-    val signer = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val signer = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
     val message = "Verify me"
     val signature = signer.signMessage(message)
 
@@ -113,7 +121,7 @@ suspend fun verifyWithPublicOnlyKeypair() {
 
 ## Cross-SDK Interoperability
 
-Signatures produced by this SDK are compatible with any implementation that follows SEP-53. The same test vectors pass across the Java, Python, and Flutter Stellar SDKs.
+Signatures produced by this SDK are compatible with any implementation that follows SEP-53. The same test vectors pass in other SEP-53 implementations, including the Java and Python Stellar SDKs.
 
 ```kotlin
 @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
@@ -138,7 +146,7 @@ Calling `signMessage` on a public-only keypair throws `IllegalStateException`.
 
 ```kotlin
 suspend fun handleSigningError() {
-    val publicOnly = KeyPair.fromAccountId("GCFMEYRERP6OTOF6GI2GQ2QLHFHNE7ZEPITKFCJ7GNFPEV3YKK6RBOA")
+    val publicOnly = KeyPair.fromAccountId("GC2BKLYOOYPDEFJKLKY6FNNRQMGFLVHJKQRGNSSRRGSMPGF32LHCQVGF")
 
     // Check before calling signMessage
     if (publicOnly.canSign()) {

@@ -7,6 +7,14 @@
 
 SEP-10 is the authentication foundation for SEP-06, SEP-12, SEP-24, SEP-30, and SEP-38. All anchor APIs that require authentication expect a Bearer token obtained through this flow.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep10.*
+import com.soneso.stellar.sdk.sep.sep10.exceptions.*
+```
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -34,6 +42,7 @@ SEP-10 is the authentication foundation for SEP-06, SEP-12, SEP-24, SEP-30, and 
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 // Load config from anchor's stellar.toml and run the full SEP-10 flow in one call
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -155,6 +164,9 @@ suspend fun jwtToken(
 Returns `AuthToken` (not a raw String). Throws exceptions on any failure -- see [Error Handling](#error-handling).
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: jwtToken() returns AuthToken, not String
 val token: String = webAuth.jwtToken(accountId, listOf(keyPair))
 
@@ -170,7 +182,10 @@ val jwtString: String = authToken.token
 `jwtToken()` returns an `AuthToken` that parses the JWT payload and exposes its claims. The SDK does NOT verify JWT signatures -- that is the server's responsibility.
 
 ```kotlin
+// header, httpClient: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep10.AuthToken
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 val authToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
@@ -225,6 +240,7 @@ For a single-signature account that owns its own keys. The account does not need
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticate() {
     val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -247,6 +263,7 @@ suspend fun authenticate() {
 For accounts that require multiple signers to meet the server's threshold. Provide all required keypairs -- their combined weight must satisfy the server's requirements.
 
 ```kotlin
+// getAccountId, secretSeed1, secretSeed2: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
@@ -274,6 +291,7 @@ suspend fun authenticateMultiSig() {
 For services that distinguish users sharing a single Stellar account via an integer memo. The `memo` parameter is `Long?`.
 
 ```kotlin
+// getAccountId, sharedSecretSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
@@ -298,6 +316,9 @@ suspend fun authenticateWithMemo() {
 **Important:** `memo` only works with G... (non-muxed) account IDs. Providing a memo together with an M... address throws `NoMemoForMuxedAccountsException`.
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: memo type is Int -- use Long
 webAuth.jwtToken(accountId, listOf(keyPair), memo = 12345) // compiles but 12345 is Int literal
 
@@ -312,6 +333,7 @@ webAuth.jwtToken(accountId, listOf(keyPair), memo = 12345L)
 Muxed accounts (M... addresses) embed a user ID into the account address as an alternative to memos. Pass the M... address as `clientAccountId` and the underlying G... keypair in `signers`.
 
 ```kotlin
+// baseSecretSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
@@ -335,12 +357,14 @@ suspend fun authenticateMuxed() {
 ```
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: memo with M... address -- throws NoMemoForMuxedAccountsException
-webAuth.jwtToken("MAAAA...", listOf(keyPair), memo = 12345L)
+webAuth.jwtToken("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6", listOf(keyPair), memo = 12345L)
 
 // CORRECT: use one method of user identification, never both
-webAuth.jwtToken("MAAAA...", listOf(keyPair))                   // muxed account only
-webAuth.jwtToken("GAAA...", listOf(keyPair), memo = 12345L)     // G... + memo only
+webAuth.jwtToken("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6", listOf(keyPair))                   // muxed account only
+webAuth.jwtToken("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", listOf(keyPair), memo = 12345L)     // G... + memo only
 ```
 
 ---
@@ -354,9 +378,11 @@ Non-custodial wallets can prove their identity to anchors by providing a client 
 Provide `clientDomain` and `clientDomainKeyPair`. The wallet's `stellar.toml` must publish a `SIGNING_KEY` that matches the keypair.
 
 ```kotlin
+// walletSigningSecretSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticateWithClientDomain() {
     val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -388,6 +414,7 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticateWithRemoteSigning() {
     val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -426,6 +453,10 @@ fun interface ClientDomainSigningDelegate {
 ```
 
 ```kotlin
+// signingDelegate: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: both clientDomainKeyPair and clientDomainSigningDelegate -- throws IllegalArgumentException
 webAuth.jwtToken(accountId, listOf(keyPair),
     clientDomain = "mywallet.com",
@@ -446,6 +477,9 @@ webAuth.jwtToken(accountId, listOf(keyPair),
 ```
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: clientDomain without any signing method -- throws IllegalArgumentException
 webAuth.jwtToken(accountId, listOf(keyPair),
     clientDomain = "mywallet.com"
@@ -469,6 +503,7 @@ When an anchor's auth server handles multiple home domains, use `homeDomain` to 
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticateMultiDomain() {
     val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -494,6 +529,7 @@ For custom flows or debugging, you can call each step of the SEP-10 flow individ
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticateLowLevel() {
     val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
@@ -587,6 +623,8 @@ The `TokenSubmissionResponse` is an `internal` class -- you do not access it dir
 JSON mapping: the server returns `"token"` (not `"jwt_token"`).
 
 ```kotlin
+// signedXdr: from the previous steps of this flow
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: trying to access TokenSubmissionResponse directly -- it is internal
 // CORRECT: use sendSignedChallenge() which returns AuthToken
 val authToken = webAuth.sendSignedChallenge(signedXdr)
@@ -604,6 +642,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
 import com.soneso.stellar.sdk.sep.sep10.exceptions.*
+val userSecretSeed = "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4"
 
 suspend fun authenticateWithErrorHandling() {
     try {
@@ -696,7 +735,7 @@ suspend fun authenticateWithErrorHandling() {
 
 ## Exception Hierarchy
 
-```
+```text
 WebAuthException (sealed)
 ├── ChallengeRequestException
 │     Properties: statusCode (Int), errorMessage (String?)
@@ -786,6 +825,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 
 class Sep10Test {
     // Server configuration -- must match what WebAuth is initialized with
@@ -924,12 +964,14 @@ val account = Account(serverAccountId, -1L)
 **Wrong: `memo` with M... muxed account**
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: throws NoMemoForMuxedAccountsException
-webAuth.jwtToken("MAAAA...", listOf(keyPair), memo = 12345L)
+webAuth.jwtToken("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6", listOf(keyPair), memo = 12345L)
 
 // CORRECT: choose one method of user identification
-webAuth.jwtToken("MAAAA...", listOf(keyPair))                  // muxed account encodes the memo
-webAuth.jwtToken("GAAA...", listOf(keyPair), memo = 12345L)    // G... account + separate memo
+webAuth.jwtToken("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6", listOf(keyPair))                  // muxed account encodes the memo
+webAuth.jwtToken("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", listOf(keyPair), memo = 12345L)    // G... account + separate memo
 ```
 
 **Wrong: network passphrase mismatch**
@@ -937,6 +979,7 @@ webAuth.jwtToken("GAAA...", listOf(keyPair), memo = 12345L)    // G... account +
 The `Network` passed to `WebAuth` must match the network the server signed the challenge with. If they differ, `InvalidSignatureException` is thrown even though the challenge was technically valid on its own network.
 
 ```kotlin
+val domain = "testanchor.stellar.org"
 // WRONG: WebAuth on public network but anchor signed for testnet
 // -> InvalidSignatureException (signatures won't verify)
 val webAuth = WebAuth(endpoint, Network.PUBLIC, signingKey, domain)
@@ -948,6 +991,8 @@ val webAuth = WebAuth(endpoint, Network.TESTNET, signingKey, domain)
 **Wrong: `signers` list must contain KeyPairs with secret keys**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: KeyPair.fromAccountId() has no private key and cannot sign
 val publicOnly = KeyPair.fromAccountId(accountId)
 webAuth.jwtToken(accountId, listOf(publicOnly))
@@ -961,6 +1006,9 @@ webAuth.jwtToken(accountId, listOf(fullKeyPair))
 **Wrong: empty signers list**
 
 ```kotlin
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 // WRONG: throws IllegalArgumentException("Signers list cannot be empty")
 webAuth.jwtToken(accountId, emptyList())
 
@@ -971,6 +1019,9 @@ webAuth.jwtToken(accountId, listOf(userKeyPair))
 **Wrong: both `clientDomainKeyPair` and `clientDomainSigningDelegate`**
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: throws IllegalArgumentException -- cannot use both signing methods
 webAuth.jwtToken(accountId, listOf(keyPair),
     clientDomain = "mywallet.com",
@@ -988,6 +1039,9 @@ webAuth.jwtToken(accountId, listOf(keyPair),
 **Wrong: `clientDomain` without any signing method**
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: throws IllegalArgumentException
 webAuth.jwtToken(accountId, listOf(keyPair),
     clientDomain = "mywallet.com"
@@ -1006,6 +1060,9 @@ webAuth.jwtToken(accountId, listOf(keyPair),
 `InvalidSequenceNumberException` and `InvalidOperationTypeException` indicate potential malicious server behavior. Never retry or ignore them.
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 try {
     val authToken = webAuth.jwtToken(accountId, listOf(keyPair))
 } catch (e: InvalidSequenceNumberException) {
@@ -1022,6 +1079,9 @@ try {
 **Wrong: expecting jwtToken() to return String**
 
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 // WRONG: jwtToken() returns AuthToken, not String
 val jwt: String = webAuth.jwtToken(accountId, listOf(keyPair)).toString()
 // This works but is misleading -- toString() returns the raw token

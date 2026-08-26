@@ -6,6 +6,14 @@
 
 SEP-09 fields are used by [SEP-12](sep-12.md) (`PutCustomerInfoRequest.kycFields`), SEP-24, and SEP-31.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep09.*
+import kotlinx.datetime.LocalDate
+```
+
 ## Table of Contents
 
 - [Class overview](#class-overview)
@@ -284,7 +292,7 @@ val fin = FinancialAccountKYCFields(
     mobileMoneyProvider = "M-Pesa",          // String? -> "mobile_money_provider"
 
     // Crypto
-    cryptoAddress = "GABC...",               // String? -> "crypto_address"
+    cryptoAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",               // String? -> "crypto_address"
     // cryptoMemo is @Deprecated -- use externalTransferMemo instead
 )
 ```
@@ -317,6 +325,7 @@ Note: `FinancialAccountKYCFields` has **no** `files()` method -- there are no bi
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep09.CardKYCFields
+val network = Network.TESTNET
 
 val card = CardKYCFields(
     number         = "4111111111111111",      // String? -> "card.number"
@@ -577,6 +586,7 @@ import com.soneso.stellar.sdk.sep.sep09.StandardKYCFields
 import com.soneso.stellar.sdk.sep.sep09.NaturalPersonKYCFields
 import com.soneso.stellar.sdk.sep.sep12.KYCService
 import com.soneso.stellar.sdk.sep.sep12.PutCustomerInfoRequest
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 suspend fun submitKYC(jwtToken: String) {
     val kycService = KYCService("https://testanchor.stellar.org/kyc")
@@ -625,7 +635,7 @@ val p = NaturalPersonKYCFields(
 val updated = p.copy(emailAddress = "john@example.com")
 ```
 
-**WRONG: `occupation` expects `Int` like in Dart/Flutter SDK**
+**WRONG: passing `occupation` as an `Int`**
 
 ```kotlin
 // WRONG: Int assignment -- in KMP SDK occupation is String?, not Int?
@@ -634,7 +644,7 @@ val p = NaturalPersonKYCFields(
 )
 
 // CORRECT: occupation is String in KMP SDK (ISCO-08 code)
-val p = NaturalPersonKYCFields(
+val person = NaturalPersonKYCFields(
     occupation = "251"
 )
 ```
@@ -642,6 +652,8 @@ val p = NaturalPersonKYCFields(
 **WRONG: `birthDate`, `idIssueDate`, and `idExpirationDate` are `String`**
 
 ```kotlin
+import kotlinx.datetime.LocalDate
+
 // WRONG: string for date fields
 val p = NaturalPersonKYCFields(
     birthDate        = "1990-05-15",  // compile error -- expects LocalDate?
@@ -650,8 +662,7 @@ val p = NaturalPersonKYCFields(
 )
 
 // CORRECT: all three date fields accept kotlinx.datetime.LocalDate?
-import kotlinx.datetime.LocalDate
-val p = NaturalPersonKYCFields(
+val person = NaturalPersonKYCFields(
     birthDate        = LocalDate(1990, 5, 15),
     idIssueDate      = LocalDate(2020, 1, 15),
     idExpirationDate = LocalDate(2030, 1, 15)
@@ -659,10 +670,11 @@ val p = NaturalPersonKYCFields(
 // In fields() output: LocalDate.toString() -> "1990-05-15" (date-only, no time component)
 ```
 
-**WRONG: using Dart/Flutter-style constant names (snake_case_field_key)**
+**WRONG: using snake_case constant names (snake_case_field_key)**
 
 ```kotlin
-// WRONG: Dart SDK uses lowercase snake_case constant names
+// first_name_field_key: from the previous steps of this flow
+// WRONG: lowercase snake_case constant names do not exist here
 NaturalPersonKYCFields.first_name_field_key  // does not exist
 
 // CORRECT: KMP SDK uses UPPER_SNAKE_CASE companion object constants
@@ -694,6 +706,7 @@ fields["card.number"]  // correct key
 **WRONG: calling `files()` on `FinancialAccountKYCFields` or `CardKYCFields`**
 
 ```kotlin
+// card, fin, person: from the previous steps of this flow
 // WRONG: neither class has a files() method
 fin.files()  // compile error
 card.files() // compile error
@@ -713,15 +726,16 @@ val fin = FinancialAccountKYCFields(
 )
 
 // CORRECT: use the general external_transfer_memo field instead
-val fin = FinancialAccountKYCFields(
+val financial = FinancialAccountKYCFields(
     externalTransferMemo = "12345678"
 )
 ```
 
-**WRONG: `StandardKYCFields` has no `fields()` method (like in Dart)**
+**WRONG: assuming `StandardKYCFields` has no `fields()` method**
 
 ```kotlin
-// WRONG (only in Dart/Flutter): assuming the container has no fields() method
+// person: from the previous steps of this flow
+// WRONG: assuming the container has no fields() method
 val kyc = StandardKYCFields(naturalPersonKYCFields = person)
 // "must call fields() on nested object directly"
 

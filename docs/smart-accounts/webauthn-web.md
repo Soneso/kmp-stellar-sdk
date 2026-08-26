@@ -2,6 +2,14 @@
 
 Platform-specific guide for configuring WebAuthn passkey authentication in browser applications using the KMP Stellar SDK Smart Account Kit.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+```
+
 ## Prerequisites
 
 - A modern browser with WebAuthn support (Chrome 67+, Firefox 60+, Safari 14+, Edge 79+)
@@ -105,7 +113,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     webauthnProvider = webauthnProvider,
     storage = storage
 )
@@ -135,7 +143,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "your-wasm-hash-hex",
-    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     webauthnProvider = webauthnProvider
 )
 ```
