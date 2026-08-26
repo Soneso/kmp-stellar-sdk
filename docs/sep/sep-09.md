@@ -10,6 +10,14 @@ SEP-9 defines standardized Know Your Customer (KYC) and Anti-Money Laundering (A
 - Provide required identity documents for regulated transfers
 - Supply bank account or payment card details for off-ramps
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep09.*
+import kotlinx.datetime.LocalDate
+```
+
 ## Quick Start
 
 ```kotlin
@@ -262,6 +270,7 @@ Identity documents and proof of address are submitted as binary data (ByteArray)
 ### Natural Person Documents
 
 ```kotlin
+// incomeDocBytes, notaryBytes, passportBackBytes, passportFrontBytes, selfieBytes, utilityBillBytes: from the previous steps of this flow
 // Binary fields accept ByteArray (loaded from files in your application)
 val person = NaturalPersonKYCFields(
     firstName = "John",
@@ -289,6 +298,7 @@ val binaryFields = person.files()
 ### Organization Documents
 
 ```kotlin
+// businessAddressBytes, incorporationBytes: from the previous steps of this flow
 val organization = OrganizationKYCFields(
     name = "Example Corporation",
 

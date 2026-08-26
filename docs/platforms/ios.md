@@ -46,7 +46,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.12.0")
                 implementation(compose.runtime)
                 implementation(compose.material3)
             }
@@ -102,7 +102,7 @@ Then add the framework to your Xcode project:
 
 ### Build Settings
 
-```
+```text
 // In Xcode Build Settings
 ENABLE_BITCODE = NO
 VALID_ARCHS = arm64
@@ -257,7 +257,7 @@ Task {
 
 ### Demo Application
 
-For comprehensive examples, see the iOS demo app:
+For complete examples, see the iOS demo app:
 - Location: `/demo/iosApp`
 - Features: Key generation, account funding, balance checking, transactions
 - Architecture: SwiftUI with Compose Multiplatform shared logic

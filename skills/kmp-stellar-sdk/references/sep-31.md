@@ -4,6 +4,16 @@
 **Prerequisites:** Requires JWT from SEP-10 (see [sep-10.md](sep-10.md)). Often used with SEP-12 (KYC, see [sep-12.md](sep-12.md)) and SEP-38 (quotes, see [sep-38.md](sep-38.md)).
 **SDK package:** `com.soneso.stellar.sdk.sep.sep31`
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep31.*
+import com.soneso.stellar.sdk.sep.sep31.exceptions.*
+import com.soneso.stellar.sdk.sep.sep09.*
+import com.soneso.stellar.sdk.sep.sep12.*
+```
+
 ## Table of Contents
 
 - [How It Works](#how-it-works)
@@ -55,7 +65,7 @@ val service: Sep31Service = try {
 ```
 
 Signature:
-```
+```kotlin
 suspend fun Sep31Service.Companion.fromDomain(
     domain: String,
     httpClient: HttpClient? = null,
@@ -76,7 +86,7 @@ val service = Sep31Service("https://api.receivinganchor.com/sep31")
 ```
 
 Constructor signature:
-```
+```kotlin
 class Sep31Service(
     val serviceUrl: String,
     httpClient: HttpClient? = null,
@@ -112,6 +122,7 @@ Query the anchor to discover supported assets, limits, fees, required SEP-12 KYC
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31BadRequestException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnknownResponseException
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -151,7 +162,7 @@ for ((assetCode, assetInfo) in info.receiveAssets) {
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun Sep31Service.info(jwt: String, lang: String? = null): Sep31InfoResponse
 ```
 
@@ -171,6 +182,7 @@ import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31CustomerInfoNeededExcept
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31ForbiddenException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionInfoNeededException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnauthorizedException
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -224,7 +236,7 @@ if (stellarAccount != null) {
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun Sep31Service.postTransactions(
     request: Sep31PostTransactionsRequest,
     jwt: String,
@@ -235,7 +247,7 @@ Accepts `200 OK` or `201 Created` from the server.
 
 ### Sep31PostTransactionsRequest constructor
 
-```
+```kotlin
 data class Sep31PostTransactionsRequest(
     val amount: Double,                 // required
     val assetCode: String,              // required
@@ -266,6 +278,10 @@ import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31BadRequestException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionNotFoundException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31UnknownResponseException
+
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
+// jwtToken: from the previous steps of this flow
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -321,7 +337,7 @@ tx.feeDetails?.let { fees ->
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun Sep31Service.getTransaction(id: String, jwt: String): Sep31TransactionResponse
 ```
 
@@ -333,6 +349,8 @@ If `stellarAccountId` is `null` in the POST response, the anchor is still prepar
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.Sep31TransactionStatus
 import kotlinx.coroutines.delay
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -376,6 +394,7 @@ while (stellarAccount == null) {
 When polling surfaces `PENDING_CUSTOMER_INFO_UPDATE`, the Receiving Anchor needs additional KYC for the registered customer scoped to this transaction. Resolve via SEP-12: pass the `transactionId` to both `getCustomerInfo` (to discover which fields are missing) and `putCustomerInfo` (to submit them). Scoping by `transactionId` returns only the fields the anchor needs for this specific transaction, not the customer's global KYC state.
 
 ```kotlin
+// jwtToken, quoteId, receiverId, senderId: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep09.NaturalPersonKYCFields
 import com.soneso.stellar.sdk.sep.sep09.StandardKYCFields
 import com.soneso.stellar.sdk.sep.sep12.CustomerStatus
@@ -426,6 +445,7 @@ Register a URL for status-change notifications so polling is not required.
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31BadRequestException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionCallbackNotSupportedException
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -447,7 +467,7 @@ try {
 ```
 
 Method signature:
-```
+```kotlin
 suspend fun Sep31Service.putTransactionCallback(
     id: String,
     callbackUrl: String,
@@ -469,6 +489,8 @@ For verifying inbound callback signatures, see [Verifying Callback Signatures](#
 import com.soneso.stellar.sdk.sep.sep31.Sep31Service
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31BadRequestException
 import com.soneso.stellar.sdk.sep.sep31.exceptions.Sep31TransactionNotFoundException
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val service = Sep31Service.fromDomain("receivinganchor.com")
 
@@ -496,7 +518,7 @@ try {
 ```
 
 Method signature (annotated `@Deprecated`):
-```
+```kotlin
 @Deprecated("Use SEP-12 PUT /customer to update KYC fields instead.")
 suspend fun Sep31Service.patchTransaction(
     id: String,
@@ -514,6 +536,7 @@ The KMP SDK returns the parsed response (per spec, the PATCH body matches `GET /
 End-to-end example combining SEP-10, SEP-12, and SEP-31:
 
 ```kotlin
+// jwtToken, transactionId: from the previous steps of this flow
 import com.soneso.stellar.sdk.AbstractTransaction
 import com.soneso.stellar.sdk.Account
 import com.soneso.stellar.sdk.AssetTypeCreditAlphaNum4
@@ -583,10 +606,10 @@ suspend fun fullPaymentFlow(sendingAnchorSeed: String) {
                     firstName = "Bob",
                     lastName = "Receiver",
                 ),
-                customFields = mapOf(
-                    "bank_account_number" to "1234567890",
-                    "bank_routing_number" to "021000021",
-                ),
+            ),
+            customFields = mapOf(
+                "bank_account_number" to "1234567890",
+                "bank_routing_number" to "021000021",
             ),
         )
     ).id
@@ -714,13 +737,13 @@ Field signatures listed here; consult the SDK KDoc for full semantics. Non-obvio
 
 ### Sep31InfoResponse
 
-```
+```kotlin
 val receiveAssets: Map<String, Sep31ReceiveAssetInfo>   // keyed by asset code, never null (may be empty)
 ```
 
 ### Sep31ReceiveAssetInfo
 
-```
+```kotlin
 val sep12Info: Sep31Sep12TypesInfo                      // always set; empty maps when anchor requires no KYC
 val minAmount: Double?
 val maxAmount: Double?
@@ -736,14 +759,14 @@ val fundingMethods: List<String>?                       // supported payment rai
 
 ### Sep31Sep12TypesInfo
 
-```
+```kotlin
 val senderTypes: Map<String, String>                    // type key -> human-readable description
 val receiverTypes: Map<String, String>                  // type key -> human-readable description
 ```
 
 ### Sep31PostTransactionsResponse
 
-```
+```kotlin
 val id: String                                          // always present
 val stellarAccountId: String?                           // may be null initially; poll until populated
 val stellarMemoType: String?                            // "id", "text", or "hash"
@@ -752,7 +775,7 @@ val stellarMemo: String?
 
 ### Sep31TransactionResponse
 
-```
+```kotlin
 val id: String
 val status: String                                      // raw string; use Sep31TransactionStatus.fromString()
 val statusEta: Long?
@@ -781,7 +804,7 @@ val requiredInfoUpdates: Map<String, Any?>?             // populated on pending_
 
 ### Sep31FeeDetails / Sep31FeeDetailsDetails
 
-```
+```kotlin
 class Sep31FeeDetails(
     val total: String,
     val asset: String,                                   // SEP-38 format asset identifier
@@ -797,7 +820,7 @@ class Sep31FeeDetailsDetails(
 
 ### Sep31Refunds / Sep31RefundPayment
 
-```
+```kotlin
 class Sep31Refunds(
     val amountRefunded: String,                          // in units of amount_in_asset
     val amountFee: String,
@@ -814,6 +837,8 @@ class Sep31RefundPayment(
 Usage:
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 val tx = sep31.getTransaction(id = transactionId, jwt = jwt)
 if (tx.status == "refunded") {
     val r = tx.refunds ?: error("Anchor reported 'refunded' but no refunds object present")
@@ -853,6 +878,7 @@ JWT-shaped tokens are redacted in user-facing exception messages but preserved v
 When the Receiving Anchor delivers status updates to your registered callback URL, each `POST` carries a `Signature` (or legacy `X-Stellar-Signature`) header signed with the anchor's `SIGNING_KEY` from its stellar.toml. The shared `CallbackSignatureVerifier` covers both SEP-12 and SEP-31 webhooks.
 
 ```kotlin
+// request: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.common.CallbackSignatureVerifier
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 
@@ -908,6 +934,7 @@ The verifier:
 **Memo is the payment routing key. Use the exact value from the anchor:**
 
 ```kotlin
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 // WRONG: signing without a memo, or guessing
 val tx = TransactionBuilder(sourceAccount = account, network = Network.TESTNET)
     .addOperation(payment)
@@ -923,7 +950,6 @@ val memoObj = when (response.stellarMemoType) {
     "hash" -> MemoHash(Base64.decode(memoValue)) // memo is base64-encoded; MemoHash(String) parses hex
     else -> error("Unknown memo type: ${response.stellarMemoType}")
 }
-val tx = TransactionBuilder(sourceAccount = account, network = Network.TESTNET)
     .addOperation(payment)
     .addMemo(memoObj)  // required — do not omit
     .setTimeout(120)
@@ -933,6 +959,7 @@ val tx = TransactionBuilder(sourceAccount = account, network = Network.TESTNET)
 **`stellarAccountId` may be null after POST. Always check before sending payment:**
 
 ```kotlin
+// response: from the previous steps of this flow
 // WRONG: sending immediately without checking
 val destination = response.stellarAccountId!!  // crashes when anchor delays the instruction
 
@@ -953,6 +980,8 @@ The Receiving Anchor matches payments by memo, not by source account. The SEP-10
 **`Sep31CustomerInfoNeededException.type` is the SEP-12 type, not a customer ID:**
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val kycService = KYCService.fromDomain("testanchor.stellar.org")
 // WRONG: passing e.type as a customer ID
 val senderId = e.type  // this is a type key like "sep31-sender", not an ID
 
@@ -968,6 +997,8 @@ val senderId = kycService.putCustomerInfo(req).id
 **`patchTransaction` wraps the fields map automatically. Don't pre-wrap:**
 
 ```kotlin
+val jwt = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// id, jwt, service: from the previous steps of this flow
 // WRONG: wrapping the fields map yourself (the SDK wraps it in {"fields": ...} too — double wrapping)
 @Suppress("DEPRECATION")
 service.patchTransaction(

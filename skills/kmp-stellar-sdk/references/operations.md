@@ -1,8 +1,8 @@
 # Stellar Operations Reference
 
-All operations are data classes instantiated via constructors (NOT builders). Every operation inherits from the `Operation` sealed class and supports an optional `sourceAccount` property (G... or M... address) that overrides the transaction source. All code assumes standard SDK imports from `com.soneso.stellar.sdk`.
+All operations are data classes instantiated via constructors (NOT builders). Every operation inherits from the `Operation` sealed class and supports an optional `sourceAccount` property (G... or M... address) that overrides the transaction source. All code runs in a `suspend` context and assumes these imports: `com.soneso.stellar.sdk.*`, `com.soneso.stellar.sdk.scval.Scv`, and `com.soneso.stellar.sdk.xdr.*`.
 
-<!-- WRONG/CORRECT: The KMP SDK does NOT use the builder pattern like Flutter/Java SDKs -->
+<!-- WRONG/CORRECT: The KMP SDK does NOT use the builder pattern found in the Java SDK -->
 <!-- WRONG: CreateAccountOperationBuilder("G...", "10.0").build() -->
 <!-- CORRECT: CreateAccountOperation(destination = "G...", startingBalance = "10.0") -->
 
@@ -36,7 +36,7 @@ All operations are data classes instantiated via constructors (NOT builders). Ev
 - [Clawback Operations](#clawback-operations)
   - [ClawbackOperation](#clawbackoperation)
 - [Liquidity Pool Operations](#liquidity-pool-operations)
-  - [LiquidityPoolDepositOperation](#liquiditypooldeposit-operation)
+  - [LiquidityPoolDepositOperation](#liquiditypooldepositoperation)
   - [LiquidityPoolWithdrawOperation](#liquiditypoolwithdrawoperation)
 - [Soroban Operations](#soroban-operations)
   - [InvokeHostFunctionOperation](#invokehostfunctionoperation)
@@ -78,6 +78,8 @@ PaymentOperation(
 ```
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val recipientId = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
 // Send XLM
 val payXlm = PaymentOperation(
     destination = recipientId,
@@ -110,6 +112,8 @@ PathPaymentStrictReceiveOperation(
 ```
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val recipientId = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
 val usd = AssetTypeCreditAlphaNum4("USD", issuerAccountId)
 
 // Direct path (no intermediaries)
@@ -143,6 +147,8 @@ PathPaymentStrictSendOperation(
 ```
 
 ```kotlin
+val recipientId = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val pathSendOp = PathPaymentStrictSendOperation(
     sendAsset = AssetTypeNative,
     sendAmount = "10.0",
@@ -157,6 +163,7 @@ val pathSendOp = PathPaymentStrictSendOperation(
 Merges source account into destination, transferring all XLM.
 
 ```kotlin
+val destinationAccountId = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
 val mergeOp = AccountMergeOperation(destination = destinationAccountId)
 ```
 
@@ -177,6 +184,7 @@ ManageSellOfferOperation(
 ```
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val xlm = AssetTypeNative
 val usd = AssetTypeCreditAlphaNum4("USD", issuerAccountId)
 
@@ -230,6 +238,7 @@ ManageBuyOfferOperation(
 ```
 
 ```kotlin
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 // WRONG: ManageBuyOfferOperation(xlm, usd, amount = "50.0", ...) — parameter is buyAmount
 // CORRECT: ManageBuyOfferOperation(xlm, usd, buyAmount = "50.0", ...)
 val buyOp = ManageBuyOfferOperation(
@@ -245,6 +254,8 @@ val buyOp = ManageBuyOfferOperation(
 Creates a passive sell offer that does not take existing offers at the same price.
 
 ```kotlin
+// xlm: from the previous steps of this flow
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val passiveOp = CreatePassiveSellOfferOperation(
     selling = usd,
     buying = xlm,
@@ -275,6 +286,7 @@ SetOptionsOperation(
 ```
 
 ```kotlin
+val signerAccountId = "GBVPKXWMAB3FIUJB6T7LF66DABKKA2ZHRHDOQZ25GBAEFZVHTBPJNOJI"
 // Set home domain
 val domainOp = SetOptionsOperation(homeDomain = "example.com")
 
@@ -306,6 +318,10 @@ val removeSignerOp = SetOptionsOperation(
 **Multi-sig setup must be atomic:** Each `SetOptionsOperation` can set only ONE signer. To add multiple signers and configure thresholds, include all operations in a SINGLE transaction. If you raise thresholds in a separate transaction first, subsequent operations may require more signatures than available, locking you out.
 
 ```kotlin
+val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
+val primaryKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val signerAId = "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR"
+val signerBId = "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U"
 // Correct: add 2 signers + set thresholds in ONE transaction
 val addA = SetOptionsOperation(
     signer = SignerKey.ed25519PublicKey(signerAId),
@@ -351,6 +367,7 @@ ChangeTrustOperation(
 ```
 
 ```kotlin
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val usd = AssetTypeCreditAlphaNum4("USD", issuerAccountId)
 
 // Create trustline with max limit
@@ -405,6 +422,9 @@ SetTrustLineFlagsOperation(
 ```
 
 ```kotlin
+// trustorAccountId: from the previous steps of this flow
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 // Authorize a trustline
 val authOp = SetTrustLineFlagsOperation(
     trustor = trustorAccountId,
@@ -472,6 +492,13 @@ CreateClaimableBalanceOperation(
 ```
 
 ```kotlin
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+
+val recipientAccountId = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM"
+@OptIn(ExperimentalTime::class)
+val nowSeconds = Clock.System.now().epochSeconds
+
 // Unconditional claimant
 val claimant = Claimant(
     destination = recipientAccountId,
@@ -485,8 +512,7 @@ val createBalanceOp = CreateClaimableBalanceOperation(
 )
 
 // Time-locked claimant (claimable after a specific time)
-// import kotlinx.datetime.Clock
-val unlockTime = Clock.System.now().epochSeconds + 86400 // 24 hours from now
+val unlockTime = nowSeconds + 86400 // 24 hours from now
 
 // WRONG: Claimant.predicateNot(...) — no static factory methods on Claimant
 // CORRECT: use ClaimPredicate sealed class directly
@@ -497,7 +523,9 @@ val timedClaimant = Claimant(
     )
 )
 
-// AND/OR predicates
+// AND/OR predicates: claimable inside the window [startTime, endTime)
+val startTime = nowSeconds
+val endTime = startTime + 86400
 val windowPredicate = ClaimPredicate.And(
     left = ClaimPredicate.Not(ClaimPredicate.BeforeAbsoluteTime(startTime)),
     right = ClaimPredicate.BeforeAbsoluteTime(endTime)
@@ -513,8 +541,8 @@ Claims an existing claimable balance by its ID (72-character hex string).
 
 ```kotlin
 // WRONG: ClaimableBalanceResponse has .id NOT .balanceId
-// Horizon returns the ID as the "id" field
-val balanceId = claimableBalanceResponse.id
+// Horizon returns the ID as the "id" field: claimableBalanceResponse.id
+val balanceId = "00000000929b20b72e5890ab51c24f1cc46fa01c4f318d8d33367d24dd614cfdf5491072" // from Horizon's "id"
 
 val claimOp = ClaimClaimableBalanceOperation(balanceId = balanceId)
 ```
@@ -524,6 +552,7 @@ val claimOp = ClaimClaimableBalanceOperation(balanceId = balanceId)
 Issuer claws back a claimable balance (requires clawback enabled on the asset).
 
 ```kotlin
+val balanceId = "00000000929b20b72e5890ab51c24f1cc46fa01c4f318d8d33367d24dd614cfdf5491072" // 72-char hex id from Horizon
 val clawbackBalanceOp = ClawbackClaimableBalanceOperation(balanceId = balanceId)
 ```
 
@@ -534,6 +563,7 @@ val clawbackBalanceOp = ClawbackClaimableBalanceOperation(balanceId = balanceId)
 Begins sponsoring reserves for another account.
 
 ```kotlin
+val sponsoredAccountId = "GDWUSKGGFDI4FRXK5EBTRECZSVQSSWJHHJOGH6JWG3AUMFFMQ435DIAG"
 val beginSponsorOp = BeginSponsoringFutureReservesOperation(
     sponsoredId = sponsoredAccountId
 )
@@ -550,6 +580,9 @@ val endSponsorOp = EndSponsoringFutureReservesOperation()
 **Sponsorship sandwich pattern** (all operations in one transaction):
 
 ```kotlin
+// sponsorAccount, sponsoredKeyPair: from the previous steps of this flow
+val newAccountId = "GDWUSKGGFDI4FRXK5EBTRECZSVQSSWJHHJOGH6JWG3AUMFFMQ435DIAG"
+val sponsorKeyPair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 val beginOp = BeginSponsoringFutureReservesOperation(sponsoredId = newAccountId)
 
 val createOp = CreateAccountOperation(
@@ -581,6 +614,11 @@ RevokeSponsorshipOperation(sponsorship: Sponsorship)
 ```
 
 ```kotlin
+// ed25519AccountId, sponsorAccountId: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val balanceId = "00000000929b20b72e5890ab51c24f1cc46fa01c4f318d8d33367d24dd614cfdf5491072" // 72-char hex id from Horizon
+val signerAccountId = "GBVPKXWMAB3FIUJB6T7LF66DABKKA2ZHRHDOQZ25GBAEFZVHTBPJNOJI"
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 // Revoke account sponsorship
 val revokeAccountOp = RevokeSponsorshipOperation(
     Sponsorship.Account(accountId)
@@ -630,6 +668,9 @@ ClawbackOperation(
 ```
 
 ```kotlin
+val holderAccountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val clawbackOp = ClawbackOperation(
     from = holderAccountId,
     asset = usd,
@@ -654,6 +695,7 @@ LiquidityPoolDepositOperation(
 ```
 
 ```kotlin
+val poolId = "dd7b1ab831c273310ddbec6f97870aa83c2fbd78ce22aded37ecbf4f3380fac7" // 64-char hex pool id
 val depositOp = LiquidityPoolDepositOperation(
     liquidityPoolId = poolId,
     maxAmountA = "1000.0",
@@ -677,6 +719,7 @@ LiquidityPoolWithdrawOperation(
 ```
 
 ```kotlin
+val poolId = "dd7b1ab831c273310ddbec6f97870aa83c2fbd78ce22aded37ecbf4f3380fac7" // 64-char hex pool id
 val withdrawOp = LiquidityPoolWithdrawOperation(
     liquidityPoolId = poolId,
     amount = "100.0",
@@ -702,6 +745,8 @@ InvokeHostFunctionOperation(
 **Upload WASM:**
 
 ```kotlin
+import java.io.File
+
 val wasmBytes = File("contract.wasm").readBytes() // or platform-specific file loading
 val uploadOp = InvokeHostFunctionOperation.uploadContractWasm(wasmBytes)
 ```
@@ -709,6 +754,8 @@ val uploadOp = InvokeHostFunctionOperation.uploadContractWasm(wasmBytes)
 **Create contract from WASM hash:**
 
 ```kotlin
+// wasmIdHex: from the previous steps of this flow
+val deployerAccountId = "GDFJHLAXAUMHA4OWPOB4P7YO72AQR2HMIUYFOXLXE2DZGM633K7HZDQP"
 // WRONG: CreateContractHostFunction(address, wasmId) — no such class
 // CORRECT: use the companion factory method
 val createOp = InvokeHostFunctionOperation.createContract(
@@ -720,6 +767,9 @@ val createOp = InvokeHostFunctionOperation.createContract(
 **Create contract with constructor args:**
 
 ```kotlin
+// wasmIdHex: from the previous steps of this flow
+val adminId = "GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE"
+val deployerAccountId = "GDFJHLAXAUMHA4OWPOB4P7YO72AQR2HMIUYFOXLXE2DZGM633K7HZDQP"
 val createOp = InvokeHostFunctionOperation.createContract(
     wasmId = wasmIdHex,
     address = Address(deployerAccountId),
@@ -735,6 +785,7 @@ val createOp = InvokeHostFunctionOperation.createContract(
 **Invoke contract function:**
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // WRONG: InvokeContractHostFunction(contractId, "transfer", arguments = [...])
 // CORRECT: use the companion factory method
 val invokeOp = InvokeHostFunctionOperation.invokeContractFunction(
@@ -753,6 +804,7 @@ val invokeOp = InvokeHostFunctionOperation.invokeContractFunction(
 For deploying a SAC, build the host function XDR manually:
 
 ```kotlin
+val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val assetXdr = usd.toXdr()
 val preimage = ContractIDPreimageXdr.FromAsset(assetXdr)
 // WRONG: ContractExecutableXdr.StellarAsset — no such variant

@@ -91,7 +91,8 @@ sealed class Operation {
          *
          * @param value The decimal amount string
          * @return The amount in stroops (10^-7 of the base unit)
-         * @throws IllegalArgumentException if the amount has more than 7 decimal places
+         * @throws IllegalArgumentException if the amount has more than 7 significant
+         * decimal places; trailing zeros do not count against the limit
          */
         internal fun toXdrAmount(value: String): Long {
             require(value.isNotBlank()) { "Amount cannot be blank" }
@@ -105,15 +106,14 @@ sealed class Operation {
             }
 
             val fractionalPart = if (parts.size == 2) {
-                val fraction = parts[1]
+                // Digits only: toLong would read a sign inside the fraction as part
+                // of the number, silently building a different amount than written
+                require(parts[1].all { it in '0'..'9' }) { "Invalid amount format: '$value'" }
+                val fraction = parts[1].trimEnd('0')
                 require(fraction.length <= 7) {
                     "Amount cannot have more than 7 decimal places, got ${fraction.length}"
                 }
-                try {
-                    fraction.padEnd(7, '0').toLong()
-                } catch (e: NumberFormatException) {
-                    throw IllegalArgumentException("Invalid amount format: '$value'", e)
-                }
+                fraction.padEnd(7, '0').toLong()
             } else {
                 0L
             }
@@ -126,7 +126,8 @@ sealed class Operation {
          *
          * @param value The amount string
          * @return The formatted amount string
-         * @throws IllegalArgumentException if the amount has more than 7 decimal places
+         * @throws IllegalArgumentException if the amount has more than 7 significant
+         * decimal places; trailing zeros do not count against the limit
          */
         internal fun formatAmountScale(value: String): String {
             require(value.isNotBlank()) { "Amount cannot be blank" }
@@ -134,10 +135,12 @@ sealed class Operation {
             require(parts.size <= 2) { "Invalid amount format: '$value'" }
 
             val fractionalPart = if (parts.size == 2) {
-                require(parts[1].length <= 7) {
-                    "The scale of the amount must be less than or equal to 7, got ${parts[1].length}"
+                require(parts[1].all { it in '0'..'9' }) { "Invalid amount format: '$value'" }
+                val fraction = parts[1].trimEnd('0')
+                require(fraction.length <= 7) {
+                    "The scale of the amount must be less than or equal to 7, got ${fraction.length}"
                 }
-                parts[1].padEnd(7, '0')
+                fraction.padEnd(7, '0')
             } else {
                 "0000000"
             }

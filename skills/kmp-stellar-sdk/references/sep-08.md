@@ -7,6 +7,14 @@ SEP-08 defines a protocol for regulated assets — assets where an issuer-run ap
 
 **Spec:** [SEP-0008 v1.7.4](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0008.md)
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep08.*
+import com.soneso.stellar.sdk.sep.sep08.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Quick Start](#1-quick-start)
@@ -27,6 +35,7 @@ SEP-08 defines a protocol for regulated assets — assets where an issuer-run ap
 ## 1. Quick Start
 
 ```kotlin
+// destinationId: from the previous steps of this flow
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.sep.sep08.Sep08Service
@@ -41,9 +50,8 @@ println("${asset.code} issued by ${asset.issuer}")
 println("Approval server: ${asset.approvalServer}")
 
 // Build and sign a transaction
-val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-val senderAccount = horizonServer.accounts().account(senderKeyPair.getAccountId())
+val senderAccount = horizonServer.loadAccount(senderKeyPair.getAccountId())
 
 val tx = TransactionBuilder(senderAccount, Network.TESTNET)
     .setBaseFee(100)
@@ -157,7 +165,7 @@ import io.ktor.client.*
 
 val client = HttpClient { /* configure timeouts, etc. */ }
 
-val sep08 = Sep08Service.fromDomain(
+val sep08Explicit = Sep08Service.fromDomain(
     domain = "regulated-asset-issuer.com",
     httpClient = client,
     httpRequestHeaders = mapOf("User-Agent" to "MyWallet/1.0"),
@@ -233,6 +241,7 @@ try {
 Build and sign a transaction normally, then submit the base64-encoded XDR envelope to the approval server. Do not submit directly to Stellar — the approval server must co-sign first.
 
 ```kotlin
+// destinationId, getAccountId, senderSeed: from the previous steps of this flow
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.sep.sep08.Sep08Service
@@ -242,7 +251,7 @@ val regulatedAsset = sep08.regulatedAssets.first()
 
 val senderKeyPair = KeyPair.fromSecretSeed(senderSeed)
 val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-val senderAccount = horizonServer.accounts().account(senderKeyPair.getAccountId())
+val senderAccount = horizonServer.loadAccount(senderKeyPair.getAccountId())
 
 val tx = TransactionBuilder(senderAccount, Network.TESTNET)
     .setBaseFee(100)
@@ -281,9 +290,11 @@ Sends a POST with `Content-Type: application/json` and body `{"tx": "<base64>"}`
 The approval server returns one of five response types. Use Kotlin `when` with sealed class matching:
 
 ```kotlin
+// sep08: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep08.Sep08PostTransactionResponse
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import kotlinx.coroutines.delay
+val approvalServer = "https://approval.example.com"
 
 val response = sep08.postTransaction(txXdr, approvalServer)
 val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
@@ -350,8 +361,10 @@ when (response) {
 When the server returns `ActionRequired` with `actionMethod == "POST"`, you can programmatically submit the requested SEP-9 fields:
 
 ```kotlin
+// sep08: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep08.Sep08PostTransactionResponse
 import com.soneso.stellar.sdk.sep.sep08.Sep08PostActionResponse
+val approvalServer = "https://approval.example.com"
 
 val response = sep08.postTransaction(txXdr, approvalServer)
 
@@ -424,6 +437,7 @@ import com.soneso.stellar.sdk.sep.sep08.exceptions.Sep08IncompleteInitDataExcept
 import com.soneso.stellar.sdk.sep.sep08.exceptions.Sep08InvalidTransactionResponseException
 import com.soneso.stellar.sdk.sep.sep08.exceptions.Sep08InvalidActionResponseException
 import kotlinx.coroutines.delay
+val server = HorizonServer("https://horizon-testnet.stellar.org")
 
 suspend fun sendRegulatedAssetPayment(
     domain: String,
@@ -460,7 +474,7 @@ suspend fun sendRegulatedAssetPayment(
     // Step 3: Build and sign the transaction
     val senderKeyPair = KeyPair.fromSecretSeed(senderSeed)
     val horizonServer = HorizonServer("https://horizon-testnet.stellar.org")
-    val senderAccount = horizonServer.accounts().account(senderKeyPair.getAccountId())
+    val senderAccount = horizonServer.loadAccount(senderKeyPair.getAccountId())
 
     val tx = TransactionBuilder(senderAccount, Network.TESTNET)
         .setBaseFee(100)
@@ -634,6 +648,7 @@ data class NextUrl(
 ## 11. Error Handling
 
 ```kotlin
+// txXdr: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep08.Sep08Service
 import com.soneso.stellar.sdk.sep.sep08.exceptions.Sep08Exception
 import com.soneso.stellar.sdk.sep.sep08.exceptions.Sep08IncompleteInitDataException
@@ -685,6 +700,7 @@ try {
 **Wrong: passing `RegulatedAsset` directly where `Asset` is expected**
 
 ```kotlin
+// dest, regulatedAsset: from the previous steps of this flow
 // WRONG: RegulatedAsset does NOT extend Asset — it wraps one internally
 PaymentOperation(destination = dest, asset = regulatedAsset, amount = "100")  // compile error
 
@@ -705,6 +721,7 @@ val txXdr = tx.toEnvelopeXdrBase64()
 **Wrong: submitting to Stellar network before getting approval**
 
 ```kotlin
+// asset, horizonServer, sep08: from the previous steps of this flow
 // WRONG: submitting directly bypasses the approval server entirely
 horizonServer.submitTransaction(tx.toEnvelopeXdrBase64())
 
@@ -719,6 +736,7 @@ if (response is Sep08PostTransactionResponse.Success) {
 **Wrong: `Pending.timeout` is milliseconds, not seconds**
 
 ```kotlin
+// delay, response: from the previous steps of this flow
 // WRONG: treating timeout as seconds
 val pending = response as Sep08PostTransactionResponse.Pending
 delay(pending.timeout.toLong() * 1000)  // waits 5,000,000ms if timeout=5000!
@@ -730,6 +748,7 @@ delay(pending.timeout.toLong())
 **Wrong: `Pending.timeout` is `Int`, not `Int?`**
 
 ```kotlin
+// delay, response: from the previous steps of this flow
 // WRONG: null-checking timeout — it always defaults to 0 (Int), never null
 if (response.timeout == null) { /* ... */ }  // compile warning — always false
 
@@ -759,6 +778,7 @@ if (response is Sep08PostTransactionResponse.Success) {
 **Wrong: `ActionRequired.actionMethod` defaults to `"GET"`, not `null`**
 
 ```kotlin
+// fields, response, sep08: from the previous steps of this flow
 // WRONG: checking for null — actionMethod always has a value (defaults to "GET")
 if (response.actionMethod == null) { /* ... */ }  // compile warning — always false
 
@@ -774,6 +794,8 @@ if (response.actionMethod == "POST") {
 **Wrong: forgetting to resubmit the ORIGINAL transaction after `PostActionDone`**
 
 ```kotlin
+// actionResponse, horizonServer, sep08: from the previous steps of this flow
+val approvalServer = "https://approval.example.com"
 // WRONG: Done is a data object with no properties — there is nothing to submit from it
 if (actionResponse is Sep08PostActionResponse.Done) {
     horizonServer.submitTransaction(actionResponse.tx)  // compile error — no such property!
@@ -797,7 +819,6 @@ val asset = sep08.regulatedAssets.first()
 if (sep08.regulatedAssets.isEmpty()) {
     throw Exception("No regulated assets found in stellar.toml")
 }
-val asset = sep08.regulatedAssets.first()
 ```
 
 **Wrong: accessing `issuer` as a method instead of a property**

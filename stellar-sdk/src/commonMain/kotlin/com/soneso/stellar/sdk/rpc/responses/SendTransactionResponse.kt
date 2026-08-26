@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * duplicate, require retry, or have an error.
  *
  * @property status The submission status of the transaction
- * @property hash Transaction hash (hex-encoded), present for PENDING and DUPLICATE status
+ * @property hash Transaction hash (hex-encoded), returned for every status
  * @property latestLedger The latest ledger known to Soroban RPC at the time it handled the request
  * @property latestLedgerCloseTime Unix timestamp of when the latest ledger was closed
  * @property errorResultXdr Base64-encoded TransactionResult XDR (only present for ERROR status)

@@ -4,6 +4,16 @@ Passkey-authenticated smart accounts on Stellar using OpenZeppelin Soroban contr
 
 Standard imports:
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.*
+```
+
 ```kotlin
 import com.soneso.stellar.sdk.smartaccount.oz.*
 import com.soneso.stellar.sdk.smartaccount.core.*
@@ -51,7 +61,7 @@ Smart accounts are in the same artifact as the rest of the KMP SDK:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 }
 ```
 
@@ -88,8 +98,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 // WRONG: accountWasmHash = "YWJjMTIzZGVm..."  — base64 is NOT accepted
 // CORRECT: accountWasmHash must be a 64-character hex string
 //   Regex is [0-9a-fA-F]{64}. Config init throws ConfigurationException.InvalidConfig otherwise.
-// WRONG: webauthnVerifierAddress = "GA7Q..."  — must be C-address, not G-address
-// CORRECT: webauthnVerifierAddress = "CBCD..."  — validated via StrKey.isValidContract
+// WRONG: webauthnVerifierAddress = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"  — must be C-address, not G-address
+// CORRECT: webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"  — validated via StrKey.isValidContract
 ```
 
 ### Optional fields
@@ -122,7 +132,7 @@ val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
-    webauthnVerifierAddress = "CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH",
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     relayerUrl = "https://relayer.example.com",       // optional
     indexerUrl = "https://indexer.example.com",       // optional
     webauthnProvider = MyWebAuthnProvider(),          // required for createWallet / transfer
@@ -139,7 +149,7 @@ val config = OZSmartAccountConfig.builder(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = "Test SDF Network ; September 2015",
     accountWasmHash = "a1b2c3d4...",
-    webauthnVerifierAddress = "CBCD1234..."
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
     .sessionExpiryMs(86_400_000L)               // 1 day
     .signatureExpirationLedgers(1440)           // ~2 hours
@@ -233,7 +243,8 @@ suspend fun createWallet(
     autoSubmit: Boolean = false,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): CreateWalletResult
 ```
 
@@ -308,6 +319,9 @@ before calling `createWallet`. Skip this step if you configured a relayer
 (which pays deploy fees) or supplied your own funded `deployerKeypair`.
 
 ```kotlin
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import kotlinx.coroutines.delay
+
 // Ensure the deployer exists on testnet — required when no relayer is
 // configured. kit.getDeployer() returns the configured deployer or the
 // deterministic default (SHA-256 of a well-known seed).
@@ -345,7 +359,8 @@ suspend fun deployPendingCredential(
     autoSubmit: Boolean = true,
     autoFund: Boolean = false,
     nativeTokenContract: String? = null,
-    forceMethod: SubmissionMethod? = null
+    forceMethod: SubmissionMethod? = null,
+    policies: Map<String, SCValXdr>? = null
 ): DeployPendingResult
 ```
 
@@ -431,6 +446,7 @@ sealed class ConnectWalletResult {
 ### Phase 1: silent restore at app launch
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val kit = OZSmartAccountKit.create(config)
 
 when (val restored = kit.walletOperations.connectWallet()) {
@@ -485,10 +501,11 @@ val fresh = kit.walletOperations.connectWallet(
 No WebAuthn ceremony, no session check. Useful after a user picks a wallet from a list in the indexer:
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val direct = kit.walletOperations.connectWallet(
     OZWalletOperations.ConnectWalletOptions(
         credentialId = "abc123_...",   // Base64URL, from indexer
-        contractId   = "CABC..."
+        contractId   = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
     )
 )
 // Always Connected on success; throws WalletException.NotFound if the
@@ -496,7 +513,7 @@ val direct = kit.walletOperations.connectWallet(
 ```
 
 ```kotlin
-// WRONG: OZWalletOperations.ConnectWalletOptions(contractId = "CABC...")  — contractId alone throws
+// WRONG: OZWalletOperations.ConnectWalletOptions(contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")  — contractId alone throws
 // CORRECT: contractId must be paired with credentialId
 ```
 
@@ -535,7 +552,7 @@ suspend fun connectToContract(contractId: String): String   // returns the conne
 ```
 
 ```kotlin
-val contractId = kit.walletOperations.connectToContract("CABC...")
+val contractId = kit.walletOperations.connectToContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 // kit.isConnected == true, kit.isHeadless == true, kit.credentialId == null
 ```
 
@@ -581,6 +598,7 @@ data class AuthenticatePasskeyResult(
 Typical flow:
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // 1. Authenticate
 val auth = kit.walletOperations.authenticatePasskey()
 
@@ -622,12 +640,12 @@ data class DelegatedSigner(val address: String) : SmartAccountSigner()
 
 ```kotlin
 val accountSigner  = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
-val contractSigner = DelegatedSigner("CBCD1234EFGH5678IJKL9012MNOP3456QRST7890UVWX1234ABCDEFGH")
+val contractSigner = DelegatedSigner("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")
 ```
 
 On-chain SCVal representation:
 
-```
+```text
 Vec([Symbol("Delegated"), Address(address)])
 ```
 
@@ -646,7 +664,7 @@ data class ExternalSigner(
 
 On-chain SCVal representation:
 
-```
+```text
 Vec([Symbol("External"), Address(verifierAddress), Bytes(keyData)])
 ```
 
@@ -657,7 +675,7 @@ Do not construct `ExternalSigner` directly for passkeys — use the `webAuthn` f
 ```kotlin
 // Factory on the companion object — NOT a subclass and NOT a constructor
 val signer: ExternalSigner = ExternalSigner.webAuthn(
-    verifierAddress = "CBCD1234...",           // WebAuthn verifier contract
+    verifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",           // WebAuthn verifier contract
     publicKey = secp256r1PublicKey,            // 65 bytes, uncompressed (0x04 prefix + X + Y)
     credentialId = credentialIdBytes           // raw bytes (NOT Base64URL-encoded here)
 )
@@ -692,13 +710,13 @@ The factory validates `publicKey.size == 32` (`SmartAccountConstants.ED25519_PUB
 `SmartAccountBuilders` offers the same factories with type-safe names plus inspection helpers:
 
 ```kotlin
-val delegated = SmartAccountBuilders.createDelegatedSigner("GA7Q...")
+val delegated = SmartAccountBuilders.createDelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
 val passkey   = SmartAccountBuilders.createWebAuthnSigner(
-    webauthnVerifierAddress = "CBCD...",
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     publicKey = publicKey65,
     credentialId = credentialIdBytes
 )
-val ed25519Signer = SmartAccountBuilders.createEd25519Signer("CDEF...", publicKey32)
+val ed25519Signer = SmartAccountBuilders.createEd25519Signer("CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z", publicKey32)
 
 // Inspection
 val isPasskey: Boolean = SmartAccountBuilders.isExternalSigner(passkey)
@@ -753,6 +771,7 @@ suspend fun transfer(
 ```
 
 ```kotlin
+val amount = "100"
 val result = kit.transactionOperations.transfer(
     tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC", // native SAC
     recipient     = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ",
@@ -953,7 +972,7 @@ enum class CredentialDeploymentStatus { PENDING, FAILED }
 
 ### Credential lifecycle
 
-```
+```text
 pending --[deploy success]--> deleted from storage
 pending --[deploy failure]--> failed (deploymentError set)
 pending --[sync discovers contract on-chain]--> deleted from storage
@@ -965,19 +984,20 @@ After deployment succeeds, the credential is removed from storage. Reconnection 
 ### Common operations
 
 ```kotlin
+val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 // Save or upsert (no deployment metadata; overwrites existing by ID)
 val cred: StoredCredential = kit.credentialManager.saveCredential(
     credentialId = "abc123_...",
     publicKey    = publicKey65,
     nickname     = "MacBook Touch ID",
-    contractId   = "CABC..."
+    contractId   = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 )
 
 // Lookup
 val found: StoredCredential? = kit.credentialManager.getCredential("abc123_...")
 val all:   List<StoredCredential> = kit.credentialManager.getAllCredentials()
 val byContract: List<StoredCredential> =
-    kit.credentialManager.getCredentialsByContract("CABC...")
+    kit.credentialManager.getCredentialsByContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 val forCurrent: List<StoredCredential> = kit.credentialManager.getForConnectedWallet()
 val pending:    List<StoredCredential> = kit.credentialManager.getPendingCredentials()
 
@@ -1041,12 +1061,12 @@ val config = OZSmartAccountConfig.builder(rpcUrl, networkPassphrase, wasmHash, v
 val kit = OZSmartAccountKit.create(config)
 
 // Wallet in-memory custody (model 2): register a secret seed at runtime
-val gAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+val gAddress = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 // Ed25519 in-memory custody (model 2): register a raw 32-byte seed at runtime
 val ed25519PublicKey = kit.externalSigners.addEd25519FromRawKey(
     secretKeyBytes = rawSeedBytes,   // exactly 32 bytes
-    verifierAddress = "CED25519VERIFIER2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    verifierAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA"
 )
 ```
 
@@ -1090,11 +1110,11 @@ suspend fun addFromSecret(secretKey: String): String    // returns derived G-add
 ```
 
 ```kotlin
-val address = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34REYB6WBMG7CKKFJHYAEGQ")
+val address = kit.externalSigners.addFromSecret("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 ```
 
 ```kotlin
-// WRONG: addFromSecret("GA7Q...")  — secret keys are S-addresses, not G-addresses
+// WRONG: addFromSecret("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")  — secret keys are S-addresses, not G-addresses
 // CORRECT: addFromSecret("S...")  — Stellar secret seed
 ```
 
@@ -1113,8 +1133,8 @@ val hasWalletAdapter: Boolean
 ```
 
 ```kotlin
-if (kit.externalSigners.canSignFor("GA7Q...")) {
-    val info = kit.externalSigners.getAll().first { it.address == "GA7Q..." }
+if (kit.externalSigners.canSignFor("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")) {
+    val info = kit.externalSigners.getAll().first { it.address == "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ" }
     println("Type: ${info.type}, wallet: ${info.walletName ?: "n/a"}")
 }
 ```
@@ -1286,7 +1306,7 @@ class OZIndexerClient(
 companion object {
     val DEFAULT_INDEXER_URLS: Map<String, String>                           // testnet + mainnet
     fun getDefaultUrl(networkPassphrase: String): String?
-    fun forNetwork(networkPassphrase: String, timeoutMs: Long = ...): OZIndexerClient?
+    fun forNetwork(networkPassphrase: String, timeoutMs: Long = OZConstants.DEFAULT_INDEXER_TIMEOUT_MS): OZIndexerClient?
 }
 ```
 
@@ -1323,7 +1343,7 @@ suspend fun lookupByAddress(address: String): AddressLookupResponse
 ```
 
 ```kotlin
-val contracts = kit.indexerClient?.lookupByAddress("GA7Q...")?.contracts ?: emptyList()
+val contracts = kit.indexerClient?.lookupByAddress("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")?.contracts ?: emptyList()
 ```
 
 Throws `ValidationException.InvalidAddress` on bad format, `IndexerException.*` on request failure.
@@ -1337,7 +1357,7 @@ suspend fun getContract(contractId: String): ContractDetailsResponse
 ```
 
 ```kotlin
-val details = kit.indexerClient?.getContract("CABC...")
+val details = kit.indexerClient?.getContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 details?.contextRules?.forEach { rule ->
     println("Rule ${rule.contextRuleId}: ${rule.signers.size} signers, ${rule.policies.size} policies")
 }
@@ -1458,7 +1478,7 @@ suspend fun deriveContractAddress(
 
 Algorithm:
 
-```
+```text
 salt         = SHA-256(credentialId)
 deployerAddr = SCAddress::Account(deployerPublicKey)
 networkId    = SHA-256(networkPassphrase as UTF-8)

@@ -2,6 +2,13 @@
 
 Get a Stellar wallet running in 30 minutes! This guide covers the essentials to start using the Stellar KMP SDK.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+```
+
 ## What You'll Build
 
 In this quick start, you'll:
@@ -16,7 +23,7 @@ Add the SDK to your Gradle project:
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 }
 ```
 
@@ -70,10 +77,7 @@ suspend fun createTestAccount() {
     val keypair = KeyPair.random()
 
     // Fund it on testnet (10,000 test XLM)
-    val success = FriendBot.fundAccount(
-        accountId = keypair.getAccountId(),
-        network = Network.TESTNET
-    )
+    val success = FriendBot.fundTestnetAccount(keypair.getAccountId())
 
     if (success) {
         println("Account funded! Address: ${keypair.getAccountId()}")
@@ -94,7 +98,7 @@ suspend fun sendFirstPayment() {
     val server = HorizonServer("https://horizon-testnet.stellar.org")
 
     // Your account (you need the secret seed)
-    val senderKeypair = KeyPair.fromSecretSeed("SXXX...")
+    val senderKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     // Load current account state from network
     val senderAccount = server.loadAccount(senderKeypair.getAccountId())
@@ -103,12 +107,12 @@ suspend fun sendFirstPayment() {
     val transaction = TransactionBuilder(senderAccount, Network.TESTNET)
         .addOperation(
             PaymentOperation(
-                destination = "GYYY...",  // Recipient address
+                destination = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",  // Recipient address
                 amount = "10",             // Amount in XLM
-                asset = Asset.NATIVE       // XLM
+                asset = AssetTypeNative       // XLM
             )
         )
-        .addMemo(Memo.text("My first payment"))
+        .addMemo(MemoText("My first payment"))
         .setBaseFee(100)
         .setTimeout(180)
         .build()
@@ -116,13 +120,12 @@ suspend fun sendFirstPayment() {
     // Sign the transaction
     transaction.sign(senderKeypair)
 
-    // Submit to network
-    val response = server.submitTransaction(transaction)
-
-    if (response.isSuccess) {
+    // Submit to network; a rejected transaction raises BadRequestException
+    try {
+        val response = server.submitTransaction(transaction.toEnvelopeXdrBase64())
         println("Payment sent! Transaction: ${response.hash}")
-    } else {
-        println("Payment failed: ${response.extras?.resultCodes}")
+    } catch (e: com.soneso.stellar.sdk.horizon.exceptions.BadRequestException) {
+        println("Payment failed: ${e.message}")
     }
 
     server.close()
@@ -147,8 +150,8 @@ fun main() = runBlocking {
     println("Bob: ${bob.getAccountId()}")
 
     // 2. Fund both accounts on testnet
-    FriendBot.fundAccount(alice.getAccountId(), Network.TESTNET)
-    FriendBot.fundAccount(bob.getAccountId(), Network.TESTNET)
+    FriendBot.fundTestnetAccount(alice.getAccountId())
+    FriendBot.fundTestnetAccount(bob.getAccountId())
 
     // 3. Send payment from Alice to Bob
     val server = HorizonServer("https://horizon-testnet.stellar.org")
@@ -159,7 +162,7 @@ fun main() = runBlocking {
             PaymentOperation(
                 destination = bob.getAccountId(),
                 amount = "100",
-                asset = Asset.NATIVE
+                asset = AssetTypeNative
             )
         )
         .setBaseFee(100)
@@ -168,8 +171,13 @@ fun main() = runBlocking {
 
     payment.sign(alice)
 
-    val result = server.submitTransaction(payment)
-    println("Payment ${if (result.isSuccess) "successful" else "failed"}")
+    // A rejected transaction raises BadRequestException, as above
+    try {
+        val result = server.submitTransaction(payment.toEnvelopeXdrBase64())
+        println("Payment successful: ${result.hash}")
+    } catch (e: com.soneso.stellar.sdk.horizon.exceptions.BadRequestException) {
+        println("Payment failed: ${e.message}")
+    }
 
     server.close()
 }

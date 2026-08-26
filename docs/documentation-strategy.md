@@ -2,6 +2,13 @@
 
 This document defines the core strategy and principles for the Stellar KMP SDK documentation.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+```
+
 ## Target Audience
 
 All documentation is written for **Group 1: SDK Users** - developers who want to integrate the SDK into their applications.
@@ -26,7 +33,7 @@ Main's user-facing documentation and skill content describe the released SDK, be
 
 Documentation follows a structured learning path from novice to expert:
 
-```
+```text
 Quick Start → Getting Started → Demo App → Architecture → SDK Usage Examples → Advanced → Soroban RPC
 ```
 
@@ -147,7 +154,7 @@ Platform guides (`docs/platforms/*.md`) follow these rules:
 - Gradle/build configuration for SDK installation
 - Platform-specific SDK initialization (if any)
 - 2-3 SDK usage examples (KeyPair generation, transaction building)
-- Links to demo app for comprehensive examples
+- Links to demo app for complete examples
 
 **What to exclude:**
 - Multiple framework alternatives (pick one)
@@ -237,6 +244,7 @@ class AccountRepository(private val server: HorizonServer) {
 
 **Right:**
 ```kotlin
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 // DO: Show direct SDK usage
 val server = HorizonServer("https://horizon-testnet.stellar.org")
 val account = server.loadAccount(accountId)
@@ -270,6 +278,7 @@ val account = server.loadAccount(accountId)
 
 **Wrong:**
 ```kotlin
+// accountId: from the previous steps of this flow
 // DON'T: Explain internal implementation
 // The SDK uses Kotlin/Native cinterop to call libsodium's
 // crypto_sign_detached function which implements Ed25519
@@ -348,11 +357,11 @@ Good documentation achieves:
 
 ## Documentation Structure
 
-```
+```text
 docs/
 ├── README.md                    # Documentation hub with learning paths
 ├── quick-start.md              # 30-minute fast path
-├── getting-started.md          # Comprehensive fundamentals
+├── getting-started.md          # Full fundamentals guide
 ├── demo-app.md                 # Demo app guide
 ├── architecture.md             # SDK design and internals
 ├── sdk-usage-examples.md       # Practical code patterns
@@ -372,7 +381,7 @@ docs/
 
 - [SDK Usage Examples](sdk-usage-examples.md) - Practical code patterns
 - [Quick Start Guide](quick-start.md) - 30-minute fast path to first transaction
-- [Getting Started Guide](getting-started.md) - Comprehensive fundamentals
+- [Getting Started Guide](getting-started.md) - Full fundamentals guide
 - [Platform Documentation](platforms/README.md) - Platform-specific guides
 
 ---

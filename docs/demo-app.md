@@ -1,13 +1,13 @@
 # Demo Application
 
-A comprehensive Kotlin Multiplatform demo showcasing the Stellar SDK across all supported platforms (Android, iOS, macOS, Desktop, Web). Learn SDK usage through production-ready patterns with 95% code sharing.
+A Kotlin Multiplatform demo showcasing the Stellar SDK across all supported platforms (Android, iOS, macOS, Desktop, Web). Learn SDK usage through production-ready patterns with 95% code sharing.
 
 ## Overview
 
 The demo app demonstrates real-world SDK usage patterns through 11 interactive features, from basic cryptography to advanced smart contract operations. Unlike simplified samples, this is a full-featured application that:
 
 - **Connects to real Stellar networks**: All operations run against testnet with actual transaction submission
-- **Uses production-ready patterns**: Comprehensive error handling, async operations, proper state management
+- **Uses production-ready patterns**: Error handling, async operations, proper state management
 - **Shares 95% of code**: Compose Multiplatform UI and business logic work across Android, iOS, Desktop, and Web
 - **Uses SDK directly**: Demonstrates actual SDK APIs, not simplified wrappers or reimplementations
 
@@ -75,7 +75,7 @@ Get the demo running in under a minute:
 # Opens at http://localhost:8081
 ```
 
-For iOS and macOS native setup, see the [comprehensive guide](../demo/README.md).
+For iOS and macOS native setup, see the [setup guide](../demo/README.md).
 
 ## Architecture
 
@@ -99,7 +99,7 @@ All features demonstrate SDK usage directly - no wrappers, no simplified impleme
 
 ## Code Organization
 
-```
+```text
 demo/shared/                    # 95% shared code
 ├── stellar/                    # SDK integration (business logic)
 │   ├── KeyPairGeneration.kt
@@ -130,7 +130,7 @@ demo/shared/                    # 95% shared code
 demo/{platform}App/             # Lightweight entry points
 ```
 
-## Comprehensive Documentation
+## Documentation
 
 This overview provides a quick introduction. For detailed information:
 

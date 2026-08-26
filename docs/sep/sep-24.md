@@ -8,6 +8,16 @@ SEP-24 enables interactive deposit and withdrawal flows with Stellar anchors. Us
 - On-ramp and off-ramp services for wallets and applications
 - KYC-compliant asset transfers with regulatory requirements
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep24.*
+import com.soneso.stellar.sdk.sep.sep24.exceptions.*
+import com.soneso.stellar.sdk.sep.sep10.*
+import com.soneso.stellar.sdk.sep.sep38.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -23,7 +33,7 @@ info.depositAssets?.forEach { (code, assetInfo) ->
 }
 
 // Authenticate via SEP-10 (required for deposits/withdrawals)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 val jwtToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
@@ -56,7 +66,6 @@ println("Final status: ${tx.status}")
 
 ```kotlin
 // Discovers TRANSFER_SERVER_SEP0024 from stellar.toml
-val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 ```
 
 ### Direct Initialization
@@ -75,6 +84,7 @@ val sep24 = Sep24Service(
 Discover supported assets, limits, and anchor capabilities. No authentication required.
 
 ```kotlin
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val info = sep24.info()
 
 // Check deposit assets
@@ -121,6 +131,9 @@ info.features?.let { features ->
 Start an interactive deposit flow. Returns a URL to display in a webview.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep24.deposit(Sep24DepositRequest(
     assetCode = "USDC",
     jwt = jwtToken,
@@ -162,6 +175,9 @@ println("Interactive URL: ${response.url}")
 Start an interactive withdrawal flow. Returns a URL to display in a webview.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val response = sep24.withdraw(Sep24WithdrawRequest(
     assetCode = "USDC",
     jwt = jwtToken,
@@ -198,6 +214,9 @@ println("Interactive URL: ${response.url}")
 Query a single transaction by its identifier.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 val response = sep24.transaction(Sep24TransactionRequest(
     jwt = jwtToken,
     id = transactionId
@@ -214,6 +233,8 @@ tx.message?.let { println("Message: $it") }
 Query by Stellar transaction hash:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val response = sep24.transaction(Sep24TransactionRequest(
     jwt = jwtToken,
     stellarTransactionId = "abc123..."
@@ -223,6 +244,8 @@ val response = sep24.transaction(Sep24TransactionRequest(
 Query by external transaction ID:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val response = sep24.transaction(Sep24TransactionRequest(
     jwt = jwtToken,
     externalTransactionId = "BANK-REF-456"
@@ -243,6 +266,8 @@ At least one of `id`, `stellarTransactionId`, or `externalTransactionId` must be
 Query transaction history for the authenticated account.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val response = sep24.transactions(Sep24TransactionsRequest(
     assetCode = "USDC",
     jwt = jwtToken,
@@ -260,6 +285,8 @@ response.transactions.forEach { tx ->
 Filter by date:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val response = sep24.transactions(Sep24TransactionsRequest(
     assetCode = "USDC",
     jwt = jwtToken,
@@ -270,6 +297,8 @@ val response = sep24.transactions(Sep24TransactionsRequest(
 Paginate results:
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 // First page
 val firstPage = sep24.transactions(Sep24TransactionsRequest(
     assetCode = "USDC",
@@ -301,6 +330,9 @@ val nextPage = sep24.transactions(Sep24TransactionsRequest(
 Continuously poll a transaction until it reaches a terminal status.
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 val tx = sep24.pollTransaction(
     request = Sep24TransactionRequest(jwt = jwtToken, id = transactionId),
     pollIntervalMs = 3000,
@@ -378,6 +410,9 @@ SEP-24 transactions progress through various states before reaching a terminal s
 ### Status Helpers
 
 ```kotlin
+// handlePendingStatus, handleSuccess, handleUnknownStatus, promptUserToEstablishTrustline, promptUserToSendFunds, txId: from the previous steps of this flow
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val tx = sep24.transaction(Sep24TransactionRequest(jwt = jwtToken, id = txId)).transaction
 
 // Get status as enum
@@ -404,6 +439,10 @@ if (Sep24TransactionStatus.isTerminal(tx.status)) {
 ## Error Handling
 
 ```kotlin
+// request, signers: from the previous steps of this flow
+val accountId = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 try {
     val response = sep24.deposit(request)
 } catch (e: Sep24AuthenticationRequiredException) {
@@ -440,12 +479,13 @@ try {
 Full workflow from authentication to transaction completion:
 
 ```kotlin
+val network = Network.TESTNET
 // 1. Initialize services
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 // 2. User keypair (in production, load from secure storage)
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val accountId = userKeyPair.getAccountId()
 
 // 3. Discover supported assets and validate
@@ -551,7 +591,7 @@ val quoteService = QuoteService.fromDomain("testanchor.stellar.org")
 val webAuth = WebAuth.fromDomain("testanchor.stellar.org", Network.TESTNET)
 
 // 2. Authenticate
-val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val jwtToken = webAuth.jwtToken(
     clientAccountId = userKeyPair.getAccountId(),
     signers = listOf(userKeyPair)

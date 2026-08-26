@@ -470,19 +470,53 @@ class KmpSDKAnalyzer:
         """
         endpoints = []
 
-        # Pattern to find setSegments() calls
+        # Find setSegments() calls with balanced-parenthesis extraction: an argument
+        # may itself contain calls (e.g. ClaimableBalanceId.forId(x).toPaddedHex()),
+        # and the call may span multiple lines, so a [^)]+ regex truncates the
+        # argument list at the first ')' and drops trailing segments.
         # Examples:
         # setSegments("accounts", accountId)
         # setSegments("accounts", account, "transactions")
         # setSegments("ledgers", ledgerSeq.toString(), "transactions")
         # setSegments("accounts", accountId, "data", key)  # FIX Issue 1
-        segments_pattern = r'setSegments\s*\(\s*([^)]+)\s*\)'
+        def _setsegments_arg_lists(text):
+            idx = 0
+            while True:
+                pos = text.find('setSegments', idx)
+                if pos == -1:
+                    return
+                open_pos = text.find('(', pos)
+                if open_pos == -1:
+                    return
+                depth, i = 1, open_pos + 1
+                while i < len(text) and depth:
+                    if text[i] == '(':
+                        depth += 1
+                    elif text[i] == ')':
+                        depth -= 1
+                    i += 1
+                yield text[open_pos + 1:i - 1]
+                idx = i
 
-        for match in re.finditer(segments_pattern, content):
-            segments_str = match.group(1)
+        def _split_top_level_commas(args):
+            parts, depth, cur = [], 0, []
+            for ch in args:
+                if ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+                if ch == ',' and depth == 0:
+                    parts.append(''.join(cur).strip())
+                    cur = []
+                else:
+                    cur.append(ch)
+            if cur:
+                parts.append(''.join(cur).strip())
+            return parts
 
-            # Parse the segments - split by comma and clean up
-            segments_raw = [s.strip() for s in segments_str.split(',')]
+        for segments_str in _setsegments_arg_lists(content):
+            # Parse the segments - split on top-level commas only and clean up
+            segments_raw = _split_top_level_commas(segments_str)
 
             # Convert to path segments
             path_parts = []
@@ -517,8 +551,20 @@ class KmpSDKAnalyzer:
                         # FIX Issue 1: data entry key placeholder
                         path_parts.append('{key}')
                     else:
-                        # Generic placeholder
-                        path_parts.append('{id}')
+                        # Generic variable: infer the placeholder from the
+                        # preceding collection literal (e.g. a `ledger(id)` call's
+                        # setSegments("ledgers", id.toString()) names {ledger_sequence}),
+                        # falling back to {id} with no known predecessor.
+                        prev = path_parts[-1] if path_parts else ''
+                        path_parts.append({
+                            'accounts': '{account_id}',
+                            'ledgers': '{ledger_sequence}',
+                            'transactions': '{transaction_id}',
+                            'operations': '{operation_id}',
+                            'claimable_balances': '{claimable_balance_id}',
+                            'liquidity_pools': '{liquidity_pool_id}',
+                            'offers': '{offer_id}',
+                        }.get(prev, '{id}'))
 
             # Construct the endpoint path
             if path_parts:

@@ -2,6 +2,12 @@
 
 The KMP SDK implements 15 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
+
 ## SEP Reference Table
 
 | SEP | Name | Description | Details |
@@ -37,6 +43,7 @@ val stellarToml = StellarToml.fromDomain("anchor.example.com")
 ```kotlin
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.sep.sep10.WebAuth
+val userKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 val webAuth = WebAuth.fromDomain("anchor.example.com", Network.TESTNET)
 val authToken = webAuth.jwtToken(userKeyPair.getAccountId(), listOf(userKeyPair))
@@ -46,6 +53,7 @@ val authToken = webAuth.jwtToken(userKeyPair.getAccountId(), listOf(userKeyPair)
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
+// authToken: AuthToken from the SEP-10 authentication fence above
 
 val sep24 = Sep24Service.fromDomain("anchor.example.com")
 val request = Sep24DepositRequest(assetCode = "USDC", jwt = authToken.token)

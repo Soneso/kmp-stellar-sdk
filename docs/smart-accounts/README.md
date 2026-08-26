@@ -4,6 +4,15 @@ The Smart Account Kit provides passkey-authenticated smart accounts on Stellar u
 
 New to smart accounts? Start with the [onboarding guide](onboarding.md) for background on how smart accounts, passkeys, and the on-chain contracts work.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.smartaccount.core.*
+import com.soneso.stellar.sdk.smartaccount.oz.*
+import com.soneso.stellar.sdk.scval.Scv
+```
+
 ## Overview
 
 A smart account is a Soroban contract that replaces traditional Stellar key management with programmable authorization. Each smart account supports:
@@ -22,7 +31,7 @@ The kit wraps the OpenZeppelin smart account contracts deployed on Soroban. The 
 
 The kit is split into two layers: a protocol-agnostic `core/` layer (signer types, signature wrappers, the `WebAuthnProvider` interface, and crypto helpers usable by any Soroban `CustomAccountInterface` contract) and an OpenZeppelin-specific `oz/` layer (the kit, managers, relayer/indexer clients, and storage adapters).
 
-```
+```text
 +-----------------------------------------------------------------------+
 |                         Your Application                              |
 +-----------------------------------------------------------------------+
@@ -99,8 +108,8 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = Network.TESTNET.networkPassphrase,
-    accountWasmHash = "<64-char hex WASM hash>",
-    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     relayerUrl = "https://relayer.example.com",    // optional: enables fee sponsoring
     indexerUrl = "https://indexer.example.com",     // optional: enables credential lookup
     webauthnProvider = MyWebAuthnProvider(),         // optional: platform-specific passkey implementation
@@ -122,7 +131,7 @@ val wallet = kit.walletOperations.createWallet(
     userName = "Alice",
     autoSubmit = true,
     autoFund = true,
-    nativeTokenContract = "<C-address of native XLM SAC>"
+    nativeTokenContract = "CAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAODX" // native XLM SAC
 )
 
 // wallet.credentialId         -- Base64URL-encoded credential ID
@@ -137,8 +146,8 @@ val wallet = kit.walletOperations.createWallet(
 // authorization entry. If a relayer is configured, the transaction is fee-sponsored.
 
 val result = kit.transactionOperations.transfer(
-    tokenContract = "<C-address of token contract>",
-    recipient = "<recipient G-address>",
+    tokenContract = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    recipient = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
     amount = "10"  // decimal amount (converted to the token's base units)
 )
 
@@ -169,8 +178,8 @@ On app relaunch, use a two-phase connect pattern. Phase 1 silently restores the 
 val config = OZSmartAccountConfig(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = Network.TESTNET.networkPassphrase,
-    accountWasmHash = "<64-char hex WASM hash>",
-    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>",
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
     storage = myStorageAdapter  // platform-specific adapter for credential persistence
 )
 val kit = OZSmartAccountKit.create(config)
@@ -224,7 +233,7 @@ Connect directly with known credentials (skips WebAuthn and session check; the c
 val connection = kit.walletOperations.connectWallet(
     OZWalletOperations.ConnectWalletOptions(
         credentialId = "abc123...",
-        contractId = "CABC..."
+        contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
     )
 )
 ```
@@ -234,7 +243,7 @@ val connection = kit.walletOperations.connectWallet(
 Backends and autonomous signers that have no passkey can attach to a smart account by contract address alone. `connectToContract()` runs no WebAuthn ceremony, holds no credential, and leaves `credentialId` null while setting `isHeadless` to `true`:
 
 ```kotlin
-val contractId = kit.walletOperations.connectToContract("CABC...")
+val contractId = kit.walletOperations.connectToContract("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")
 ```
 
 A headless connection is operable only through the multi-signer / external-signer pipeline (calls with a non-empty `selectedSigners`). The single-passkey signing paths reject it with `WalletException.HeadlessConnection`. See [connectToContract](api-reference.md#connecttocontract) for the operating boundary and a signing example.
@@ -259,7 +268,7 @@ Add additional signers to a context rule so multiple parties can authorize trans
 // Add a delegated Stellar account as a signer on the Default context rule (ID 0)
 val addResult = kit.signerManager.addDelegated(
     contextRuleId = 0u,
-    address = "<delegated G-address>"
+    address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 )
 
 // Add a new passkey signer (handles WebAuthn registration, credential storage,
@@ -294,14 +303,14 @@ Policies enforce constraints on context rules. Each context rule supports up to 
 // Require 2-of-3 signers to authorize
 val thresholdResult = kit.policyManager.addSimpleThreshold(
     contextRuleId = 0u,
-    policyAddress = "<C-address of the simple-threshold policy>",
+    policyAddress = "CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z", // simple-threshold policy
     threshold = 2u
 )
 
 // Limit spending to 1000 XLM per day
 val limitResult = kit.policyManager.addSpendingLimit(
     contextRuleId = 0u,
-    policyAddress = "<C-address of the spending-limit policy>",
+    policyAddress = "CAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAKAL", // spending-limit policy
     spendingLimit = "1000",
     periodLedgers = Util.LEDGERS_PER_DAY.toUInt()
 )
@@ -312,7 +321,7 @@ For custom policy contracts beyond the built-in types, use `addPolicy()` with po
 ```kotlin
 val result = kit.policyManager.addPolicy(
     contextRuleId = 0u,
-    policyAddress = "<C-address of the custom policy>",
+    policyAddress = "CAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDBWBA", // custom policy contract
     installParams = Scv.toMap(linkedMapOf(
         Scv.toSymbol("my_param") to Scv.toUint32(42u)
     ))
@@ -389,8 +398,8 @@ For configuration with many optional fields, use the builder:
 val config = OZSmartAccountConfig.builder(
     rpcUrl = "https://soroban-testnet.stellar.org",
     networkPassphrase = Network.TESTNET.networkPassphrase,
-    accountWasmHash = "<64-char hex WASM hash>",
-    webauthnVerifierAddress = "<C-address of the WebAuthn verifier>"
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
     .sessionExpiryMs(86_400_000L)  // 1 day
     .relayerUrl("https://relayer.example.com")
@@ -407,7 +416,7 @@ The SDK needs two values that depend on the network: a WASM hash (`accountWasmHa
 
 Current testnet values are in `DemoConfig.kt` in the demo app:
 
-```
+```text
 smart-account-demo/shared/src/commonMain/kotlin/com/soneso/smartdemo/config/DemoConfig.kt
 ```
 
@@ -463,8 +472,11 @@ Set `deployerKeypair` in the config to use your own deployer:
 
 ```kotlin
 val config = OZSmartAccountConfig(
-    // ...required fields...
-    deployerKeypair = myFundedKeypair
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    networkPassphrase = Network.TESTNET.networkPassphrase,
+    accountWasmHash = "c2b1a0f9e8d7c6b5a4938271605f4e3d2c1b0a998877665544332211aabbccdd", // 64-char hex
+    webauthnVerifierAddress = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
+    deployerKeypair = myFundedKeypair // your funded deployer account
 )
 ```
 

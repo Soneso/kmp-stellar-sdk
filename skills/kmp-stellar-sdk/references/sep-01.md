@@ -3,6 +3,14 @@
 **Purpose:** Fetch and parse a domain's `stellar.toml` to discover anchor service endpoints, supported assets, validators, and organization details.
 **Prerequisites:** None
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep01.*
+import com.soneso.stellar.sdk.sep.sep10.*
+```
+
 ## Table of Contents
 
 1. [Loading stellar.toml](#1-loading-stellartoml)
@@ -148,6 +156,7 @@ info.authServer                    // String?  SEP-03 compliance (deprecated)
 Always null-check endpoints before using them:
 
 ```kotlin
+// stellarToml: from the previous steps of this flow
 val info = stellarToml.generalInformation
 
 if (info.webAuthEndpoint == null) {
@@ -395,6 +404,7 @@ try {
 **Using the wrong constructor -- `StellarToml()` vs `StellarToml.parse()`:**
 
 ```kotlin
+// tomlContent: from the previous steps of this flow
 // WRONG: StellarToml(tomlString) -- the primary constructor takes parsed data objects, not a TOML string
 // CORRECT: StellarToml.parse(tomlString) -- static method that parses TOML content
 val stellarToml = StellarToml.parse(tomlContent)
@@ -408,18 +418,18 @@ val stellarToml = StellarToml.parse(tomlContent)
 val contacts: List<PointOfContact>? = stellarToml.pointsOfContact
 ```
 
-**Using Flutter/Dart casing for orgDba:**
+**Using Dart-style casing for orgDba:**
 
 ```kotlin
-// WRONG: docs.orgDBA -- uppercase DBA is the Dart/Flutter convention
+// WRONG: docs.orgDBA -- uppercase DBA is a Dart-style convention
 // CORRECT: docs.orgDba -- standard Kotlin camelCase
 val dba: String? = docs.orgDba
 ```
 
-**Using Flutter/Dart casing for kycServer:**
+**Using Dart-style casing for kycServer:**
 
 ```kotlin
-// WRONG: info.kYCServer -- uppercase YC is the Dart/Flutter convention
+// WRONG: info.kYCServer -- uppercase YC is a Dart-style convention
 // CORRECT: info.kycServer -- standard Kotlin camelCase
 val kycUrl: String? = info.kycServer
 ```
@@ -537,7 +547,7 @@ suspend fun connectToAnchor(domain: String, userKeyPair: KeyPair) {
 
     // Step 2: SEP-10 -- authenticate and obtain JWT
     val webAuth = WebAuth.fromDomain(domain, Network.PUBLIC)
-    val jwt = webAuth.jwtToken(userKeyPair.getAccountId(), listOf(userKeyPair))
+    val jwt = webAuth.jwtToken(userKeyPair.getAccountId(), listOf(userKeyPair)).token
 
     // Step 3: SEP-24 -- start interactive deposit/withdrawal
     val sep24 = Sep24Service.fromDomain(domain)

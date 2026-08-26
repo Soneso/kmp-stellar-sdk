@@ -5,6 +5,14 @@
 **Package:** `com.soneso.stellar.sdk.sep.sep24`
 **Spec:** SEP-0024
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep24.*
+import com.soneso.stellar.sdk.sep.sep24.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Full Flow: SEP-10 Auth + SEP-24 Deposit](#1-full-flow-sep-10-auth--sep-24-deposit)
@@ -42,7 +50,7 @@ val network = Network.TESTNET
 
 // Step 1: Authenticate via SEP-10 to get a JWT
 val webAuth = WebAuth.fromDomain(anchorDomain, network)
-val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMCLXPILHSE7GIQST...")
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 val authToken = webAuth.jwtToken(
     clientAccountId = keyPair.getAccountId(),
     signers = listOf(keyPair)
@@ -96,7 +104,6 @@ import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 
 // Fetches stellar.toml from https://testanchor.stellar.org/.well-known/stellar.toml
 // and reads TRANSFER_SERVER_SEP0024
-val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 ```
 
 Signature:
@@ -157,7 +164,7 @@ val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 // Optional: pass a language code (RFC 4646, e.g. "en", "de")
 val info = sep24.info(lang = "en")
 // Or without language:
-val info = sep24.info()
+val defaultInfo = sep24.info()
 ```
 
 Signature:
@@ -253,6 +260,7 @@ The `/fee` endpoint is deprecated in favor of SEP-38 `GET /price`. Only use it i
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24FeeRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val info = sep24.info()
@@ -301,6 +309,7 @@ A deposit converts external funds (bank transfer, crypto, etc.) into Stellar tok
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -357,6 +366,7 @@ data class Sep24DepositRequest(
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -364,7 +374,7 @@ val response = sep24.deposit(Sep24DepositRequest(
     assetCode = "USD",
     jwt = jwtToken,
     amount = "100.0",   // String, not Double
-    account = "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    account = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     memo = "12345",
     memoType = "id",    // "text", "id", or "hash"
     lang = "en-US"
@@ -376,6 +386,8 @@ println("Open: ${response.url}")
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
 // Get quoteId from SEP-38 service first
 val response = sep24.deposit(Sep24DepositRequest(
@@ -392,8 +404,10 @@ val response = sep24.deposit(Sep24DepositRequest(
 Pass KYC data as key-value pairs to pre-fill the anchor's interactive form. Field names follow SEP-9.
 
 ```kotlin
+// idPhotoBytes: from the previous steps of this flow
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -417,6 +431,8 @@ val response = sep24.deposit(Sep24DepositRequest(
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
 val response = sep24.deposit(Sep24DepositRequest(
     assetCode = "USD",
@@ -443,6 +459,7 @@ A withdrawal converts Stellar tokens into external assets sent to a bank account
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24WithdrawRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -488,6 +505,8 @@ data class Sep24WithdrawRequest(
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24WithdrawRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
 val response = sep24.withdraw(Sep24WithdrawRequest(
     assetCode = "USD",
@@ -504,6 +523,8 @@ val response = sep24.withdraw(Sep24WithdrawRequest(
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24WithdrawRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
 val response = sep24.withdraw(Sep24WithdrawRequest(
     assetCode = "USDC",
@@ -523,11 +544,14 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.Asset
-import com.soneso.stellar.sdk.Memo
+import com.soneso.stellar.sdk.MemoText
 import com.soneso.stellar.sdk.TransactionBuilder
-import com.soneso.stellar.sdk.operations.PaymentOperation
+import com.soneso.stellar.sdk.PaymentOperation
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
+val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -550,18 +574,18 @@ if (tx.status == "pending_user_transfer_start") {
         val amount = tx.amountIn!!
 
         val horizon = HorizonServer("https://horizon-testnet.stellar.org")
-        val sourceKeyPair = KeyPair.fromSecretSeed(secretSeed)
-        val sourceAccount = horizon.accounts().account(sourceKeyPair.getAccountId())
+        val sourceKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+        val sourceAccount = horizon.loadAccount(sourceKeyPair.getAccountId())
 
         val asset = Asset.createNonNativeAsset("USD", issuerAccountId)
 
         val transaction = TransactionBuilder(sourceAccount, Network.TESTNET)
             .addOperation(PaymentOperation(anchorAccount, asset, amount))
-            .addMemo(Memo.text(memo))  // adjust for memoType
+            .addMemo(MemoText(memo))  // adjust for memoType
             .build()
 
         transaction.sign(sourceKeyPair)
-        horizon.submitTransaction(transaction)
+        horizon.submitTransaction(transaction.toEnvelopeXdrBase64())
     }
 }
 ```
@@ -579,6 +603,8 @@ Use `transaction()` to query a single transaction by ID. Always use the `id` fro
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -630,6 +656,8 @@ The SDK provides `pollTransaction()` which continuously queries until a terminal
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionStatus
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -682,6 +710,8 @@ import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionStatus
 import com.soneso.stellar.sdk.sep.sep24.exceptions.Sep24AuthenticationRequiredException
 import com.soneso.stellar.sdk.sep.sep24.exceptions.Sep24TransactionNotFoundException
 import kotlinx.coroutines.delay
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 val request = Sep24TransactionRequest(jwt = jwtToken, id = transactionId)
@@ -740,6 +770,7 @@ while (polling) {
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionsRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -778,6 +809,8 @@ data class Sep24TransactionsRequest(
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionsRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
 val response = sep24.transactions(Sep24TransactionsRequest(
     assetCode = "USD",
@@ -863,6 +896,7 @@ The `Sep24Transaction` object is returned inside `Sep24TransactionResponse.trans
 ### Helper methods on Sep24Transaction
 
 ```kotlin
+// tx: from the previous steps of this flow
 // Get status as a Sep24TransactionStatus enum (null if unrecognized)
 val statusEnum: Sep24TransactionStatus? = tx.getStatusEnum()
 
@@ -875,6 +909,9 @@ val terminal: Boolean = tx.isTerminal()
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionStatus
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val response = sep24.transaction(Sep24TransactionRequest(
     jwt = jwtToken,
@@ -983,6 +1020,9 @@ When a transaction includes structured fee information, it appears in the `feeDe
 | `description` | `String?` | Optional human-readable description |
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 val tx = sep24.transaction(Sep24TransactionRequest(jwt = jwtToken, id = transactionId)).transaction
 
 tx.feeDetails?.let { fee ->
@@ -1019,6 +1059,9 @@ When a transaction is refunded (`status == "refunded"` or `refunds != null`), in
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val response = sep24.transaction(Sep24TransactionRequest(
     jwt = jwtToken,
@@ -1059,6 +1102,8 @@ import com.soneso.stellar.sdk.sep.sep24.Sep24DepositRequest
 import com.soneso.stellar.sdk.sep.sep24.Sep24Service
 import com.soneso.stellar.sdk.sep.sep24.Sep24TransactionRequest
 import com.soneso.stellar.sdk.sep.sep24.exceptions.*
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 
 val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 
@@ -1113,9 +1158,10 @@ try {
 
 ## 14. Common Pitfalls
 
-**Wrong: using Flutter/Dart-style late properties and cascade assignment**
+**Wrong: using Dart-style late properties and cascade assignment**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: KMP SDK uses Kotlin data classes with constructor parameters, not Dart late fields
 // Sep24DepositRequest()
 //   ..assetCode = "USDC"
@@ -1131,10 +1177,11 @@ val request = Sep24DepositRequest(
 **Wrong: `claimableBalanceSupported` is `Boolean?` in KMP, not `String?`**
 
 ```kotlin
-// WRONG: in the Flutter SDK, claimableBalanceSupported is String?
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+// WRONG: claimableBalanceSupported is not a string flag
 // val request = Sep24DepositRequest(assetCode = "USDC", jwt = jwt, claimableBalanceSupported = "true")
 
-// CORRECT: in the KMP SDK, claimableBalanceSupported is Boolean?
+// CORRECT: claimableBalanceSupported is Boolean?
 val request = Sep24DepositRequest(
     assetCode = "USDC",
     jwt = jwtToken,
@@ -1145,6 +1192,7 @@ val request = Sep24DepositRequest(
 **Wrong: `noOlderThan` is `String?` in KMP, not `DateTime`**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: noOlderThan is not a DateTime object in the KMP SDK
 // Sep24TransactionsRequest(assetCode = "USD", jwt = jwt, noOlderThan = DateTime.utc(2024, 1, 1))
 
@@ -1170,6 +1218,9 @@ if (minAmount != null && minAmount > 100.0) { /* ... */ }
 **Wrong: using `transactions()` (plural) for ID-based lookup**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
+val transactionId = "82fhs729f63dh0v4" // id returned when the transfer was initiated
 // WRONG: Sep24TransactionsRequest has no 'id' field
 // sep24.transactions(Sep24TransactionsRequest(jwt = jwtToken, id = transactionId))
 
@@ -1183,8 +1234,9 @@ val response = sep24.transaction(Sep24TransactionRequest(
 **Wrong: setting `assetIssuer` for native XLM**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: native assets have no issuer
-// Sep24DepositRequest(assetCode = "native", jwt = jwt, assetIssuer = "GABC...")
+// Sep24DepositRequest(assetCode = "native", jwt = jwt, assetIssuer = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
 
 // CORRECT: omit assetIssuer for native
 val request = Sep24DepositRequest(
@@ -1196,6 +1248,7 @@ val request = Sep24DepositRequest(
 **Wrong: setting `refundMemo` without `refundMemoType` (or vice versa)**
 
 ```kotlin
+val jwtToken = "eyJhbGciOiJFUzI1NiJ9..." // JWT from SEP-10 authentication
 // WRONG: both fields must be set together
 // Sep24WithdrawRequest(assetCode = "USD", jwt = jwt, refundMemo = "ref-123")
 
@@ -1231,6 +1284,8 @@ if (tx.status == "pending_user_transfer_start") {
 **Wrong: using `authToken` object directly as JWT string**
 
 ```kotlin
+// authToken: the AuthToken returned by webAuth.jwtToken(...) in SEP-10 authentication
+val sep24 = Sep24Service.fromDomain("testanchor.stellar.org")
 // WRONG: passing AuthToken object where String is expected
 // val response = sep24.deposit(Sep24DepositRequest(assetCode = "USDC", jwt = authToken))
 

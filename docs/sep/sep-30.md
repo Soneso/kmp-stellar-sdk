@@ -9,6 +9,14 @@ SEP-30 defines a protocol for multi-party recovery of Stellar accounts. Users re
 - Share account access across devices or between individuals
 - Social recovery using trusted contacts as identity verifiers
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep30.*
+import com.soneso.stellar.sdk.horizon.*
+```
+
 ## Quick Start
 
 ```kotlin
@@ -32,7 +40,7 @@ suspend fun accountRecoveryExample() {
 
     // Register the account (requires SEP-10 JWT proving high threshold control)
     val sep10Jwt = "eyJ..." // Obtained via SEP-10 authentication
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
     val registration = sep30.registerAccount(accountAddress, request, sep10Jwt)
 
     // The server returns its signing key -- add it as a signer on the account
@@ -116,12 +124,12 @@ suspend fun registerAccountExample() {
         authMethods = listOf(
             Sep30AuthMethod(type = "email", value = "alice@example.com"),
             Sep30AuthMethod(type = "phone_number", value = "+14155551234"),
-            Sep30AuthMethod(type = "stellar_address", value = "GDUA...ABC")
+            Sep30AuthMethod(type = "stellar_address", value = "GAJZR5RMNUNEK7CRXJVEWXZ5XUXWT7FJGILCDDOITF7EC26RPWJ4UVOE")
         )
     )
 
     val request = Sep30Request(identities = listOf(ownerIdentity))
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     val response = sep30.registerAccount(accountAddress, request, sep10Jwt)
 
@@ -133,7 +141,7 @@ suspend fun registerAccountExample() {
     // Add the server's signing key as a signer on the Stellar account
     val serverSignerKey = response.signers.first().key
     val server = HorizonServer("https://horizon-testnet.stellar.org")
-    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val senderKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
     val sourceAccount = server.loadAccount(senderKeyPair.getAccountId())
 
     val addSignerTx = TransactionBuilder(sourceAccount, Network.TESTNET)
@@ -170,12 +178,12 @@ suspend fun registerSharedAccountExample() {
         role = "receiver",
         authMethods = listOf(
             Sep30AuthMethod(type = "email", value = "bob@example.com"),
-            Sep30AuthMethod(type = "stellar_address", value = "GBOB...XYZ")
+            Sep30AuthMethod(type = "stellar_address", value = "GDVEU3DD4KOFECV66VIHWEZOYX4ZKR3WV27L464SIIPOU2IUI3JCZA57")
         )
     )
 
     val request = Sep30Request(identities = listOf(senderIdentity, receiverIdentity))
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     val response = sep30.registerAccount(accountAddress, request, sep10Jwt)
     response.identities.forEach { identity ->
@@ -203,7 +211,7 @@ suspend fun updateIdentitiesExample() {
     )
 
     val request = Sep30Request(identities = listOf(updatedIdentity))
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     val response = sep30.updateIdentitiesForAccount(accountAddress, request, jwt)
     println("Updated identities for: ${response.address}")
@@ -222,8 +230,8 @@ suspend fun signTransactionExample() {
     val sep30 = Sep30Service("https://recovery.example.com")
     val jwt = "eyJ..." // SEP-10 or external auth JWT
 
-    val accountAddress = "GABC...XYZ"
-    val signingAddress = "GDEF...UVW" // From registration response signers
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+    val signingAddress = "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM" // From registration response signers
 
     // Build the recovery transaction
     val server = HorizonServer("https://horizon-testnet.stellar.org")
@@ -269,7 +277,7 @@ Retrieves the recovery configuration for a registered account.
 suspend fun accountDetailsExample() {
     val sep30 = Sep30Service("https://recovery.example.com")
     val jwt = "eyJ..." // SEP-10 or external auth JWT
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     val details = sep30.accountDetails(accountAddress, jwt)
 
@@ -294,7 +302,7 @@ Permanently removes the account's recovery registration from the server. This op
 suspend fun deleteAccountExample() {
     val sep30 = Sep30Service("https://recovery.example.com")
     val jwt = "eyJ..." // SEP-10 or external auth JWT
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     // Returns the account details as they were before deletion
     val deleted = sep30.deleteAccount(accountAddress, jwt)
@@ -342,8 +350,8 @@ suspend fun multiServerRecoveryWorkflow() {
 
     val sep10Jwt1 = "eyJ..." // SEP-10 JWT for server 1
     val sep10Jwt2 = "eyJ..." // SEP-10 JWT for server 2
-    val accountAddress = "GABC...XYZ"
-    val ownerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV3C7CAZMTQDBJHJG6C34CBOEPVCBWVISXZ3DQHKP")
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
+    val ownerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
     val ownerIdentity = Sep30RequestIdentity(
         role = "owner",
@@ -446,7 +454,7 @@ import com.soneso.stellar.sdk.sep.sep30.exceptions.*
 suspend fun errorHandlingExample() {
     val sep30 = Sep30Service("https://recovery.example.com")
     val jwt = "eyJ..."
-    val accountAddress = "GABC...XYZ"
+    val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
 
     try {
         val ownerIdentity = Sep30RequestIdentity(

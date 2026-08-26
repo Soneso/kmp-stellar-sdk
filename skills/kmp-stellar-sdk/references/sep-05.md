@@ -4,6 +4,14 @@
 **Prerequisites:** None
 **Package:** `com.soneso.stellar.sdk.sep.sep05`
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.sep.sep05.*
+import com.soneso.stellar.sdk.sep.sep05.exceptions.*
+```
+
 ## Table of Contents
 
 1. [Mnemonic Class Overview](#1-mnemonic-class-overview)
@@ -51,7 +59,7 @@ fun main() = runBlocking {
 }
 ```
 
-> **Key difference from Flutter:** The KMP SDK uses `Mnemonic` (not `Wallet`) as the class name. `getSecretSeed()` returns `CharArray?` (not `String`), so use `concatToString()` to convert it.
+> **Class name:** The class is `Mnemonic` (some other Stellar SDKs call it `Wallet`). `getSecretSeed()` returns `CharArray?` (not `String`), so use `concatToString()` to convert it.
 
 ---
 
@@ -130,7 +138,7 @@ fun main() = runBlocking {
 }
 ```
 
-> **Auto-detection:** `Mnemonic.from()` defaults to `language = null`, which auto-detects the language. This differs from Flutter's `Wallet.from()` which defaults to English and requires an explicit language parameter for non-English mnemonics.
+> **Auto-detection:** `Mnemonic.from()` defaults to `language = null`, which auto-detects the language.
 
 ---
 
@@ -522,7 +530,7 @@ fun main() = runBlocking {
 }
 ```
 
-**Using the wrong class name (Flutter habit):**
+**Using the wrong class name:**
 
 ```kotlin
 // WRONG: the KMP SDK does not have a Wallet class
@@ -535,6 +543,7 @@ val mnemonic = Mnemonic.from(phrase)
 **Treating getSecretSeed() as String:**
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG: getSecretSeed() returns CharArray?, not String
 val seed: String = keyPair.getSecretSeed()
 
@@ -551,7 +560,6 @@ val kp = mnemonic.getKeyPair(index = 0)
 // mnemonic is never closed -- sensitive data remains in memory
 
 // CORRECT: always close when done, or use .use {}
-val mnemonic = Mnemonic.from(phrase)
 try {
     val kp = mnemonic.getKeyPair(index = 0)
     // ... use kp ...
@@ -593,7 +601,7 @@ val mnemonic = Mnemonic.from(phrase, language = MnemonicLanguage.KOREAN)
 
 ```kotlin
 // FRAGILE: auto-detection may pick the wrong language for ambiguous words
-val mnemonic = Mnemonic.from(frenchPhrase)  // might misdetect if words overlap with another language
+val autoDetected = Mnemonic.from(frenchPhrase)  // might misdetect if words overlap with another language
 
 // BETTER: pass the known language explicitly for non-English mnemonics
 val mnemonic = Mnemonic.from(frenchPhrase, language = MnemonicLanguage.FRENCH)

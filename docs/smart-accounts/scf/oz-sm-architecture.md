@@ -28,7 +28,7 @@ The implementation has two layers:
 
 **OpenZeppelin layer** (contract-specific): High-level operations built on the core primitives, targeting the OpenZeppelin smart account contracts.
 
-```
+```text
 +----------------------------------------------------------------------+
 |                           Application                                |
 +----------------------------------------------------------------------+

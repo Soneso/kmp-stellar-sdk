@@ -2,6 +2,12 @@
 
 This guide covers JavaScript-specific setup and usage for both Browser and Node.js environments.
 
+Code examples assume a `suspend` calling context and these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+```
+
 ## Table of Contents
 
 - [Platform Overview](#platform-overview)
@@ -46,7 +52,7 @@ kotlin {
     sourceSets {
         val jsMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.12.0")
 
                 // Optional: UI frameworks
                 implementation("org.jetbrains.kotlinx:kotlinx-html:0.9.1")
@@ -176,7 +182,7 @@ fun main() = runBlocking {
 
     try {
         // Fund on testnet
-        val funded = FriendBot.fundAccount(
+        val funded = FriendBot.fundTestnetAccount(
             keypair.getAccountId(),
             Network.TESTNET
         )

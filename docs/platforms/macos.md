@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val desktopMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.11.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.12.0")
                 implementation(compose.desktop.currentOs)
             }
         }
@@ -108,7 +108,7 @@ Task {
     print("Secret Seed: \(keypair.getSecretSeed()?.toString() ?? "")")
 
     // Or import from secret seed
-    let imported = try await KeyPair.companion.fromSecretSeed(seed: "SXXX...")
+    let imported = try await KeyPair.companion.fromSecretSeed(seed: "SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 }
 ```
 
@@ -139,7 +139,7 @@ Task {
     )
     .addOperation(
         PaymentOperation(
-            destination: "GDESTINATION...",
+            destination: "GCZJM35NKGVK47BB4SPBDV25477PZYIYPVVG453LPYFNXLS3FGHDXOCM",
             amount: "10.00",
             asset: AssetTypeNative()
         )
@@ -169,7 +169,7 @@ Task {
     let server = HorizonServer(serverUrl: "https://horizon-testnet.stellar.org")
 
     // Load account details
-    let account = try await server.loadAccount(accountId: "GXXX...")
+    let account = try await server.loadAccount(accountId: "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
 
     // Get XLM balance
     if let xlmBalance = account.balances.first(where: { $0.assetType == "native" }) {

@@ -1,6 +1,14 @@
 # Security Best Practices
 
-Security patterns and guidelines for production Stellar KMP SDK applications. All code assumes `import com.soneso.stellar.sdk.*` and runs inside a `suspend` context (coroutine).
+Security patterns and guidelines for production Stellar KMP SDK applications. All code runs inside a `suspend` context (coroutine) and assumes these imports:
+
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.horizon.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.sep.sep05.*
+import com.soneso.stellar.sdk.sep.sep10.*
+```
 
 ## Secret Key Management
 
@@ -10,7 +18,7 @@ Secret keys (S... seeds) give full control over an account. Compromised keys lea
 
 ```kotlin
 // WRONG -- secret key exposed in source code
-// val kp = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6GR...")
+// val kp = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 
 // CORRECT -- load from platform-specific secure storage
 suspend fun loadKeyPair(secureStore: SecureKeyStore): KeyPair {
@@ -28,6 +36,7 @@ suspend fun loadKeyPair(secureStore: SecureKeyStore): KeyPair {
 `KeyPair.getSecretSeed()` returns `CharArray?` (not `String`) by design. `CharArray` can be explicitly zeroed; `String` is immutable on JVM and may linger in memory, heap dumps, or swap files.
 
 ```kotlin
+val keyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 // WRONG -- converting secret seed to String defeats security design
 // val seedString: String = String(keyPair.getSecretSeed()!!)
 
@@ -40,9 +49,10 @@ seedChars?.let { chars ->
 ```
 
 ```kotlin
+// secureStore: from the previous steps of this flow
 // WRONG -- fromSecretSeed(String) is marked "Insecure" in the SDK
 // Only use for prototyping/testing, NEVER in production with real secrets
-// val kp = KeyPair.fromSecretSeed("SCZANGBA5YH...")
+// val kp = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
 // CORRECT -- fromSecretSeed(CharArray) allows secure cleanup
 val seedChars = secureStore.readSecretAsCharArray("stellar_seed")
@@ -159,6 +169,7 @@ try {
 ### Mnemonic Generation and Storage
 
 ```kotlin
+// secureStore: from the previous steps of this flow
 // Generate a 24-word mnemonic (256 bits -- maximum security, recommended)
 val phrase: String = Mnemonic.generate24WordsMnemonic()
 
@@ -221,6 +232,34 @@ fun isValidSeed(seed: String): Boolean {
 }
 ```
 
+`StrKey` validation requires canonical encoding, and JVM, Android, JS and native
+apply the same rule. All of the following are rejected:
+
+- trailing `=` padding, and any content following a `=`
+- whitespace anywhere in the string, including whitespace inserted mid-string
+- lowercase base32 characters
+- any character outside the base32 alphabet, including a non-ASCII character
+  whose low byte would alias onto a legal one
+
+Trim untrusted input before validating it. A strkey pasted from a user interface
+frequently carries surrounding whitespace, and such a value is rejected rather
+than silently normalized.
+
+```kotlin
+// isValidStellarAddress, userInput: from the previous steps of this flow
+val address = userInput.trim()
+if (!isValidStellarAddress(address)) {
+    // reject the input -- do not attempt any further normalization
+}
+```
+
+Validation agrees with decoding. `isValidSignedPayload` enforces the same `P...`
+framing that `SignerKey` and the XDR decoders require -- declared payload length
+in 1..64, an exact fit, zero padding -- and `isValidClaimableBalance` rejects a
+`B...` strkey whose discriminant is not `CLAIMABLE_BALANCE_ID_TYPE_V0`, as does
+the `Address` constructor. Every `StrKey.decode*` entry point signals a rejection
+with `IllegalArgumentException`.
+
 ### Asset Code Validation
 
 ```kotlin
@@ -245,9 +284,10 @@ fun validateAmount(input: String): String? {
         ?: return "Amount must be a number"
     if (amount <= 0) return "Amount must be positive"
 
-    // Stellar supports max 7 decimal places (stroops)
+    // Stellar supports max 7 significant decimal places (stroops);
+    // trailing zeros do not count against the limit
     val parts = input.split(".")
-    if (parts.size == 2 && parts[1].length > 7) {
+    if (parts.size == 2 && parts[1].trimEnd('0').length > 7) {
         return "Maximum 7 decimal places"
     }
 
@@ -277,6 +317,9 @@ fun validateMemoText(value: String): String? {
 Always inspect transaction contents before calling `sign()`, especially when receiving XDR from external sources (SEP-0007 URIs, SEP-10 challenges, multi-sig coordination). See [XDR Reference](./xdr.md) for the inspection pattern.
 
 ```kotlin
+// envelopeXdrBase64, expectedAccountId: from the previous steps of this flow
+val signerKeyPair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val network = Network.TESTNET
 // Parse and inspect a transaction from an external source
 val tx = AbstractTransaction.fromEnvelopeXdr(envelopeXdrBase64, network)
 if (tx is Transaction) {
@@ -390,6 +433,7 @@ Security rules for multi-sig accounts:
 - Always inspect transaction contents before co-signing (see XDR sharing pattern in advanced.md)
 
 ```kotlin
+// cosignerAccountId: from the previous steps of this flow
 // Configure multi-sig thresholds
 // WRONG: SignerKey.Ed25519(...) -- no such constructor
 // CORRECT: SignerKey.ed25519PublicKey(...) -- factory method
@@ -509,6 +553,8 @@ The SDK uses audited cryptographic libraries with no custom crypto:
 - [ ] Secret `CharArray` zeroed with `fill('\u0000')` after use
 - [ ] `Mnemonic.close()` called when HD wallet instance is no longer needed
 - [ ] All user-supplied addresses validated with `StrKey` methods
+- [ ] Untrusted strkey input trimmed before validation -- `=` padding, whitespace
+      and lowercase characters are rejected as non-canonical
 - [ ] `StrKey.isValidEd25519SecretSeed()` called with `CharArray`, not `String`
 - [ ] Asset codes validated (1-12 alphanumeric characters)
 - [ ] Amounts validated as positive decimals with at most 7 decimal places
