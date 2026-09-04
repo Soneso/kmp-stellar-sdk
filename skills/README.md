@@ -37,7 +37,7 @@ kmp-stellar-sdk/
     horizon_api.md               # Horizon endpoint coverage
     horizon_streaming.md         # SSE streaming patterns
     rpc.md                       # Soroban RPC methods
-    soroban_contracts.md         # Contract deploy/invoke/auth
+    soroban_contracts.md         # Contract deploy/invoke/auth/bindings
     smart_accounts.md            # OZ smart account kit: config, wallet, signers, events
     smart_accounts_policies.md   # Context rules, policies, multi-signer flows
     smart_accounts_webauthn.md   # Platform WebAuthn adapters (Android/iOS/macOS/Web)

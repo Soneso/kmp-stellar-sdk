@@ -368,7 +368,7 @@ val tx = client.buildInvoke<Unit>(
 tx.signAndSubmit(keyPair)
 ```
 
-For contract authorization, multi-auth workflows, and low-level deploy/invoke:
+For contract authorization, multi-auth workflows, low-level deploy/invoke, and typed clients generated with stellar-contract-bindings (`stellar-contract-bindings kmp`):
 [Smart Contracts Guide](./references/soroban_contracts.md)
 
 ## 7. Smart Accounts (OpenZeppelin)
@@ -461,7 +461,7 @@ The KMP SDK implements 15 SEPs: 01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 31, 38, 
 - [Horizon API](./references/horizon_api.md) - Complete Horizon endpoint coverage
 - [Horizon Streaming](./references/horizon_streaming.md) - SSE patterns for all streaming endpoints
 - [RPC](./references/rpc.md) - All Soroban RPC methods
-- [Smart Contracts](./references/soroban_contracts.md) - Contract deployment, invocation, auth
+- [Smart Contracts](./references/soroban_contracts.md) - Contract deployment, invocation, auth, generated bindings
 - [Smart Accounts](./references/smart_accounts.md) - OZ kit core: config, wallet creation/connect, signers, transactions, credentials, events
 - [Smart Accounts - Policies](./references/smart_accounts_policies.md) - Context rules, policies, multi-signer operations
 - [Smart Accounts - WebAuthn](./references/smart_accounts_webauthn.md) - Platform adapters for Android, iOS, macOS, Web
