@@ -1109,7 +1109,7 @@ val client = ContractClient.forContract(
 // Use when you need specific type conversion or custom parsing logic
 val balance = client.invoke<BigInteger>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),  // SDK auto-converts native types to XDR
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),  // SDK auto-converts native types to XDR
     source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null,  // No signer needed for read-only calls
     parseResultXdrFn = { scval ->
@@ -1122,7 +1122,7 @@ println("Balance: $balance")
 // Use when contract spec provides complete type information
 val balanceXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
     source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null
 )
@@ -1305,7 +1305,7 @@ val xdrArgs = client.funcArgsToXdrSCValues(
 // Parse XDR results to native types (inverse of funcArgsToXdrSCValues for bidirectional conversion)
 val resultXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
     source = sourceAccount,
     signer = null
 )

@@ -230,7 +230,7 @@ suspend fun callContract() {
     // Query with Map-based arguments (auto-executes)
     val balance = client.invoke<Long>(
         functionName = "balance",
-        arguments = mapOf("account" to accountAddress),
+        arguments = mapOf("id" to accountAddress),
         source = sourceAccount,
         signer = null,  // No signer for read calls
         parseResultXdrFn = { Scv.fromInt128(it).toLong() }
