@@ -30,6 +30,7 @@ import com.soneso.stellar.sdk.xdr.*
   - [Invoke Contract Methods](#invoke-contract-methods)
   - [Result Parsing with funcResToNative](#result-parsing-with-funcrestonative)
   - [Multi-Auth Contract Invocation](#multi-auth-contract-invocation)
+  - [Generated Contract Bindings](#generated-contract-bindings)
 - [Low-Level: SorobanServer](#low-level-sorobanserver)
 - [Argument Encoding with Scv](#argument-encoding-with-scv)
 - [Automatic Type Conversion](#automatic-type-conversion)
@@ -401,6 +402,43 @@ val tx = client.buildInvoke<SCValXdr>(
 
 // Sign and submit
 tx.signAndSubmit(keyPair)
+```
+
+### Generated Contract Bindings
+
+[stellar-contract-bindings](https://github.com/lightsail-network/stellar-contract-bindings) generates a Kotlin class from a contract's spec: one `suspend` method per contract function with native parameter and return types, plus a `build<Function>Tx` variant returning `AssembledTransaction` for the multi-auth flow above. Generated code needs kmp-stellar-sdk 1.9.0 or later.
+
+```bash
+pip install stellar-contract-bindings
+stellar-contract-bindings kmp --contract-id C... --rpc-url https://soroban-testnet.stellar.org \
+  --output ./generated --package com.example.bindings --class-name TokenContract
+```
+
+```kotlin
+// keyPair, rpcUrl, tokenContractId, toAccountId: from the previous steps of this flow
+import com.example.bindings.TokenContract
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
+// No spec download: the generated methods encode and decode all values themselves
+// WRONG: TokenContract(client) -- the constructor is internal
+// CORRECT: TokenContract.forContract(contractId, rpcUrl, network)
+val token = TokenContract.forContract(tokenContractId, rpcUrl, Network.TESTNET)
+val sourceId = keyPair.getAccountId()
+
+// WRONG: token.invoke("balance", mapOf(...)) -- generated clients have no invoke
+// CORRECT: one typed method per contract function, source and signer last
+val balance: BigInteger = token.balance(Address(sourceId), source = sourceId, signer = null)
+
+// Function and parameter names are the spec's names in camelCase (expiration_ledger ->
+// expirationLedger); struct fields keep the spec's names
+token.transfer(
+    from = Address(sourceId),
+    to = Address(toAccountId),
+    amount = BigInteger.fromLong(1000L),
+    source = sourceId,
+    signer = keyPair
+)
+token.client.close()
 ```
 
 ---

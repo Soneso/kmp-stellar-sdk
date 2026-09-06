@@ -64,6 +64,7 @@ import com.soneso.stellar.sdk.Claimant
   - [Deploying Contracts](#deploying-contracts)
   - [Type Conversions (XDR ↔ Native)](#type-conversions-xdr--native)
   - [Authorization](#authorization)
+  - [Contract Bindings](#contract-bindings)
 - [Network Communication](#network-communication)
   - [Streaming Events with SSE](#streaming-events-with-sse)
   - [Soroban RPC Operations](#soroban-rpc-operations)
@@ -1108,7 +1109,7 @@ val client = ContractClient.forContract(
 // Use when you need specific type conversion or custom parsing logic
 val balance = client.invoke<BigInteger>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),  // SDK auto-converts native types to XDR
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),  // SDK auto-converts native types to XDR
     source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null,  // No signer needed for read-only calls
     parseResultXdrFn = { scval ->
@@ -1121,7 +1122,7 @@ println("Balance: $balance")
 // Use when contract spec provides complete type information
 val balanceXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
     source = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",
     signer = null
 )
@@ -1304,7 +1305,7 @@ val xdrArgs = client.funcArgsToXdrSCValues(
 // Parse XDR results to native types (inverse of funcArgsToXdrSCValues for bidirectional conversion)
 val resultXdr = client.invoke<SCValXdr>(
     functionName = "balance",
-    arguments = mapOf("account" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
+    arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
     source = sourceAccount,
     signer = null
 )
@@ -1458,6 +1459,55 @@ assembled.signAuthEntries(
 // Complete the transaction signing and submission
 val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
 assembled.signAndSubmit(sourceKeypair)
+```
+
+### Contract Bindings
+
+Generate a typed Kotlin class from a contract's spec with [stellar-contract-bindings](https://github.com/lightsail-network/stellar-contract-bindings). The generated client has one method per contract function with native parameter and return types, plus a `build...Tx` variant that returns an `AssembledTransaction` for the [multi-signature workflow](#advanced-contract-control-buildinvoke).
+
+```bash
+pip install stellar-contract-bindings
+
+stellar-contract-bindings kmp \
+  --contract-id YOUR_CONTRACT_ID \
+  --rpc-url https://soroban-testnet.stellar.org \
+  --output ./generated \
+  --package com.example.bindings \
+  --class-name TokenContract
+```
+
+Or use the [web interface](https://stellar-contract-bindings.fly.dev/).
+
+The generated file needs kmp-stellar-sdk 1.9.0 or later. Function and parameter names are the contract spec's names in camelCase (`expiration_ledger` becomes `expirationLedger`); struct fields keep the spec's names. The example below uses the testnet XLM Stellar Asset Contract.
+
+```kotlin
+import com.example.bindings.TokenContract
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
+val sourceKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
+val sourceId = sourceKeypair.getAccountId()
+
+// The generated methods encode and decode all values themselves, so no spec is loaded
+val token = TokenContract.forContract(
+    contractId = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    rpcUrl = "https://soroban-testnet.stellar.org",
+    network = Network.TESTNET
+)
+
+// Read-only call: typed arguments, typed result
+val balance: BigInteger = token.balance(Address(sourceId), source = sourceId, signer = null)
+println("Balance: $balance")
+
+// Write: signs with the source keypair and submits
+token.transfer(
+    from = Address(sourceId),
+    to = Address("GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U"),
+    amount = BigInteger.fromLong(1000L),
+    source = sourceId,
+    signer = sourceKeypair
+)
+
+token.client.close()
 ```
 
 ## Network Communication
