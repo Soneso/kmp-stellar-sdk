@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `SCValXdr.toNative()` converts a smart contract value to native Kotlin values
+  without a contract spec: `UInt`/`Int` and `ULong`/`Long` for the 32- and
+  64-bit arms, `BigInteger` for the 128- and 256-bit arms, strkey strings for
+  addresses, `ByteArray` for bytes, lists for vecs and maps for maps. A value
+  with no faithful native representation, such as an error or a map whose keys
+  cannot serve as Kotlin map keys, comes back as the `SCValXdr` itself.
+
 ## [1.12.0] - 2026-08-26
 
 Migration guide: [docs/migration/1.12.0.md](docs/migration/1.12.0.md)
