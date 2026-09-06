@@ -63,6 +63,7 @@ import com.soneso.stellar.sdk.Claimant
   - [Advanced Contract Control (buildInvoke)](#advanced-contract-control-buildinvoke)
   - [Deploying Contracts](#deploying-contracts)
   - [Type Conversions (XDR ↔ Native)](#type-conversions-xdr--native)
+  - [Spec-less conversion with toNative](#spec-less-conversion-with-tonative)
   - [Authorization](#authorization)
 - [Network Communication](#network-communication)
   - [Streaming Events with SSE](#streaming-events-with-sse)
@@ -1351,6 +1352,102 @@ when (resultXdr.discriminant) {
     }
     else -> println("Unexpected type: ${resultXdr.discriminant}")
 }
+```
+
+### Spec-less conversion with toNative
+
+`SCValXdr.toNative()` converts a value tree to native Kotlin values without a contract spec. It is an opt-in extension function in `com.soneso.stellar.sdk.scval`. The conversion never throws: every value has a defined result, and a value with no native representation comes back as the `SCValXdr` itself (the same instance), so a caller detects that case with `is SCValXdr`.
+
+Reach for `toNative()` when no spec is at hand: contract event values, ledger entries, simulation results, or a quick look at a value during development. `funcResToNative` is its companion for results whose contract spec is available, since the spec lets it reconstruct structs, unions and enums. The two produce different shapes: a map becomes a Kotlin `Map` here and a list of pairs on the spec path, and error, contract-instance and executable-tag values come back as the `SCValXdr` itself here, where the spec path unwraps their payloads.
+
+**Conversion outcomes:**
+
+| XDR Type | Result |
+|----------|--------|
+| `SCV_BOOL` | `Boolean` |
+| `SCV_VOID` | `null` |
+| `SCV_U32` / `SCV_I32` | `UInt` / `Int` |
+| `SCV_U64`, `SCV_TIMEPOINT`, `SCV_DURATION` | `ULong` |
+| `SCV_I64` | `Long` |
+| `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` | `BigInteger` (`com.ionspin.kotlin.bignum.integer`) |
+| `SCV_BYTES` | `ByteArray` (the stored payload array, so writes to it go through to the value) |
+| `SCV_STRING`, `SCV_SYMBOL` | `String` |
+| `SCV_ADDRESS` | strkey `String` (`G...`, `C...`, `M...`, `B...` or `L...`); the `SCValXdr` itself when the address has no strkey form |
+| `SCV_VEC` | `List<Any?>`, each element converted in order; an absent payload gives an empty list |
+| `SCV_MAP` | `Map<Any?, Any?>` under the key rules below, or the `SCValXdr` itself; an absent payload gives an empty map |
+| `SCV_ERROR`, `SCV_CONTRACT_INSTANCE`, `SCV_LEDGER_KEY_CONTRACT_INSTANCE`, `SCV_LEDGER_KEY_NONCE`, `SCV_EXECUTABLE_TAG` | the `SCValXdr` itself; `Scv.fromError`, `Scv.fromExecutableTagBytes` and the other `Scv.from*` accessors read the payload on request |
+
+**Map keys:**
+
+Map keys need value-based equality, which `ByteArray` and the XDR types do not provide, so keys convert under a narrower table than values:
+
+| Key Type | Map Key |
+|----------|---------|
+| `SCV_SYMBOL`, `SCV_STRING` | `String` |
+| `SCV_U32` / `SCV_I32` | `UInt` / `Int` |
+| `SCV_U64`, `SCV_TIMEPOINT`, `SCV_DURATION` | `ULong` |
+| `SCV_I64` | `Long` |
+| `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` | `BigInteger` |
+| `SCV_BOOL` | `Boolean` |
+| `SCV_VOID` | `null` |
+| `SCV_BYTES` | lowercase hex `String` |
+| `SCV_ADDRESS` | strkey `String` |
+
+Bytes are the one asymmetry between the two tables: a bytes value stays a `ByteArray`, while a bytes key becomes its lowercase hex `String` (`byteArrayOf(1, 2)` becomes the key `"0102"`). Addresses are strkey strings on both sides, so an address key is looked up with the same `G...`/`C...` string that an address value converts to.
+
+Key equality is plain Kotlin `equals`/`hashCode` on the converted keys, and a key is looked up with the exact type the table gives: a u32 key with a `UInt`, a u64 key with a `ULong`, a 128-bit or 256-bit key with a `BigInteger`. The primitive integer types are never normalized against each other, so primitive keys of equal value from different arms are distinct: a u32 key `5` and a u64 key `5` are two entries, found with `5u` and `5uL`. Three kinds of key collide, and a map holding a collision falls back as described below:
+
+- A wide-integer key and a primitive integer key of equal value: an i128 key `5` and a u64 key `5` are the same key, in either entry order. Keys of different value coexist, so an i128 key `-1` and a u64 key `18446744073709551615` are two entries.
+- Wide-integer keys of equal value across arms: a u128 key `5` and an i256 key `5` are the same key.
+- A bytes key and a symbol or string key spelling its hex: the bytes `[0x30, 0x31]` and the symbol `"3031"` are the same key.
+
+A map converts to the `SCValXdr` itself as a whole when either
+
+- any key is unrepresentable: a vec, map, error, contract instance, nonce key, executable tag or ledger-key-contract-instance key, or an address key with no strkey form; or
+- two entries collide on equal converted keys.
+
+A nested map that falls back is contained: the enclosing vec or map still converts, with that map left as an `SCValXdr` element. A converted map preserves the entry order of the XDR map.
+
+**Examples:**
+
+```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.scval.toNative
+import com.soneso.stellar.sdk.xdr.SCValXdr
+
+// A u64 above Long.MAX_VALUE converts to a ULong and keeps its exact value
+val count = Scv.toUint64(18446744073709551615uL).toNative()  // ULong 18446744073709551615
+
+// A map with symbol keys converts to a Map keyed by String, in entry order
+val owner = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+val record = Scv.toMap(
+    linkedMapOf(
+        Scv.toSymbol("name") to Scv.toString("Alice"),
+        Scv.toSymbol("age") to Scv.toUint32(30u),
+        Scv.toSymbol("balance") to Scv.toInt128(BigInteger.parseString("1000000000")),
+        Scv.toSymbol("owner") to Scv.toAddress(Address(owner).toSCAddress())
+    )
+)
+val fields = record.toNative() as Map<*, *>
+val name = fields["name"] as String  // "Alice"
+val age = fields["age"] as UInt  // 30u
+val balance = fields["balance"] as BigInteger  // 1000000000
+val ownerAddress = fields["owner"] as String  // the strkey held in owner
+// fields.keys.toList() is ["name", "age", "balance", "owner"]
+
+// A vec converts to a List with each element converted in turn
+val items = Scv.toVec(
+    listOf(Scv.toUint32(1u), Scv.toSymbol("a"), Scv.toVec(listOf(Scv.toBoolean(true))))
+).toNative()  // [1u, "a", [true]]
+
+// A map whose key has no native representation comes back as the SCValXdr itself
+val keyedByVec = Scv.toMap(
+    linkedMapOf(Scv.toVec(listOf(Scv.toUint32(1u))) to Scv.toUint32(2u))
+)
+val result = keyedByVec.toNative()
+// result is SCValXdr, and it is the same instance as keyedByVec
 ```
 
 ### Authorization
