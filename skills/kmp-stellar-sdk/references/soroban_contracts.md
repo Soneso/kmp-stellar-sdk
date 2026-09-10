@@ -683,6 +683,153 @@ when (result) {
 }
 ```
 
+### Spec-less conversion with toNative
+
+`toNative()` converts an `SCValXdr` tree to native Kotlin values without a contract spec. It lives in package `com.soneso.stellar.sdk.scval` and needs its own import:
+
+```kotlin
+import com.soneso.stellar.sdk.scval.toNative
+
+fun SCValXdr.toNative(): Any?
+```
+
+It never throws. A value with no native representation comes back as the `SCValXdr` itself (the same instance), detected with `is SCValXdr`. It is the spec-less companion of [funcResToNative](#result-parsing-with-funcrestonative), and the two produce different shapes: a map becomes a Kotlin `Map` here and a `List<Pair<K, V>>` on the spec path, and error, contract-instance and executable-tag values stay `SCValXdr` here where the spec path unwraps their payloads.
+
+Type mapping (XDR -> Kotlin via toNative):
+
+| XDR Type | Kotlin Type |
+|---|---|
+| SCV_BOOL | Boolean |
+| SCV_VOID | null |
+| SCV_U32 | UInt |
+| SCV_I32 | Int |
+| SCV_U64, SCV_TIMEPOINT, SCV_DURATION | ULong |
+| SCV_I64 | Long |
+| SCV_U128, SCV_I128, SCV_U256, SCV_I256 | BigInteger (com.ionspin.kotlin.bignum.integer) |
+| SCV_BYTES | ByteArray (the stored payload array) |
+| SCV_STRING, SCV_SYMBOL | String |
+| SCV_ADDRESS | String (G.../C.../M.../B.../L...); the SCValXdr itself when the address has no strkey form |
+| SCV_VEC | List\<Any?\>, elements converted in order; absent payload -> empty list |
+| SCV_MAP | Map\<Any?, Any?\> under the key rules below, or the SCValXdr itself; absent payload -> empty map |
+| SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG | the SCValXdr itself (read the payload with Scv.fromError, Scv.fromExecutableTagBytes, ...) |
+
+Map key rules:
+
+| Key Type | Map Key |
+|---|---|
+| SCV_SYMBOL, SCV_STRING | String |
+| SCV_U32 | UInt |
+| SCV_I32 | Int |
+| SCV_U64, SCV_TIMEPOINT, SCV_DURATION | ULong |
+| SCV_I64 | Long |
+| SCV_U128, SCV_I128, SCV_U256, SCV_I256 | BigInteger |
+| SCV_BOOL | Boolean |
+| SCV_VOID | null |
+| SCV_BYTES | lowercase hex String (values stay ByteArray; keys do not) |
+| SCV_ADDRESS | strkey String (same as for a value) |
+| SCV_VEC, SCV_MAP, SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG, an address with no strkey form | unrepresentable |
+
+- Look a key up with the exact type in this table: `UInt` for u32, `ULong` for u64, `BigInteger` for a 128-bit or 256-bit key. The primitive integer types are never normalized against each other, so a u32 key `5` and a u64 key `5` are two distinct entries (`5u` and `5uL`).
+- Collisions: a wide-integer key and a primitive integer key of equal value (i128 `5` and u64 `5`, in either order); wide-integer keys of equal value across arms (u128 `5` and i256 `5`); a bytes key and a symbol or string key spelling its hex (bytes `[0x30, 0x31]` and symbol `"3031"`). Keys of different numeric value coexist (i128 `-1` and u64 `18446744073709551615`).
+- Fallback: a map with an unrepresentable key, or with two entries colliding on equal converted keys, converts to the `SCValXdr` itself as a whole. A nested map that falls back is contained; the enclosing vec or map still converts with that map left as an `SCValXdr` element.
+- A converted map preserves the entry order of the XDR map.
+
+```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.scval.toNative
+
+// Scalars keep their exact value on every target
+val count = Scv.toUint64(ULong.MAX_VALUE).toNative()
+println(count)  // 18446744073709551615 (ULong)
+val amount = Scv.toInt128(BigInteger.parseString("-170141183460469231731687303715884105728")).toNative()
+println(amount)  // -170141183460469231731687303715884105728 (BigInteger)
+val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+val owner = Scv.toAddress(Address(accountId).toSCAddress()).toNative()
+println(owner)  // GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ (String)
+
+// A symbol-keyed map becomes a Map<String, Any?> in entry order
+val record = Scv.toMap(
+    linkedMapOf(
+        Scv.toSymbol("name") to Scv.toString("Alice"),
+        Scv.toSymbol("age") to Scv.toUint32(30u)
+    )
+).toNative() as Map<*, *>
+println(record["name"])       // Alice
+println(record["age"])        // 30 (UInt)
+println(record.keys.toList()) // [name, age]
+```
+
+**WRONG/CORRECT map fallback detection:**
+
+```kotlin
+import com.soneso.stellar.sdk.scval.toNative
+
+// A vec key has no native representation, so the whole map falls back
+val keyedByVec = Scv.toMap(
+    linkedMapOf(Scv.toVec(listOf(Scv.toUint32(1u))) to Scv.toUint32(2u))
+)
+
+// WRONG: keyedByVec.toNative() as Map<*, *> -- throws ClassCastException, the result is the SCValXdr itself
+// CORRECT: check for the fallback before using the result as a Map
+val converted = keyedByVec.toNative()
+if (converted is SCValXdr) {
+    // converted === keyedByVec; read the entries with Scv.fromMap
+    val entries: LinkedHashMap<SCValXdr, SCValXdr> = Scv.fromMap(converted)
+    println("Map without a native form: ${entries.size} entries")
+} else {
+    val fields = converted as Map<*, *>
+    println("Map with ${fields.size} entries")
+}
+```
+
+**WRONG/CORRECT integer key lookup:**
+
+```kotlin
+import com.soneso.stellar.sdk.scval.toNative
+
+// u32 key 5 and u64 key 5 are two distinct entries: UInt never equals ULong
+val byNumber = Scv.toMap(
+    linkedMapOf(
+        Scv.toUint32(5u) to Scv.toSymbol("u32"),
+        Scv.toUint64(5u) to Scv.toSymbol("u64")
+    )
+).toNative() as Map<*, *>
+
+// WRONG: byNumber[5] -- compiles, but an Int never equals a UInt key, so this is null
+// WRONG: byNumber[5uL] to reach the u32 entry -- a ULong finds the u64 entry ("u64")
+// CORRECT: look each key up with the exact type of its arm
+println(byNumber[5u])   // u32
+println(byNumber[5uL])  // u64
+```
+
+**WRONG/CORRECT bytes key lookup:**
+
+```kotlin
+import com.soneso.stellar.sdk.scval.toNative
+
+val byBytes = Scv.toMap(
+    linkedMapOf(Scv.toBytes(byteArrayOf(1, 2)) to Scv.toSymbol("hex"))
+).toNative() as Map<*, *>
+
+// WRONG: byBytes[byteArrayOf(1, 2)] -- compiles, but keys are hex strings, so this is null
+// CORRECT: a bytes key is its lowercase hex string; a bytes VALUE stays a ByteArray
+println(byBytes["0102"])  // hex
+```
+
+**WRONG/CORRECT 128-bit values:**
+
+```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.scval.toNative
+
+val balance = Scv.toInt128(BigInteger.parseString("-170141183460469231731687303715884105728")).toNative()
+
+// WRONG: balance as Long -- throws ClassCastException, i128/u128/i256/u256 convert to BigInteger
+// CORRECT: cast to BigInteger; only u32/i32/u64/i64/timepoint/duration convert to platform integers
+val amount = balance as BigInteger
+println(amount)  // -170141183460469231731687303715884105728
+```
+
 ---
 
 ## Reading Contract State
