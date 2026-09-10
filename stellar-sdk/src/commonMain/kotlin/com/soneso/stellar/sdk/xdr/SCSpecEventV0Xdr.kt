@@ -16,7 +16,7 @@ private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "lib", "name", "prefix
  * {
  *     string doc<SC_SPEC_DOC_LIMIT>;
  *     string lib<80>;
- *     SCSymbol name;
+ *     string name<SC_SPEC_TYPE_NAME_LIMIT>;
  *     SCSymbol prefixTopics<2>;
  *     SCSpecEventParamV0 params<>;
  *     SCSpecEventDataFormat dataFormat;
@@ -25,7 +25,7 @@ private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "lib", "name", "prefix
 data class SCSpecEventV0Xdr(
   val doc: String,
   val lib: String,
-  val name: SCSymbolXdr,
+  val name: String,
   val prefixTopics: List<SCSymbolXdr>,
   val params: List<SCSpecEventParamV0Xdr>,
   val dataFormat: SCSpecEventDataFormatXdr
@@ -35,7 +35,7 @@ data class SCSpecEventV0Xdr(
     fun decode(reader: XdrReader): SCSpecEventV0Xdr {
       val doc = reader.readString()
       val lib = reader.readString()
-      val name = SCSymbolXdr.decode(reader)
+      val name = reader.readString()
       val prefixTopics = List(reader.readInt()) { SCSymbolXdr.decode(reader) }
       val params = List(reader.readInt()) { SCSpecEventParamV0Xdr.decode(reader) }
       val dataFormat = SCSpecEventDataFormatXdr.decode(reader)
@@ -51,7 +51,7 @@ data class SCSpecEventV0Xdr(
       return SCSpecEventV0Xdr(
         XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
         XdrJson.unescapeString(XdrJson.field(json, "lib", XDR_JSON_TYPE), XDR_JSON_TYPE, "lib", maxLength = 80),
-        SCSymbolXdr.fromXdrJsonTree(XdrJson.field(json, "name", XDR_JSON_TYPE)),
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = SC_SPEC_TYPE_NAME_LIMIT),
         XdrJson.array(XdrJson.field(json, "prefix_topics", XDR_JSON_TYPE), XDR_JSON_TYPE, "prefix_topics", maxLength = 2).map { SCSymbolXdr.fromXdrJsonTree(it) },
         XdrJson.array(XdrJson.field(json, "params", XDR_JSON_TYPE), XDR_JSON_TYPE, "params").map { SCSpecEventParamV0Xdr.fromXdrJsonTree(it) },
         SCSpecEventDataFormatXdr.fromXdrJsonTree(XdrJson.field(json, "data_format", XDR_JSON_TYPE))
@@ -62,7 +62,7 @@ data class SCSpecEventV0Xdr(
   fun encode(writer: XdrWriter) {
     writer.writeString(doc)
     writer.writeString(lib)
-    name.encode(writer)
+    writer.writeString(name)
     writer.writeInt(prefixTopics.size)
     prefixTopics.forEach { item ->
       item.encode(writer)
@@ -77,7 +77,7 @@ data class SCSpecEventV0Xdr(
   fun toXdrJsonElement(): JsonElement = buildJsonObject {
     put("doc", XdrJson.escapedString(doc))
     put("lib", XdrJson.escapedString(lib))
-    put("name", name.toXdrJsonElement())
+    put("name", XdrJson.escapedString(name))
     put("prefix_topics", XdrJson.array(prefixTopics) { it.toXdrJsonElement() })
     put("params", XdrJson.array(params) { it.toXdrJsonElement() })
     put("data_format", dataFormat.toXdrJsonElement())

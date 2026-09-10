@@ -16,7 +16,7 @@ private val XDR_JSON_KEYS: Array<String> = arrayOf("doc", "lib", "name", "cases"
  * {
  *     string doc<SC_SPEC_DOC_LIMIT>;
  *     string lib<80>;
- *     string name<60>;
+ *     string name<SC_SPEC_TYPE_NAME_LIMIT>;
  *     SCSpecUDTEnumCaseV0 cases<>;
  * };
  */
@@ -45,7 +45,7 @@ data class SCSpecUDTEnumV0Xdr(
       return SCSpecUDTEnumV0Xdr(
         XdrJson.unescapeString(XdrJson.field(json, "doc", XDR_JSON_TYPE), XDR_JSON_TYPE, "doc", maxLength = SC_SPEC_DOC_LIMIT),
         XdrJson.unescapeString(XdrJson.field(json, "lib", XDR_JSON_TYPE), XDR_JSON_TYPE, "lib", maxLength = 80),
-        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 60),
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = SC_SPEC_TYPE_NAME_LIMIT),
         XdrJson.array(XdrJson.field(json, "cases", XDR_JSON_TYPE), XDR_JSON_TYPE, "cases").map { SCSpecUDTEnumCaseV0Xdr.fromXdrJsonTree(it) }
       )
     }

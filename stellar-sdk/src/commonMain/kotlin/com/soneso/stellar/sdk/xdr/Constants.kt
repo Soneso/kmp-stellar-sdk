@@ -5,6 +5,7 @@ package com.soneso.stellar.sdk.xdr
 
 const val CONTRACT_COST_COUNT_LIMIT: Int = 1024
 const val SC_SPEC_DOC_LIMIT: Int = 1024
+const val SC_SPEC_TYPE_NAME_LIMIT: Int = 1024
 const val SCSYMBOL_LIMIT: Int = 32
 const val MASK_ACCOUNT_FLAGS: Int = 0x7
 const val MASK_ACCOUNT_FLAGS_V17: Int = 0xF
