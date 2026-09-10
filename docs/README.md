@@ -88,6 +88,7 @@ This SDK provides an implementation of the Stellar protocol with:
 
 ### Soroban (Smart Contracts)
 - ContractClient for easy interaction
+- Typed clients generated with stellar-contract-bindings
 - AssembledTransaction lifecycle management
 - Authorization handling
 - State restoration

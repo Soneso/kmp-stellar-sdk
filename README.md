@@ -73,7 +73,7 @@ The SDK provides:
 - **Transaction Building** - TransactionBuilder with fluent API, all 27 Stellar operations, memos, time bounds, multi-signature support
 - **Assets & Accounts** - Native (XLM) and issued assets, trustlines, muxed accounts, SAC contract ID derivation
 - **Horizon API Client** - Full REST API coverage with request builders, SSE streaming, automatic retries, SEP-29 validation
-- **Soroban Smart Contracts** - High-level ContractClient with beginner-friendly Map-based API and power-user mode
+- **Soroban Smart Contracts** - High-level ContractClient with beginner-friendly Map-based API and power-user mode, plus typed clients generated with stellar-contract-bindings
 - **Soroban RPC Client** - Transaction simulation, event queries, ledger data, contract deployment and invocation
 - **Contract Deployment** - One-step deploy() or two-step install/deployFromWasmId for WASM reuse
 - **Authorization** - Automatic and custom auth handling with signature verification
@@ -230,7 +230,7 @@ suspend fun callContract() {
     // Query with Map-based arguments (auto-executes)
     val balance = client.invoke<Long>(
         functionName = "balance",
-        arguments = mapOf("account" to accountAddress),
+        arguments = mapOf("id" to accountAddress),
         source = sourceAccount,
         signer = null,  // No signer for read calls
         parseResultXdrFn = { Scv.fromInt128(it).toLong() }
@@ -280,6 +280,8 @@ suspend fun multiSigContractCall() {
     val result = assembled.signAndSubmit(sourceKeypair)
 }
 ```
+
+**Typed clients** generated from a contract spec with [stellar-contract-bindings](https://github.com/lightsail-network/stellar-contract-bindings) (`stellar-contract-bindings kmp`) replace the map-based arguments and result parsers above with one Kotlin method per contract function; see [Contract Bindings](docs/sdk-usage-examples.md#contract-bindings).
 
 For deployment examples, authorization patterns, and advanced usage, see the [Getting Started Guide](docs/getting-started.md) and [Demo App](demo/README.md).
 
