@@ -371,7 +371,7 @@ class XdrSCSpecTest {
         val event = SCSpecEventV0Xdr(
             doc = "Transfer event",
             lib = "",
-            name = SCSymbolXdr("transfer"),
+            name = "transfer",
             prefixTopics = listOf(SCSymbolXdr("TOKEN")),
             params = listOf(
                 SCSpecEventParamV0Xdr("From", "from", SCSpecTypeDefXdr.Void(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS), SCSpecEventParamLocationV0Xdr.SC_SPEC_EVENT_PARAM_LOCATION_TOPIC_LIST),
@@ -387,7 +387,7 @@ class XdrSCSpecTest {
         val event = SCSpecEventV0Xdr(
             doc = "",
             lib = "",
-            name = SCSymbolXdr("init"),
+            name = "init",
             prefixTopics = emptyList(),
             params = emptyList(),
             dataFormat = SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_VEC
@@ -451,7 +451,7 @@ class XdrSCSpecTest {
     @Test
     fun testSCSpecEntryEvent() {
         val entry = SCSpecEntryXdr.EventV0(
-            SCSpecEventV0Xdr("", "", SCSymbolXdr("e"), emptyList(), emptyList(),
+            SCSpecEventV0Xdr("", "", "e", emptyList(), emptyList(),
                 SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_MAP)
         )
         assertXdrRoundTrip(entry, { v, w -> v.encode(w) }, { r -> SCSpecEntryXdr.decode(r) })

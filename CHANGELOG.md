@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with no faithful native representation, such as an error or a map whose keys
   cannot serve as Kotlin map keys, comes back as the `SCValXdr` itself.
 
+### Changed
+- XDR definitions regenerated from stellar/stellar-xdr commit
+  `c40231c76bf2ebce76b24aa11c72508ac3eaa329`. Contract spec names may now be up
+  to `SC_SPEC_TYPE_NAME_LIMIT` (1024) bytes: the `name` fields of
+  `SCSpecTypeUDT`, `SCSpecUDTStructV0`, `SCSpecUDTUnionV0`, `SCSpecUDTEnumV0`
+  and `SCSpecUDTErrorEnumV0` were capped at 60, and `SCSpecEventV0.name` is a
+  plain XDR string where it was an `SCSymbol` capped at 32. In Kotlin,
+  `SCSpecEventV0Xdr.name` is therefore `String` rather than `SCSymbolXdr`, a
+  source-incompatible change for code that read `name.value`. The binary
+  encoding and the XDR-JSON rendering of the affected types are unchanged, as
+  an `SCSymbol` and a plain string encode identically; only the accepted name
+  lengths grew.
+
 ## [1.12.0] - 2026-08-26
 
 Migration guide: [docs/migration/1.12.0.md](docs/migration/1.12.0.md)

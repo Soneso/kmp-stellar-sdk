@@ -18,7 +18,7 @@ internal data class Sep51CorpusEntry(
   val source: String
 )
 
-/** SEP-0051 conformance cases for the XDR definitions pinned at 911c9356277468cb588481bd90b5d4b6eda395a7. */
+/** SEP-0051 conformance cases for the XDR definitions pinned at c40231c76bf2ebce76b24aa11c72508ac3eaa329. */
 internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
   Sep51CorpusEntry(
     "ScAddress",

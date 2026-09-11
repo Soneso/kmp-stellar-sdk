@@ -14,7 +14,7 @@ private val XDR_JSON_KEYS: Array<String> = arrayOf("name")
  * XDR Source:
  * struct SCSpecTypeUDT
  * {
- *     string name<60>;
+ *     string name<SC_SPEC_TYPE_NAME_LIMIT>;
  * };
  */
 data class SCSpecTypeUDTXdr(
@@ -34,7 +34,7 @@ data class SCSpecTypeUDTXdr(
     internal fun fromXdrJsonTree(element: JsonElement): SCSpecTypeUDTXdr {
       val json = XdrJson.obj(element, XDR_JSON_TYPE, XDR_JSON_KEYS)
       return SCSpecTypeUDTXdr(
-        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = 60)
+        XdrJson.unescapeString(XdrJson.field(json, "name", XDR_JSON_TYPE), XDR_JSON_TYPE, "name", maxLength = SC_SPEC_TYPE_NAME_LIMIT)
       )
     }
   }

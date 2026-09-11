@@ -320,7 +320,7 @@ class SorobanContractParserTest {
             SCSpecEventV0Xdr(
                 doc = "",
                 lib = "",
-                name = SCSymbolXdr("Transfer"),
+                name = "Transfer",
                 prefixTopics = emptyList(),
                 params = emptyList(),
                 dataFormat = SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE
@@ -332,7 +332,7 @@ class SorobanContractParserTest {
             metaEntries = emptyMap()
         )
         assertEquals(1, info.events.size)
-        assertEquals("Transfer", info.events[0].name.value)
+        assertEquals("Transfer", info.events[0].name)
     }
 
     @Test

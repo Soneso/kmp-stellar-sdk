@@ -154,7 +154,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 is SCSpecEntryXdr.UdtUnionV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtEnumV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtErrorEnumV0 -> entry.value.name == name
-                is SCSpecEntryXdr.EventV0 -> entry.value.name.value == name
+                is SCSpecEntryXdr.EventV0 -> entry.value.name == name
             }
         }
     }

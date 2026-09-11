@@ -1889,7 +1889,7 @@ class ContractSpecTest {
             SCSpecEntryXdr.EventV0(
                 SCSpecEventV0Xdr(
                     "", "",
-                    SCSymbolXdr("MyEvent"),
+                    "MyEvent",
                     emptyList(), emptyList(),
                     SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE
                 )
@@ -1931,7 +1931,7 @@ class ContractSpecTest {
             SCSpecEntryXdr.EventV0(
                 SCSpecEventV0Xdr(
                     "", "",
-                    SCSymbolXdr("MyEvent"),
+                    "MyEvent",
                     emptyList(), emptyList(),
                     SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE
                 )
