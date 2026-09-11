@@ -271,7 +271,7 @@ class SorobanParserTest {
      */
     private fun printEvent(event: SCSpecEventV0Xdr): String {
         val builder = StringBuilder()
-        builder.append("Event: ${event.name.value}\n")
+        builder.append("Event: ${event.name}\n")
         builder.append("lib: ${event.lib}\n")
 
         event.prefixTopics.forEachIndexed { index, prefixTopic ->
@@ -588,7 +588,7 @@ class SorobanParserTest {
         // Validate events count and specific event names
         assertEquals(8, contractInfo.events.size, "Contract should have exactly 8 events")
 
-        val eventNames = contractInfo.events.map { it.name.value }
+        val eventNames = contractInfo.events.map { it.name }
         assertTrue(eventNames.contains("SetAdmin"), "Contract should have SetAdmin event")
         assertTrue(eventNames.contains("Approve"), "Contract should have Approve event")
         assertTrue(eventNames.contains("Transfer"), "Contract should have Transfer event")
@@ -599,14 +599,14 @@ class SorobanParserTest {
         assertTrue(eventNames.contains("Clawback"), "Contract should have Clawback event")
 
         // Validate Transfer event structure
-        val transferEvent = contractInfo.events.firstOrNull { it.name.value == "Transfer" }
+        val transferEvent = contractInfo.events.firstOrNull { it.name == "Transfer" }
         assertNotNull(transferEvent, "Transfer event should be found")
         assertEquals(1, transferEvent.prefixTopics.size, "Transfer event should have 1 prefix topic")
         assertEquals("transfer", transferEvent.prefixTopics[0].value, "Transfer event prefix topic should be 'transfer'")
         assertEquals(4, transferEvent.params.size, "Transfer event should have 4 parameters")
 
         // Validate Approve event structure
-        val approveEvent = contractInfo.events.firstOrNull { it.name.value == "Approve" }
+        val approveEvent = contractInfo.events.firstOrNull { it.name == "Approve" }
         assertNotNull(approveEvent, "Approve event should be found")
         assertEquals(1, approveEvent.prefixTopics.size, "Approve event should have 1 prefix topic")
         assertEquals("approve", approveEvent.prefixTopics[0].value, "Approve event prefix topic should be 'approve'")
@@ -723,7 +723,7 @@ class SorobanParserTest {
         assertEquals(8, events.size, "ContractSpec events() should return exactly 8 events")
 
         // Validate specific event names exist
-        val eventNames = events.map { it.name.value }
+        val eventNames = events.map { it.name }
         assertTrue(eventNames.contains("SetAdmin"), "Events should include SetAdmin")
         assertTrue(eventNames.contains("Approve"), "Events should include Approve")
         assertTrue(eventNames.contains("Transfer"), "Events should include Transfer")
@@ -734,7 +734,7 @@ class SorobanParserTest {
         assertTrue(eventNames.contains("Clawback"), "Events should include Clawback")
 
         // Validate Transfer event structure from ContractSpec
-        val transferEvent = events.firstOrNull { it.name.value == "Transfer" }
+        val transferEvent = events.firstOrNull { it.name == "Transfer" }
         assertNotNull(transferEvent, "Transfer event should be found")
         assertEquals(1, transferEvent.prefixTopics.size, "Transfer event should have 1 prefix topic")
         assertEquals("transfer", transferEvent.prefixTopics[0].value, "Transfer event prefix topic should be 'transfer'")

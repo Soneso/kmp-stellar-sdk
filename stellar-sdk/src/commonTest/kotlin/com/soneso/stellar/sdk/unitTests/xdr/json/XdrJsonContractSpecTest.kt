@@ -40,7 +40,7 @@ internal fun sampleSCSpecTypeBytesNXdr(seed: Int, depth: Int): SCSpecTypeBytesNX
 )
 
 internal fun sampleSCSpecTypeUDTXdr(seed: Int, depth: Int): SCSpecTypeUDTXdr = SCSpecTypeUDTXdr(
-  sampleString(seed, 60)
+  sampleString(seed, 0)
 )
 
 internal fun sampleSCSpecTypeDefXdrVoidScSpecTypeValArm(seed: Int, depth: Int): SCSpecTypeDefXdr =
@@ -160,7 +160,7 @@ internal fun sampleSCSpecUDTStructFieldV0Xdr(seed: Int, depth: Int): SCSpecUDTSt
 internal fun sampleSCSpecUDTStructV0Xdr(seed: Int, depth: Int): SCSpecUDTStructV0Xdr = SCSpecUDTStructV0Xdr(
   sampleString(seed, 0),
   sampleString(seed + 3, 80),
-  sampleString(seed + 6, 60),
+  sampleString(seed + 6, 0),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSpecUDTStructFieldV0Xdr(seed + 9 + it, depth + 1) } else emptyList()
 )
 
@@ -192,7 +192,7 @@ internal fun sampleSCSpecUDTUnionCaseV0Xdr(seed: Int, depth: Int): SCSpecUDTUnio
 internal fun sampleSCSpecUDTUnionV0Xdr(seed: Int, depth: Int): SCSpecUDTUnionV0Xdr = SCSpecUDTUnionV0Xdr(
   sampleString(seed, 0),
   sampleString(seed + 3, 80),
-  sampleString(seed + 6, 60),
+  sampleString(seed + 6, 0),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSpecUDTUnionCaseV0Xdr(seed + 9 + it, depth + 1) } else emptyList()
 )
 
@@ -205,7 +205,7 @@ internal fun sampleSCSpecUDTEnumCaseV0Xdr(seed: Int, depth: Int): SCSpecUDTEnumC
 internal fun sampleSCSpecUDTEnumV0Xdr(seed: Int, depth: Int): SCSpecUDTEnumV0Xdr = SCSpecUDTEnumV0Xdr(
   sampleString(seed, 0),
   sampleString(seed + 3, 80),
-  sampleString(seed + 6, 60),
+  sampleString(seed + 6, 0),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSpecUDTEnumCaseV0Xdr(seed + 9 + it, depth + 1) } else emptyList()
 )
 
@@ -218,7 +218,7 @@ internal fun sampleSCSpecUDTErrorEnumCaseV0Xdr(seed: Int, depth: Int): SCSpecUDT
 internal fun sampleSCSpecUDTErrorEnumV0Xdr(seed: Int, depth: Int): SCSpecUDTErrorEnumV0Xdr = SCSpecUDTErrorEnumV0Xdr(
   sampleString(seed, 0),
   sampleString(seed + 3, 80),
-  sampleString(seed + 6, 60),
+  sampleString(seed + 6, 0),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSpecUDTErrorEnumCaseV0Xdr(seed + 9 + it, depth + 1) } else emptyList()
 )
 
@@ -249,7 +249,7 @@ internal fun sampleSCSpecEventDataFormatXdr(seed: Int): SCSpecEventDataFormatXdr
 internal fun sampleSCSpecEventV0Xdr(seed: Int, depth: Int): SCSpecEventV0Xdr = SCSpecEventV0Xdr(
   sampleString(seed, 0),
   sampleString(seed + 3, 80),
-  sampleSCSymbolXdr(seed + 6, depth + 1),
+  sampleString(seed + 6, 0),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSymbolXdr(seed + 9 + it, depth + 1) } else emptyList(),
   if (depth < SAMPLE_DEPTH) List(1) { sampleSCSpecEventParamV0Xdr(seed + 12 + it, depth + 1) } else emptyList(),
   sampleSCSpecEventDataFormatXdr(seed + 15)
