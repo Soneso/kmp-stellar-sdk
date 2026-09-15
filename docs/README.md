@@ -14,6 +14,7 @@ Welcome to the documentation for the Stellar SDK for Kotlin Multiplatform. This 
 
 ### Architecture & Design
 - **[Architecture Guide](architecture.md)** - System architecture, design decisions, and security principles
+- **[Addresses and StrKey](addresses.md)** - The address formats the SDK reads and writes, and the rules the codec checks them against
 - **[Platform Guides](platforms/)** - Platform-specific setup and considerations
 
 ### Advanced Topics
@@ -43,7 +44,7 @@ This SDK provides an implementation of the Stellar protocol with:
 
 ### Core Features
 - Ed25519 keypair generation and management
-- StrKey encoding/decoding (G..., S..., C..., M... addresses)
+- StrKey encoding/decoding for all nine key types (G, S, M, C, L, B, T, X, P) - see [Addresses and StrKey](addresses.md)
 - Transaction building and signing
 - Fee bump transactions
 - Multi-signature support
