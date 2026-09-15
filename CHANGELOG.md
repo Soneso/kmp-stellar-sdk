@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.13.0] - 2026-09-15
 
 ### Added
 - `SCValXdr.toNative()` converts a smart contract value to native Kotlin values
@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   addresses, `ByteArray` for bytes, lists for vecs and maps for maps. A value
   with no faithful native representation, such as an error or a map whose keys
   cannot serve as Kotlin map keys, comes back as the `SCValXdr` itself.
+- `docs/addresses.md` documents the strkey encodings and the address types:
+  `KeyPair`, `Address`, `MuxedAccount`, `ClaimableBalanceId`, and `SignerKey`.
+- Generated contract bindings are documented in the usage examples and the
+  bundled agent skill.
 
 ### Changed
 - XDR definitions regenerated from stellar/stellar-xdr commit
@@ -27,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   encoding and the XDR-JSON rendering of the affected types are unchanged, as
   an `SCSymbol` and a plain string encode identically; only the accepted name
   lengths grew.
+
+### Fixed
+- Publishing a release reliably deploys the versioned API docs; after 1.12.0
+  they required a manual workflow dispatch.
 
 ## [1.12.0] - 2026-08-26
 

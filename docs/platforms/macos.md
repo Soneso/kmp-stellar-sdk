@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val desktopMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.12.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.13.0")
                 implementation(compose.desktop.currentOs)
             }
         }

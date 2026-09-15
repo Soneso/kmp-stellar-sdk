@@ -81,6 +81,18 @@ class ClassInfo:
     is_actual: bool = False  # KMP `actual` declaration in a platform sourceset
 
 
+@dataclass
+class TopLevelFunctionInfo:
+    """Parsed top-level (file-scope) public function information."""
+
+    name: str  # receiver-qualified name, e.g. "SCValXdr.toNative"
+    signature: str
+    is_deprecated: bool = False
+    platform: str = ""  # empty for commonMain; else source-set label (e.g. "androidMain")
+    is_expect: bool = False  # KMP `expect` declaration in commonMain
+    is_actual: bool = False  # KMP `actual` declaration in a platform sourceset
+
+
 # ---------------------------------------------------------------------------
 # Text utilities
 # ---------------------------------------------------------------------------
@@ -755,6 +767,153 @@ def determine_group(rel_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Top-level function extraction
+# ---------------------------------------------------------------------------
+
+# Regex to find top-level function declarations. `fun interface` is a
+# class-like declaration handled by CLASS_START, so it is excluded here.
+TOP_LEVEL_FUN_START = re.compile(
+    r"^[ \t]*"
+    r"((?:@Deprecated(?:\([^)]*\))?\s*)?)"  # optional @Deprecated
+    r"((?:(?:public|private|internal|protected|expect|actual|external|inline|suspend|operator|infix|tailrec)\s+)*)"  # modifiers
+    r"fun\b(?!\s+interface\b)",
+    re.MULTILINE,
+)
+
+
+def advance_brace_depth(text: str, start: int, end: int, depth: int) -> int:
+    """Advance brace depth from `start` to `end`, skipping string and char literals."""
+    i = start
+    n = len(text)
+    while i < end:
+        ch = text[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif ch == "'":
+            # A char literal may hold a brace or a double quote ('{', '"');
+            # counting either would desync the depth or the string skip.
+            i += 1
+            while i < end and text[i] != "'" and text[i] != "\n":
+                if text[i] == "\\":
+                    i += 1
+                i += 1
+        elif ch == '"':
+            if i + 2 < n and text[i : i + 3] == '"""':
+                i += 3
+                while i < end and text[i : i + 3] != '"""':
+                    i += 1
+                i += 2  # skip closing triple (loop i+=1)
+            else:
+                i += 1
+                while i < end and text[i] != '"' and text[i] != "\n":
+                    if text[i] == "\\":
+                        i += 1
+                    i += 1
+        i += 1
+    return depth
+
+
+def extract_top_level_functions(clean: str) -> list[TopLevelFunctionInfo]:
+    """Extract public top-level function declarations from cleaned source.
+
+    Top-level means brace depth 0 in the file, i.e. outside every class body
+    and every function body.
+    """
+    results: list[TopLevelFunctionInfo] = []
+    n = len(clean)
+    depth = 0
+    cursor = 0
+
+    for m in TOP_LEVEL_FUN_START.finditer(clean):
+        depth = advance_brace_depth(clean, cursor, m.start(), depth)
+        cursor = m.start()
+        if depth != 0:
+            continue
+
+        deprecated_str = m.group(1).strip()
+        modifier_tokens = m.group(2).split()
+        if any(t in ("private", "internal", "protected") for t in modifier_tokens):
+            continue
+
+        pos = m.end()
+
+        # Optional type parameters <T>
+        type_params = ""
+        while pos < n and clean[pos] in (" ", "\t", "\n"):
+            pos += 1
+        if pos < n and clean[pos] == "<":
+            angle_end = balance_angles(clean, pos)
+            type_params = compact_ws(clean[pos : angle_end + 1])
+            pos = angle_end + 1
+
+        # Receiver type (optional) and function name: everything up to the
+        # parameter list's opening paren, respecting <> nesting so a generic
+        # receiver like Map<String, Int>.foo stays intact.
+        while pos < n and clean[pos] in (" ", "\t", "\n"):
+            pos += 1
+        head_start = pos
+        angle = 0
+        while pos < n:
+            ch = clean[pos]
+            if ch == "<":
+                angle += 1
+            elif ch == ">" and angle > 0:
+                angle -= 1
+            elif ch == "(" and angle == 0:
+                break
+            pos += 1
+        receiver_and_name = compact_ws(clean[head_start:pos])
+        if pos >= n or not receiver_and_name:
+            continue
+
+        # Parameters
+        paren_end = balance_parens(clean, pos)
+        params = clean_method_params(clean[pos + 1 : paren_end])
+
+        # Return type: after the closing paren, up to the body start ({ for a
+        # block body, = for an expression body) or the end of the header line.
+        # The `>` guard keeps a function-type return like () -> Unit intact.
+        pos = paren_end + 1
+        after_start = pos
+        angle = 0
+        while pos < n:
+            ch = clean[pos]
+            if ch == "<":
+                angle += 1
+            elif ch == ">" and angle > 0:
+                angle -= 1
+            elif ch in ("{", "=", "\n") and angle == 0:
+                break
+            pos += 1
+        after = compact_ws(clean[after_start:pos])
+        return_type = after[1:].strip() if after.startswith(":") else ""
+
+        sig = ""
+        if "suspend" in modifier_tokens:
+            sig += "suspend "
+        sig += "fun "
+        if type_params:
+            sig += f"{type_params} "
+        sig += f"{receiver_and_name}({params})"
+        if return_type:
+            sig += f": {return_type}"
+
+        results.append(
+            TopLevelFunctionInfo(
+                name=receiver_and_name,
+                signature=sig,
+                is_deprecated=bool(deprecated_str),
+                is_expect="expect" in modifier_tokens,
+                is_actual="actual" in modifier_tokens,
+            )
+        )
+
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Main class parser
 # ---------------------------------------------------------------------------
 
@@ -769,10 +928,13 @@ CLASS_START = re.compile(
 )
 
 
-def parse_kotlin_file(filepath: Path) -> list[ClassInfo]:
-    """Parse a Kotlin file and extract all public classes with their members."""
+def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFunctionInfo]]:
+    """Parse a Kotlin file and extract all public classes with their members,
+    plus all public top-level functions."""
     content = filepath.read_text(encoding="utf-8")
     clean = strip_comments(content)
+
+    functions = extract_top_level_functions(clean)
 
     results = []
 
@@ -1021,7 +1183,7 @@ def parse_kotlin_file(filepath: Path) -> list[ClassInfo]:
 
         results.append(info)
 
-    return results
+    return results, functions
 
 
 # ---------------------------------------------------------------------------
@@ -1132,6 +1294,21 @@ def format_class_section(info: ClassInfo) -> str:
     return "\n".join(lines), member_count
 
 
+def format_functions_section(fn_list: list[TopLevelFunctionInfo]) -> str:
+    """Format the top-level functions block for a group."""
+    lines = ["## Top-level functions"]
+    for fn in fn_list:
+        line = ""
+        if fn.is_deprecated:
+            line += "@Deprecated "
+        line += fn.signature
+        if fn.platform:
+            line += f" ({fn.platform})"
+        lines.append(line)
+    lines.append("")  # blank line
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1147,9 +1324,10 @@ def main():
         )
         sys.exit(1)
 
-    # Collect all classes, grouped
+    # Collect all classes and top-level functions, grouped
     groups: dict[str, list[ClassInfo]] = {k: [] for k in GROUP_TITLES}
-    stats = {"files": 0, "classes": 0, "members": 0, "skipped_dirs": 0, "errors": 0, "dedup_expect": 0}
+    fn_groups: dict[str, list[TopLevelFunctionInfo]] = {k: [] for k in GROUP_TITLES}
+    stats = {"files": 0, "classes": 0, "members": 0, "functions": 0, "skipped_dirs": 0, "errors": 0, "dedup_expect": 0}
 
     for platform_label, source_set, subdir_filter in SCAN_SOURCES:
         pkg_root = SDK_ROOT / source_set / PKG_REL_PATH
@@ -1189,7 +1367,7 @@ def main():
                 group = determine_group(rel_path)
 
                 try:
-                    classes = parse_kotlin_file(filepath)
+                    classes, functions = parse_kotlin_file(filepath)
                     stats["files"] += 1
 
                     for cls in classes:
@@ -1210,6 +1388,16 @@ def main():
                         display_path = f"{source_set}/{rel_path}"
                         print(
                             f"  {display_path}: {cls.name} ({member_count} members)",
+                            file=sys.stderr,
+                        )
+
+                    for fn in functions:
+                        fn.platform = platform_label
+                        stats["functions"] += 1
+                        fn_groups[group].append(fn)
+                        display_path = f"{source_set}/{rel_path}"
+                        print(
+                            f"  {display_path}: fun {fn.name}",
                             file=sys.stderr,
                         )
 
@@ -1234,21 +1422,38 @@ def main():
             filtered.append(c)
         groups[group_key] = filtered
 
+    # Same expect/actual dedup for top-level functions.
+    for group_key, fn_list in fn_groups.items():
+        fn_has_actual: set[str] = {f.name for f in fn_list if f.is_actual}
+        fn_filtered = []
+        for f in fn_list:
+            if f.is_expect and f.name in fn_has_actual:
+                stats["dedup_expect"] += 1
+                continue
+            fn_filtered.append(f)
+        fn_groups[group_key] = fn_filtered
+
     # Sort classes within each group: commonMain first (platform=""), then by
     # platform label, then by name. Platform tags group together in output.
     for group_key, class_list in groups.items():
         class_list.sort(key=lambda c: (c.platform, c.name))
         groups[group_key] = class_list
 
+    # Same ordering for top-level functions.
+    for group_key, fn_list in fn_groups.items():
+        fn_list.sort(key=lambda f: (f.platform, f.name))
+        fn_groups[group_key] = fn_list
+
     # Generate markdown
     md = "# KMP Stellar SDK API Reference (Signatures)\n\n"
     md += "Compact method signature reference for `com.soneso.stellar.sdk`.\n"
     md += "Generated by `generate_api_reference.py`. Do not edit manually.\n\n"
-    md += f"**Stats:** {stats['classes']} classes, {stats['members']} members\n\n"
+    md += f"**Stats:** {stats['classes']} classes, {stats['members']} members, {stats['functions']} top-level functions\n\n"
 
     for group_key, title in GROUP_TITLES.items():
         class_list = groups[group_key]
-        if not class_list:
+        fn_list = fn_groups[group_key]
+        if not class_list and not fn_list:
             continue
 
         md += "---\n"
@@ -1259,6 +1464,9 @@ def main():
             section, _ = format_class_section(cls)
             md += section + "\n"
 
+        if fn_list:
+            md += format_functions_section(fn_list) + "\n"
+
     # Write output
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(md, encoding="utf-8")
@@ -1268,6 +1476,7 @@ def main():
     print(f"Files processed: {stats['files']}", file=sys.stderr)
     print(f"Classes extracted: {stats['classes']}", file=sys.stderr)
     print(f"Total members: {stats['members']}", file=sys.stderr)
+    print(f"Top-level functions: {stats['functions']}", file=sys.stderr)
     print(f"Directories skipped: {stats['skipped_dirs']}", file=sys.stderr)
     print(f"Expect dedup (replaced by actual): {stats['dedup_expect']}", file=sys.stderr)
     print(f"Errors: {stats['errors']}", file=sys.stderr)

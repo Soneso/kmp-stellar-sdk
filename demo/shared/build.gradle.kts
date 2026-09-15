@@ -113,7 +113,7 @@ kotlin {
                 api(project(":stellar-sdk"))
 
                 // Users consuming from Maven should use:
-                // api("com.soneso.stellar:stellar-sdk:1.12.0")
+                // api("com.soneso.stellar:stellar-sdk:1.13.0")
 
                 // ============================================================
                 // Coroutines

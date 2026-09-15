@@ -482,7 +482,7 @@ private fun getEntryTitle(entry: SCSpecEntryXdr): String {
         is SCSpecEntryXdr.UdtUnionV0 -> "Union: ${entry.value.name}"
         is SCSpecEntryXdr.UdtEnumV0 -> "Enum: ${entry.value.name}"
         is SCSpecEntryXdr.UdtErrorEnumV0 -> "Error Enum: ${entry.value.name}"
-        is SCSpecEntryXdr.EventV0 -> "Event: ${entry.value.name.value}"
+        is SCSpecEntryXdr.EventV0 -> "Event: ${entry.value.name}"
     }
 }
 

@@ -225,13 +225,11 @@ Before publishing to Maven Central, verify the artifact works with a local Maven
 ./gradlew publishToMavenLocal --no-daemon
 ```
 
-#### Step 9: Test with Demo App
+#### Step 9: Test with Demo Apps
 
-Temporarily switch a demo app to use the local artifact instead of the project dependency. Choose the demo app most relevant to the changes:
+Temporarily switch BOTH demo apps (`demo/` and `smart-account-demo/`) to use the local artifact instead of the project dependency, and build both. Always both, regardless of what the release touches: neither demo is compiled by CI or by the SDK test suites, so a demo is the only place a source-incompatible SDK change against demo code surfaces, and both consume the same artifact. (The 1.13.0 prep caught exactly this: the main demo no longer compiled against an XDR type change that every SDK-level gate had passed.)
 
-- **Smart account changes**: Use the smart account demo (`smart-account-demo/`)
-- **Core SDK changes**: Use the main demo (`demo/`)
-- **Both**: When the release touches the core SDK and smart accounts, test both demos.
+The native-framework targets (`iosApp`/`macosApp`) cannot build against the Maven artifact — their `export(project(":stellar-sdk"))` requires the project dependency — so verify the artifact through the Android, desktop, and JS targets (e.g. `:demo:androidApp:assembleDebug`, `:demo:shared:compileKotlinDesktop`, `:demo:shared:jsJar`, and the smart-account equivalents). Android also verifies the AAR.
 
 In the demo app's `shared/build.gradle.kts`, replace the project dependency with the local Maven artifact:
 
@@ -407,6 +405,7 @@ Verify the release is complete:
 - [ ] README shows correct version
 - [ ] Getting Started guide references new version
 - [ ] CHANGELOG.md includes release
+- [ ] Versioned API docs deployed: https://soneso.github.io/kmp-stellar-sdk/api/X.Y.Z/ answers 200. The tag run commits the versioned copy back to main and that commit's push triggers the deploy that serves it, so no manual step is needed; if the URL 404s, dispatch the workflow once (`gh workflow run pages.yml`) and re-check. The docs commit lands on origin/main during the release, so pull before any further local work
 
 ## Troubleshooting
 
@@ -542,6 +541,6 @@ Use this checklist for each release:
 
 ---
 
-**Document Version**: 1.2
-**Last Updated**: August 10, 2026
-**Based on**: Releases 0.2.0 through 1.11.0
+**Document Version**: 1.3
+**Last Updated**: September 15, 2026
+**Based on**: Releases 0.2.0 through 1.12.0
