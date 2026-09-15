@@ -75,7 +75,13 @@ jobs:
           if git diff --cached --quiet; then
             echo "docs/api/$VERSION is unchanged, nothing to commit"
           else
-            git commit -m "Publish API docs for $VERSION [skip ci]"
+            # The commit must NOT carry [skip ci]: its push has to trigger this
+            # workflow once more so the last deployment in the concurrency queue
+            # is built from a checkout that contains docs/api/$VERSION, whatever
+            # order the tag run and the release-commit run finish in. That
+            # follow-up run resolves version=latest, so it commits nothing and
+            # cannot retrigger itself.
+            git commit -m "Publish API docs for $VERSION"
             git pull --rebase origin main
             git push origin HEAD:main
           fi
