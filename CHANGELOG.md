@@ -32,10 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an `SCSymbol` and a plain string encode identically; only the accepted name
   lengths grew.
 
-### Fixed
-- Publishing a release reliably deploys the versioned API docs; after 1.12.0
-  they required a manual workflow dispatch.
-
 ## [1.12.0] - 2026-08-26
 
 Migration guide: [docs/migration/1.12.0.md](docs/migration/1.12.0.md)

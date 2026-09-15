@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>toNative</title>
+    <link href="../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../styles/style.css" rel="Stylesheet">
+<link href="../../styles/main.css" rel="Stylesheet">
+<link href="../../styles/prism.css" rel="Stylesheet">
+<link href="../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../index.html" tabindex="1">
+                    stellar-sdk
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.13.0        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":stellar-sdk/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":stellar-sdk/commonMain"
+                                       data-filter=":stellar-sdk/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    stellar-sdk
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="member" id="content" pageIds="stellar-sdk::com.soneso.stellar.sdk.scval//toNative/com.soneso.stellar.sdk.xdr.SCValXdr#/PointingToDeclaration//-2014708805">
+  <div class="breadcrumbs"><a href="../../index.html">stellar-sdk</a><span class="delimiter">/</span><a href="index.html">com.soneso.stellar.sdk.scval</a><span class="delimiter">/</span><span class="current">toNative</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>to</span><wbr></wbr><span><span>Native</span></span></h1>
+  </div>
+  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":stellar-sdk/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a><span class="token punctuation">.</span><a href="to-native.html"><span class="token function">toNative</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a><span class="token operator">?</span></div><p class="paragraph">Converts this <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> to a native Kotlin value without a contract spec.</p><p class="paragraph">The conversion is total: it never throws, whatever the receiver contains. Every arm has a defined result, and where a value has no native representation the result is the <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> itself (the same instance, never a copy), so a caller detects that case with <code class="lang-kotlin">is SCValXdr</code>. The receiver and its children are never mutated. The <code class="lang-kotlin">ByteArray</code> returned for a bytes value is the stored payload array, so writing to it writes through to the receiver.</p><h2 class="">Value conversion</h2><ul><li><p class="paragraph"><code class="lang-kotlin">SCV_BOOL</code> → <code class="lang-kotlin">Boolean</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_VOID</code> → <code class="lang-kotlin">null</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U32</code> → <code class="lang-kotlin">UInt</code>; <code class="lang-kotlin">SCV_I32</code> → <code class="lang-kotlin">Int</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U64</code>, <code class="lang-kotlin">SCV_TIMEPOINT</code>, <code class="lang-kotlin">SCV_DURATION</code> → <code class="lang-kotlin">ULong</code>; <code class="lang-kotlin">SCV_I64</code> → <code class="lang-kotlin">Long</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U128</code>, <code class="lang-kotlin">SCV_I128</code>, <code class="lang-kotlin">SCV_U256</code>, <code class="lang-kotlin">SCV_I256</code> → <code class="lang-kotlin">BigInteger</code> (<code class="lang-kotlin">com.ionspin.kotlin.bignum.integer.BigInteger</code>, as returned by <a href="-scv/from-uint128.html">Scv.fromUint128</a>, <a href="-scv/from-int128.html">Scv.fromInt128</a>, <a href="-scv/from-uint256.html">Scv.fromUint256</a> and <a href="-scv/from-int256.html">Scv.fromInt256</a>)</p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_BYTES</code> → <code class="lang-kotlin">ByteArray</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_STRING</code>, <code class="lang-kotlin">SCV_SYMBOL</code> → <code class="lang-kotlin">String</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_ADDRESS</code> → strkey <code class="lang-kotlin">String</code> (<code class="lang-kotlin">G...</code>, <code class="lang-kotlin">C...</code>, <code class="lang-kotlin">M...</code>, <code class="lang-kotlin">B...</code> or <code class="lang-kotlin">L...</code>)</p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_VEC</code> → <code class="lang-kotlin">List&lt;Any?&gt;</code> with each element converted recursively, in order; an absent payload yields an empty list</p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_MAP</code> → <code class="lang-kotlin">Map&lt;Any?, Any?&gt;</code> under the key rules below; an absent payload yields an empty map</p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_ERROR</code>, <code class="lang-kotlin">SCV_CONTRACT_INSTANCE</code>, <code class="lang-kotlin">SCV_LEDGER_KEY_CONTRACT_INSTANCE</code>, <code class="lang-kotlin">SCV_LEDGER_KEY_NONCE</code>, <code class="lang-kotlin">SCV_EXECUTABLE_TAG</code> → the <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> itself. The same holds for an address whose bytes have no strkey encoding and for a <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/-void/index.html">SCValXdr.Void</a> whose discriminant is anything other than <code class="lang-kotlin">SCV_VOID</code>. The <code class="lang-kotlin">Scv.from*</code> accessors, for example <a href="-scv/from-error.html">Scv.fromError</a> or <a href="-scv/from-executable-tag-bytes.html">Scv.fromExecutableTagBytes</a>, read those payloads on request.</p></li></ul><h2 class="">Map keys</h2><p class="paragraph">Map keys need value-based equality, which <code class="lang-kotlin">ByteArray</code> and the generated XDR types do not provide, so keys use a narrower conversion than values:</p><ul><li><p class="paragraph"><code class="lang-kotlin">SCV_SYMBOL</code>, <code class="lang-kotlin">SCV_STRING</code> → <code class="lang-kotlin">String</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U32</code> → <code class="lang-kotlin">UInt</code>; <code class="lang-kotlin">SCV_I32</code> → <code class="lang-kotlin">Int</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U64</code>, <code class="lang-kotlin">SCV_TIMEPOINT</code>, <code class="lang-kotlin">SCV_DURATION</code> → <code class="lang-kotlin">ULong</code>; <code class="lang-kotlin">SCV_I64</code> → <code class="lang-kotlin">Long</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_U128</code>, <code class="lang-kotlin">SCV_I128</code>, <code class="lang-kotlin">SCV_U256</code>, <code class="lang-kotlin">SCV_I256</code> → <code class="lang-kotlin">BigInteger</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_BOOL</code> → <code class="lang-kotlin">Boolean</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_VOID</code> → <code class="lang-kotlin">null</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_BYTES</code> → lowercase hex <code class="lang-kotlin">String</code>; this is the one asymmetry between the two tables, since a bytes value stays a <code class="lang-kotlin">ByteArray</code></p></li><li><p class="paragraph"><code class="lang-kotlin">SCV_ADDRESS</code> → strkey <code class="lang-kotlin">String</code>, the same representation as for a value</p></li></ul><p class="paragraph">Every other key arm is unrepresentable. A map with an unrepresentable key, or with two entries whose converted keys are equal, converts to the <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> itself as a whole. A nested map that falls back is contained: the enclosing vec or map still converts, with that map left as an <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> element.</p><p class="paragraph">Key equality is plain Kotlin <code class="lang-kotlin">equals</code>/<code class="lang-kotlin">hashCode</code> on the converted keys, and a key is looked up with the exact type the table above gives, so a 128-bit or 256-bit key is looked up with a <code class="lang-kotlin">BigInteger</code>. The primitive integer types are never normalized against each other, and a wide-integer key and a primitive integer key are compared by numeric value:</p><ul><li><p class="paragraph">Primitive integer keys of equal value from different arms are distinct: a <code class="lang-kotlin">U32</code> key <code class="lang-kotlin">5</code> (<code class="lang-kotlin">UInt</code>) and a <code class="lang-kotlin">U64</code> key <code class="lang-kotlin">5</code> (<code class="lang-kotlin">ULong</code>) coexist as two entries.</p></li><li><p class="paragraph">A wide-integer key and a primitive integer key of equal value are the same key: an <code class="lang-kotlin">I128</code> key <code class="lang-kotlin">5</code> and a <code class="lang-kotlin">U64</code> key <code class="lang-kotlin">5</code> collide, so such a map falls back. Keys whose values differ never collide, so an <code class="lang-kotlin">I128</code> key <code class="lang-kotlin">-1</code> and a <code class="lang-kotlin">U64</code> key <code class="lang-kotlin">18446744073709551615</code> coexist.</p></li><li><p class="paragraph">Wide-integer keys of equal value collide even across arms: a <code class="lang-kotlin">U128</code> key <code class="lang-kotlin">5</code> and an <code class="lang-kotlin">I256</code> key <code class="lang-kotlin">5</code> are the same key, so such a map falls back.</p></li><li><p class="paragraph">A bytes key collides with a symbol or string key spelling its hex: the bytes <code class="lang-kotlin">[0x30, 0x31]</code> and the symbol <code class="lang-kotlin">&quot;3031&quot;</code> are the same key, so such a map falls back.</p></li></ul><p class="paragraph">The resulting map preserves the entry order of the XDR map.</p><h2 class="">Relation to ContractSpec</h2><p class="paragraph"><a href="../com.soneso.stellar.sdk.contract/-contract-spec/func-res-to-native.html">com.soneso.stellar.sdk.contract.ContractSpec.funcResToNative</a> and <a href="../com.soneso.stellar.sdk.contract/-contract-spec/sc-val-to-native.html">com.soneso.stellar.sdk.contract.ContractSpec.scValToNative</a> convert with a contract spec, which lets them reconstruct structs, unions and enums. This function is the spec-less companion for values whose spec is unavailable or unneeded, and its output shapes differ: a map becomes a <code class="lang-kotlin">Map</code> here and a list of pairs on the spec path, and error, contract-instance and executable-tag values are returned as the <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> itself here where the spec path unwraps their payloads.</p><h2 class="">Usage</h2><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">val scVal = Scv.toMap(linkedMapOf(<br>    Scv.toSymbol(&quot;balance&quot;) to Scv.toInt128(BigInteger.fromLong(1_000L)),<br>    Scv.toSymbol(&quot;tags&quot;) to Scv.toVec(listOf(Scv.toString(&quot;a&quot;), Scv.toString(&quot;b&quot;)))<br>))<br>val native = scVal.toNative() as Map&lt;*, *&gt;<br>native[&quot;balance&quot;]  // BigInteger 1000<br>native[&quot;tags&quot;]     // [&quot;a&quot;, &quot;b&quot;]<br><br>// A value with no native form comes back unchanged<br>val tag = Scv.toExecutableTag(&quot;v1&quot;).toNative()<br>check(tag is SCValXdr)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><span class="kdoc-tag"><h4 class="">Receiver</h4><p class="paragraph">the value to convert</p></span><span class="kdoc-tag"><h4 class="">Return</h4><p class="paragraph">the native Kotlin value, <code class="lang-kotlin">null</code> for <code class="lang-kotlin">SCV_VOID</code>, or this <a href="../com.soneso.stellar.sdk.xdr/-s-c-val-xdr/index.html">SCValXdr</a> itself when the value has no native representation</p></span></div></div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

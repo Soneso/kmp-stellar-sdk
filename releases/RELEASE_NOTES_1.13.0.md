@@ -2,7 +2,7 @@
 
 ## Overview
 
-Version 1.13.0 adds `SCValXdr.toNative()`, which converts a smart-contract value to a native Kotlin value without requiring the contract spec, so contract invocation and simulation results can be consumed directly instead of parsing the raw XDR union by hand. The XDR definitions move to stellar-xdr `c40231c`, which carries one source-incompatible type change, listed under Compatibility. Generated contract bindings and the strkey address rules are now documented, and the versioned API docs publish reliably on release.
+Version 1.13.0 adds `SCValXdr.toNative()`, which converts a smart-contract value to a native Kotlin value without requiring the contract spec, so contract invocation and simulation results can be consumed directly instead of parsing the raw XDR union by hand. The XDR definitions move to stellar-xdr `c40231c`, which carries one source-incompatible type change, listed under Compatibility. Generated contract bindings and the strkey address rules are now documented.
 
 ## Added
 
@@ -20,7 +20,6 @@ Details: [spec-less conversion with toNative](https://github.com/Soneso/kmp-stel
 ## Changed
 
 - XDR definitions regenerated from stellar/stellar-xdr commit `c40231c`. Contract spec names may now be up to 1024 bytes (the new `SC_SPEC_TYPE_NAME_LIMIT` constant): the `name` fields of `SCSpecTypeUDT`, `SCSpecUDTStructV0`, `SCSpecUDTUnionV0`, `SCSpecUDTEnumV0` and `SCSpecUDTErrorEnumV0` were capped at 60, and `SCSpecEventV0.name` is a plain XDR string where it was an `SCSymbol` capped at 32. The binary encoding and the XDR-JSON rendering of the affected types are unchanged.
-- Publishing a release now reliably deploys the versioned API docs; after 1.12.0 they required a manual workflow dispatch.
 
 ## Compatibility
 
