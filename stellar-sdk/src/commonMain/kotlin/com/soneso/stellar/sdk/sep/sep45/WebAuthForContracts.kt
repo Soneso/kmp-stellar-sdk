@@ -1002,8 +1002,7 @@ class WebAuthForContracts(
         return try {
             val bytes = Base64.decode(base64Xdr)
             val reader = XdrReader(bytes)
-            val count = reader.readInt()
-            List(count) { SorobanAuthorizationEntryXdr.decode(reader) }
+            List(reader.readArrayLength()) { SorobanAuthorizationEntryXdr.decode(reader) }
         } catch (e: Exception) {
             throw Sep45InvalidArgsException("Failed to decode authorization entries: ${e.message}")
         }

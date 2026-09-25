@@ -29,7 +29,7 @@ data class ParallelTxsComponentXdr(
 
     fun decode(reader: XdrReader): ParallelTxsComponentXdr {
       val baseFee = if (reader.readBoolean()) Int64Xdr.decode(reader) else null
-      val executionStages = List(reader.readInt()) { ParallelTxExecutionStageXdr.decode(reader) }
+      val executionStages = List(reader.readArrayLength()) { ParallelTxExecutionStageXdr.decode(reader) }
       return ParallelTxsComponentXdr(baseFee, executionStages)
     }
 

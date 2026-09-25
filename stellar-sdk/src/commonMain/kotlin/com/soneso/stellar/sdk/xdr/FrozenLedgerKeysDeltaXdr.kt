@@ -24,8 +24,8 @@ data class FrozenLedgerKeysDeltaXdr(
   companion object {
 
     fun decode(reader: XdrReader): FrozenLedgerKeysDeltaXdr {
-      val keysToFreeze = List(reader.readInt()) { EncodedLedgerKeyXdr.decode(reader) }
-      val keysToUnfreeze = List(reader.readInt()) { EncodedLedgerKeyXdr.decode(reader) }
+      val keysToFreeze = List(reader.readArrayLength()) { EncodedLedgerKeyXdr.decode(reader) }
+      val keysToUnfreeze = List(reader.readArrayLength()) { EncodedLedgerKeyXdr.decode(reader) }
       return FrozenLedgerKeysDeltaXdr(keysToFreeze, keysToUnfreeze)
     }
 

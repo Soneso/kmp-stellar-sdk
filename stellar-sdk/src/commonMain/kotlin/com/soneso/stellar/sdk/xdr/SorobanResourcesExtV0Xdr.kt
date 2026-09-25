@@ -26,7 +26,7 @@ data class SorobanResourcesExtV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SorobanResourcesExtV0Xdr {
-      val archivedSorobanEntries = List(reader.readInt()) { Uint32Xdr.decode(reader) }
+      val archivedSorobanEntries = List(reader.readArrayLength()) { Uint32Xdr.decode(reader) }
       return SorobanResourcesExtV0Xdr(archivedSorobanEntries)
     }
 

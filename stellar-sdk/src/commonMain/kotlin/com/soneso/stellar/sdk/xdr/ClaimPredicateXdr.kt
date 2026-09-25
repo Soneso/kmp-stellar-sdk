@@ -72,11 +72,11 @@ sealed class ClaimPredicateXdr {
       return when (discriminant) {
         ClaimPredicateTypeXdr.CLAIM_PREDICATE_UNCONDITIONAL -> Void
         ClaimPredicateTypeXdr.CLAIM_PREDICATE_AND -> {
-          val value = List(reader.readInt()) { ClaimPredicateXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
           AndPredicates(value)
         }
         ClaimPredicateTypeXdr.CLAIM_PREDICATE_OR -> {
-          val value = List(reader.readInt()) { ClaimPredicateXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
           OrPredicates(value)
         }
         ClaimPredicateTypeXdr.CLAIM_PREDICATE_NOT -> {

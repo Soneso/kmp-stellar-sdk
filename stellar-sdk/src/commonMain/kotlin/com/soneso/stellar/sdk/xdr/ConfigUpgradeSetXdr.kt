@@ -22,7 +22,7 @@ data class ConfigUpgradeSetXdr(
   companion object {
 
     fun decode(reader: XdrReader): ConfigUpgradeSetXdr {
-      val updatedEntry = List(reader.readInt()) { ConfigSettingEntryXdr.decode(reader) }
+      val updatedEntry = List(reader.readArrayLength()) { ConfigSettingEntryXdr.decode(reader) }
       return ConfigUpgradeSetXdr(updatedEntry)
     }
 

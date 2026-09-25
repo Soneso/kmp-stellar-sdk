@@ -26,7 +26,7 @@ data class TransactionSetV1Xdr(
 
     fun decode(reader: XdrReader): TransactionSetV1Xdr {
       val previousLedgerHash = HashXdr.decode(reader)
-      val phases = List(reader.readInt()) { TransactionPhaseXdr.decode(reader) }
+      val phases = List(reader.readArrayLength()) { TransactionPhaseXdr.decode(reader) }
       return TransactionSetV1Xdr(previousLedgerHash, phases)
     }
 

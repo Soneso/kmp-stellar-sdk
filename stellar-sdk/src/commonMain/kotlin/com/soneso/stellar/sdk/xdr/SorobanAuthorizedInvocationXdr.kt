@@ -26,7 +26,7 @@ data class SorobanAuthorizedInvocationXdr(
 
     fun decode(reader: XdrReader): SorobanAuthorizedInvocationXdr {
       val function = SorobanAuthorizedFunctionXdr.decode(reader)
-      val subInvocations = List(reader.readInt()) { SorobanAuthorizedInvocationXdr.decode(reader) }
+      val subInvocations = List(reader.readArrayLength()) { SorobanAuthorizedInvocationXdr.decode(reader) }
       return SorobanAuthorizedInvocationXdr(function, subInvocations)
     }
 

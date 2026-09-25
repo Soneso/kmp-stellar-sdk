@@ -32,7 +32,7 @@ data class SCSpecUDTErrorEnumV0Xdr(
       val doc = reader.readString()
       val lib = reader.readString()
       val name = reader.readString()
-      val cases = List(reader.readInt()) { SCSpecUDTErrorEnumCaseV0Xdr.decode(reader) }
+      val cases = List(reader.readArrayLength()) { SCSpecUDTErrorEnumCaseV0Xdr.decode(reader) }
       return SCSpecUDTErrorEnumV0Xdr(doc, lib, name, cases)
     }
 

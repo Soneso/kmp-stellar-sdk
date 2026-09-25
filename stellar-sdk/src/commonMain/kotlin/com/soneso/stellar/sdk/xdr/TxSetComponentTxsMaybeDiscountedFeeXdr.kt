@@ -26,7 +26,7 @@ data class TxSetComponentTxsMaybeDiscountedFeeXdr(
 
     fun decode(reader: XdrReader): TxSetComponentTxsMaybeDiscountedFeeXdr {
       val baseFee = if (reader.readBoolean()) Int64Xdr.decode(reader) else null
-      val txs = List(reader.readInt()) { TransactionEnvelopeXdr.decode(reader) }
+      val txs = List(reader.readArrayLength()) { TransactionEnvelopeXdr.decode(reader) }
       return TxSetComponentTxsMaybeDiscountedFeeXdr(baseFee, txs)
     }
 

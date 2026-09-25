@@ -24,8 +24,8 @@ data class FreezeBypassTxsDeltaXdr(
   companion object {
 
     fun decode(reader: XdrReader): FreezeBypassTxsDeltaXdr {
-      val addTxs = List(reader.readInt()) { HashXdr.decode(reader) }
-      val removeTxs = List(reader.readInt()) { HashXdr.decode(reader) }
+      val addTxs = List(reader.readArrayLength()) { HashXdr.decode(reader) }
+      val removeTxs = List(reader.readArrayLength()) { HashXdr.decode(reader) }
       return FreezeBypassTxsDeltaXdr(addTxs, removeTxs)
     }
 

@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "ParallelTxExecutionStageXdr"
 value class ParallelTxExecutionStageXdr(val value: List<DependentTxClusterXdr>) {
   companion object {
     fun decode(reader: XdrReader): ParallelTxExecutionStageXdr {
-      val value = List(reader.readInt()) { DependentTxClusterXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { DependentTxClusterXdr.decode(reader) }
       return ParallelTxExecutionStageXdr(value)
     }
 

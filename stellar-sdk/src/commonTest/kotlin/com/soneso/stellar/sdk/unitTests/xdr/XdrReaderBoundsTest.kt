@@ -89,6 +89,36 @@ class XdrReaderBoundsTest {
     }
 
     @Test
+    fun testNegativeArrayLengthIsRejected() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            XdrReader(intBytes(-1) + ByteArray(8)).readArrayLength()
+        }
+        assertTrue(
+            exception.message?.contains("negative") == true,
+            "Message should identify the negative count, got: ${exception.message}"
+        )
+    }
+
+    @Test
+    fun testArrayLengthAboveQuarterOfRemainingBytesIsRejected() {
+        // Three elements need at least 12 bytes; only 8 follow the count
+        val exception = assertFailsWith<IllegalArgumentException> {
+            XdrReader(intBytes(3) + ByteArray(8)).readArrayLength()
+        }
+        val message = exception.message.orEmpty()
+        assertTrue(
+            message.contains("XDR array count 3") && message.contains("8 byte(s) remaining"),
+            "Message should name the count and the remaining bytes, got: $message"
+        )
+    }
+
+    @Test
+    fun testArrayLengthAtQuarterOfRemainingBytesIsAccepted() {
+        assertEquals(2, XdrReader(intBytes(2) + ByteArray(8)).readArrayLength())
+        assertEquals(0, XdrReader(intBytes(0)).readArrayLength())
+    }
+
+    @Test
     fun testReadFixedOpaquePastEndFails() {
         assertFailsWith<IllegalArgumentException> {
             XdrReader(byteArrayOf(1, 2, 3, 4)).readFixedOpaque(8)

@@ -39,7 +39,7 @@ data class AccountEntryExtensionV2Xdr(
     fun decode(reader: XdrReader): AccountEntryExtensionV2Xdr {
       val numSponsored = Uint32Xdr.decode(reader)
       val numSponsoring = Uint32Xdr.decode(reader)
-      val signerSponsoringIDs = List(reader.readInt()) { SponsorshipDescriptorXdr.decode(reader) }
+      val signerSponsoringIDs = List(reader.readArrayLength()) { SponsorshipDescriptorXdr.decode(reader) }
       val ext = AccountEntryExtensionV2ExtXdr.decode(reader)
       return AccountEntryExtensionV2Xdr(numSponsored, numSponsoring, signerSponsoringIDs, ext)
     }

@@ -22,7 +22,7 @@ data class FreezeBypassTxsXdr(
   companion object {
 
     fun decode(reader: XdrReader): FreezeBypassTxsXdr {
-      val txHashes = List(reader.readInt()) { HashXdr.decode(reader) }
+      val txHashes = List(reader.readArrayLength()) { HashXdr.decode(reader) }
       return FreezeBypassTxsXdr(txHashes)
     }
 

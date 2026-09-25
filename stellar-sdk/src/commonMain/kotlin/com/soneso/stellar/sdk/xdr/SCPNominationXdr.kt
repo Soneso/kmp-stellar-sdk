@@ -29,8 +29,8 @@ data class SCPNominationXdr(
 
     fun decode(reader: XdrReader): SCPNominationXdr {
       val quorumSetHash = HashXdr.decode(reader)
-      val votes = List(reader.readInt()) { ValueXdr.decode(reader) }
-      val accepted = List(reader.readInt()) { ValueXdr.decode(reader) }
+      val votes = List(reader.readArrayLength()) { ValueXdr.decode(reader) }
+      val accepted = List(reader.readArrayLength()) { ValueXdr.decode(reader) }
       return SCPNominationXdr(quorumSetHash, votes, accepted)
     }
 

@@ -29,7 +29,7 @@ data class CreateClaimableBalanceOpXdr(
     fun decode(reader: XdrReader): CreateClaimableBalanceOpXdr {
       val asset = AssetXdr.decode(reader)
       val amount = Int64Xdr.decode(reader)
-      val claimants = List(reader.readInt()) { ClaimantXdr.decode(reader) }
+      val claimants = List(reader.readArrayLength()) { ClaimantXdr.decode(reader) }
       return CreateClaimableBalanceOpXdr(asset, amount, claimants)
     }
 

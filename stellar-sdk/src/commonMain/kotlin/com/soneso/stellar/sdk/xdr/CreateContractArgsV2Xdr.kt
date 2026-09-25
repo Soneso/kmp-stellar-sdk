@@ -30,7 +30,7 @@ data class CreateContractArgsV2Xdr(
     fun decode(reader: XdrReader): CreateContractArgsV2Xdr {
       val contractIdPreimage = ContractIDPreimageXdr.decode(reader)
       val executable = ContractExecutableXdr.decode(reader)
-      val constructorArgs = List(reader.readInt()) { SCValXdr.decode(reader) }
+      val constructorArgs = List(reader.readArrayLength()) { SCValXdr.decode(reader) }
       return CreateContractArgsV2Xdr(contractIdPreimage, executable, constructorArgs)
     }
 

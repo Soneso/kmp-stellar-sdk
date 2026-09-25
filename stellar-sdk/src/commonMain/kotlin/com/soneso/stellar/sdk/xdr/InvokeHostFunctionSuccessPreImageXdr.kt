@@ -26,7 +26,7 @@ data class InvokeHostFunctionSuccessPreImageXdr(
 
     fun decode(reader: XdrReader): InvokeHostFunctionSuccessPreImageXdr {
       val returnValue = SCValXdr.decode(reader)
-      val events = List(reader.readInt()) { ContractEventXdr.decode(reader) }
+      val events = List(reader.readArrayLength()) { ContractEventXdr.decode(reader) }
       return InvokeHostFunctionSuccessPreImageXdr(returnValue, events)
     }
 

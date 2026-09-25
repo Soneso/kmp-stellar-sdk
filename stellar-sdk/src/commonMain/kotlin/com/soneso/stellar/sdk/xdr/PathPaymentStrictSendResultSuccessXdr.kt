@@ -25,7 +25,7 @@ data class PathPaymentStrictSendResultSuccessXdr(
   companion object {
 
     fun decode(reader: XdrReader): PathPaymentStrictSendResultSuccessXdr {
-      val offers = List(reader.readInt()) { ClaimAtomXdr.decode(reader) }
+      val offers = List(reader.readArrayLength()) { ClaimAtomXdr.decode(reader) }
       val last = SimplePaymentResultXdr.decode(reader)
       return PathPaymentStrictSendResultSuccessXdr(offers, last)
     }

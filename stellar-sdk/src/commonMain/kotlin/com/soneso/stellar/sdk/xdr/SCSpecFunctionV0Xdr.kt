@@ -31,8 +31,8 @@ data class SCSpecFunctionV0Xdr(
     fun decode(reader: XdrReader): SCSpecFunctionV0Xdr {
       val doc = reader.readString()
       val name = SCSymbolXdr.decode(reader)
-      val inputs = List(reader.readInt()) { SCSpecFunctionInputV0Xdr.decode(reader) }
-      val outputs = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
+      val inputs = List(reader.readArrayLength()) { SCSpecFunctionInputV0Xdr.decode(reader) }
+      val outputs = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecFunctionV0Xdr(doc, name, inputs, outputs)
     }
 

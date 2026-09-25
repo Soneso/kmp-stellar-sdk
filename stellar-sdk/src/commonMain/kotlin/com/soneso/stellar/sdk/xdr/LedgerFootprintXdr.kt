@@ -25,8 +25,8 @@ data class LedgerFootprintXdr(
   companion object {
 
     fun decode(reader: XdrReader): LedgerFootprintXdr {
-      val readOnly = List(reader.readInt()) { LedgerKeyXdr.decode(reader) }
-      val readWrite = List(reader.readInt()) { LedgerKeyXdr.decode(reader) }
+      val readOnly = List(reader.readArrayLength()) { LedgerKeyXdr.decode(reader) }
+      val readWrite = List(reader.readArrayLength()) { LedgerKeyXdr.decode(reader) }
       return LedgerFootprintXdr(readOnly, readWrite)
     }
 

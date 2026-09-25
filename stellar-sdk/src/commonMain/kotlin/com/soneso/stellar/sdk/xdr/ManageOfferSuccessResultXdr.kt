@@ -35,7 +35,7 @@ data class ManageOfferSuccessResultXdr(
   companion object {
 
     fun decode(reader: XdrReader): ManageOfferSuccessResultXdr {
-      val offersClaimed = List(reader.readInt()) { ClaimAtomXdr.decode(reader) }
+      val offersClaimed = List(reader.readArrayLength()) { ClaimAtomXdr.decode(reader) }
       val offer = ManageOfferSuccessResultOfferXdr.decode(reader)
       return ManageOfferSuccessResultXdr(offersClaimed, offer)
     }

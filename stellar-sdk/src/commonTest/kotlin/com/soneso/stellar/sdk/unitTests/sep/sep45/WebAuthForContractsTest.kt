@@ -2471,6 +2471,40 @@ class WebAuthForContractsTest {
     }
 
     @Test
+    fun testDecodeEmptyAuthorizationEntries() {
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET
+        )
+
+        // "AAAAAA==" is the count 0 with no entries following
+        assertEquals(emptyList(), webAuth.decodeAuthorizationEntries("AAAAAA=="))
+    }
+
+    @Test
+    fun testDecodeAuthorizationEntriesRejectsHostileCount() {
+        val webAuth = WebAuthForContracts(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET
+        )
+
+        // "QAAAAA==" is the count 0x40000000 with no entries following
+        val exception = assertFailsWith<Sep45InvalidArgsException> {
+            webAuth.decodeAuthorizationEntries("QAAAAA==")
+        }
+        assertTrue(
+            exception.message.orEmpty().contains("XDR array count 1073741824"),
+            "Message should name the rejected count, got: ${exception.message}"
+        )
+    }
+
+    @Test
     fun testAuthTokenParsing() {
         val token = Sep45AuthToken.parse(SUCCESS_JWT_TOKEN)
 

@@ -38,7 +38,7 @@ sealed class InflationResultXdr {
       val discriminant = InflationResultCodeXdr.decode(reader)
       return when (discriminant) {
         InflationResultCodeXdr.INFLATION_SUCCESS -> {
-          val value = List(reader.readInt()) { InflationPayoutXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { InflationPayoutXdr.decode(reader) }
           Payouts(value)
         }
         InflationResultCodeXdr.INFLATION_NOT_TIME -> Void

@@ -22,7 +22,7 @@ data class FrozenLedgerKeysXdr(
   companion object {
 
     fun decode(reader: XdrReader): FrozenLedgerKeysXdr {
-      val keys = List(reader.readInt()) { EncodedLedgerKeyXdr.decode(reader) }
+      val keys = List(reader.readArrayLength()) { EncodedLedgerKeyXdr.decode(reader) }
       return FrozenLedgerKeysXdr(keys)
     }
 

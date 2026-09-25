@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "ContractCostParamsXdr"
 value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
   companion object {
     fun decode(reader: XdrReader): ContractCostParamsXdr {
-      val value = List(reader.readInt()) { ContractCostParamEntryXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { ContractCostParamEntryXdr.decode(reader) }
       return ContractCostParamsXdr(value)
     }
 

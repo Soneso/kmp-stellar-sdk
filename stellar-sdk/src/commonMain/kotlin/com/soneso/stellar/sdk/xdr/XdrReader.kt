@@ -13,6 +13,21 @@ expect class XdrReader(input: ByteArray) {
     fun readVariableOpaque(): ByteArray
 
     /**
+     * Reads the element count of a variable-length XDR array and validates it against the
+     * remaining bytes before the caller allocates the array.
+     *
+     * Every XDR array element occupies at least 4 bytes (scalars, enum and union discriminants,
+     * optional flags and length prefixes are 4 bytes; fixed opaque data is padded to 4), so a
+     * count above a quarter of the remaining bytes cannot be satisfied by the buffer. Rejecting
+     * it here keeps a hostile count from sizing a large allocation.
+     *
+     * @return The element count, between 0 and a quarter of the remaining bytes (inclusive).
+     * @throws IllegalArgumentException if the count is negative or exceeds a quarter of the
+     *   remaining bytes.
+     */
+    fun readArrayLength(): Int
+
+    /**
      * Increments the recursion depth counter and throws if the depth exceeds [cap].
      *
      * Call before each recursive invocation of a self-referential XDR decode function.

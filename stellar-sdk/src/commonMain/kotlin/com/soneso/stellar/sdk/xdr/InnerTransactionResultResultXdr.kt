@@ -57,11 +57,11 @@ sealed class InnerTransactionResultResultXdr {
       val discriminant = TransactionResultCodeXdr.decode(reader)
       return when (discriminant) {
         TransactionResultCodeXdr.txSUCCESS -> {
-          val value = List(reader.readInt()) { OperationResultXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { OperationResultXdr.decode(reader) }
           Results(discriminant, value)
         }
         TransactionResultCodeXdr.txFAILED -> {
-          val value = List(reader.readInt()) { OperationResultXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { OperationResultXdr.decode(reader) }
           Results(discriminant, value)
         }
         TransactionResultCodeXdr.txTOO_EARLY -> Void(discriminant)

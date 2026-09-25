@@ -51,7 +51,7 @@ data class ClaimableBalanceEntryXdr(
 
     fun decode(reader: XdrReader): ClaimableBalanceEntryXdr {
       val balanceId = ClaimableBalanceIDXdr.decode(reader)
-      val claimants = List(reader.readInt()) { ClaimantXdr.decode(reader) }
+      val claimants = List(reader.readArrayLength()) { ClaimantXdr.decode(reader) }
       val asset = AssetXdr.decode(reader)
       val amount = Int64Xdr.decode(reader)
       val ext = ClaimableBalanceEntryExtXdr.decode(reader)

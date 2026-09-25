@@ -59,11 +59,11 @@ data class LedgerCloseMetaV2Xdr(
       val ext = LedgerCloseMetaExtXdr.decode(reader)
       val ledgerHeader = LedgerHeaderHistoryEntryXdr.decode(reader)
       val txSet = GeneralizedTransactionSetXdr.decode(reader)
-      val txProcessing = List(reader.readInt()) { TransactionResultMetaV1Xdr.decode(reader) }
-      val upgradesProcessing = List(reader.readInt()) { UpgradeEntryMetaXdr.decode(reader) }
-      val scpInfo = List(reader.readInt()) { SCPHistoryEntryXdr.decode(reader) }
+      val txProcessing = List(reader.readArrayLength()) { TransactionResultMetaV1Xdr.decode(reader) }
+      val upgradesProcessing = List(reader.readArrayLength()) { UpgradeEntryMetaXdr.decode(reader) }
+      val scpInfo = List(reader.readArrayLength()) { SCPHistoryEntryXdr.decode(reader) }
       val totalByteSizeOfLiveSorobanState = Uint64Xdr.decode(reader)
-      val evictedKeys = List(reader.readInt()) { LedgerKeyXdr.decode(reader) }
+      val evictedKeys = List(reader.readArrayLength()) { LedgerKeyXdr.decode(reader) }
       return LedgerCloseMetaV2Xdr(ext, ledgerHeader, txSet, txProcessing, upgradesProcessing, scpInfo, totalByteSizeOfLiveSorobanState, evictedKeys)
     }
 

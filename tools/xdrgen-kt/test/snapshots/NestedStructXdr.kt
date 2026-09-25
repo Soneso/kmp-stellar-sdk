@@ -37,7 +37,7 @@ data class NestedStructXdr(
     fun decode(reader: XdrReader): NestedStructXdr {
       val inner = SimpleStructXdr.decode(reader)
       val optionalInner = if (reader.readBoolean()) SimpleStructXdr.decode(reader) else null
-      val items = List(reader.readInt()) { SimpleStructXdr.decode(reader) }
+      val items = List(reader.readArrayLength()) { SimpleStructXdr.decode(reader) }
       val fixedItems = Array(3) { SimpleStructXdr.decode(reader) }
       val rawData = reader.readVariableOpaque()
       val fixedData = reader.readFixedOpaque(4)

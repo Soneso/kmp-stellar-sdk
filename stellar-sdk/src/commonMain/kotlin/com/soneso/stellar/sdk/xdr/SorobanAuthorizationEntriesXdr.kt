@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "SorobanAuthorizationEntriesXdr"
 value class SorobanAuthorizationEntriesXdr(val value: List<SorobanAuthorizationEntryXdr>) {
   companion object {
     fun decode(reader: XdrReader): SorobanAuthorizationEntriesXdr {
-      val value = List(reader.readInt()) { SorobanAuthorizationEntryXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { SorobanAuthorizationEntryXdr.decode(reader) }
       return SorobanAuthorizationEntriesXdr(value)
     }
 

@@ -31,7 +31,7 @@ data class OperationMetaV2Xdr(
     fun decode(reader: XdrReader): OperationMetaV2Xdr {
       val ext = ExtensionPointXdr.decode(reader)
       val changes = LedgerEntryChangesXdr.decode(reader)
-      val events = List(reader.readInt()) { ContractEventXdr.decode(reader) }
+      val events = List(reader.readArrayLength()) { ContractEventXdr.decode(reader) }
       return OperationMetaV2Xdr(ext, changes, events)
     }
 

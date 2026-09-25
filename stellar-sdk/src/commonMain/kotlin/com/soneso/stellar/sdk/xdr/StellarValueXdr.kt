@@ -56,7 +56,7 @@ data class StellarValueXdr(
     fun decode(reader: XdrReader): StellarValueXdr {
       val txSetHash = HashXdr.decode(reader)
       val closeTime = TimePointXdr.decode(reader)
-      val upgrades = List(reader.readInt()) { UpgradeTypeXdr.decode(reader) }
+      val upgrades = List(reader.readArrayLength()) { UpgradeTypeXdr.decode(reader) }
       val ext = StellarValueExtXdr.decode(reader)
       return StellarValueXdr(txSetHash, closeTime, upgrades, ext)
     }

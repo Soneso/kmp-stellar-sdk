@@ -83,6 +83,22 @@ actual class XdrReader actual constructor(input: ByteArray) {
         return readFixedOpaque(length)
     }
 
+    actual fun readArrayLength(): Int {
+        val count = readInt()
+        if (count < 0) {
+            throw IllegalArgumentException("XDR array count cannot be negative, got $count")
+        }
+        // The count was read in full, so offset does not exceed data.size here.
+        val remaining = data.size - offset
+        if (count > remaining / 4) {
+            throw IllegalArgumentException(
+                "XDR array count $count exceeds the maximum of ${remaining / 4} " +
+                    "for the $remaining byte(s) remaining at offset $offset"
+            )
+        }
+        return count
+    }
+
     actual fun enterRecursion(cap: Int) {
         recursionDepth++
         if (recursionDepth > cap) {

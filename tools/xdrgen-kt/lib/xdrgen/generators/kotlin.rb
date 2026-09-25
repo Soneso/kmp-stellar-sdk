@@ -1354,7 +1354,7 @@ module Xdrgen
            !decl.fixed? &&
            kotlin_type_for_typespec(decl.type) == struct_name
           inner_decode = decode_expression_for_typespec(decl.type, reader_var)
-          "List(#{reader_var}.readInt()) { " \
+          "List(#{reader_var}.readArrayLength()) { " \
             "#{reader_var}.enterRecursion(#{XDR_RECURSION_CAP}); " \
             "try { #{inner_decode} } finally { #{reader_var}.exitRecursion() } }"
         else
@@ -1386,7 +1386,7 @@ module Xdrgen
             if kotlin_type_for_typespec(decl.type) == 'Byte'
               "#{reader_var}.readVariableOpaque()"
             else
-              "List(#{reader_var}.readInt()) { #{inner_decode} }"
+              "List(#{reader_var}.readArrayLength()) { #{inner_decode} }"
             end
           end
         else

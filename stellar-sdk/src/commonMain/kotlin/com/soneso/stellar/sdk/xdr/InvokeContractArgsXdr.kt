@@ -28,7 +28,7 @@ data class InvokeContractArgsXdr(
     fun decode(reader: XdrReader): InvokeContractArgsXdr {
       val contractAddress = SCAddressXdr.decode(reader)
       val functionName = SCSymbolXdr.decode(reader)
-      val args = List(reader.readInt()) { SCValXdr.decode(reader) }
+      val args = List(reader.readArrayLength()) { SCValXdr.decode(reader) }
       return InvokeContractArgsXdr(contractAddress, functionName, args)
     }
 

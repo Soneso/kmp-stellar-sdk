@@ -43,9 +43,9 @@ data class LedgerCloseMetaV0Xdr(
     fun decode(reader: XdrReader): LedgerCloseMetaV0Xdr {
       val ledgerHeader = LedgerHeaderHistoryEntryXdr.decode(reader)
       val txSet = TransactionSetXdr.decode(reader)
-      val txProcessing = List(reader.readInt()) { TransactionResultMetaXdr.decode(reader) }
-      val upgradesProcessing = List(reader.readInt()) { UpgradeEntryMetaXdr.decode(reader) }
-      val scpInfo = List(reader.readInt()) { SCPHistoryEntryXdr.decode(reader) }
+      val txProcessing = List(reader.readArrayLength()) { TransactionResultMetaXdr.decode(reader) }
+      val upgradesProcessing = List(reader.readArrayLength()) { UpgradeEntryMetaXdr.decode(reader) }
+      val scpInfo = List(reader.readArrayLength()) { SCPHistoryEntryXdr.decode(reader) }
       return LedgerCloseMetaV0Xdr(ledgerHeader, txSet, txProcessing, upgradesProcessing, scpInfo)
     }
 
