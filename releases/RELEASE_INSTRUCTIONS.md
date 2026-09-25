@@ -405,7 +405,7 @@ Verify the release is complete:
 - [ ] README shows correct version
 - [ ] Getting Started guide references new version
 - [ ] CHANGELOG.md includes release
-- [ ] Versioned API docs deployed: https://soneso.github.io/kmp-stellar-sdk/api/X.Y.Z/ answers 200. Until the pages workflow is reworked, expect a 404: the tag run cannot push its versioned copy to main (branch protection rejects the bot's push, and a `GITHUB_TOKEN` push would not trigger a deploy anyway). The tag run therefore shows as failed in Actions; that is expected. Publish the copy manually: `./gradlew :stellar-sdk:dokkaGenerateHtml`, then `rm -rf docs/api/X.Y.Z && mkdir -p docs/api/X.Y.Z && cp -r stellar-sdk/build/dokka/html/* docs/api/X.Y.Z/`, commit as `Publish API docs for X.Y.Z` (the message must NOT contain `[skip ci]`, which would suppress the deploy), push to main (admin bypass); the main-push run then deploys it. Merge main into release-docs before the next docs round
+- [ ] API docs deployed: https://soneso.github.io/kmp-stellar-sdk/api/latest/ shows version X.Y.Z. The pages workflow deploys on every push to main; if the run for the release commit failed, dispatch it again with `gh workflow run pages.yml --ref main` rather than re-running an older run, whose workflow definition may predate the current one.
 
 ## Troubleshooting
 
