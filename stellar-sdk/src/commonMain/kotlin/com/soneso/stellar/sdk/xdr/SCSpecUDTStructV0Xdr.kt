@@ -32,7 +32,7 @@ data class SCSpecUDTStructV0Xdr(
       val doc = reader.readString()
       val lib = reader.readString()
       val name = reader.readString()
-      val fields = List(reader.readInt()) { SCSpecUDTStructFieldV0Xdr.decode(reader) }
+      val fields = List(reader.readArrayLength()) { SCSpecUDTStructFieldV0Xdr.decode(reader) }
       return SCSpecUDTStructV0Xdr(doc, lib, name, fields)
     }
 

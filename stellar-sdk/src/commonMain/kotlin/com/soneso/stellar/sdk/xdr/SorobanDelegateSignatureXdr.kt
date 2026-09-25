@@ -29,7 +29,7 @@ data class SorobanDelegateSignatureXdr(
     fun decode(reader: XdrReader): SorobanDelegateSignatureXdr {
       val address = SCAddressXdr.decode(reader)
       val signature = SCValXdr.decode(reader)
-      val nestedDelegates = List(reader.readInt()) { reader.enterRecursion(128); try { SorobanDelegateSignatureXdr.decode(reader) } finally { reader.exitRecursion() } }
+      val nestedDelegates = List(reader.readArrayLength()) { reader.enterRecursion(128); try { SorobanDelegateSignatureXdr.decode(reader) } finally { reader.exitRecursion() } }
       return SorobanDelegateSignatureXdr(address, signature, nestedDelegates)
     }
 

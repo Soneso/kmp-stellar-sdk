@@ -32,7 +32,7 @@ data class SCSpecUDTEnumV0Xdr(
       val doc = reader.readString()
       val lib = reader.readString()
       val name = reader.readString()
-      val cases = List(reader.readInt()) { SCSpecUDTEnumCaseV0Xdr.decode(reader) }
+      val cases = List(reader.readArrayLength()) { SCSpecUDTEnumCaseV0Xdr.decode(reader) }
       return SCSpecUDTEnumV0Xdr(doc, lib, name, cases)
     }
 

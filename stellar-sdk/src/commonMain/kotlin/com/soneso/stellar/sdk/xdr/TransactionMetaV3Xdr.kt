@@ -43,7 +43,7 @@ data class TransactionMetaV3Xdr(
     fun decode(reader: XdrReader): TransactionMetaV3Xdr {
       val ext = ExtensionPointXdr.decode(reader)
       val txChangesBefore = LedgerEntryChangesXdr.decode(reader)
-      val operations = List(reader.readInt()) { OperationMetaXdr.decode(reader) }
+      val operations = List(reader.readArrayLength()) { OperationMetaXdr.decode(reader) }
       val txChangesAfter = LedgerEntryChangesXdr.decode(reader)
       val sorobanMeta = if (reader.readBoolean()) SorobanTransactionMetaXdr.decode(reader) else null
       return TransactionMetaV3Xdr(ext, txChangesBefore, operations, txChangesAfter, sorobanMeta)

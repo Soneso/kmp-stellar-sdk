@@ -29,7 +29,7 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
     fun decode(reader: XdrReader): SCSpecUDTUnionCaseTupleV0Xdr {
       val doc = reader.readString()
       val name = reader.readString()
-      val type = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
+      val type = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecUDTUnionCaseTupleV0Xdr(doc, name, type)
     }
 

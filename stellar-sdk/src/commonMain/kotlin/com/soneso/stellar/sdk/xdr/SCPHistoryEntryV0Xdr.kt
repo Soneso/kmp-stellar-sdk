@@ -25,7 +25,7 @@ data class SCPHistoryEntryV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCPHistoryEntryV0Xdr {
-      val quorumSets = List(reader.readInt()) { SCPQuorumSetXdr.decode(reader) }
+      val quorumSets = List(reader.readArrayLength()) { SCPQuorumSetXdr.decode(reader) }
       val ledgerMessages = LedgerSCPMessagesXdr.decode(reader)
       return SCPHistoryEntryV0Xdr(quorumSets, ledgerMessages)
     }

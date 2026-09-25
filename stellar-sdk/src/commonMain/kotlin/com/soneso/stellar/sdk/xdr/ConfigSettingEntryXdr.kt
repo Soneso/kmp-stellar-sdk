@@ -239,7 +239,7 @@ sealed class ConfigSettingEntryXdr {
           ContractExecutionLanes(value)
         }
         ConfigSettingIDXdr.CONFIG_SETTING_LIVE_SOROBAN_STATE_SIZE_WINDOW -> {
-          val value = List(reader.readInt()) { Uint64Xdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { Uint64Xdr.decode(reader) }
           LiveSorobanStateSizeWindow(value)
         }
         ConfigSettingIDXdr.CONFIG_SETTING_EVICTION_ITERATOR -> {

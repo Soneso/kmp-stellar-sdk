@@ -26,7 +26,7 @@ data class LedgerSCPMessagesXdr(
 
     fun decode(reader: XdrReader): LedgerSCPMessagesXdr {
       val ledgerSeq = Uint32Xdr.decode(reader)
-      val messages = List(reader.readInt()) { SCPEnvelopeXdr.decode(reader) }
+      val messages = List(reader.readArrayLength()) { SCPEnvelopeXdr.decode(reader) }
       return LedgerSCPMessagesXdr(ledgerSeq, messages)
     }
 

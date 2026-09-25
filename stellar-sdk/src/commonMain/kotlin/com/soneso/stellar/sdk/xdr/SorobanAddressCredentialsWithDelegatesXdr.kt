@@ -26,7 +26,7 @@ data class SorobanAddressCredentialsWithDelegatesXdr(
 
     fun decode(reader: XdrReader): SorobanAddressCredentialsWithDelegatesXdr {
       val addressCredentials = SorobanAddressCredentialsXdr.decode(reader)
-      val delegates = List(reader.readInt()) { SorobanDelegateSignatureXdr.decode(reader) }
+      val delegates = List(reader.readArrayLength()) { SorobanDelegateSignatureXdr.decode(reader) }
       return SorobanAddressCredentialsWithDelegatesXdr(addressCredentials, delegates)
     }
 

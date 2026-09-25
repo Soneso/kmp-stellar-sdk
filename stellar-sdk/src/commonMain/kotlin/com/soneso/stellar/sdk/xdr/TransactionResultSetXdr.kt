@@ -23,7 +23,7 @@ data class TransactionResultSetXdr(
   companion object {
 
     fun decode(reader: XdrReader): TransactionResultSetXdr {
-      val results = List(reader.readInt()) { TransactionResultPairXdr.decode(reader) }
+      val results = List(reader.readArrayLength()) { TransactionResultPairXdr.decode(reader) }
       return TransactionResultSetXdr(results)
     }
 

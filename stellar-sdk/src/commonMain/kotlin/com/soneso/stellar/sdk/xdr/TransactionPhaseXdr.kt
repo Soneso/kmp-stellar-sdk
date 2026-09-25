@@ -39,7 +39,7 @@ sealed class TransactionPhaseXdr {
       val discriminant = reader.readInt()
       return when (discriminant) {
         0 -> {
-          val value = List(reader.readInt()) { TxSetComponentXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { TxSetComponentXdr.decode(reader) }
           V0Components(value)
         }
         1 -> {

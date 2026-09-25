@@ -78,7 +78,7 @@ data class AccountEntryXdr(
       val flags = Uint32Xdr.decode(reader)
       val homeDomain = String32Xdr.decode(reader)
       val thresholds = ThresholdsXdr.decode(reader)
-      val signers = List(reader.readInt()) { SignerXdr.decode(reader) }
+      val signers = List(reader.readArrayLength()) { SignerXdr.decode(reader) }
       val ext = AccountEntryExtXdr.decode(reader)
       return AccountEntryXdr(accountId, balance, seqNum, numSubEntries, inflationDest, flags, homeDomain, thresholds, signers, ext)
     }

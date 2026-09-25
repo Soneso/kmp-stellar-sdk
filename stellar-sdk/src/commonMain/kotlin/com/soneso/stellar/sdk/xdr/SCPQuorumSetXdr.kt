@@ -28,8 +28,8 @@ data class SCPQuorumSetXdr(
 
     fun decode(reader: XdrReader): SCPQuorumSetXdr {
       val threshold = Uint32Xdr.decode(reader)
-      val validators = List(reader.readInt()) { NodeIDXdr.decode(reader) }
-      val innerSets = List(reader.readInt()) { SCPQuorumSetXdr.decode(reader) }
+      val validators = List(reader.readArrayLength()) { NodeIDXdr.decode(reader) }
+      val innerSets = List(reader.readArrayLength()) { SCPQuorumSetXdr.decode(reader) }
       return SCPQuorumSetXdr(threshold, validators, innerSets)
     }
 

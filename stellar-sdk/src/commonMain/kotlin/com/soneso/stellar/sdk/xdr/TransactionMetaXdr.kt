@@ -63,7 +63,7 @@ sealed class TransactionMetaXdr {
       val discriminant = reader.readInt()
       return when (discriminant) {
         0 -> {
-          val value = List(reader.readInt()) { OperationMetaXdr.decode(reader) }
+          val value = List(reader.readArrayLength()) { OperationMetaXdr.decode(reader) }
           Operations(value)
         }
         1 -> {

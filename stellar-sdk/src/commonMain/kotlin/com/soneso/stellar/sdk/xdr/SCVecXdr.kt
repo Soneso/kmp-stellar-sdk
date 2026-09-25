@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "SCVecXdr"
 value class SCVecXdr(val value: List<SCValXdr>) {
   companion object {
     fun decode(reader: XdrReader): SCVecXdr {
-      val value = List(reader.readInt()) { SCValXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { SCValXdr.decode(reader) }
       return SCVecXdr(value)
     }
 

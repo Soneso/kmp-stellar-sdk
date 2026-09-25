@@ -25,7 +25,7 @@ data class ContractEventV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): ContractEventV0Xdr {
-      val topics = List(reader.readInt()) { SCValXdr.decode(reader) }
+      val topics = List(reader.readArrayLength()) { SCValXdr.decode(reader) }
       val data = SCValXdr.decode(reader)
       return ContractEventV0Xdr(topics, data)
     }

@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "SCMapXdr"
 value class SCMapXdr(val value: List<SCMapEntryXdr>) {
   companion object {
     fun decode(reader: XdrReader): SCMapXdr {
-      val value = List(reader.readInt()) { SCMapEntryXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { SCMapEntryXdr.decode(reader) }
       return SCMapXdr(value)
     }
 

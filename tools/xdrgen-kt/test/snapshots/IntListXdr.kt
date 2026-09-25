@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "IntListXdr"
 value class IntListXdr(val value: List<Int>) {
   companion object {
     fun decode(reader: XdrReader): IntListXdr {
-      val value = List(reader.readInt()) { reader.readInt() }
+      val value = List(reader.readArrayLength()) { reader.readInt() }
       return IntListXdr(value)
     }
 

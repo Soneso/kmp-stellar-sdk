@@ -32,7 +32,7 @@ data class TransactionMetaV2Xdr(
 
     fun decode(reader: XdrReader): TransactionMetaV2Xdr {
       val txChangesBefore = LedgerEntryChangesXdr.decode(reader)
-      val operations = List(reader.readInt()) { OperationMetaXdr.decode(reader) }
+      val operations = List(reader.readArrayLength()) { OperationMetaXdr.decode(reader) }
       val txChangesAfter = LedgerEntryChangesXdr.decode(reader)
       return TransactionMetaV2Xdr(txChangesBefore, operations, txChangesAfter)
     }

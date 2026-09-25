@@ -40,9 +40,9 @@ data class SorobanTransactionMetaXdr(
 
     fun decode(reader: XdrReader): SorobanTransactionMetaXdr {
       val ext = SorobanTransactionMetaExtXdr.decode(reader)
-      val events = List(reader.readInt()) { ContractEventXdr.decode(reader) }
+      val events = List(reader.readArrayLength()) { ContractEventXdr.decode(reader) }
       val returnValue = SCValXdr.decode(reader)
-      val diagnosticEvents = List(reader.readInt()) { DiagnosticEventXdr.decode(reader) }
+      val diagnosticEvents = List(reader.readArrayLength()) { DiagnosticEventXdr.decode(reader) }
       return SorobanTransactionMetaXdr(ext, events, returnValue, diagnosticEvents)
     }
 

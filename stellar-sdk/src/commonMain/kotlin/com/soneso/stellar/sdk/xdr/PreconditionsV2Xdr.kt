@@ -83,7 +83,7 @@ data class PreconditionsV2Xdr(
       val minSeqNum = if (reader.readBoolean()) SequenceNumberXdr.decode(reader) else null
       val minSeqAge = DurationXdr.decode(reader)
       val minSeqLedgerGap = Uint32Xdr.decode(reader)
-      val extraSigners = List(reader.readInt()) { SignerKeyXdr.decode(reader) }
+      val extraSigners = List(reader.readArrayLength()) { SignerKeyXdr.decode(reader) }
       return PreconditionsV2Xdr(timeBounds, ledgerBounds, minSeqNum, minSeqAge, minSeqLedgerGap, extraSigners)
     }
 

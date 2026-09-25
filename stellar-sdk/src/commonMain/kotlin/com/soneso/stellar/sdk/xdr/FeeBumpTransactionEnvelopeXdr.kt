@@ -28,7 +28,7 @@ data class FeeBumpTransactionEnvelopeXdr(
 
     fun decode(reader: XdrReader): FeeBumpTransactionEnvelopeXdr {
       val tx = FeeBumpTransactionXdr.decode(reader)
-      val signatures = List(reader.readInt()) { DecoratedSignatureXdr.decode(reader) }
+      val signatures = List(reader.readArrayLength()) { DecoratedSignatureXdr.decode(reader) }
       return FeeBumpTransactionEnvelopeXdr(tx, signatures)
     }
 

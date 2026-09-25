@@ -36,8 +36,8 @@ data class SCSpecEventV0Xdr(
       val doc = reader.readString()
       val lib = reader.readString()
       val name = reader.readString()
-      val prefixTopics = List(reader.readInt()) { SCSymbolXdr.decode(reader) }
-      val params = List(reader.readInt()) { SCSpecEventParamV0Xdr.decode(reader) }
+      val prefixTopics = List(reader.readArrayLength()) { SCSymbolXdr.decode(reader) }
+      val params = List(reader.readArrayLength()) { SCSpecEventParamV0Xdr.decode(reader) }
       val dataFormat = SCSpecEventDataFormatXdr.decode(reader)
       return SCSpecEventV0Xdr(doc, lib, name, prefixTopics, params, dataFormat)
     }

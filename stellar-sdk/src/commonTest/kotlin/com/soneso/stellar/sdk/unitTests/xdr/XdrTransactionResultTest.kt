@@ -1,9 +1,14 @@
 package com.soneso.stellar.sdk.unitTests.xdr
 
 import com.soneso.stellar.sdk.xdr.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
+@OptIn(ExperimentalEncodingApi::class)
 class XdrTransactionResultTest {
 
     private fun rtResult(value: TransactionResultResultXdr) =
@@ -11,6 +16,46 @@ class XdrTransactionResultTest {
 
     private fun rtTxResult(value: TransactionResultXdr) =
         XdrTestHelpers.assertXdrRoundTrip(value, { v, w -> v.encode(w) }, { r -> TransactionResultXdr.decode(r) })
+
+    /** Fee charged, `txSUCCESS` discriminant and operation result count of a `TransactionResult`. */
+    private fun successResultHeader(opResultCount: Int): XdrWriter = XdrWriter().apply {
+        writeLong(100L)
+        writeInt(TransactionResultCodeXdr.txSUCCESS.value)
+        writeInt(opResultCount)
+    }
+
+    @Test fun testHandBuiltSuccessResultDecodes() {
+        val writer = successResultHeader(1)
+        OperationResultXdr.Void(OperationResultCodeXdr.opBAD_AUTH).encode(writer)
+        TransactionResultExtXdr.Void.encode(writer)
+
+        val decoded = TransactionResultXdr.fromXdrBase64(Base64.encode(writer.toByteArray()))
+        assertEquals(
+            TransactionResultXdr(
+                feeCharged = Int64Xdr(100L),
+                result = TransactionResultResultXdr.Results(
+                    TransactionResultCodeXdr.txSUCCESS,
+                    listOf(OperationResultXdr.Void(OperationResultCodeXdr.opBAD_AUTH))
+                ),
+                ext = TransactionResultExtXdr.Void
+            ),
+            decoded
+        )
+    }
+
+    @Test fun testHostileOperationResultCountIsRejectedBeforeAllocation() {
+        // 16 bytes announcing 2^30 operation results, none of which follow
+        val bytes = successResultHeader(0x40000000).toByteArray()
+        assertEquals(16, bytes.size)
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            TransactionResultXdr.fromXdrBase64(Base64.encode(bytes))
+        }
+        assertTrue(
+            exception.message.orEmpty().contains("XDR array count 1073741824"),
+            "Message should name the rejected count, got: ${exception.message}"
+        )
+    }
 
     @Test fun testResultTooEarly() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txTOO_EARLY))
     @Test fun testResultTooLate() = rtResult(TransactionResultResultXdr.Void(TransactionResultCodeXdr.txTOO_LATE))

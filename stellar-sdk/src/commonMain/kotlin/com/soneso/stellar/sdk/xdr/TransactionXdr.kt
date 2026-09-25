@@ -61,7 +61,7 @@ data class TransactionXdr(
       val seqNum = SequenceNumberXdr.decode(reader)
       val cond = PreconditionsXdr.decode(reader)
       val memo = MemoXdr.decode(reader)
-      val operations = List(reader.readInt()) { OperationXdr.decode(reader) }
+      val operations = List(reader.readArrayLength()) { OperationXdr.decode(reader) }
       val ext = TransactionExtXdr.decode(reader)
       return TransactionXdr(sourceAccount, fee, seqNum, cond, memo, operations, ext)
     }

@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "DependentTxClusterXdr"
 value class DependentTxClusterXdr(val value: List<TransactionEnvelopeXdr>) {
   companion object {
     fun decode(reader: XdrReader): DependentTxClusterXdr {
-      val value = List(reader.readInt()) { TransactionEnvelopeXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { TransactionEnvelopeXdr.decode(reader) }
       return DependentTxClusterXdr(value)
     }
 

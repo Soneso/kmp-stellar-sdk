@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "LedgerEntryChangesXdr"
 value class LedgerEntryChangesXdr(val value: List<LedgerEntryChangeXdr>) {
   companion object {
     fun decode(reader: XdrReader): LedgerEntryChangesXdr {
-      val value = List(reader.readInt()) { LedgerEntryChangeXdr.decode(reader) }
+      val value = List(reader.readArrayLength()) { LedgerEntryChangeXdr.decode(reader) }
       return LedgerEntryChangesXdr(value)
     }
 

@@ -23,7 +23,7 @@ data class SCSpecTypeTupleXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecTypeTupleXdr {
-      val valueTypes = List(reader.readInt()) { SCSpecTypeDefXdr.decode(reader) }
+      val valueTypes = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecTypeTupleXdr(valueTypes)
     }
 

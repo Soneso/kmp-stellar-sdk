@@ -29,7 +29,7 @@ data class InvokeHostFunctionOpXdr(
 
     fun decode(reader: XdrReader): InvokeHostFunctionOpXdr {
       val hostFunction = HostFunctionXdr.decode(reader)
-      val auth = List(reader.readInt()) { SorobanAuthorizationEntryXdr.decode(reader) }
+      val auth = List(reader.readArrayLength()) { SorobanAuthorizationEntryXdr.decode(reader) }
       return InvokeHostFunctionOpXdr(hostFunction, auth)
     }
 

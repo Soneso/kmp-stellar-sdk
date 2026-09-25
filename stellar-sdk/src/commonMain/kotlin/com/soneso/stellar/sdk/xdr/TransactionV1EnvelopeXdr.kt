@@ -28,7 +28,7 @@ data class TransactionV1EnvelopeXdr(
 
     fun decode(reader: XdrReader): TransactionV1EnvelopeXdr {
       val tx = TransactionXdr.decode(reader)
-      val signatures = List(reader.readInt()) { DecoratedSignatureXdr.decode(reader) }
+      val signatures = List(reader.readArrayLength()) { DecoratedSignatureXdr.decode(reader) }
       return TransactionV1EnvelopeXdr(tx, signatures)
     }
 

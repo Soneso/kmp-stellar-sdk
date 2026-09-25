@@ -45,7 +45,7 @@ data class TransactionV0Xdr(
       val seqNum = SequenceNumberXdr.decode(reader)
       val timeBounds = if (reader.readBoolean()) TimeBoundsXdr.decode(reader) else null
       val memo = MemoXdr.decode(reader)
-      val operations = List(reader.readInt()) { OperationXdr.decode(reader) }
+      val operations = List(reader.readArrayLength()) { OperationXdr.decode(reader) }
       val ext = TransactionV0ExtXdr.decode(reader)
       return TransactionV0Xdr(sourceAccountEd25519, fee, seqNum, timeBounds, memo, operations, ext)
     }

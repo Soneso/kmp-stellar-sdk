@@ -47,7 +47,7 @@ data class PathPaymentStrictSendOpXdr(
       val destination = MuxedAccountXdr.decode(reader)
       val destAsset = AssetXdr.decode(reader)
       val destMin = Int64Xdr.decode(reader)
-      val path = List(reader.readInt()) { AssetXdr.decode(reader) }
+      val path = List(reader.readArrayLength()) { AssetXdr.decode(reader) }
       return PathPaymentStrictSendOpXdr(sendAsset, sendAmount, destination, destAsset, destMin, path)
     }
 
