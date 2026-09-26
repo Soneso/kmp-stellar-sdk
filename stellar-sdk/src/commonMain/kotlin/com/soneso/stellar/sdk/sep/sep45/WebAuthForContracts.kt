@@ -151,35 +151,11 @@ class WebAuthForContracts(
     var useFormUrlEncoded: Boolean = true
 
     /**
-     * JSON configuration for parsing server responses.
-     */
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
-    /**
-     * Lazy-initialized HTTP client for WebAuth requests.
+     * HTTP client for authentication requests: the injected client, or
+     * [createDefaultHttpClient] when none is given.
      */
     private val client: HttpClient by lazy {
-        httpClient ?: HttpClient {
-            install(ContentNegotiation) {
-                json(this@WebAuthForContracts.json)
-            }
-            install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
-                socketTimeoutMillis = 30_000
-            }
-            install(HttpRequestRetry) {
-                retryOnServerErrors(maxRetries = 3)
-                exponentialDelay()
-            }
-            install(DefaultRequest) {
-                header("X-Client-Name", Util.CLIENT_NAME)
-                header("X-Client-Version", Util.getSdkVersion())
-            }
-        }
+        httpClient ?: createDefaultHttpClient()
     }
 
     /**
@@ -221,6 +197,38 @@ class WebAuthForContracts(
 
     companion object {
         private const val WEB_AUTH_VERIFY_FUNCTION = "web_auth_verify"
+
+        /**
+         * JSON configuration for parsing server responses.
+         */
+        private val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+
+        /**
+         * Builds the HTTP client used when no client is injected: JSON content negotiation,
+         * a 10 s connect and 30 s request and socket timeout, retries on server errors, and
+         * the client identification headers `X-Client-Name` and `X-Client-Version`.
+         */
+        internal fun createDefaultHttpClient(): HttpClient = HttpClient {
+            install(ContentNegotiation) {
+                json(WebAuthForContracts.json)
+            }
+            install(HttpTimeout) {
+                connectTimeoutMillis = 10_000
+                requestTimeoutMillis = 30_000
+                socketTimeoutMillis = 30_000
+            }
+            install(HttpRequestRetry) {
+                retryOnServerErrors(maxRetries = 3)
+                exponentialDelay()
+            }
+            install(DefaultRequest) {
+                header("X-Client-Name", Util.CLIENT_NAME)
+                header("X-Client-Version", Util.getSdkVersion())
+            }
+        }
 
         /**
          * Creates an instance that queries ledger state through the given [sorobanServer] instead

@@ -8,6 +8,8 @@ import com.soneso.stellar.sdk.horizon.requests.SSEStream
 import com.soneso.stellar.sdk.horizon.responses.Pageable
 import com.soneso.stellar.sdk.horizon.responses.Response
 import com.soneso.stellar.sdk.unitTests.ClaimableBalanceVectors
+import com.soneso.stellar.sdk.unitTests.FirstRequestCapture
+import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
@@ -301,22 +303,15 @@ class SSEStreamTest {
 
     @Test
     fun testStreamThroughHorizonDefaultClientSendsClientIdentification() {
-        // The real default client of HorizonServer, with the request captured in the send
-        // pipeline after DefaultRequest has applied and aborted before any network access.
-        val captured = CopyOnWriteArrayList<HttpRequestBuilder>()
+        // The real default client of HorizonServer; the capture aborts the request before any
+        // network access.
         val server = HorizonServer(SERVER_URI)
-        server.httpClient.sendPipeline.intercept(HttpSendPipeline.Before) {
-            captured.add(HttpRequestBuilder().takeFrom(context))
-            throw IllegalStateException("Request captured before network access")
-        }
+        val capture = FirstRequestCapture(server.httpClient)
         val stream = server.transactions()
             .stream(StreamedRecord.serializer(), RecordingListener(), 30_000.milliseconds)
         try {
-            awaitUntil(description = "the initial request") { captured.isNotEmpty() }
-            val request = captured[0]
-            assertEquals(listOf("kmp-stellar-sdk"), request.headers.getAll("X-Client-Name"))
-            assertEquals(listOf(Util.getSdkVersion()), request.headers.getAll("X-Client-Version"))
-            assertNull(request.url.parameters["X-Client-Name"], "Client identification travels in headers only")
+            awaitUntil(description = "the initial request") { capture.request != null }
+            assertSdkClientIdentification(capture.request!!)
         } finally {
             stream.close()
             server.close()

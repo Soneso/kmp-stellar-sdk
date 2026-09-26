@@ -4,6 +4,8 @@ import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.sseRequest
 import com.soneso.stellar.sdk.horizon.responses.Response
+import com.soneso.stellar.sdk.unitTests.FirstRequestCapture
+import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
@@ -116,14 +118,10 @@ class SSEStreamNativeTest {
 
     @Test
     fun testStreamThroughHorizonDefaultClientSendsClientIdentification() = runTest {
-        // The real default client of HorizonServer, with the request captured in the send
-        // pipeline after DefaultRequest has applied and aborted before any network access.
-        val captured = mutableListOf<HttpRequestBuilder>()
+        // The real default client of HorizonServer; the capture aborts the request before any
+        // network access.
         val client = HorizonServer.createDefaultHttpClient()
-        client.sendPipeline.intercept(HttpSendPipeline.Before) {
-            captured.add(HttpRequestBuilder().takeFrom(context))
-            throw IllegalStateException("Request captured before network access")
-        }
+        val capture = FirstRequestCapture(client)
         try {
             sseRequest(
                 httpClient = client,
@@ -135,10 +133,7 @@ class SSEStreamNativeTest {
                 onClose = {}
             )
 
-            val request = captured.firstOrNull() ?: fail("No request reached the send pipeline")
-            assertEquals(listOf("kmp-stellar-sdk"), request.headers.getAll("X-Client-Name"))
-            assertEquals(listOf(Util.getSdkVersion()), request.headers.getAll("X-Client-Version"))
-            assertNull(request.url.parameters["X-Client-Name"], "Client identification travels in headers only")
+            assertSdkClientIdentification(capture.request ?: fail("No request reached the send pipeline"))
         } finally {
             client.close()
         }
