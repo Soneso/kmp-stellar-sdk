@@ -71,7 +71,7 @@ class HorizonServer(
                 exponentialDelay()
             }
             install(DefaultRequest) {
-                header("X-Client-Name", "kmp-stellar-sdk")
+                header("X-Client-Name", com.soneso.stellar.sdk.Util.CLIENT_NAME)
                 header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
             }
         }
@@ -102,7 +102,7 @@ class HorizonServer(
                 exponentialDelay()
             }
             install(DefaultRequest) {
-                header("X-Client-Name", "kmp-stellar-sdk")
+                header("X-Client-Name", com.soneso.stellar.sdk.Util.CLIENT_NAME)
                 header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
             }
         }

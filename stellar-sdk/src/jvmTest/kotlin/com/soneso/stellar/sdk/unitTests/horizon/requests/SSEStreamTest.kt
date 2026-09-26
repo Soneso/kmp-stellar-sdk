@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.unitTests.horizon.requests
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.EventListener
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
@@ -230,19 +231,96 @@ class SSEStreamTest {
         assertNull(requests[0].url.parameters["cursor"], "The initial connect has no cursor")
     }
 
+    /**
+     * MockEngine client whose `DefaultRequest` sets the client identification headers the way
+     * [HorizonServer.createDefaultHttpClient] does, or with the values an application injects.
+     */
+    private fun identifiedSseClient(
+        engine: MockEngine,
+        clientName: String = "kmp-stellar-sdk",
+        clientVersion: String = Util.getSdkVersion()
+    ): HttpClient = HttpClient(engine) {
+        install(HttpTimeout)
+        install(DefaultRequest) {
+            header("X-Client-Name", clientName)
+            header("X-Client-Version", clientVersion)
+        }
+    }
+
+    /** Streams from the transactions endpoint through [client] and returns the first request. */
+    private fun firstStreamRequest(
+        client: HttpClient,
+        requests: List<HttpRequestData>
+    ): HttpRequestData {
+        val stream = HorizonServer(SERVER_URI, client)
+            .transactions()
+            .stream(StreamedRecord.serializer(), RecordingListener(), 30_000.milliseconds)
+        try {
+            awaitUntil(description = "the initial request") { requests.isNotEmpty() }
+            return requests[0]
+        } finally {
+            stream.close()
+        }
+    }
+
     @Test
     fun testStreamRequestCarriesSseHeadersAndClientIdentification() {
         val (engine, requests) = engineServing(sseEvent("1", record("a", "1", "x")))
-        val listener = RecordingListener()
 
-        startStream(engine, listener)
+        val request = firstStreamRequest(identifiedSseClient(engine), requests)
 
-        awaitUntil(description = "the initial request") { requests.isNotEmpty() }
-        val request = requests[0]
         assertEquals("text/event-stream", request.headers[HttpHeaders.Accept])
         assertEquals("no-cache", request.headers[HttpHeaders.CacheControl])
-        assertEquals("kotlin-stellar-sdk", request.url.parameters["X-Client-Name"])
-        assertNotNull(request.url.parameters["X-Client-Version"], "SDK version is sent for server-side tracking")
+        assertEquals(listOf("kmp-stellar-sdk"), request.headers.getAll("X-Client-Name"))
+        assertEquals(listOf(Util.getSdkVersion()), request.headers.getAll("X-Client-Version"))
+        assertNull(request.url.parameters["X-Client-Name"], "Client identification travels in headers only")
+        assertNull(request.url.parameters["X-Client-Version"], "Client identification travels in headers only")
+    }
+
+    @Test
+    fun testStreamRequestCarriesTheInjectedClientIdentification() {
+        val (engine, requests) = engineServing(sseEvent("1", record("a", "1", "x")))
+
+        val request = firstStreamRequest(identifiedSseClient(engine, "my-app", "1.0"), requests)
+
+        assertEquals(listOf("my-app"), request.headers.getAll("X-Client-Name"))
+        assertEquals(listOf("1.0"), request.headers.getAll("X-Client-Version"))
+    }
+
+    @Test
+    fun testStreamRequestThroughClientWithoutIdentificationSendsNone() {
+        val (engine, requests) = engineServing(sseEvent("1", record("a", "1", "x")))
+
+        val request = firstStreamRequest(sseClient(engine), requests)
+
+        assertNull(request.headers["X-Client-Name"])
+        assertNull(request.headers["X-Client-Version"])
+        assertNull(request.url.parameters["X-Client-Name"])
+        assertNull(request.url.parameters["X-Client-Version"])
+    }
+
+    @Test
+    fun testStreamThroughHorizonDefaultClientSendsClientIdentification() {
+        // The real default client of HorizonServer, with the request captured in the send
+        // pipeline after DefaultRequest has applied and aborted before any network access.
+        val captured = CopyOnWriteArrayList<HttpRequestBuilder>()
+        val server = HorizonServer(SERVER_URI)
+        server.httpClient.sendPipeline.intercept(HttpSendPipeline.Before) {
+            captured.add(HttpRequestBuilder().takeFrom(context))
+            throw IllegalStateException("Request captured before network access")
+        }
+        val stream = server.transactions()
+            .stream(StreamedRecord.serializer(), RecordingListener(), 30_000.milliseconds)
+        try {
+            awaitUntil(description = "the initial request") { captured.isNotEmpty() }
+            val request = captured[0]
+            assertEquals(listOf("kmp-stellar-sdk"), request.headers.getAll("X-Client-Name"))
+            assertEquals(listOf(Util.getSdkVersion()), request.headers.getAll("X-Client-Version"))
+            assertNull(request.url.parameters["X-Client-Name"], "Client identification travels in headers only")
+        } finally {
+            stream.close()
+            server.close()
+        }
     }
 
     @Test

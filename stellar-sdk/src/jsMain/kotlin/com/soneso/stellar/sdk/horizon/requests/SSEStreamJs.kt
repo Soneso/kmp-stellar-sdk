@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.horizon.requests
 
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.horizon.responses.Response
 import io.ktor.client.*
 import io.ktor.http.*
@@ -69,20 +70,15 @@ internal actual suspend fun <T : Response> sseRequest(
 }
 
 /**
- * Adds client identification query parameters to the URL.
+ * Returns [url] with the client identification as the query parameters `X-Client-Name` and
+ * `X-Client-Version`. The browser `EventSource` API cannot set request headers, and Horizon
+ * reads both values from the query string when the headers are absent.
  */
-private fun addClientIdentification(url: Url): String {
+internal fun addClientIdentification(url: Url): String {
     return URLBuilder(url).apply {
-        parameters.append("X-Client-Name", "kotlin-stellar-sdk")
-        parameters.append("X-Client-Version", getSdkVersion())
+        parameters.append("X-Client-Name", Util.CLIENT_NAME)
+        parameters.append("X-Client-Version", Util.getSdkVersion())
     }.buildString()
-}
-
-/**
- * Gets the SDK version.
- */
-private fun getSdkVersion(): String {
-    return "dev" // In production, this could be injected during build
 }
 
 /**

@@ -94,5 +94,5 @@ object OZConstants {
     /**
      * SDK name sent in client identification headers.
      */
-    const val CLIENT_NAME = "kmp-stellar-sdk"
+    const val CLIENT_NAME = com.soneso.stellar.sdk.Util.CLIENT_NAME
 }
