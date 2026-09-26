@@ -8,15 +8,6 @@
 
 A Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
-Code examples assume a `suspend` calling context and these imports:
-
-```kotlin
-import com.soneso.stellar.sdk.*
-import com.soneso.stellar.sdk.contract.*
-import com.soneso.stellar.sdk.rpc.*
-import com.soneso.stellar.sdk.rpc.responses.*
-```
-
 ## Platform Support
 
 | Platform | Status | Crypto Library | Notes |
@@ -106,9 +97,16 @@ See [docs/platforms/](docs/platforms/) for detailed platform-specific instructio
 
 ## Quick Start
 
-### Generate a Random KeyPair
+All cryptographic and network operations are `suspend` functions. The examples below assume a `suspend` calling context and these imports:
 
-All cryptographic operations use Kotlin's `suspend` functions for proper async support across platforms.
+```kotlin
+import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.*
+import com.soneso.stellar.sdk.rpc.*
+import com.soneso.stellar.sdk.rpc.responses.*
+```
+
+### Generate a Random KeyPair
 
 ```kotlin
 import com.soneso.stellar.sdk.KeyPair
