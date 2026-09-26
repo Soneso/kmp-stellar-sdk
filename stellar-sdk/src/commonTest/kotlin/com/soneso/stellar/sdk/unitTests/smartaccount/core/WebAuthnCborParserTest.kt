@@ -242,6 +242,29 @@ class WebAuthnCborParserTest {
     }
 
     @Test
+    fun extractAuthenticatorData_authDataLengthNearIntMaxReturnsNull() = runTest {
+        // {"authData": <byte string, 4-byte length 0x7ffffff4>} with no content bytes
+        val data = byteArrayOf(
+            0xa1.toByte(), 0x68, 0x61, 0x75, 0x74, 0x68, 0x44, 0x61, 0x74, 0x61,
+            0x5a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte()
+        )
+        assertNull(WebAuthnCborParser.extractAuthenticatorDataFromAttestation(data))
+    }
+
+    @Test
+    fun extractAuthenticatorData_skippedValueLengthNearIntMaxReturnsNull() = runTest {
+        // {"attStmt": <byte string, 4-byte length 0x7ffffff4>, "authData": ...}: the "attStmt"
+        // value is skipped; its content starts at offset 14, where adding the length exceeds
+        // Int.MAX_VALUE.
+        var data = buildCborHead(5, 2)
+        data += buildCborTextString("attStmt")
+        data += byteArrayOf(0x5a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte(), 0x01, 0x02)
+        data += buildCborTextString("authData")
+        data += buildCborByteString(buildAuthenticatorData())
+        assertNull(WebAuthnCborParser.extractAuthenticatorDataFromAttestation(data))
+    }
+
+    @Test
     fun extractAuthenticatorData_authDataWith1ByteCborLength() = runTest {
         // authData between 24 and 255 bytes triggers the 0x58 prefix path
         val authData = ByteArray(100) { it.toByte() }
@@ -417,6 +440,32 @@ class WebAuthnCborParserTest {
         assertNull(WebAuthnCborParser.readCborByteString(encoded, 0))
     }
 
+    @Test
+    fun readCborByteString_4ByteLengthNearIntMax_returnsNull() = runTest {
+        // 10 filler bytes, then 0x5a = major-type 2 | 26 with length 0x7ffffff4 and 3 content
+        // bytes; the content starts at offset 15, where adding the length exceeds Int.MAX_VALUE.
+        val data = ByteArray(10) +
+            byteArrayOf(0x5a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte(), 0x01, 0x02, 0x03)
+        assertNull(WebAuthnCborParser.readCborByteString(data, 10))
+    }
+
+    @Test
+    fun readCborByteString_lengthEqualToRemainingBytes_isAccepted() = runTest {
+        // Leading filler byte, then 0x5a with 4-byte length 3 and exactly 3 content bytes
+        val data = byteArrayOf(0x00, 0x5a, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x0b, 0x0c)
+        val result = WebAuthnCborParser.readCborByteString(data, 1)
+        assertNotNull(result)
+        assertContentEquals(byteArrayOf(0x0a, 0x0b, 0x0c), result.first)
+        assertEquals(data.size, result.second)
+    }
+
+    @Test
+    fun readCborByteString_lengthOneBeyondRemainingBytes_returnsNull() = runTest {
+        // Same layout, but the length claims 4 bytes while 3 remain
+        val data = byteArrayOf(0x00, 0x5a, 0x00, 0x00, 0x00, 0x04, 0x0a, 0x0b, 0x0c)
+        assertNull(WebAuthnCborParser.readCborByteString(data, 1))
+    }
+
     // =========================================================================
     // 3. readCborTextString
     // =========================================================================
@@ -481,6 +530,32 @@ class WebAuthnCborParserTest {
         // 0x44 = major-type 2 (byte string), not 3
         val encoded = byteArrayOf(0x44.toByte(), 0x01, 0x02, 0x03, 0x04)
         assertNull(WebAuthnCborParser.readCborTextString(encoded, 0))
+    }
+
+    @Test
+    fun readCborTextString_4ByteLengthNearIntMax_returnsNull() = runTest {
+        // 10 filler bytes, then 0x7a = major-type 3 | 26 with length 0x7ffffff4 and 3 content bytes.
+        // The text string reader accepts lengths of at most 2 bytes, so it rejects any 4-byte length.
+        val data = ByteArray(10) +
+            byteArrayOf(0x7a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte(), 0x41, 0x42, 0x43)
+        assertNull(WebAuthnCborParser.readCborTextString(data, 10))
+    }
+
+    @Test
+    fun readCborTextString_lengthEqualToRemainingBytes_isAccepted() = runTest {
+        // Leading filler byte, then 0x79 with 2-byte length 3 and exactly 3 content bytes
+        val data = byteArrayOf(0x00, 0x79, 0x00, 0x03, 0x41, 0x42, 0x43)
+        val result = WebAuthnCborParser.readCborTextString(data, 1)
+        assertNotNull(result)
+        assertEquals("ABC", result.first)
+        assertEquals(data.size, result.second)
+    }
+
+    @Test
+    fun readCborTextString_lengthOneBeyondRemainingBytes_returnsNull() = runTest {
+        // Same layout, but the length claims 4 bytes while 3 remain
+        val data = byteArrayOf(0x00, 0x79, 0x00, 0x04, 0x41, 0x42, 0x43)
+        assertNull(WebAuthnCborParser.readCborTextString(data, 1))
     }
 
     // =========================================================================
@@ -674,6 +749,38 @@ class WebAuthnCborParserTest {
     @Test
     fun skipCborValue_offsetAtEnd_returnsNull() = runTest {
         assertNull(WebAuthnCborParser.skipCborValue(byteArrayOf(0x01), 1))
+    }
+
+    @Test
+    fun skipCborValue_byteString4ByteLengthNearIntMax_returnsNull() = runTest {
+        // 10 filler bytes, then 0x5a = major-type 2 | 26 with length 0x7ffffff4 and 3 content
+        // bytes; the content starts at offset 15, where adding the length exceeds Int.MAX_VALUE.
+        val data = ByteArray(10) +
+            byteArrayOf(0x5a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte(), 0x01, 0x02, 0x03)
+        assertNull(WebAuthnCborParser.skipCborValue(data, 10))
+    }
+
+    @Test
+    fun skipCborValue_textString4ByteLengthNearIntMax_returnsNull() = runTest {
+        // 10 filler bytes, then 0x7a = major-type 3 | 26 with length 0x7ffffff4 and 3 content
+        // bytes; the content starts at offset 15, where adding the length exceeds Int.MAX_VALUE.
+        val data = ByteArray(10) +
+            byteArrayOf(0x7a, 0x7f, 0xff.toByte(), 0xff.toByte(), 0xf4.toByte(), 0x41, 0x42, 0x43)
+        assertNull(WebAuthnCborParser.skipCborValue(data, 10))
+    }
+
+    @Test
+    fun skipCborValue_lengthEqualToRemainingBytes_isAccepted() = runTest {
+        // Leading filler byte, then 0x5a with 4-byte length 3 and exactly 3 content bytes
+        val data = byteArrayOf(0x00, 0x5a, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x0b, 0x0c)
+        assertEquals(data.size, WebAuthnCborParser.skipCborValue(data, 1))
+    }
+
+    @Test
+    fun skipCborValue_lengthOneBeyondRemainingBytes_returnsNull() = runTest {
+        // Same layout, but the length claims 4 bytes while 3 remain
+        val data = byteArrayOf(0x00, 0x5a, 0x00, 0x00, 0x00, 0x04, 0x0a, 0x0b, 0x0c)
+        assertNull(WebAuthnCborParser.skipCborValue(data, 1))
     }
 
     // =========================================================================

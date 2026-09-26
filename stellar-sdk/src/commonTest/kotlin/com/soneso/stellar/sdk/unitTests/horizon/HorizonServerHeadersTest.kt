@@ -2,6 +2,8 @@ package com.soneso.stellar.sdk.unitTests.horizon
 
 import com.soneso.stellar.sdk.horizon.*
 import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
+import com.soneso.stellar.sdk.unitTests.captureFirstRequest
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.*
@@ -531,27 +533,29 @@ class HorizonServerHeadersTest {
     }
 
     @Test
-    fun testDefaultHttpClientCreation_includesHeaders() {
-        // Given/When: Creating default HTTP client
+    fun testDefaultHttpClientCreation_includesHeaders() = runTest {
+        // Given: The real default HTTP client, with requests captured before any network access
         val client = HorizonServer.createDefaultHttpClient()
 
-        // Then: Client is created successfully
-        assertNotNull(client)
-
-        // Cleanup
-        client.close()
+        try {
+            // When/Then: A request carries the client identification headers once each
+            assertSdkClientIdentification(captureFirstRequest(client))
+        } finally {
+            client.close()
+        }
     }
 
     @Test
-    fun testSubmitHttpClientCreation_includesHeaders() {
-        // Given/When: Creating submit HTTP client
+    fun testSubmitHttpClientCreation_includesHeaders() = runTest {
+        // Given: The real submit HTTP client, with requests captured before any network access
         val client = HorizonServer.createSubmitHttpClient()
 
-        // Then: Client is created successfully
-        assertNotNull(client)
-
-        // Cleanup
-        client.close()
+        try {
+            // When/Then: A request carries the client identification headers once each
+            assertSdkClientIdentification(captureFirstRequest(client))
+        } finally {
+            client.close()
+        }
     }
 
     // ========== Multiple Requests Test ==========

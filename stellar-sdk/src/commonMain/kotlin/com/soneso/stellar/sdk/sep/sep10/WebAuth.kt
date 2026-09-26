@@ -293,21 +293,30 @@ class WebAuth(
 ) {
 
     /**
-     * JSON configuration for parsing server responses.
-     */
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
-    /**
-     * Lazy-initialized HTTP client for WebAuth requests.
-     * Uses default configuration similar to HorizonServer.
+     * HTTP client for authentication requests: the injected client, or
+     * [createDefaultHttpClient] when none is given.
      */
     private val client: HttpClient by lazy {
-        httpClient ?: HttpClient {
+        httpClient ?: createDefaultHttpClient()
+    }
+
+    companion object {
+        /**
+         * JSON configuration for parsing server responses.
+         */
+        private val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
+
+        /**
+         * Builds the HTTP client used when no client is injected: JSON content negotiation,
+         * a 10 s connect and 30 s request and socket timeout, retries on server errors, and
+         * the client identification headers `X-Client-Name` and `X-Client-Version`.
+         */
+        internal fun createDefaultHttpClient(): HttpClient = HttpClient {
             install(ContentNegotiation) {
-                json(this@WebAuth.json)
+                json(WebAuth.json)
             }
             install(HttpTimeout) {
                 connectTimeoutMillis = 10_000
@@ -319,13 +328,11 @@ class WebAuth(
                 exponentialDelay()
             }
             install(DefaultRequest) {
-                header("X-Client-Name", "kmp-stellar-sdk")
+                header("X-Client-Name", com.soneso.stellar.sdk.Util.CLIENT_NAME)
                 header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
             }
         }
-    }
 
-    companion object {
         /**
          * Creates a WebAuth instance by discovering configuration from a domain's stellar.toml.
          *

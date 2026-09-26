@@ -263,6 +263,16 @@ When a failure is ambiguous, reproduce it against the affected service directly 
 
 Publish before committing to Git. This allows fixing any build or publishing issues without amending commits.
 
+#### Step 10b: Check the Maven Central publishing quota
+
+Maven Central enforces monthly publishing limits (from 2026-10-01). On 2026-09-16 Sonatype confirmed that the increased limits of the `com.soneso` namespace are granted per namespace, not per organization, so the organization-level tiles in the Usage Center and their warning banner do not apply to `com.soneso`.
+
+The `com.soneso` limit has three dimensions per calendar month: 1.5 GB, 2,690 files, and 7 releases. One release of this SDK is about 64 MB and 560 files, so the file count binds at 4 releases per month (4 x 560 = 2,240; a fifth release would exceed 2,690). Seven releases would fit only with the signature checksum files dropped from the publication, which is not done.
+
+Before publishing, open https://central.sonatype.com/publishing (Publishing Settings, Usage Center) and read the `com.soneso` row under "Usage by Namespace". Do not publish if the row's file count plus 560 would exceed 2,690, its size plus 64 MB would exceed 1.5 GB, or its release count is already 7.
+
+A deployment stuck in PUBLISHING with "Deployment components info not found" can still complete. Check the deployment's status in the portal before retrying, because a retry that lands as a second publication counts against the quota.
+
 #### Step 11: Publish to Staging Repository
 
 Use the **Nexus Publishing Plugin** command (NOT the direct OSSRH command):

@@ -710,6 +710,12 @@ Migration guide: [docs/migration/1.12.0.md](docs/migration/1.12.0.md)
   are logged. Context rule edits submit removals before additions, fixing
   contract errors when replacing signers or policies in one edit.
 
+## [1.7.0] - 2026-06-12
+
+Published to Maven Central with the same content as 1.7.1, which followed the
+next morning; the changes are listed under 1.7.1. There is no git tag for
+1.7.0.
+
 ## [1.6.1] - 2026-05-29
 
 ### Added

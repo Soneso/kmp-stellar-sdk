@@ -14,6 +14,8 @@ import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
+import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
+import com.soneso.stellar.sdk.unitTests.captureFirstRequest
 import com.soneso.stellar.sdk.xdr.*
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -1118,6 +1120,19 @@ class WebAuthForContractsTest {
     // ============================================================================
     // Challenge Request Tests
     // ============================================================================
+
+    @Test
+    fun testDefaultHttpClientSendsClientIdentification() = runTest {
+        // The client WebAuthForContracts builds when none is injected; the capture aborts the
+        // request before any network access.
+        val client = WebAuthForContracts.createDefaultHttpClient()
+
+        try {
+            assertSdkClientIdentification(captureFirstRequest(client, AUTH_SERVER))
+        } finally {
+            client.close()
+        }
+    }
 
     private fun createThrowingMockClient(failure: Throwable): HttpClient {
         val mockEngine = MockEngine { throw failure }

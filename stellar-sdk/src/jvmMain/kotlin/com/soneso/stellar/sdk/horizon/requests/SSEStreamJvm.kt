@@ -19,6 +19,9 @@ import kotlin.coroutines.coroutineContext
 /**
  * JVM implementation of SSE request handling.
  * Uses Ktor's streaming API to read SSE events line by line.
+ *
+ * The client identification headers `X-Client-Name` and `X-Client-Version` come from the
+ * client's `DefaultRequest` configuration, as for every other Horizon request.
  */
 internal actual suspend fun <T : Response> sseRequest(
     httpClient: HttpClient,
@@ -30,7 +33,7 @@ internal actual suspend fun <T : Response> sseRequest(
     onClose: () -> Unit
 ) {
     try {
-        httpClient.prepareGet(addClientIdentification(url)) {
+        httpClient.prepareGet(url) {
             headers {
                 append(HttpHeaders.Accept, "text/event-stream")
                 append(HttpHeaders.CacheControl, "no-cache")
@@ -138,27 +141,6 @@ private suspend fun parseSSEStream(
         if (coroutineContext.isActive) {
             onFailure(e, statusCode)
         }
-    }
-}
-
-/**
- * Adds client identification query parameters to the URL.
- */
-private fun addClientIdentification(url: Url): Url {
-    return URLBuilder(url).apply {
-        parameters.append("X-Client-Name", "kotlin-stellar-sdk")
-        parameters.append("X-Client-Version", getSdkVersion())
-    }.build()
-}
-
-/**
- * Gets the SDK version from package metadata.
- */
-private fun getSdkVersion(): String {
-    return try {
-        SSEStream::class.java.`package`?.implementationVersion ?: "dev"
-    } catch (e: Exception) {
-        "dev"
     }
 }
 

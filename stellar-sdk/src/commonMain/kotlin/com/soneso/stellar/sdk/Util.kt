@@ -34,6 +34,13 @@ object Util {
     }
 
     /**
+     * SDK name sent as `X-Client-Name` by every request the SDK identifies itself on:
+     * Horizon (including SSE streams), Soroban RPC, SEP-10 and SEP-45 authentication,
+     * and the OpenZeppelin relayer.
+     */
+    internal const val CLIENT_NAME = "kmp-stellar-sdk"
+
+    /**
      * Pads a byte array to the specified length with null bytes (0x00).
      * If the input array is already longer than or equal to the specified length,
      * only the first [length] bytes are returned.

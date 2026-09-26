@@ -174,7 +174,7 @@ class SorobanServer(
                     connectTimeoutMillis = CONNECT_TIMEOUT
                 }
                 install(DefaultRequest) {
-                    header("X-Client-Name", "kmp-stellar-sdk")
+                    header("X-Client-Name", com.soneso.stellar.sdk.Util.CLIENT_NAME)
                     header("X-Client-Version", com.soneso.stellar.sdk.Util.getSdkVersion())
                 }
             }

@@ -10,6 +10,8 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.sep.sep10.exceptions.ChallengeRequestException
 import com.soneso.stellar.sdk.sep.sep10.exceptions.GenericChallengeValidationException
 import com.soneso.stellar.sdk.sep.sep10.exceptions.NoMemoForMuxedAccountsException
+import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
+import com.soneso.stellar.sdk.unitTests.captureFirstRequest
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -841,6 +843,19 @@ class WebAuthChallengeTest {
 
         assertTrue(capturedUrl.contains("account=$validAccountId"))
         assertTrue(capturedUrl.contains("memo=12345"))
+    }
+
+    @Test
+    fun testDefaultHttpClientSendsClientIdentification() = runTest {
+        // The client WebAuth builds when none is injected; the capture aborts the request
+        // before any network access.
+        val client = WebAuth.createDefaultHttpClient()
+
+        try {
+            assertSdkClientIdentification(captureFirstRequest(client, testAuthEndpoint))
+        } finally {
+            client.close()
+        }
     }
 
     @Test

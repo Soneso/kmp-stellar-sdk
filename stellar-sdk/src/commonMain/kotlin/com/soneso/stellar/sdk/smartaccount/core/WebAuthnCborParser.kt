@@ -480,7 +480,7 @@ internal object WebAuthnCborParser {
             else -> return null // Indefinite-length or 8-byte length not supported
         }
 
-        if (dataStart + length > data.size) return null
+        if (length > data.size - dataStart) return null
 
         val bytes = data.copyOfRange(dataStart, dataStart + length)
         return Pair(bytes, dataStart + length)
@@ -532,7 +532,7 @@ internal object WebAuthnCborParser {
             else -> return null
         }
 
-        if (dataStart + length > data.size) return null
+        if (length > data.size - dataStart) return null
 
         val text = data.copyOfRange(dataStart, dataStart + length).decodeToString()
         return Pair(text, dataStart + length)
@@ -625,7 +625,7 @@ internal object WebAuthnCborParser {
                 val lengthResult = readCborLength(data, offset) ?: return null
                 val length = lengthResult.first
                 val contentStart = lengthResult.second
-                if (contentStart + length > data.size) return null
+                if (length > data.size - contentStart) return null
                 contentStart + length
             }
             4 -> {
