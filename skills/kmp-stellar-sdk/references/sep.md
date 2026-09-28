@@ -1,6 +1,6 @@
 # SEP Implementations
 
-The KMP SDK implements 15 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
+The KMP SDK implements 20 Stellar Ecosystem Proposals (SEPs) that cover authentication, asset transfers, identity verification, and other standardized protocols for integrating with anchors and other Stellar services.
 
 Code examples assume a `suspend` calling context and these imports:
 
@@ -20,11 +20,16 @@ import com.soneso.stellar.sdk.*
 | SEP-09 | Standard KYC Fields | Standard vocabulary for KYC/AML data fields | [Details](sep-09.md) |
 | SEP-10 | Web Authentication | Authenticate accounts and obtain JWT tokens | [Details](sep-10.md) |
 | SEP-12 | KYC API | Submit and manage customer information | [Details](sep-12.md) |
+| SEP-23 | Strkey Encoding | Encode, decode and validate G, S, M, T, X, P, C, L and B strkeys | [Details](security.md#address-validation) |
 | SEP-24 | Interactive Deposit/Withdrawal | Interactive web flows for fiat on/off ramps | [Details](sep-24.md) |
+| SEP-29 | Account Memo Requirements | Refuse submission when a destination requires a memo the transaction lacks | [Details](troubleshooting.md#sep-0029-memo-required-accountrequiresmemoexception) |
 | SEP-30 | Account Recovery | Recover access to accounts via identity verification | [Details](sep-30.md) |
 | SEP-31 | Cross-Border Payments | Sending Anchor side of the SEP-31 payment flow | [Details](sep-31.md) |
 | SEP-38 | Anchor RFQ API | Get exchange quotes for asset conversions | [Details](sep-38.md) |
 | SEP-45 | Web Auth for Contracts | Authenticate Soroban contract accounts | [Details](sep-45.md) |
+| SEP-46 | Contract Meta | Read key-value metadata embedded in contract WASM | [Details](soroban_contracts.md#contract-introspection) |
+| SEP-47 | Contract Interface Discovery | List the SEPs a contract declares in its `sep` meta entries | [Details](soroban_contracts.md#contract-introspection) |
+| SEP-48 | Contract Interface Specification | Parse function, type, and event specs from contract WASM | [Details](soroban_contracts.md#contract-introspection) |
 | SEP-51 | XDR-JSON | Render XDR values as canonical JSON and read them back | [Details](sep-51.md) |
 | SEP-53 | Sign/Verify Messages | Sign and verify arbitrary messages with Ed25519 keypairs | [Details](sep-53.md) |
 

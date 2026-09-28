@@ -1025,6 +1025,7 @@ val contractId = "CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC"
 val wasmBytes = File("contract.wasm").readBytes()
 val contractInfo: SorobanContractInfo =
     SorobanContractParser.parseContractByteCode(wasmBytes)
+val declaredSeps: List<String> = contractInfo.supportedSeps // SEP numbers from the `sep` meta entry
 
 // From network (by WASM hash or contract ID)
 val server = SorobanServer("https://soroban-testnet.stellar.org:443")
@@ -1047,6 +1048,7 @@ See `rpc.md` > the contract loading section for `getExternalRefWasmHash()`.
 | `udtErrorEnums` | `List<SCSpecUDTErrorEnumV0Xdr>` | Error enum definitions |
 | `events` | `List<SCSpecEventV0Xdr>` | Event definitions |
 | `metaEntries` | `Map<String, String>` | Contract metadata |
+| `supportedSeps` | `List<String>` | SEP numbers declared in the contract's `sep` metadata entry |
 | `envInterfaceVersion` | `ULong` | Protocol version |
 
 ### Using ContractSpec for Introspection

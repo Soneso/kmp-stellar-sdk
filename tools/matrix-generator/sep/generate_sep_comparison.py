@@ -69,6 +69,7 @@ class SEPCompatibilityGenerator:
         "0010": "Lets wallets and exchanges create authenticated web sessions by proving Stellar account ownership. Supports individual, shared, and muxed accounts.",
         "0012": "A standard API for wallets to upload KYC data to anchors. Customers enter their information once and reuse it across multiple services.",
         "0024": "An interactive deposit and withdrawal flow where the anchor controls the UI via a popup within the wallet. Based on SEP-06 but limited to the interactive path.",
+        "0029": "An account signals that incoming payments must carry a memo by setting the data entry `config.memo_required` to `1`. Before submitting a transaction without a memo, the sender loads the destination of every payment, path payment and account merge operation and refuses to submit when one of them requires a memo. Multiplexed destinations are exempt, because the multiplexing id already identifies the recipient.",
         "0030": "Account Recovery: multi-party recovery of Stellar accounts using alternative authentication methods",
         "0031": "Cross-Border Payments: a programmatic API for Sending Anchors to deliver on-chain payments to Receiving Anchors, who then settle the off-chain leg with the Receiving Client. Covers asset discovery, SEP-12 KYC linkage, optional SEP-38 quotes, status polling, and refunds.",
         "0038": "Lets anchors provide quotes for exchanging on-chain assets for off-chain assets and vice versa.",
@@ -701,11 +702,12 @@ class SEPCompatibilityGenerator:
 
             # Additional Information
             f.write("## Additional Information\n\n")
-            f.write("**Documentation:** See `docs/sep-implementations.md` for usage examples and API reference\n\n")
+            f.write("**Documentation:** See `docs/sep/README.md` for usage examples and API reference\n\n")
             f.write(f"**Specification:** [SEP-{self.sep_number}](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-{self.sep_number}.md)\n\n")
 
             # Map SEP numbers to their actual implementation packages
             package_overrides = {
+                '0029': 'com.soneso.stellar.sdk.horizon',
                 '0046': 'com.soneso.stellar.sdk.contract',
                 '0047': 'com.soneso.stellar.sdk.contract',
                 '0048': 'com.soneso.stellar.sdk.contract',

@@ -6,7 +6,7 @@ It analyzes three areas:
 
 - **Horizon API** -- all REST endpoints defined in `stellar-go/services/horizon`
 - **Soroban RPC** -- all JSON-RPC methods defined in `stellar-rpc`
-- **SEPs** -- 13 Stellar Ecosystem Proposals (SEP-01, 02, 05, 06, 08, 09, 10, 12, 24, 30, 38, 45, 53)
+- **SEPs** -- 19 Stellar Ecosystem Proposals (SEP-01, 02, 05, 06, 08, 09, 10, 12, 24, 29, 30, 31, 38, 45, 46, 47, 48, 51, 53)
 
 ## Requirements
 

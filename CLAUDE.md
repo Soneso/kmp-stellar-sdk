@@ -30,7 +30,7 @@ The SDK is **production-ready** with comprehensive functionality implemented:
 - **Soroban RPC**: Contract calls, simulation, state restoration, polling, CAP-85 external reference resolution and deployment (`ContractClient.deployFromExternalRef`, `Address.deriveContractId`)
 - **High-Level API**: ContractClient, AssembledTransaction with full lifecycle
 - **XDR**: Complete XDR type system and serialization
-- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-24 (Hosted Deposit/Withdrawal), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-51 (XDR-JSON), SEP-53 (Sign and Verify Messages)
+- **SEP Support**: SEP-1 (Stellar TOML), SEP-2 (Federation Protocol), SEP-5 (Key Derivation), SEP-6 (Deposit and Withdrawal API), SEP-8 (Regulated Assets), SEP-9/12 (KYC), SEP-10 (Web Authentication), SEP-23 (Strkey Encoding), SEP-24 (Hosted Deposit/Withdrawal), SEP-29 (Account Memo Requirements), SEP-30 (Account Recovery), SEP-31 (Cross-Border Payments), SEP-38 (Anchor RFQ), SEP-45 (Web Authentication for Contract Accounts), SEP-46 (Contract Meta), SEP-47 (Contract Interface Discovery), SEP-48 (Contract Interface Specification), SEP-51 (XDR-JSON), SEP-53 (Sign and Verify Messages)
 
 ### Smart Accounts (OpenZeppelin)
 - **Contracts**: [OpenZeppelin stellar-contracts](https://github.com/OpenZeppelin/stellar-contracts) v0.7.0

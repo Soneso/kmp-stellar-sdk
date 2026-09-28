@@ -18,14 +18,16 @@ Stellar Ecosystem Proposals (SEPs) are standards that define how services, appli
 | SEP-9 | Standard KYC Fields | [sep-09.md](sep-09.md) |
 | SEP-10 | Web Authentication | [sep-10.md](sep-10.md) |
 | SEP-12 | KYC API | [sep-12.md](sep-12.md) |
+| SEP-23 | Strkey Encoding | [sep-23.md](sep-23.md) |
 | SEP-24 | Interactive Deposit and Withdrawal | [sep-24.md](sep-24.md) |
+| SEP-29 | Account Memo Requirements | [sep-29.md](sep-29.md) |
 | SEP-30 | Account Recovery | [sep-30.md](sep-30.md) |
 | SEP-31 | Cross-Border Payments | [sep-31.md](sep-31.md) |
 | SEP-38 | Anchor RFQ API | [sep-38.md](sep-38.md) |
 | SEP-45 | Web Authentication for Contract Accounts | [sep-45.md](sep-45.md) |
-| SEP-46 | Contract Meta | [Contract Parser](../advanced.md#contract-parser) |
-| SEP-47 | Contract Interface Discovery | [Contract Parser](../advanced.md#contract-parser) |
-| SEP-48 | Contract Interface Specification | [Contract Parser](../advanced.md#contract-parser) |
+| SEP-46 | Contract Meta | [Contract Parser](../advanced.md#contract-parser); [Compatibility matrix](../../compatibility/sep/SEP-0046_COMPATIBILITY_MATRIX.md) |
+| SEP-47 | Contract Interface Discovery | [Contract Parser](../advanced.md#contract-parser); [Compatibility matrix](../../compatibility/sep/SEP-0047_COMPATIBILITY_MATRIX.md) |
+| SEP-48 | Contract Interface Specification | [Contract Parser](../advanced.md#contract-parser); [Compatibility matrix](../../compatibility/sep/SEP-0048_COMPATIBILITY_MATRIX.md) |
 | SEP-51 | XDR-JSON | [sep-51.md](sep-51.md) |
 | SEP-53 | Sign and Verify Messages | [sep-53.md](sep-53.md) |
 
@@ -42,6 +44,7 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0010 Compatibility Matrix](../../compatibility/sep/SEP-0010_COMPATIBILITY_MATRIX.md)
 - [SEP-0012 Compatibility Matrix](../../compatibility/sep/SEP-0012_COMPATIBILITY_MATRIX.md)
 - [SEP-0024 Compatibility Matrix](../../compatibility/sep/SEP-0024_COMPATIBILITY_MATRIX.md)
+- [SEP-0029 Compatibility Matrix](../../compatibility/sep/SEP-0029_COMPATIBILITY_MATRIX.md)
 - [SEP-0030 Compatibility Matrix](../../compatibility/sep/SEP-0030_COMPATIBILITY_MATRIX.md)
 - [SEP-0031 Compatibility Matrix](../../compatibility/sep/SEP-0031_COMPATIBILITY_MATRIX.md)
 - [SEP-0038 Compatibility Matrix](../../compatibility/sep/SEP-0038_COMPATIBILITY_MATRIX.md)
@@ -56,4 +59,4 @@ To regenerate all matrices: `python3 tools/matrix-generator/run_analysis.py`
 
 ---
 
-**Last Updated**: 2026-08-05
+**Last Updated**: 2026-09-28

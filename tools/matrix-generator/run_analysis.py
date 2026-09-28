@@ -34,6 +34,7 @@ KNOWN_SEPS: Dict[str, str] = {
     '0011': 'Txrep',
     '0012': 'KYC API',
     '0024': 'Hosted Deposit/Withdrawal',
+    '0029': 'Account Memo Requirements',
     '0030': 'Account Recovery',
     '0031': 'Cross-Border Payments',
     '0038': 'Anchor RFQ API',
@@ -71,6 +72,21 @@ _KEYPAIR_FILE = (
     / "stellar"
     / "sdk"
     / "KeyPair.kt"
+)
+
+# Sep29Checker.kt path for SEP-29 detection
+_SEP29_CHECKER_FILE = (
+    SDK_ROOT
+    / "stellar-sdk"
+    / "src"
+    / "commonMain"
+    / "kotlin"
+    / "com"
+    / "soneso"
+    / "stellar"
+    / "sdk"
+    / "horizon"
+    / "Sep29Checker.kt"
 )
 
 # SorobanContractParser.kt path for SEP-46/47/48 detection
@@ -137,6 +153,15 @@ class AnalysisOrchestrator:
                     raw = item.name[3:]  # strip 'sep' prefix
                     if raw.isdigit():
                         sep_numbers.append(raw.zfill(4))
+
+        # SEP-29 (Account Memo Requirements) is the memo required check in the horizon/
+        # package, run by the Horizon submit methods
+        if _SEP29_CHECKER_FILE.exists():
+            content = _SEP29_CHECKER_FILE.read_text(encoding='utf-8')
+            if 'config.memo_required' in content and 'fun checkMemoRequired' in content:
+                padded = '0029'
+                if padded not in sep_numbers:
+                    sep_numbers.append(padded)
 
         # SEP-53 (Sign and Verify Messages) lives in KeyPair.kt, not a sep53/ dir
         if _KEYPAIR_FILE.exists():

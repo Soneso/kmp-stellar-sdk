@@ -89,6 +89,15 @@ class SEPAnalyzer:
         # Special case: SEP-51 lives in the generated xdr/ package
         self.xdr_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr'
         self._xdr_sources: Dict[str, str] = {}
+        # Special case: SEP-29 lives in the horizon/ package, next to the submit methods it guards
+        self.horizon_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/horizon'
+        self.sep29_files = (
+            self.horizon_dir / 'Sep29Checker.kt',
+            self.horizon_dir / 'HorizonServer.kt',
+            self.horizon_dir / 'exceptions' / 'AccountRequiresMemoException.kt',
+        )
+        self.operation_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/Operation.kt'
+        self._source_texts: Dict[Path, str] = {}
         self.analysis_data: Dict[str, Any] = {}
 
     def find_sep_files(self) -> List[Path]:
@@ -104,6 +113,11 @@ class SEPAnalyzer:
         if self.sep_number == '0053':
             if self.keypair_file.exists():
                 files.append(self.keypair_file)
+            return sorted(files)
+
+        # Special case: SEP-29 is the memo required check run by the Horizon submit methods
+        if self.sep_number == '0029':
+            files.extend(path for path in self.sep29_files if path.exists())
             return sorted(files)
 
         # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
@@ -147,6 +161,13 @@ class SEPAnalyzer:
             sep53_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep53/Sep53Test.kt'
             if sep53_test_file.exists():
                 files.append(sep53_test_file)
+            return sorted(files)
+
+        # Special case: SEP-29 test is Sep29CheckerTest.kt in unitTests/horizon/
+        if self.sep_number == '0029':
+            sep29_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/horizon/Sep29CheckerTest.kt'
+            if sep29_test_file.exists():
+                files.append(sep29_test_file)
             return sorted(files)
 
         # Special case: SEP-46, SEP-47, SEP-48 tests live in contract/
@@ -555,6 +576,7 @@ class SEPAnalyzer:
             '0010': self.map_sep_10_fields,
             '0012': self.map_sep_12_fields,
             '0024': self.map_sep_24_fields,
+            '0029': self.map_sep_29_fields,
             '0030': self.map_sep_30_fields,
             '0031': self.map_sep_31_fields,
             '0038': self.map_sep_38_fields,
@@ -1540,6 +1562,135 @@ class SEPAnalyzer:
         }
 
         return {'service_methods': self._map_service_methods(classes, service_methods)}
+
+    def _source_text(self, path: Path) -> str:
+        """
+        Read an SDK source file once and cache its text.
+
+        Args:
+            path: Absolute path of the source file
+
+        Returns:
+            The file text, or an empty string if the file does not exist
+        """
+        if path not in self._source_texts:
+            self._source_texts[path] = path.read_text(encoding='utf-8') if path.exists() else ''
+        return self._source_texts[path]
+
+    def map_sep_29_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-29 (Account Memo Requirements) fields.
+
+        SEP-29 has no sep29/ package. The internal Sep29Checker in horizon/ runs the check,
+        HorizonServer calls it from both submit methods, and AccountRequiresMemoException
+        reports a refused submission. Every requirement is mapped to the symbol that
+        carries it and counts as implemented only while each pattern proving it matches
+        the source.
+        """
+        checker = self.horizon_dir / 'Sep29Checker.kt'
+        server = self.horizon_dir / 'HorizonServer.kt'
+        exception = self.horizon_dir / 'exceptions' / 'AccountRequiresMemoException.kt'
+
+        def submit_patterns(method: str, response: str) -> List[str]:
+            # The one-argument overload must delegate with the check enabled, and the
+            # two-argument overload must run the check unless the caller opts out.
+            return [
+                r'private val sep29Checker = Sep29Checker\(',
+                rf'suspend fun {method}\(transactionEnvelopeXdr: String\): '
+                rf'[\w.]*{response} \{{\s*return {method}\(transactionEnvelopeXdr, '
+                r'skipMemoRequiredCheck = false\)',
+                rf'suspend fun {method}\(\s*transactionEnvelopeXdr: String,\s*'
+                rf'skipMemoRequiredCheck: Boolean\s*\): [\w.]*{response} \{{\s*'
+                r'if \(!skipMemoRequiredCheck\) \{\s*'
+                r'sep29Checker\.checkMemoRequired\(transactionEnvelopeXdr\)',
+            ]
+
+        # field name -> (SDK symbol, source file, regex patterns that must all match)
+        evidence: Dict[str, Dict[str, Tuple[str, Path, List[str]]]] = {
+            'memo_requirement_flag': {
+                'memo_required_data_entry': ('Sep29Checker.accountRequiresMemo', checker, [
+                    r'ACCOUNT_REQUIRES_MEMO_KEY = "config\.memo_required"',
+                    r'ACCOUNT_REQUIRES_MEMO_VALUE = "MQ=="',
+                    r'account\.data\[ACCOUNT_REQUIRES_MEMO_KEY\] == ACCOUNT_REQUIRES_MEMO_VALUE',
+                ]),
+                'set_memo_required_flag': ('ManageDataOperation', self.operation_file, [
+                    r'data class ManageDataOperation\(\s*val name: String,\s*val value: ByteArray\? = null',
+                ]),
+            },
+            'sender_side_check': {
+                'payment_destination': ('Sep29Checker (OperationBodyXdr.PaymentOp)', checker, [
+                    r'is OperationBodyXdr\.PaymentOp -> body\.value\.destination',
+                ]),
+                'path_payment_strict_send_destination': ('Sep29Checker (OperationBodyXdr.PathPaymentStrictSendOp)', checker, [
+                    r'is OperationBodyXdr\.PathPaymentStrictSendOp -> body\.value\.destination',
+                ]),
+                'path_payment_strict_receive_destination': ('Sep29Checker (OperationBodyXdr.PathPaymentStrictReceiveOp)', checker, [
+                    r'is OperationBodyXdr\.PathPaymentStrictReceiveOp -> body\.value\.destination',
+                ]),
+                'account_merge_destination': ('Sep29Checker (OperationBodyXdr.Destination)', checker, [
+                    r'is OperationBodyXdr\.Destination -> body\.value\b',
+                ]),
+                'muxed_destination_exempt': ('Sep29Checker (MuxedAccountXdr.Ed25519 only)', checker, [
+                    r'if \(destination is MuxedAccountXdr\.Ed25519\) \{',
+                ]),
+                'memo_present_skips_lookup': ('Sep29Checker (memo short-circuit)', checker, [
+                    r'if \(transaction\.memo !is MemoXdr\.Void\) \{\s*return\s*\}',
+                ]),
+                'fee_bump_inner_transaction': ('Sep29Checker (FeeBump innerTx)', checker, [
+                    r'is TransactionEnvelopeXdr\.FeeBump -> when \(val inner = envelope\.value\.tx\.innerTx\)',
+                    r'memo = inner\.value\.tx\.memo,\s*operations = inner\.value\.tx\.operations',
+                ]),
+                'unknown_destination_skipped': ('Sep29Checker (HTTP 404 skipped)', checker, [
+                    r'catch \(e: BadRequestException\) \{\s*// [^\n]*\n\s*if \(e\.code == 404\) \{\s*false',
+                ]),
+            },
+            'submission_integration': {
+                'submit_transaction_opt_out': (
+                    'HorizonServer.submitTransaction(skipMemoRequiredCheck)', server,
+                    submit_patterns('submitTransaction', 'TransactionResponse'),
+                ),
+                'submit_transaction_async_opt_out': (
+                    'HorizonServer.submitTransactionAsync(skipMemoRequiredCheck)', server,
+                    submit_patterns('submitTransactionAsync', 'SubmitTransactionAsyncResponse'),
+                ),
+                'account_requires_memo_exception': ('AccountRequiresMemoException', exception, [
+                    r'class AccountRequiresMemoException\(\s*message: String,\s*'
+                    r'val accountId: String,\s*val operationIndex: Int\s*\) : SdkException\(message\)',
+                ]),
+            },
+        }
+
+        # The exception row also needs the checker to throw it with both fields set.
+        exception_thrown = re.search(
+            r'throw AccountRequiresMemoException\(\s*message = "[^"]+",\s*'
+            r'accountId = destination,\s*operationIndex = operationIndex\s*\)',
+            self._source_text(checker),
+        ) is not None
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            section_evidence = evidence.get(section_key, {})
+
+            section_mappings: Dict[str, Optional[str]] = {}
+            for field in section.get('fields', []):
+                field_name = field.get('name', '')
+                entry = section_evidence.get(field_name)
+                if entry is None:
+                    section_mappings[field_name] = None
+                    continue
+                symbol, path, patterns = entry
+                source = self._source_text(path)
+                matched = all(re.search(pattern, source) for pattern in patterns)
+                if field_name == 'account_requires_memo_exception':
+                    matched = matched and exception_thrown
+                section_mappings[field_name] = symbol if matched else None
+
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
 
     @staticmethod
     def _map_sep30_identity_fields(sep_fields: List[Dict[str, Any]]) -> Dict[str, Optional[str]]:

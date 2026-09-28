@@ -1343,6 +1343,56 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def parse_sep_29(self) -> Dict[str, Any]:
+        """Parse SEP-29 (Account Memo Requirements) structure - hardcoded definitions
+
+        The specification is a short prose section rather than field tables. The data
+        entry, the four checked operation types, the multiplexed destination exemption and
+        the refusal to submit are transcribed from its Specification section. The fee bump,
+        memo short-circuit and unknown destination rows state how a client applies those
+        rules to envelopes the specification does not spell out, and the submission rows
+        cover the check as part of each submit method.
+        """
+        print(f"{Colors.BLUE}Using SEP-29 specific parser (hardcoded){Colors.END}")
+
+        sections: List[Section] = []
+
+        # Memo Requirement Flag
+        section = Section(title='Memo Requirement Flag', key='memo_requirement_flag')
+        section.fields = [
+            Field(name='memo_required_data_entry', description='Reads the destination account\'s config.memo_required data entry and compares it with the value 1', field_type='data_entry', required=True),
+            Field(name='set_memo_required_flag', description='Sets or removes the data entry with a manage data operation', field_type='operation', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Memo Requirement Flag': {len(section.fields)} fields{Colors.END}")
+
+        # Sender-Side Check
+        section = Section(title='Sender-Side Check', key='sender_side_check')
+        section.fields = [
+            Field(name='payment_destination', description='Checks the destination of a PAYMENT operation', field_type='operation', required=True),
+            Field(name='path_payment_strict_send_destination', description='Checks the destination of a PATH_PAYMENT_STRICT_SEND operation', field_type='operation', required=True),
+            Field(name='path_payment_strict_receive_destination', description='Checks the destination of a PATH_PAYMENT_STRICT_RECEIVE operation', field_type='operation', required=True),
+            Field(name='account_merge_destination', description='Checks the destination of a MERGE_ACCOUNT operation', field_type='operation', required=True),
+            Field(name='muxed_destination_exempt', description='Skips multiplexed destinations, whose id already identifies the recipient', field_type='feature', required=True),
+            Field(name='memo_present_skips_lookup', description='Makes no account lookup when the transaction carries a memo', field_type='feature', required=True),
+            Field(name='fee_bump_inner_transaction', description='Reads the memo and operations of a fee bump envelope from its inner transaction', field_type='feature', required=True),
+            Field(name='unknown_destination_skipped', description='Skips a destination Horizon does not know (HTTP 404) and lets the network report it', field_type='feature', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Sender-Side Check': {len(section.fields)} fields{Colors.END}")
+
+        # Submission Integration
+        section = Section(title='Submission Integration', key='submission_integration')
+        section.fields = [
+            Field(name='submit_transaction_opt_out', description='submitTransaction runs the check before submitting unless skipMemoRequiredCheck is true', field_type='function', required=True),
+            Field(name='submit_transaction_async_opt_out', description='submitTransactionAsync runs the check before submitting unless skipMemoRequiredCheck is true', field_type='function', required=True),
+            Field(name='account_requires_memo_exception', description='Refuses submission with an exception naming the account and the operation index', field_type='exception', required=True),
+        ]
+        sections.append(section)
+        print(f"{Colors.GREEN}  Found 'Submission Integration': {len(section.fields)} fields{Colors.END}")
+
+        return self._build_result(sections)
+
     def parse_sep_30(self) -> Dict[str, Any]:
         """Parse SEP-30 (Account Recovery) structure - hardcoded definitions"""
         print(f"{Colors.BLUE}Using SEP-30 specific parser (hardcoded){Colors.END}")
@@ -1971,6 +2021,7 @@ class SEPParser:
             '0010': self.parse_sep_10,
             '0012': self.parse_sep_12,
             '0024': self.parse_sep_24,
+            '0029': self.parse_sep_29,
             '0030': self.parse_sep_30,
             '0031': self.parse_sep_31,
             '0038': self.parse_sep_38,
