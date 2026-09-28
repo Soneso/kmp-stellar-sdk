@@ -1206,7 +1206,7 @@ const val MAX_NAME_SIZE = 20
 const val MAX_EXTERNAL_KEY_SIZE = 256
 const val CLIENT_NAME_HEADER = "X-Client-Name"
 const val CLIENT_VERSION_HEADER = "X-Client-Version"
-const val CLIENT_NAME = "kmp-stellar-sdk"
+const val CLIENT_NAME = com.soneso.stellar.sdk.Util.CLIENT_NAME
 
 ## OZContextRuleManager
 suspend fun addContextRule(contextType: ContextRuleType, name: String, validUntil: UInt? = null, signers: List<SmartAccountSigner>, policies: Map<String, SCValXdr> = emptyMap(), selectedSigners: List<SelectedSigner> = emptyList(), forceMethod: SubmissionMethod? = null): TransactionResult

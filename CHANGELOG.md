@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-09-28
+
+### Added
+- `XdrReader.readArrayLength()` reads the element count of a variable-length
+  XDR array and validates it against the remaining bytes before the caller
+  allocates the list. A negative count, or one above a quarter of the
+  remaining bytes, raises `IllegalArgumentException`. Every XDR array element
+  occupies at least 4 bytes, so a count the buffer can hold is never rejected.
+
+### Changed
+- Generated XDR decoders read variable-length array counts through
+  `readArrayLength()`, so a hostile count fails at the count, before any
+  count-sized allocation, with `IllegalArgumentException` and one of two
+  messages: `XDR array count cannot be negative, got <n>` or `XDR array count
+  <n> exceeds the maximum of <m> for the <r> byte(s) remaining at offset <o>`.
+  SEP-45 `WebAuthForContracts.decodeAuthorizationEntries` reports the
+  rejection as `Sep45InvalidArgsException`.
+- Horizon SSE streams on JVM/Android and native (iOS/macOS) carry exactly the
+  client identification the HTTP client configures, as every other Horizon
+  request does. With the default `HorizonServer` client that is the headers
+  `X-Client-Name: kmp-stellar-sdk` and `X-Client-Version` with the SDK
+  version. The SDK adds no `X-Client-Name` or `X-Client-Version` query
+  parameters to stream URLs; at 1.13.0 it appended `kotlin-stellar-sdk` and
+  `dev` there. Caller-configured query parameters are preserved.
+  Browser (JS) streams, whose `EventSource` cannot set headers, send
+  `kmp-stellar-sdk` and the SDK version in those query parameters.
+- The client name `kmp-stellar-sdk` is one internal constant, which the public
+  `OZConstants.CLIENT_NAME` reads; its value is unchanged.
+- Only the latest API docs are hosted, at
+  https://soneso.github.io/kmp-stellar-sdk/api/latest/. Versioned URLs such
+  as `api/1.13.0/` answer 404.
+
+### Fixed
+- The WebAuthn CBOR parser compares a byte-string length against the bytes
+  that remain, so the check cannot overflow for a length near `Int.MAX_VALUE`.
+  The parser returns `null` for a malformed attestation object carrying such
+  a length.
+
 ## [1.13.0] - 2026-09-15
 
 ### Added
