@@ -39,16 +39,22 @@ def get_sdk_version() -> str:
     """
     Extract SDK version from gradle.properties.
 
+    Every matrix header prints this value, so a missing version fails the run.
+
     Returns:
-        Version string (e.g. '1.3.1') or 'Unknown' if not found.
+        Version string (e.g. '1.3.1').
+
+    Raises:
+        OSError: If gradle.properties cannot be read.
+        ValueError: If gradle.properties has no non-empty version entry.
     """
     gradle_properties_path = SDK_ROOT / 'gradle.properties'
-    if gradle_properties_path.exists():
-        content = gradle_properties_path.read_text(encoding='utf-8')
-        match = re.search(r'version=(.+)', content)
-        if match:
-            return match.group(1).strip()
-    return 'Unknown'
+    content = gradle_properties_path.read_text(encoding='utf-8')
+    match = re.search(r'version=(.+)', content)
+    version = match.group(1).strip() if match else ''
+    if not version:
+        raise ValueError(f"No version entry in {gradle_properties_path}")
+    return version
 
 
 def camel_to_snake(name: str) -> str:
