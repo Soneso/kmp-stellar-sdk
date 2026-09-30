@@ -13,12 +13,11 @@ Usage:
 import json
 import sys
 import subprocess
-import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
-from common import Colors, DATA_DIR, COMPATIBILITY_DIR, SDK_ROOT, TOOLS_DIR, get_sdk_version
+from common import Colors, DATA_DIR, COMPATIBILITY_DIR, SDK_PACKAGE_PATH, SDK_ROOT, TOOLS_DIR, get_sdk_version
 
 
 # Human-readable titles for known SEPs (used in summary display)
@@ -47,91 +46,23 @@ KNOWN_SEPS: Dict[str, str] = {
     '0053': 'Message Signing',
 }
 
-# SEP source directory relative to SDK_ROOT
-_SEP_SOURCE_DIR = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "sep"
-)
+# SEP source directory, one sepNN/ subdirectory per SEP
+_SEP_SOURCE_DIR = SDK_ROOT / SDK_PACKAGE_PATH / "sep"
 
 # KeyPair.kt path for SEP-53 detection
-_KEYPAIR_FILE = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "KeyPair.kt"
-)
+_KEYPAIR_FILE = SDK_ROOT / SDK_PACKAGE_PATH / "KeyPair.kt"
 
 # StrKey.kt path for SEP-23 detection
-_STRKEY_FILE = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "StrKey.kt"
-)
+_STRKEY_FILE = SDK_ROOT / SDK_PACKAGE_PATH / "StrKey.kt"
 
 # Sep29Checker.kt path for SEP-29 detection
-_SEP29_CHECKER_FILE = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "horizon"
-    / "Sep29Checker.kt"
-)
+_SEP29_CHECKER_FILE = SDK_ROOT / SDK_PACKAGE_PATH / "horizon" / "Sep29Checker.kt"
 
 # SorobanContractParser.kt path for SEP-46/47/48 detection
-_CONTRACT_PARSER_FILE = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "contract"
-    / "SorobanContractParser.kt"
-)
+_CONTRACT_PARSER_FILE = SDK_ROOT / SDK_PACKAGE_PATH / "contract" / "SorobanContractParser.kt"
 
 # Generated XDR package used for SEP-51 detection
-_XDR_SOURCE_DIR = (
-    SDK_ROOT
-    / "stellar-sdk"
-    / "src"
-    / "commonMain"
-    / "kotlin"
-    / "com"
-    / "soneso"
-    / "stellar"
-    / "sdk"
-    / "xdr"
-)
+_XDR_SOURCE_DIR = SDK_ROOT / SDK_PACKAGE_PATH / "xdr"
 
 # Shared XDR-JSON runtime backing the conversion methods
 _XDR_JSON_FILE = _XDR_SOURCE_DIR / "XdrJson.kt"
@@ -357,7 +288,8 @@ class AnalysisOrchestrator:
     ) -> bool:
         """Run the 3-stage SEP pipeline for every detected SEP.
 
-        Failures are reported but do not stop processing of remaining SEPs.
+        A failed stage ends its SEP, because each later stage reads the file
+        the stage before it writes; the remaining SEPs still run.
 
         Args:
             sep_numbers: Sorted list of 4-digit SEP numbers.
@@ -376,7 +308,6 @@ class AnalysisOrchestrator:
         all_success = True
 
         for sep_idx, sep_num in enumerate(sep_numbers):
-            sep_label = f"SEP-{int(sep_num):04d}"
             step = base_step + sep_idx * len(stages)
 
             for stage_offset, (script_base, desc_template) in enumerate(stages):
@@ -392,9 +323,9 @@ class AnalysisOrchestrator:
 
                 if not success:
                     all_success = False
-
-            # Read coverage after all 3 stages for this SEP
-            self.sep_coverage[sep_num] = self._read_sep_coverage(sep_num)
+                    break
+            else:
+                self.sep_coverage[sep_num] = self._read_sep_coverage(sep_num)
 
         return all_success
 
@@ -547,33 +478,11 @@ class AnalysisOrchestrator:
         if not sdk_sep_dir.exists():
             errors.append(f"SDK sep/ source directory not found at {sdk_sep_dir}")
 
-        horizon_dir = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "horizon"
-        )
+        horizon_dir = SDK_ROOT / SDK_PACKAGE_PATH / "horizon"
         if not horizon_dir.exists():
             errors.append(f"SDK horizon/ source directory not found at {horizon_dir}")
 
-        rpc_dir = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "rpc"
-        )
+        rpc_dir = SDK_ROOT / SDK_PACKAGE_PATH / "rpc"
         if not rpc_dir.exists():
             errors.append(f"SDK rpc/ source directory not found at {rpc_dir}")
 

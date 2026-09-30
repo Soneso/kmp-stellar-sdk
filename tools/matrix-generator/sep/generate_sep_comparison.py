@@ -25,14 +25,13 @@ from enum import Enum
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from common import Colors, DATA_DIR, COMPATIBILITY_DIR, SDK_ROOT, get_sdk_version, snake_to_camel
+from common import Colors, DATA_DIR, COMPATIBILITY_DIR, get_sdk_version, snake_to_camel
 
 
 class CompatibilityStatus(Enum):
     """Compatibility status indicators"""
     IMPLEMENTED = "✅"
     NOT_IMPLEMENTED = "❌"
-    PARTIAL = "⚠️"
     SERVER = "Server"
 
 

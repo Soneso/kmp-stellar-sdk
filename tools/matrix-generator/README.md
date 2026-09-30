@@ -4,7 +4,7 @@ Automated tool that generates compatibility matrices comparing the KMP Stellar S
 
 It analyzes three areas:
 
-- **Horizon API** -- all REST endpoints defined in `stellar-go/services/horizon`
+- **Horizon API** -- all REST endpoints defined in `stellar-horizon` (`internal/httpx/router.go`)
 - **Soroban RPC** -- all JSON-RPC methods defined in `stellar-rpc`
 - **SEPs** -- 20 Stellar Ecosystem Proposals (SEP-01, 02, 05, 06, 08, 09, 10, 12, 23, 24, 29, 30, 31, 38, 45, 46, 47, 48, 51, 53)
 
@@ -24,7 +24,7 @@ Run all three pipelines in a single command:
 python3 tools/matrix-generator/run_analysis.py
 ```
 
-This auto-detects implemented SEPs and runs Horizon, RPC, and SEP analysis sequentially.
+This auto-detects implemented SEPs and runs Horizon, RPC, and SEP analysis sequentially. A failed Horizon or RPC run stops the analysis; a failed SEP stage ends that SEP, and the remaining SEPs still run.
 
 This generates Markdown reports in `compatibility/`:
 
@@ -48,7 +48,7 @@ Each subsystem can be run independently.
 python3 tools/matrix-generator/horizon/run_horizon_analysis.py
 
 # Use a specific Horizon version
-python3 tools/matrix-generator/horizon/run_horizon_analysis.py --horizon-version v2.30.0
+python3 tools/matrix-generator/horizon/run_horizon_analysis.py --horizon-version v28.0.1
 
 # Use a local router.go file
 python3 tools/matrix-generator/horizon/run_horizon_analysis.py --local /path/to/router.go
@@ -56,6 +56,8 @@ python3 tools/matrix-generator/horizon/run_horizon_analysis.py --local /path/to/
 # Enable verbose output
 python3 tools/matrix-generator/horizon/run_horizon_analysis.py --verbose
 ```
+
+The default run cites the latest stellar-horizon release. `--horizon-version` must name a published release; the matrix header takes the version, release date, and source URL from its release record.
 
 ### Soroban RPC
 
@@ -74,7 +76,9 @@ python3 tools/matrix-generator/rpc/run_rpc_analysis.py --verbose
 
 The default run cites the newest stable stellar-rpc release: the highest `vX.Y.Z` tag in the full release list that is neither a draft nor a prerelease. `--rpc-version` must name a non-draft release with a `vX.Y.Z` or `vX.Y.Z-suffix` tag, which may be a prerelease. The matrix header takes the version, release date, and source URL from that release record. `--local` reads the go-stellar-sdk version from the `go.mod` of the stellar-rpc checkout that holds the given `jsonrpc.go`.
 
-The run exits non-zero and writes no matrix when the release lookup fails or any mapped RPC method lacks its request or response file.
+The response fields of a method include the fields of the structs its response struct embeds, which may be declared in any of the fetched protocol files. Fields ending in `Json` are the JSON-format variants of XDR fields and are not counted, because the SDK decodes XDR.
+
+The run exits non-zero and writes no matrix when the release lookup fails, when the methods that the release registers in `cmd/stellar-rpc/internal/jsonrpc.go` differ from the mapped methods, or when any mapped RPC method lacks its request or response file.
 
 ### SEPs
 
@@ -108,15 +112,15 @@ tools/matrix-generator/
 ├── run_analysis.py              # Master orchestrator (runs all pipelines)
 ├── common.py                    # Shared utilities (colors, paths, SDK version)
 ├── github_fetcher.py            # GitHub API client (release + source fetching)
-├── sdk_analyzer.py              # Kotlin source analyzer (used by Horizon pipeline)
+├── sdk_analyzer.py              # Pipeline module: Kotlin source analyzer for the Horizon pipeline
 ├── horizon/
 │   ├── run_horizon_analysis.py  # Horizon pipeline orchestrator
-│   ├── horizon_parser.py        # Parses router.go for endpoint definitions
-│   └── generate_horizon_comparison.py
+│   ├── horizon_parser.py        # Pipeline module: endpoints from router.go
+│   └── generate_horizon_comparison.py  # Pipeline module: comparison and matrix
 ├── rpc/
 │   ├── run_rpc_analysis.py      # RPC pipeline orchestrator
-│   ├── rpc_parser.py            # Parses jsonrpc.go for RPC method definitions
-│   └── generate_rpc_comparison.py
+│   ├── rpc_parser.py            # Pipeline module: request and response structs, registered method check
+│   └── generate_rpc_comparison.py  # Pipeline module: comparison and matrix
 ├── sep/
 │   ├── sep_parser.py            # Fetches and parses SEP specs from GitHub
 │   ├── sep_analyzer.py          # Analyzes SDK source for SEP implementation

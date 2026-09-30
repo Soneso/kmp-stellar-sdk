@@ -456,6 +456,12 @@ class Sep23RunTest(Sep23AnalyzerCase):
                       "**Required Fields:** 34.38% (11/32)\n\n**Optional Fields:** 100% (0/0)\n\n", matrix)
         self.assertIn(f"| {VECTORS_TITLE} | 8.7% | 2/23 | 2 | 23 |\n", matrix)
 
+    def test_a_missing_definition_file_raises(self) -> None:
+        self.write_sdk()
+        (self.data_dir / "sep" / "sep_0023_definition.json").unlink()
+        with self.assertRaises(FileNotFoundError):
+            sep_analyzer.SEPAnalyzer("0023").analyze()
+
     def test_reads_strkey_and_both_test_files(self) -> None:
         self.write_sdk()
         result = sep_analyzer.SEPAnalyzer("0023").analyze()

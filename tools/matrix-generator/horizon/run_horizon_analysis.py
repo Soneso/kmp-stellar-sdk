@@ -14,7 +14,7 @@ Usage:
     python run_horizon_analysis.py
 
     # Use specific Horizon version
-    python run_horizon_analysis.py --horizon-version v2.30.0
+    python run_horizon_analysis.py --horizon-version v28.0.1
 
     # Use local router.go (for testing/development)
     python run_horizon_analysis.py --local /path/to/router.go
@@ -35,7 +35,6 @@ from typing import Any, Dict, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common import (
-    Colors,
     DATA_DIR,
     COMPATIBILITY_DIR,
     SDK_ROOT,
@@ -43,7 +42,7 @@ from common import (
     ProgressTracker,
 )
 from github_fetcher import (
-    get_latest_release,
+    get_horizon_release,
     fetch_router_source,
     GitHubFetchError,
     ReleaseNotFoundError,
@@ -68,7 +67,7 @@ class HorizonAnalysisPipeline:
         Initialize the pipeline.
 
         Args:
-            horizon_version: Specific Horizon version tag (e.g., 'v2.30.0'). None = latest.
+            horizon_version: Specific Horizon version tag (e.g., 'v28.0.1'). None = latest.
             local_router_path: Path to local router.go file. None = fetch from GitHub.
             verbose: Enable verbose output.
         """
@@ -161,55 +160,19 @@ class HorizonAnalysisPipeline:
         else:
             # Fetch from GitHub
             try:
-                # Show authentication status
-                if is_authenticated():
-                    self.progress.log(
-                        "GitHub: Authenticated (5,000 req/hour)", force=True
-                    )
-                else:
-                    self.progress.log(
-                        "GitHub: Unauthenticated (60 req/hour)", force=True
-                    )
-                    self.progress.log(
-                        "  Tip: Set GITHUB_TOKEN for higher limits", force=True
-                    )
+                self.progress.log_github_access(is_authenticated())
 
                 if self.horizon_version:
-                    # Use specific version
                     self.progress.log(
                         f"Fetching Horizon version: {self.horizon_version}", force=True
                     )
-                    self.router_source = fetch_router_source(self.horizon_version)
-                    self.release_info = {
-                        "version": self.horizon_version,
-                        "published_at": "unknown",
-                        "html_url": (
-                            f"https://github.com/stellar/stellar-horizon/releases/tag/"
-                            f"{self.horizon_version}"
-                        ),
-                        "source": "GitHub",
-                    }
                 else:
-                    # Fetch latest release
                     self.progress.log("Fetching latest Horizon release...", force=True)
-                    release = get_latest_release()
-                    self.router_source = fetch_router_source(release.version)
-                    self.release_info = {
-                        "version": release.version,
-                        "published_at": release.published_at.strftime("%Y-%m-%d"),
-                        "html_url": release.html_url,
-                        "source": "GitHub",
-                    }
+                release = get_horizon_release(self.horizon_version)
+                self.router_source = fetch_router_source(release.version)
+                self.release_info = release.release_info()
 
-                self.progress.log(
-                    f"Version: {self.release_info['version']}", force=True
-                )
-                self.progress.log(
-                    f"Published: {self.release_info['published_at']}", force=True
-                )
-                self.progress.log(
-                    f"Source: {self.release_info['html_url']}", force=True
-                )
+                self.progress.log_release(self.release_info)
                 self.progress.finish_step(
                     f"Downloaded {len(self.router_source)} bytes"
                 )
@@ -330,7 +293,7 @@ Examples:
   %(prog)s
 
   # Use specific Horizon version
-  %(prog)s --horizon-version v2.30.0
+  %(prog)s --horizon-version v28.0.1
 
   # Use local router.go file (for testing/development)
   %(prog)s --local /path/to/router.go
@@ -339,7 +302,7 @@ Examples:
   %(prog)s --verbose
 
   # Combine options
-  %(prog)s --horizon-version v2.29.0 --verbose
+  %(prog)s --horizon-version v28.0.1 --verbose
         """,
     )
 
@@ -347,7 +310,7 @@ Examples:
         "--horizon-version",
         type=str,
         metavar="VERSION",
-        help="Specific Horizon version tag (e.g., v2.30.0). Default: latest release",
+        help="Specific Horizon version tag (e.g., v28.0.1). Default: latest release",
     )
 
     parser.add_argument(

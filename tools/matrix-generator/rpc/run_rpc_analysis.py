@@ -36,9 +36,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from common import (
-        Colors,
         DATA_DIR,
         COMPATIBILITY_DIR,
+        SDK_PACKAGE_PATH,
         SDK_ROOT,
         get_sdk_version,
         ProgressTracker,
@@ -53,7 +53,7 @@ try:
         SourceFileNotFoundError,
         is_authenticated,
     )
-    from rpc_parser import GoProtocolParser, RPCMethodParser, verify_method_set
+    from rpc_parser import GoProtocolParser, RPCMethodExtractor, verify_method_set
     from generate_rpc_comparison import (
         SorobanSDKAnalyzer,
         RPCComparisonAnalyzer,
@@ -213,18 +213,7 @@ class RPCAnalysisPipeline:
         else:
             # Fetch from GitHub
             try:
-                # Show authentication status
-                if is_authenticated():
-                    self.progress.log(
-                        "GitHub: Authenticated (5,000 req/hour)", force=True
-                    )
-                else:
-                    self.progress.log(
-                        "GitHub: Unauthenticated (60 req/hour)", force=True
-                    )
-                    self.progress.log(
-                        "  Tip: Set GITHUB_TOKEN for higher limits", force=True
-                    )
+                self.progress.log_github_access(is_authenticated())
 
                 if self.rpc_version:
                     self.progress.log(
@@ -236,22 +225,9 @@ class RPCAnalysisPipeline:
                     release = get_latest_rpc_release()
 
                 self.jsonrpc_source = fetch_rpc_jsonrpc_source(release.version)
-                self.release_info = {
-                    "version": release.version,
-                    "published_at": release.published_at.strftime("%Y-%m-%d"),
-                    "html_url": release.html_url,
-                    "source": "GitHub",
-                }
+                self.release_info = release.release_info()
 
-                self.progress.log(
-                    f"Version: {self.release_info['version']}", force=True
-                )
-                self.progress.log(
-                    f"Published: {self.release_info['published_at']}", force=True
-                )
-                self.progress.log(
-                    f"Source: {self.release_info['html_url']}", force=True
-                )
+                self.progress.log_release(self.release_info)
                 self.progress.finish_step(
                     f"Downloaded {len(self.jsonrpc_source)} bytes"
                 )
@@ -263,17 +239,13 @@ class RPCAnalysisPipeline:
         """Step 2: Parse RPC method definitions from Go source."""
         self.progress.start_step("Parsing RPC Methods")
 
-        # RPCMethodParser (alias for RPCMethodExtractor) wraps GoProtocolParser
-        # and fetches method definitions from GitHub
-        extractor = RPCMethodParser(
-            rpc_version=self.release_info["version"],
-            protocol_source=self.protocol_source,
-        )
+        # The mapped methods must be the methods the release registers.
+        verify_method_set(self.jsonrpc_source)
+
+        extractor = RPCMethodExtractor(self.release_info, protocol_source=self.protocol_source)
         rpc_data = extractor.extract_methods()
 
-        methods = rpc_data["methods"]
-        verify_method_set(methods)
-        methods_count = len(methods)
+        methods_count = len(rpc_data["methods"])
         self.progress.log(f"Found {methods_count} RPC methods", force=True)
 
         # Enrich with response struct fields (if not local mode)
@@ -285,13 +257,6 @@ class RPCAnalysisPipeline:
             self.progress.log(
                 "Response fields enriched successfully", force=True
             )
-
-        # Add version metadata
-        rpc_data.setdefault("metadata", {}).update({
-            "rpc_version": self.release_info["version"],
-            "rpc_release_date": self.release_info["published_at"],
-            "rpc_release_url": self.release_info["html_url"],
-        })
 
         # Save results
         with open(self.rpc_methods_file, "w", encoding="utf-8") as f:
@@ -306,19 +271,7 @@ class RPCAnalysisPipeline:
         self.progress.start_step("Analyzing KMP SDK")
 
         # Locate SorobanServer.kt
-        soroban_server_path = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "rpc"
-            / "SorobanServer.kt"
-        )
+        soroban_server_path = SDK_ROOT / SDK_PACKAGE_PATH / "rpc" / "SorobanServer.kt"
 
         if not soroban_server_path.exists():
             raise FileNotFoundError(
