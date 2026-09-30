@@ -4,7 +4,7 @@
 [![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin-Multiplatform-blueviolet?logo=kotlin)](https://kotlinlang.org/docs/multiplatform.html)
 [![Maven Central](https://img.shields.io/maven-central/v/com.soneso.stellar/stellar-sdk)](https://search.maven.org/artifact/com.soneso.stellar/stellar-sdk)
 [![codecov](https://codecov.io/gh/Soneso/kmp-stellar-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/Soneso/kmp-stellar-sdk)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Soneso/kmp-stellar-sdk)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/Soneso/kmp-stellar-sdk)
 
 A Kotlin Multiplatform SDK for building applications on the Stellar Network. Write your Stellar integration once in Kotlin and deploy it across JVM (Android, Server), iOS, macOS, and Web (Browser/Node.js) platforms.
 
