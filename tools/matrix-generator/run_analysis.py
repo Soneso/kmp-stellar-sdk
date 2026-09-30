@@ -33,6 +33,7 @@ KNOWN_SEPS: Dict[str, str] = {
     '0010': 'Web Authentication',
     '0011': 'Txrep',
     '0012': 'KYC API',
+    '0023': 'Strkeys',
     '0024': 'Hosted Deposit/Withdrawal',
     '0029': 'Account Memo Requirements',
     '0030': 'Account Recovery',
@@ -72,6 +73,20 @@ _KEYPAIR_FILE = (
     / "stellar"
     / "sdk"
     / "KeyPair.kt"
+)
+
+# StrKey.kt path for SEP-23 detection
+_STRKEY_FILE = (
+    SDK_ROOT
+    / "stellar-sdk"
+    / "src"
+    / "commonMain"
+    / "kotlin"
+    / "com"
+    / "soneso"
+    / "stellar"
+    / "sdk"
+    / "StrKey.kt"
 )
 
 # Sep29Checker.kt path for SEP-29 detection
@@ -153,6 +168,11 @@ class AnalysisOrchestrator:
                     raw = item.name[3:]  # strip 'sep' prefix
                     if raw.isdigit():
                         sep_numbers.append(raw.zfill(4))
+
+        # SEP-23 (Strkeys) is the StrKey object in the SDK package root, not a sep23/ dir. The
+        # SEP-23 analyzer checks the declarations inside it, so a renamed one fails the run.
+        if _STRKEY_FILE.exists() and '0023' not in sep_numbers:
+            sep_numbers.append('0023')
 
         # SEP-29 (Account Memo Requirements) is the memo required check in the horizon/
         # package, run by the Horizon submit methods

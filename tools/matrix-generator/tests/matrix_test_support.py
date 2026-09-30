@@ -13,7 +13,7 @@ from typing import Any, ContextManager, Dict, List, Optional, Sequence, TypeVar
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 
-for _path in (TOOLS_DIR / "rpc", TOOLS_DIR):
+for _path in (TOOLS_DIR / "rpc", TOOLS_DIR / "sep", TOOLS_DIR):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 

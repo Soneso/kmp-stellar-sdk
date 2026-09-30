@@ -25,11 +25,70 @@ import re
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional, Set, Tuple
 
-from common import Colors, DATA_DIR, SDK_ROOT, get_sdk_version, snake_to_camel
+from common import (
+    CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, SDK_ROOT, STRKEY_TEST_FILE,
+    get_sdk_version, snake_to_camel,
+)
+
+
+# Kotlin tokens, tried in this order at every position. Comments, raw strings, regular strings
+# and character literals are matched whole, so a quote inside one of them never opens a string.
+# The literal groups hold the text as written: escapes and string templates are not evaluated.
+_KOTLIN_TOKEN = re.compile(
+    r'(?P<comment>//[^\n]*|/\*.*?\*/)'
+    r'|"""(?P<raw>.*?)"""'
+    r'|"(?P<string>(?:[^"\\\n]|\\.)*)"'
+    r"|'(?:[^'\\\n]|\\.)*'"
+    r'|(?P<plus>\+)'
+    r'|(?P<space>\s+)'
+    r'|\w+'
+    r'|.',
+    re.DOTALL,
+)
+
+# A Kotlin integer literal: hexadecimal, binary or decimal, with underscores between digits
+_KOTLIN_INTEGER = re.compile(r'0[xX][0-9a-fA-F](?:_*[0-9a-fA-F])*|0[bB][01](?:_*[01])*|0|[1-9](?:_*[0-9])*')
+
+
+def _kotlin_integer(text: str) -> Optional[int]:
+    """Return the value of a Kotlin integer literal, or None when the text is none."""
+    return int(text.replace('_', ''), 0) if _KOTLIN_INTEGER.fullmatch(text) else None
+
+
+def _kotlin_byte_value(expression: str) -> Optional[int]:
+    """
+    Return the value of a version byte expression, or None when it has another form.
+
+    The forms are an integer literal and `N shl M` over integer literals, either optionally in
+    parentheses and followed by .toByte().
+    """
+    text = re.sub(r'\.toByte\(\)$', '', ' '.join(expression.split()))
+    while text.startswith('(') and text.endswith(')'):
+        text = text[1:-1].strip()
+    shift = re.fullmatch(r'(\S+) shl (\S+)', text)
+    if shift is None:
+        return _kotlin_integer(text)
+    value, bits = (_kotlin_integer(operand) for operand in shift.groups())
+    return None if value is None or bits is None else value << bits
 
 
 class SEPAnalyzer:
     """Analyzer for KMP SDK SEP implementations"""
+
+    # SEP-23 key type -> (VersionByte entry, encode function, decode function) in StrKey.kt, or
+    # None for a key type the SDK does not implement. The SDK names the entries and functions
+    # after the key material, not after the specification's constants.
+    SEP23_KEY_TYPES: Dict[str, Optional[Tuple[str, str, str]]] = {
+        'STRKEY_PUBKEY': ('ACCOUNT_ID', 'encodeEd25519PublicKey', 'decodeEd25519PublicKey'),
+        'STRKEY_MUXED': ('MED25519_PUBLIC_KEY', 'encodeMed25519PublicKey', 'decodeMed25519PublicKey'),
+        'STRKEY_PRIVKEY': ('SEED', 'encodeEd25519SecretSeed', 'decodeEd25519SecretSeed'),
+        'STRKEY_PRE_AUTH_TX': ('PRE_AUTH_TX', 'encodePreAuthTx', 'decodePreAuthTx'),
+        'STRKEY_HASH_X': ('SHA256_HASH', 'encodeSha256Hash', 'decodeSha256Hash'),
+        'STRKEY_SIGNED_PAYLOAD': ('SIGNED_PAYLOAD', 'encodeSignedPayload', 'decodeSignedPayload'),
+        'STRKEY_CONTRACT': ('CONTRACT', 'encodeContract', 'decodeContract'),
+        'STRKEY_LIQUIDITY_POOL': ('LIQUIDITY_POOL', 'encodeLiquidityPool', 'decodeLiquidityPool'),
+        'STRKEY_CLAIMABLE_BALANCE': ('CLAIMABLE_BALANCE', 'encodeClaimableBalance', 'decodeClaimableBalance'),
+    }
 
     # Shared runtime behind the XDR-JSON conversion methods (SEP-51)
     XDR_JSON_RUNTIME = 'XdrJson.kt'
@@ -97,6 +156,13 @@ class SEPAnalyzer:
             self.horizon_dir / 'exceptions' / 'AccountRequiresMemoException.kt',
         )
         self.operation_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/Operation.kt'
+        # Special case: SEP-23 is the StrKey object in the package root; its test vectors are
+        # quoted in the StrKey unit test files
+        self.strkey_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/StrKey.kt'
+        self.common_test_dir = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk'
+        self.strkey_test_files = tuple(
+            self.common_test_dir / name for name in (STRKEY_TEST_FILE, CLAIMABLE_BALANCE_VECTORS_FILE)
+        )
         self._source_texts: Dict[Path, str] = {}
         self.analysis_data: Dict[str, Any] = {}
 
@@ -119,6 +185,12 @@ class SEPAnalyzer:
         if self.sep_number == '0029':
             files.extend(path for path in self.sep29_files if path.exists())
             return sorted(files)
+
+        # Special case: SEP-23 lives in StrKey.kt, read here so a missing or unreadable file
+        # fails the run with its path
+        if self.sep_number == '0023':
+            self._required_source_text(self.strkey_file)
+            return [self.strkey_file]
 
         # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
         if self.sep_number in ('0046', '0047', '0048'):
@@ -169,6 +241,13 @@ class SEPAnalyzer:
             if sep29_test_file.exists():
                 files.append(sep29_test_file)
             return sorted(files)
+
+        # Special case: SEP-23 vectors are quoted in the StrKey unit test files, read here so a
+        # missing or unreadable file fails the run with its path
+        if self.sep_number == '0023':
+            for path in self.strkey_test_files:
+                self._required_source_text(path)
+            return sorted(self.strkey_test_files)
 
         # Special case: SEP-46, SEP-47, SEP-48 tests live in contract/
         if self.sep_number in ('0046', '0047', '0048'):
@@ -575,6 +654,7 @@ class SEPAnalyzer:
             '0009': self.map_sep_09_fields,
             '0010': self.map_sep_10_fields,
             '0012': self.map_sep_12_fields,
+            '0023': self.map_sep_23_fields,
             '0024': self.map_sep_24_fields,
             '0029': self.map_sep_29_fields,
             '0030': self.map_sep_30_fields,
@@ -1576,6 +1656,161 @@ class SEPAnalyzer:
         if path not in self._source_texts:
             self._source_texts[path] = path.read_text(encoding='utf-8') if path.exists() else ''
         return self._source_texts[path]
+
+    def _required_source_text(self, path: Path) -> str:
+        """
+        Read an SDK file the analysis cannot run without, once, and cache its text.
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+            OSError: If the file cannot be read as UTF-8 text
+        """
+        if path not in self._source_texts:
+            if not path.is_file():
+                raise FileNotFoundError(f"SEP-23 required file not found: {self._sdk_relative(path)}")
+            try:
+                self._source_texts[path] = path.read_text(encoding='utf-8')
+            except (OSError, UnicodeDecodeError) as error:
+                raise OSError(f"SEP-23 cannot read {self._sdk_relative(path)}: {error}") from error
+        return self._source_texts[path]
+
+    def _sdk_relative(self, path: Path) -> str:
+        """Return a path below the SDK root relative to it, as error messages name files."""
+        return str(path.relative_to(self.sdk_path))
+
+    def map_sep_23_fields(self, classes: List[Dict[str, Any]],
+                          sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
+        """
+        Map SEP-23 (Strkeys) fields.
+
+        StrKey.kt is read as plain text: it compiles, and the SDK's unit tests call every encode
+        and decode function with the specification's vectors. A key type is implemented when the
+        VersionByte entry SEP23_KEY_TYPES names holds the base value the specification gives,
+        compared as integers. The mapped symbol is the encode and decode function pair.
+
+        A test vector is implemented when a string literal in the unit test file its
+        definition names equals the vector. The check proves presence of the literal only:
+        not that a test asserts the vector, nor whether it is asserted as valid or invalid.
+
+        Raises:
+            FileNotFoundError: If StrKey.kt or a named test file does not exist
+            OSError: If one of those files cannot be read
+            ValueError: If StrKey.kt lacks `object StrKey`, a closed VersionByte enum, a mapped
+                entry or a mapped function, a mapped entry's value has a form _kotlin_byte_value
+                does not evaluate, or a key type has no entry in SEP23_KEY_TYPES
+        """
+        source = self._sdk_relative(self.strkey_file)
+        strkey = self._required_source_text(self.strkey_file)
+        if re.search(r'\bobject\s+StrKey\b', strkey) is None:
+            raise ValueError(f"SEP-23 object StrKey not found in {source}")
+        version_bytes = self._sep_23_version_byte_body(strkey, source)
+        literals: Dict[Path, Set[str]] = {}
+
+        field_mappings: Dict[str, Dict[str, Optional[str]]] = {}
+
+        for section in sep_definition.get('sections', []):
+            section_key = section.get('key', '')
+            section_mappings: Dict[str, Optional[str]] = {}
+
+            for field in section.get('fields', []):
+                field_name = field.get('name', '')
+                if section_key == 'key_types':
+                    section_mappings[field_name] = self._sep_23_key_type_symbol(
+                        field_name, field['value'], strkey, version_bytes, source
+                    )
+                elif section_key == 'test_vectors_quoted_in_the_strkey_unit_test_files':
+                    path = self.common_test_dir / field['test_file']
+                    if path not in literals:
+                        literals[path] = self._kotlin_string_literals(self._required_source_text(path))
+                    section_mappings[field_name] = field['test_file'] if field['value'] in literals[path] else None
+                else:
+                    section_mappings[field_name] = None
+
+            field_mappings[section_key] = section_mappings
+
+        return field_mappings
+
+    @staticmethod
+    def _sep_23_version_byte_body(strkey: str, source: str) -> str:
+        """
+        Return the body of the VersionByte enum, up to the brace that closes its opening brace.
+
+        Raises:
+            ValueError: If StrKey.kt declares no VersionByte enum, or its brace never closes
+        """
+        declaration = re.search(r'\benum\s+class\s+VersionByte\b[^{]*\{', strkey)
+        if declaration is None:
+            raise ValueError(f"SEP-23 enum class VersionByte not found in {source}")
+        depth = 1
+        for brace in re.compile(r'[{}]').finditer(strkey, declaration.end()):
+            depth += 1 if brace.group() == '{' else -1
+            if depth == 0:
+                return strkey[declaration.end():brace.start()]
+        raise ValueError(f"SEP-23 enum class VersionByte in {source} has no closing brace")
+
+    def _sep_23_key_type_symbol(self, key_type: str, base_value: int, strkey: str,
+                                version_bytes: str, source: str) -> Optional[str]:
+        """
+        Return the StrKey function pair of a SEP-23 key type, or None when it is not implemented.
+
+        Raises:
+            ValueError: If the key type has no entry in SEP23_KEY_TYPES, or its mapped entry or
+                functions are absent, or the entry's value has a form that does not evaluate
+        """
+        if key_type not in self.SEP23_KEY_TYPES:
+            raise ValueError(f"SEP-23 key type {key_type} has no entry in SEP23_KEY_TYPES")
+        names = self.SEP23_KEY_TYPES[key_type]
+        if names is None:
+            return None
+        entry, encode, decode = names
+
+        # The first constructor argument, which may hold one level of parentheses
+        declared = re.search(rf'\b{entry}\s*\((?P<value>(?:\([^()]*\)|[^(),])*)', version_bytes)
+        if declared is None:
+            raise ValueError(f"SEP-23 VersionByte.{entry} not found in {source}")
+        value = _kotlin_byte_value(declared.group('value'))
+        if value is None:
+            raise ValueError(f"SEP-23 cannot evaluate VersionByte.{entry} in {source}")
+        for function in (encode, decode):
+            if re.search(rf'\bfun\s+{function}\s*\(', strkey) is None:
+                raise ValueError(f"SEP-23 function StrKey.{function} not found in {source}")
+        return f'StrKey.{encode} / {decode}' if value == base_value else None
+
+    @staticmethod
+    def _kotlin_string_literals(source: str) -> Set[str]:
+        """
+        Return the values of the string literals in Kotlin source.
+
+        String literals in comments do not count. A maximal run of string literals joined with
+        `+`, across line breaks included, counts as one literal with the concatenated value.
+        """
+        literals: Set[str] = set()
+        run: Optional[List[str]] = None
+        joined = False
+
+        for token in _KOTLIN_TOKEN.finditer(source):
+            kind = token.lastgroup
+            if kind in ('comment', 'space'):
+                continue
+            if kind in ('raw', 'string'):
+                value = token.group(kind)
+                if run is not None and joined:
+                    run.append(value)
+                else:
+                    if run is not None:
+                        literals.add(''.join(run))
+                    run = [value]
+                joined = False
+            elif kind == 'plus' and run is not None and not joined:
+                joined = True
+            else:
+                if run is not None:
+                    literals.add(''.join(run))
+                run, joined = None, False
+
+        if run is not None:
+            literals.add(''.join(run))
+        return literals
 
     def map_sep_29_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:

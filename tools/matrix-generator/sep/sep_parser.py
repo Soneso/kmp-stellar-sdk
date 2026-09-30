@@ -21,11 +21,11 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional, Set, Union
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from common import Colors, DATA_DIR, SDK_ROOT
+from common import CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, SDK_ROOT, STRKEY_TEST_FILE
 
 
 @dataclass
@@ -36,6 +36,11 @@ class Field:
     requirements: str = ""
     required: bool = False
     field_type: str = ""
+    # Specification value the analyzer checks the SDK against, such as a SEP-23 version byte
+    # base value or test vector
+    value: Optional[Union[int, str]] = None
+    # SDK test file the analyzer reads for this field, relative to the commonTest package root
+    test_file: str = ""
 
 
 @dataclass
@@ -67,6 +72,10 @@ class Section:
             }
             if f.field_type:
                 field_dict['type'] = f.field_type
+            if f.value is not None:
+                field_dict['value'] = f.value
+            if f.test_file:
+                field_dict['test_file'] = f.test_file
             result['fields'].append(field_dict)
 
         return result
@@ -1197,6 +1206,118 @@ class SEPParser:
 
         return self._build_result(sections)
 
+    def parse_sep_23(self) -> Dict[str, Any]:
+        """Parse SEP-23 (Strkeys): the version byte table and the test cases, counted from the document.
+
+        A missing or empty section, table or case list raises ValueError, so nothing is written.
+        """
+        print(f"{Colors.BLUE}Using SEP-23 specific parser{Colors.END}")
+
+        sections = [self._parse_sep_23_key_types(), self._parse_sep_23_test_vectors()]
+        for section in sections:
+            print(f"{Colors.GREEN}  Found '{section.title}': {section.field_count} fields{Colors.END}")
+
+        return self._build_result(sections)
+
+    @staticmethod
+    def _table_cells(row: str) -> List[str]:
+        """Return the stripped cells of a Markdown table row."""
+        return [cell.strip() for cell in row.strip().strip('|').split('|')]
+
+    def _parse_sep_23_key_types(self) -> Section:
+        """Read one item per row of the Specification table whose header names Key type and First char.
+
+        The item value is the base value, an integer or a shift expression, evaluated to an integer,
+        which the analyzer compares.
+        """
+        specification = re.search(r'^##[ \t]+Specification[ \t]*\n(?P<body>.*?)(?=^##[ \t]|\Z)',
+                                  self.raw_content, re.MULTILINE | re.DOTALL)
+        if specification is None:
+            raise ValueError("SEP-23 '## Specification' section not found")
+
+        table = re.search(r'^(?P<header>\|(?=[^\n]*\bKey type\b)(?=[^\n]*\bFirst char\b)[^\n]*)\n'
+                          r'\|[-:| \t]+\n(?P<rows>(?:\|[^\n]*(?:\n|\Z))*)', specification.group('body'), re.MULTILINE)
+        if table is None:
+            raise ValueError("SEP-23 version byte table not found: no table header in '## Specification' "
+                             "names both 'Key type' and 'First char'")
+
+        header = self._table_cells(table.group('header'))
+        columns: Dict[str, int] = {}
+        for column in ('Key type', 'Base value', 'First char'):
+            if column not in header:
+                raise ValueError(f"SEP-23 version byte table has no '{column}' column")
+            columns[column] = header.index(column)
+
+        section = Section(title='Key types', key='key_types')
+        for row in table.group('rows').splitlines():
+            cells = self._table_cells(row)
+            if len(cells) != len(header):
+                raise ValueError(f"SEP-23 version byte table row has {len(cells)} cells, the header {len(header)}: {row}")
+
+            name = cells[columns['Key type']]
+            base_value = cells[columns['Base value']]
+            first_char = cells[columns['First char']]
+
+            if re.fullmatch(r'[A-Z][A-Z0-9_]*', name) is None:
+                raise ValueError(f"SEP-23 version byte table row has no key type name: {row}")
+            if any(existing.name == name for existing in section.fields):
+                raise ValueError(f"SEP-23 version byte table lists {name} twice")
+            shift = re.fullmatch(r'(\d+)(?:\s*<<\s*(\d+))?', base_value)
+            if shift is None:
+                raise ValueError(f"SEP-23 key type {name}: base value '{base_value}' is neither an integer nor a shift expression")
+            if re.fullmatch(r'[A-Z2-7]', first_char) is None:
+                raise ValueError(f"SEP-23 key type {name}: first char '{first_char}' is not one base-32 character")
+
+            value = int(shift.group(1)) << int(shift.group(2) or 0)
+            evaluated = base_value if shift.group(2) is None else f'{base_value} = {value}'
+            section.fields.append(Field(name=name, field_type='key_type', required=True, value=value,
+                                        description=f'Version byte base value {evaluated}, first character {first_char}'))
+
+        if not section.fields:
+            raise ValueError("SEP-23 version byte table has no rows")
+
+        return section
+
+    def _parse_sep_23_test_vectors(self) -> Section:
+        """Read one item per numbered valid and invalid test case, named valid_01 ... in document order.
+
+        The description leads with the SDK test file the analyzer reads, because the matrix cuts
+        descriptions at 100 characters. The valid claimable balance vector is a constant the
+        claimable balance tests share; every other vector is quoted in the StrKey test.
+        """
+        tests = re.search(r'^##[ \t]+Tests[ \t]*\n(?P<body>.*?)(?=^##[ \t]|\Z)', self.raw_content, re.MULTILINE | re.DOTALL)
+        if tests is None:
+            raise ValueError("SEP-23 '## Tests' section not found")
+
+        section = Section(title='Test vectors quoted in the StrKey unit test files',
+                          key='test_vectors_quoted_in_the_strkey_unit_test_files')
+        for heading, prefix in (('Valid test cases', 'valid'), ('Invalid test cases', 'invalid')):
+            subsection = re.search(rf'^###[ \t]+{re.escape(heading)}[ \t]*\n(?P<body>.*?)(?=^###[ \t]|\Z)',
+                                   tests.group('body'), re.MULTILINE | re.DOTALL)
+            if subsection is None:
+                raise ValueError(f"SEP-23 '### {heading}' subsection not found")
+
+            # The paragraph after the invalid cases repeats their strkeys in a C array.
+            body = re.split(r'^You can paste', subsection.group('body'), maxsplit=1, flags=re.MULTILINE)[0]
+            cases = re.split(r'^\d+\.[ \t]+', body, flags=re.MULTILINE)[1:]
+            if not cases:
+                raise ValueError(f"SEP-23 '### {heading}' lists no test cases")
+
+            width = max(2, len(str(len(cases))))
+            for number, case in enumerate(cases, start=1):
+                title = ' '.join(re.split(r'\n[ \t]*\n', case, maxsplit=1)[0].split())
+                vectors = re.findall(r'^[ \t]*-[ \t]+Strkey:?\s*`([^`\s]+)`', case, re.MULTILINE)
+                if len(vectors) != 1:
+                    raise ValueError(f"SEP-23 {prefix} case {number} ({title}) has {len(vectors)} Strkey lines, expected 1")
+
+                vector = vectors[0]
+                test_file = CLAIMABLE_BALANCE_VECTORS_FILE if prefix == 'valid' and vector.startswith('B') else STRKEY_TEST_FILE
+                section.fields.append(Field(name=f'{prefix}_{number:0{width}d}', field_type='test_vector', required=True,
+                                            value=vector, test_file=test_file,
+                                            description=f'quoted in `{test_file}`: {title}'))
+
+        return section
+
     def parse_sep_24(self) -> Dict[str, Any]:
         """Parse SEP-24 (Hosted Deposit/Withdrawal) structure"""
         print(f"{Colors.BLUE}Using SEP-24 specific parser{Colors.END}")
@@ -2020,6 +2141,7 @@ class SEPParser:
             '0009': self.parse_sep_09,
             '0010': self.parse_sep_10,
             '0012': self.parse_sep_12,
+            '0023': self.parse_sep_23,
             '0024': self.parse_sep_24,
             '0029': self.parse_sep_29,
             '0030': self.parse_sep_30,
