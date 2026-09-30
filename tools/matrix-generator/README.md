@@ -6,7 +6,7 @@ It analyzes three areas:
 
 - **Horizon API** -- all REST endpoints defined in `stellar-go/services/horizon`
 - **Soroban RPC** -- all JSON-RPC methods defined in `stellar-rpc`
-- **SEPs** -- 19 Stellar Ecosystem Proposals (SEP-01, 02, 05, 06, 08, 09, 10, 12, 24, 29, 30, 31, 38, 45, 46, 47, 48, 51, 53)
+- **SEPs** -- 20 Stellar Ecosystem Proposals (SEP-01, 02, 05, 06, 08, 09, 10, 12, 23, 24, 29, 30, 31, 38, 45, 46, 47, 48, 51, 53)
 
 ## Requirements
 
@@ -91,7 +91,15 @@ python3 tools/matrix-generator/sep/sep_analyzer.py 0010
 python3 tools/matrix-generator/sep/generate_sep_comparison.py 0010
 ```
 
-The SEP number argument accepts both short (`10`) and zero-padded (`0010`) forms.
+The SEP number argument takes the four-digit form (`0023`). The comparison script writes it unchanged into the matrix file name and title.
+
+The SEP-23 scripts exit non-zero and write nothing when:
+
+- The specification lacks its Specification or Tests section, a well-formed version byte table, or a test case list.
+- StrKey.kt or a StrKey test file is missing or unreadable.
+- StrKey.kt lacks `object StrKey`, a closed `enum class VersionByte`, a mapped VersionByte entry, or a mapped encode or decode function.
+- A mapped VersionByte entry holds a value the analyzer cannot evaluate.
+- A key type has no entry in the analyzer's key type table.
 
 ## Project Structure
 

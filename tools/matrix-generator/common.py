@@ -14,6 +14,12 @@ SDK_ROOT = TOOLS_DIR.parent.parent
 DATA_DIR = TOOLS_DIR / 'data'
 COMPATIBILITY_DIR = SDK_ROOT / 'compatibility'
 
+# Unit test files that quote the SEP-23 test vectors, relative to the SDK's commonTest package
+# root com/soneso/stellar/sdk/. The SEP parser names the file each vector is quoted in and the
+# SEP analyzer reads that file.
+STRKEY_TEST_FILE = 'unitTests/StrKeyTest.kt'
+CLAIMABLE_BALANCE_VECTORS_FILE = 'unitTests/ClaimableBalanceVectors.kt'
+
 
 class Colors:
     """ANSI color codes for terminal output"""

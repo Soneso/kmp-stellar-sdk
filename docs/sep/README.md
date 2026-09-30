@@ -43,6 +43,7 @@ Detailed field-by-field coverage reports are generated automatically. See indivi
 - [SEP-0009 Compatibility Matrix](../../compatibility/sep/SEP-0009_COMPATIBILITY_MATRIX.md)
 - [SEP-0010 Compatibility Matrix](../../compatibility/sep/SEP-0010_COMPATIBILITY_MATRIX.md)
 - [SEP-0012 Compatibility Matrix](../../compatibility/sep/SEP-0012_COMPATIBILITY_MATRIX.md)
+- [SEP-0023 Compatibility Matrix](../../compatibility/sep/SEP-0023_COMPATIBILITY_MATRIX.md)
 - [SEP-0024 Compatibility Matrix](../../compatibility/sep/SEP-0024_COMPATIBILITY_MATRIX.md)
 - [SEP-0029 Compatibility Matrix](../../compatibility/sep/SEP-0029_COMPATIBILITY_MATRIX.md)
 - [SEP-0030 Compatibility Matrix](../../compatibility/sep/SEP-0030_COMPATIBILITY_MATRIX.md)
@@ -59,4 +60,4 @@ To regenerate all matrices: `python3 tools/matrix-generator/run_analysis.py`
 
 ---
 
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-30

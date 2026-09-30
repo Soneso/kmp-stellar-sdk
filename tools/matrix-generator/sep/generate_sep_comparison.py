@@ -707,6 +707,7 @@ class SEPCompatibilityGenerator:
 
             # Map SEP numbers to their actual implementation packages
             package_overrides = {
+                '0023': 'com.soneso.stellar.sdk.StrKey',
                 '0029': 'com.soneso.stellar.sdk.horizon',
                 '0046': 'com.soneso.stellar.sdk.contract',
                 '0047': 'com.soneso.stellar.sdk.contract',
