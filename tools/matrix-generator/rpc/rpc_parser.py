@@ -29,12 +29,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from common import Colors, DATA_DIR, SDK_ROOT, get_sdk_version, camel_to_snake
 from github_fetcher import (
-    fetch_rpc_response_file,
     fetch_all_rpc_response_files,
+    fetch_url,
     get_latest_rpc_release,
     get_latest_go_stellar_sdk_release,
-    GitHubFetchError,
-    SourceFileNotFoundError,
 )
 
 
@@ -69,26 +67,30 @@ class GoRequestStruct:
 
 class GoProtocolParser:
     """
-    Parse stellar-rpc protocol Go files from GitHub to extract RPC method
+    Parse go-stellar-sdk protocol Go files from GitHub to extract RPC method
     request definitions, parameter names, and required/optional status.
 
-    The parser fetches individual per-method Go files from the stellar-rpc
-    repository (cmd/stellar-rpc/internal/methods/) and extracts ``XxxRequest``
-    struct definitions using regex so that the KMP compatibility matrices
-    always reflect the actual upstream protocol without manual updates.
+    The parser fetches the per-method Go files from the go-stellar-sdk
+    repository (protocols/rpc/) and extracts ``XxxRequest`` struct definitions
+    using regex so that the KMP compatibility matrices reflect the upstream
+    protocol without manual updates.
 
     Args:
         protocol_source: Base URL of the GitHub directory that contains the
-            per-method Go files.  Defaults to the latest go-stellar-sdk
-            release's ``protocols/rpc/`` URL.
+            per-method Go files. :class:`RPCMethodExtractor` passes the
+            ``protocols/rpc/`` URL at the go-stellar-sdk version that the RPC
+            release pins in its go.mod. Without a source, the parser uses the
+            latest go-stellar-sdk release; a failed lookup of that release
+            raises :class:`~github_fetcher.GitHubFetchError`.
     """
 
-    # Base URL for the per-method Go files.
-    # Request/response struct definitions live in the go-stellar-sdk repository
-    # under protocols/rpc/, not in stellar-rpc/methods/ (which contains handler
-    # logic only and no longer defines the canonical request structs).
-    # {ref} is resolved at runtime to the latest go-stellar-sdk module release, so
-    # request-struct fields not yet in a released RPC are not measured against the SDK.
+    # Base URL for the per-method Go files. The request and response structs
+    # live in the go-stellar-sdk repository under protocols/rpc/; the methods/
+    # directory of stellar-rpc holds handler logic only.
+    # In the pipeline, {ref} is the go-stellar-sdk version that the RPC release
+    # pins in its go.mod, so the structs match what that release exposes. A
+    # standalone GoProtocolParser without a source uses the latest
+    # go-stellar-sdk release.
     GITHUB_METHODS_BASE_URL_TEMPLATE = (
         "https://raw.githubusercontent.com/stellar/go-stellar-sdk/{ref}"
         "/protocols/rpc/"
@@ -128,10 +130,7 @@ class GoProtocolParser:
 
     def __init__(self, protocol_source: Optional[str] = None) -> None:
         if protocol_source is None:
-            try:
-                go_sdk_ref = get_latest_go_stellar_sdk_release().version
-            except GitHubFetchError:
-                go_sdk_ref = "master"
+            go_sdk_ref = get_latest_go_stellar_sdk_release().version
             protocol_source = self.GITHUB_METHODS_BASE_URL_TEMPLATE.format(ref=go_sdk_ref)
 
         if not protocol_source.endswith("/"):
@@ -149,9 +148,18 @@ class GoProtocolParser:
         """
         Fetch and parse every known RPC method file.
 
+        The matrix must list every mapped method with its parameters, so
+        every fetch and parse error propagates. Every method file declares a
+        ``<Prefix>Request`` struct, ``struct{}`` for a method without
+        parameters, so a file without it fails the run.
+
         Returns:
             Mapping from camelCase method name to its method dictionary as
             produced by :meth:`_struct_to_method_dict`.
+
+        Raises:
+            GitHubFetchError: If a method file cannot be fetched.
+            ValueError: If a method file has no ``<Prefix>Request`` struct.
         """
         methods: Dict[str, Dict[str, Any]] = {}
 
@@ -159,28 +167,13 @@ class GoProtocolParser:
             filename = camel_to_snake(method_prefix) + ".go"
             content = self._fetch_file(filename)
 
-            if content is None:
-                print(f"  {Colors.YELLOW}Warning:{Colors.END} protocol file not found: {filename}")
-                continue
-
-            try:
-                request_struct = self._parse_request_content(content, method_prefix, filename)
-                if request_struct:
-                    methods[method_name] = self._struct_to_method_dict(request_struct)
-                else:
-                    # Methods without a Request struct take no parameters
-                    description = self._extract_description(content, method_prefix)
-                    if not description:
-                        description = self._METHOD_DESCRIPTIONS.get(method_name, "")
-                    methods[method_name] = {
-                        "description": description,
-                        "required_params": [],
-                        "optional_params": [],
-                        "struct_name": None,
-                        "parameters": [],
-                    }
-            except Exception as exc:  # pylint: disable=broad-except
-                print(f"  {Colors.RED}Error{Colors.END} parsing {filename}: {exc}")
+            request_struct = self._parse_request_content(content, method_prefix, filename)
+            if request_struct is None:
+                raise ValueError(
+                    f"{method_name}: request struct {method_prefix}Request "
+                    f"not found in {filename}"
+                )
+            methods[method_name] = self._struct_to_method_dict(request_struct)
 
         return methods
 
@@ -188,7 +181,7 @@ class GoProtocolParser:
     # File fetching
     # ------------------------------------------------------------------
 
-    def _fetch_file(self, filename: str) -> Optional[str]:
+    def _fetch_file(self, filename: str) -> str:
         """
         Return content for *filename*, using the in-memory cache to avoid
         duplicate network requests.
@@ -198,27 +191,17 @@ class GoProtocolParser:
                 e.g. ``"get_events.go"``.
 
         Returns:
-            File content as a string, or ``None`` when the file cannot be
-            retrieved.
+            File content as a string.
+
+        Raises:
+            GitHubFetchError: If the file cannot be fetched.
         """
         if filename in self._file_cache:
             return self._file_cache[filename]
 
-        url = self._base_url + filename
-
-        try:
-            # Reuse the centralised fetcher so authentication, timeouts, and
-            # error handling are consistent across all matrix-generator modules.
-            from github_fetcher import fetch_url  # noqa: PLC0415 (local import OK)
-            data = fetch_url(url)
-            content = data.decode("utf-8")
-            self._file_cache[filename] = content
-            return content
-        except SourceFileNotFoundError:
-            return None
-        except GitHubFetchError as exc:
-            print(f"  {Colors.YELLOW}Warning:{Colors.END} could not fetch {url}: {exc}")
-            return None
+        content = fetch_url(self._base_url + filename).decode("utf-8")
+        self._file_cache[filename] = content
+        return content
 
     # ------------------------------------------------------------------
     # Go source parsing
@@ -390,26 +373,6 @@ class GoProtocolParser:
 
         return fields
 
-    def add_response_fields_to_method(
-        self,
-        method_name: str,
-        methods: Dict[str, Dict[str, Any]],
-        response_content: str,
-    ) -> None:
-        """
-        Augment an already-parsed method dict with response field metadata.
-
-        Args:
-            method_name: camelCase RPC method name (e.g. ``"getLatestLedger"``).
-            methods: The methods dict as returned by :meth:`parse_all_methods`.
-            response_content: Go source text for the response struct file.
-        """
-        if method_name not in methods:
-            return
-        methods[method_name]["response_fields"] = self.parse_response_fields(
-            response_content
-        )
-
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -444,6 +407,34 @@ class GoProtocolParser:
         }
 
 
+def verify_method_set(methods: Dict[str, Any]) -> None:
+    """
+    Require *methods* to hold exactly the methods of
+    :attr:`GoProtocolParser.METHOD_NAME_MAPPING`.
+
+    The matrix computes coverage over the methods it lists; this check keeps
+    that denominator equal to the full mapping.
+
+    Args:
+        methods: Mapping from camelCase method name to its method dictionary.
+
+    Raises:
+        ValueError: Naming every missing and every unexpected method.
+    """
+    expected = set(GoProtocolParser.METHOD_NAME_MAPPING.values())
+    missing = sorted(expected - set(methods))
+    unexpected = sorted(set(methods) - expected)
+    if missing or unexpected:
+        problems = []
+        if missing:
+            problems.append(f"missing: {', '.join(missing)}")
+        if unexpected:
+            problems.append(f"unexpected: {', '.join(unexpected)}")
+        raise ValueError(
+            f"Parsed RPC methods differ from METHOD_NAME_MAPPING ({'; '.join(problems)})"
+        )
+
+
 # ---------------------------------------------------------------------------
 # RPCMethodExtractor  (absorbed from generate_rpc_comparison.py)
 # ---------------------------------------------------------------------------
@@ -459,7 +450,7 @@ class RPCMethodExtractor:
 
     Args:
         rpc_version: Optional RPC version tag used for enriching metadata
-            (e.g. ``"v21.5.0"``).  When omitted the latest release is
+            (e.g. ``"v28.0.1"``).  When omitted the latest release is
             determined automatically via the GitHub API.
         protocol_source: Override the base URL used by :class:`GoProtocolParser`.
             Defaults to the GitHub methods directory.
@@ -490,20 +481,19 @@ class RPCMethodExtractor:
         Returns:
             Dict with ``metadata`` and ``methods`` keys.  ``methods`` is the
             direct output of :meth:`GoProtocolParser.parse_all_methods`.
+
+        Raises:
+            GitHubFetchError: If the release lookup or a method file fetch fails.
         """
         version = self._rpc_version
         release_date = "unknown"
         release_url = ""
 
         if version is None:
-            try:
-                release = get_latest_rpc_release()
-                version = release.version
-                release_date = release.published_at.strftime("%Y-%m-%d")
-                release_url = release.html_url
-            except GitHubFetchError as exc:
-                print(f"  {Colors.YELLOW}Warning:{Colors.END} could not fetch RPC release: {exc}")
-                version = "unknown"
+            release = get_latest_rpc_release()
+            version = release.version
+            release_date = release.published_at.strftime("%Y-%m-%d")
+            release_url = release.html_url
 
         print(f"  Parsing Go protocol files for RPC {version} ...")
         methods = self._parser.parse_all_methods()
@@ -527,13 +517,19 @@ class RPCMethodExtractor:
         Fetch response struct files from GitHub and add ``response_fields`` to
         each method dict in *data* in-place.
 
-        Methods for which no response file is found are silently skipped.
+        Every method needs a response file whose ``*Response`` struct yields at
+        least one field; the first method without one raises.
 
         Args:
             data: Dict as returned by :meth:`extract_methods`.
+
+        Raises:
+            GitHubFetchError: If a response file or the go.mod pin cannot be fetched.
+            ValueError: If a response file yields no response fields, or the
+                go.mod of the release has no go-stellar-sdk requirement.
         """
-        methods = data.get("methods", {})
-        version = data.get("metadata", {}).get("rpc_version", "unknown")
+        methods = data["methods"]
+        version = data["metadata"]["rpc_version"]
 
         response_files = fetch_all_rpc_response_files(
             tag=version,
@@ -541,9 +537,13 @@ class RPCMethodExtractor:
         )
 
         for method_name, response_content in response_files.items():
-            self._parser.add_response_fields_to_method(
-                method_name, methods, response_content
-            )
+            response_fields = self._parser.parse_response_fields(response_content)
+            if not response_fields:
+                raise ValueError(
+                    f"No response fields parsed from the {method_name} response "
+                    f"file of RPC {version}"
+                )
+            methods[method_name]["response_fields"] = response_fields
 
 
 # ---------------------------------------------------------------------------
@@ -595,8 +595,8 @@ def main() -> int:
     cli.add_argument(
         "--version",
         metavar="TAG",
-        help="Specific RPC version tag to analyse (e.g. v21.5.0). "
-             "Defaults to the latest release.",
+        help="Specific RPC version tag to analyse (e.g. v28.0.1). "
+             "Defaults to the newest stable release.",
     )
     cli.add_argument(
         "--no-response-fields",
@@ -638,10 +638,7 @@ def main() -> int:
 
         if not args.skip_response_fields:
             print("  Fetching response struct definitions ...")
-            try:
-                extractor.enrich_with_response_fields(data)
-            except GitHubFetchError as exc:
-                print(f"  {Colors.YELLOW}Warning:{Colors.END} response field enrichment failed: {exc}")
+            extractor.enrich_with_response_fields(data)
 
         # Determine output path
         if args.output:

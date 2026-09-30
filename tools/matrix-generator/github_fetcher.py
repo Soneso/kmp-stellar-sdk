@@ -41,8 +41,26 @@ import urllib.request
 import urllib.error
 from dataclasses import dataclass
 from datetime import datetime
+from email.message import Message
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
+
+from common import camel_to_snake
+
+
+RPC_RELEASES_URL = 'https://api.github.com/repos/stellar/stellar-rpc/releases?per_page=100'
+
+# A stable stellar-rpc server release carries a plain vX.Y.Z tag. Client
+# library tags (rpcclient-v24.0.0) and suffixed prerelease tags (v23.0.0-rc.1)
+# do not match.
+_STABLE_RELEASE_TAG = re.compile(r'^v(\d+)\.(\d+)\.(\d+)$')
+
+# An explicit --rpc-version tag names a server release, stable or prerelease
+# (v23.0.0-rc.1). The matrix header cites it as the RPC version, so client
+# library tags (rpcclient-v24.0.0) are rejected.
+_RELEASE_TAG = re.compile(r'^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$')
+
+_NEXT_PAGE_LINK = re.compile(r'<([^>]+)>\s*;\s*rel="next"')
 
 
 @dataclass
@@ -169,6 +187,27 @@ def _make_request(url: str, headers: Optional[Dict[str, str]] = None) -> bytes:
     Raises:
         GitHubFetchError: If request fails
     """
+    return _make_request_with_headers(url, headers)[0]
+
+
+def _make_request_with_headers(
+    url: str,
+    headers: Optional[Dict[str, str]] = None,
+) -> Tuple[bytes, Message]:
+    """
+    Make HTTP request like :func:`_make_request` and also return the response
+    headers, which paginated API responses need for their ``Link`` header.
+
+    Args:
+        url: URL to fetch
+        headers: Optional HTTP headers
+
+    Returns:
+        Tuple of the response body as bytes and the response headers
+
+    Raises:
+        GitHubFetchError: If request fails
+    """
     if headers is None:
         headers = {}
 
@@ -185,7 +224,7 @@ def _make_request(url: str, headers: Optional[Dict[str, str]] = None) -> bytes:
 
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
-            return response.read()
+            return response.read(), response.headers
     except urllib.error.HTTPError as e:
         # Provide helpful message for rate limit errors
         if e.code == 403 and 'rate limit' in str(e.reason).lower():
@@ -295,61 +334,172 @@ def fetch_router_source(tag: str) -> str:
         ) from e
 
 
-def get_latest_rpc_release() -> GitHubRelease:
+def _fetch_release_records(url: str) -> List[Dict[str, Any]]:
     """
-    Fetch the latest Stellar RPC server release metadata from GitHub API.
+    Fetch every record of a paginated GitHub release list.
 
-    This function filters out client library releases (rpcclient-*) and returns
-    only server releases (v*).
+    Follows the ``Link: rel="next"`` response header until the last page.
+    Release selection depends on ``tag_name``, ``draft`` and ``prerelease``,
+    so every record must carry them with their API types.
+
+    Args:
+        url: URL of the first page of the release list
 
     Returns:
-        GitHubRelease instance with release metadata for the latest server release
+        Release records of all pages, in API order
 
     Raises:
-        ReleaseNotFoundError: If no server release is found
-        GitHubFetchError: If API request fails
+        GitHubFetchError: If a request fails, a page is not a JSON array, or a
+            record lacks a string ``tag_name`` or boolean ``draft`` and
+            ``prerelease`` flags
     """
-    # Fetch all releases instead of just /latest to allow filtering
-    api_url = 'https://api.github.com/repos/stellar/stellar-rpc/releases'
+    records: List[Dict[str, Any]] = []
+    page_url: Optional[str] = url
 
-    try:
-        response_data = _make_request(api_url)
-        releases = json.loads(response_data.decode('utf-8'))
+    while page_url:
+        body, headers = _make_request_with_headers(page_url)
+        try:
+            page = json.loads(body.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            raise GitHubFetchError(
+                f"Invalid JSON in release list {page_url}: {e}"
+            ) from e
 
-        if not releases:
-            raise ReleaseNotFoundError("No release data returned from GitHub API")
-
-        # Filter for server releases only (exclude client library releases)
-        # Server releases: v25.0.0, v24.0.0, etc.
-        # Client releases (exclude): rpcclient-v24.0.0, rpcclient-v23.0.0, etc.
-        server_releases = [
-            release for release in releases
-            if release.get('tag_name', '').startswith('v')
-            and not release.get('tag_name', '').startswith('rpcclient-')
-        ]
-
-        if not server_releases:
-            raise ReleaseNotFoundError(
-                "No RPC server releases found (all releases are client libraries)"
+        if not isinstance(page, list):
+            raise GitHubFetchError(
+                f"Release list {page_url} is not a JSON array: {str(page)[:200]}"
             )
+        for record in page:
+            if not (
+                isinstance(record, dict)
+                and isinstance(record.get('tag_name'), str)
+                and isinstance(record.get('draft'), bool)
+                and isinstance(record.get('prerelease'), bool)
+            ):
+                raise GitHubFetchError(
+                    f"Release list {page_url} contains a record without a string "
+                    f"tag_name and boolean draft and prerelease flags: {str(record)[:200]}"
+                )
+        records.extend(page)
 
-        # Releases are already sorted by published date (newest first) from GitHub API
-        latest_server_release = server_releases[0]
+        next_link = _NEXT_PAGE_LINK.search(headers.get('Link') or '')
+        page_url = next_link.group(1) if next_link else None
 
-        return GitHubRelease.from_api_response(latest_server_release)
+    return records
 
-    except json.JSONDecodeError as e:
-        raise GitHubFetchError(
-            f"Invalid JSON response from GitHub API: {e}"
-        ) from e
+
+def _newest_stable_release(records: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Select the stable release with the highest version.
+
+    A stable release has a plain ``vX.Y.Z`` tag and is neither a draft nor a
+    prerelease. The prerelease flag is checked in addition to the tag because
+    stellar-rpc has published a suffix-less tag (``v21.3.0``) as a prerelease.
+    Versions compare numerically; the API's list order is not a version order.
+
+    Raises:
+        ReleaseNotFoundError: If no record is a stable release
+    """
+    candidates = []
+    for record in records:
+        tag_match = _STABLE_RELEASE_TAG.match(record['tag_name'])
+        if tag_match and not record['draft'] and not record['prerelease']:
+            version = tuple(int(part) for part in tag_match.groups())
+            candidates.append((version, record))
+
+    if not candidates:
+        raise ReleaseNotFoundError(
+            f"No stable vX.Y.Z release (neither draft nor prerelease) among "
+            f"{len(records)} stellar-rpc release records"
+        )
+
+    return max(candidates, key=lambda candidate: candidate[0])[1]
+
+
+def _published_release(records: List[Dict[str, Any]], tag: str) -> Dict[str, Any]:
+    """
+    Select the non-draft release record for ``tag``.
+
+    The tag must have the form ``vX.Y.Z`` or ``vX.Y.Z-suffix``. Prereleases
+    are accepted, so an explicit tag can cite one.
+
+    Raises:
+        ReleaseNotFoundError: If the tag has another form, no record has the
+            tag, or only a draft has it
+    """
+    if not _RELEASE_TAG.match(tag):
+        raise ReleaseNotFoundError(
+            f"{tag!r} is not a stellar-rpc release tag of the form vX.Y.Z or vX.Y.Z-suffix"
+        )
+    matches = [record for record in records if record['tag_name'] == tag]
+    published = [record for record in matches if not record['draft']]
+    if published:
+        return published[0]
+    if matches:
+        raise ReleaseNotFoundError(
+            f"stellar-rpc release {tag} is a draft; only published releases can be analysed"
+        )
+    raise ReleaseNotFoundError(
+        f"stellar-rpc release {tag} is not in the release list of stellar/stellar-rpc"
+    )
+
+
+def _release_from_record(record: Dict[str, Any]) -> GitHubRelease:
+    """
+    Build a :class:`GitHubRelease` from a release record.
+
+    Raises:
+        GitHubFetchError: If the record lacks a field or holds a malformed one
+    """
+    try:
+        return GitHubRelease.from_api_response(record)
     except KeyError as e:
         raise GitHubFetchError(
             f"Missing required field in API response: {e}"
         ) from e
-    except ValueError as e:
+    except (TypeError, ValueError) as e:
         raise GitHubFetchError(
-            f"Invalid data format in API response: {e}"
+            f"Invalid data format in API response for {record['tag_name']}: {e}"
         ) from e
+
+
+def get_latest_rpc_release() -> GitHubRelease:
+    """
+    Fetch the newest stable Stellar RPC server release from the GitHub API.
+
+    Reads the complete release list and selects the highest ``vX.Y.Z``
+    version among releases that are neither drafts nor prereleases.
+
+    Returns:
+        GitHubRelease instance for the newest stable server release
+
+    Raises:
+        ReleaseNotFoundError: If the list holds no stable server release
+        GitHubFetchError: If a request fails or the response is invalid
+    """
+    records = _fetch_release_records(RPC_RELEASES_URL)
+    return _release_from_record(_newest_stable_release(records))
+
+
+def get_rpc_release(tag: str) -> GitHubRelease:
+    """
+    Fetch the Stellar RPC release record for an explicit tag.
+
+    The tag must name a non-draft release in the release list; a prerelease
+    is accepted.
+
+    Args:
+        tag: Release tag (e.g. 'v28.0.1')
+
+    Returns:
+        GitHubRelease instance for that release
+
+    Raises:
+        ReleaseNotFoundError: If the tag is absent or names only a draft
+        GitHubFetchError: If a request fails or the response is invalid
+    """
+    records = _fetch_release_records(RPC_RELEASES_URL)
+    return _release_from_record(_published_release(records, tag))
 
 
 def get_latest_go_stellar_sdk_release() -> GitHubRelease:
@@ -443,6 +593,36 @@ def fetch_rpc_jsonrpc_source(tag: str) -> str:
 _GO_SDK_REF_BY_RPC_TAG: Dict[str, str] = {}
 
 
+def go_stellar_sdk_ref_from_go_mod(go_mod: str, source: str) -> str:
+    """Return the go-stellar-sdk git ref that a stellar-rpc ``go.mod`` pins.
+
+    The ref is usable on raw.githubusercontent.com: a release tag (e.g.
+    ``v0.6.0``) for a normal version, or the commit hash for a Go
+    pseudo-version.
+
+    Args:
+        go_mod: Text of the go.mod file
+        source: Location of the go.mod file, used in the error message
+
+    Raises:
+        ValueError: If the go.mod has no github.com/stellar/go-stellar-sdk requirement
+    """
+    match = re.search(r'github\.com/stellar/go-stellar-sdk\s+(\S+)', go_mod)
+    if not match:
+        raise ValueError(
+            f"{source} has no github.com/stellar/go-stellar-sdk requirement; "
+            f"the go-stellar-sdk ref for the RPC structs cannot be resolved"
+        )
+    version = match.group(1)
+    # A Go pseudo-version is not a git tag; its ref is the trailing commit
+    # hash. Both pseudo-version forms carry a 14-digit UTC timestamp directly
+    # before the final 12-hex segment (vX.Y.Z-yyyymmddhhmmss-<hash> and the
+    # base-incremented vX.Y.Z-0.yyyymmddhhmmss-<hash>). A normal release tag
+    # is used as-is.
+    pseudo = re.match(r'^v\S*\d{14}-([0-9a-f]{12})$', version)
+    return pseudo.group(1) if pseudo else version
+
+
 def _resolve_go_stellar_sdk_ref(rpc_tag: str) -> str:
     """Resolve (and cache) the go-stellar-sdk ref that stellar-rpc@<rpc_tag> pins.
 
@@ -450,30 +630,18 @@ def _resolve_go_stellar_sdk_ref(rpc_tag: str) -> str:
     versions independently of stellar-rpc. Reading them from the ref that the RPC
     release actually depends on (per its go.mod) keeps the comparison matched to
     exactly what that RPC release exposes, rather than to a lagging go-stellar-sdk
-    module tag. Returns a git ref usable on raw.githubusercontent.com: a release
-    tag (e.g. ``v0.6.0``) for a normal version, or the commit hash for a Go
-    pseudo-version. Falls back to ``master`` when the pin cannot be read.
+    module tag.
+
+    Raises:
+        GitHubFetchError: If the go.mod of the release cannot be fetched
+        ValueError: If the go.mod has no go-stellar-sdk requirement
     """
     if rpc_tag in _GO_SDK_REF_BY_RPC_TAG:
         return _GO_SDK_REF_BY_RPC_TAG[rpc_tag]
 
-    ref = "master"
-    try:
-        go_mod = _make_request(
-            f"https://raw.githubusercontent.com/stellar/stellar-rpc/{rpc_tag}/go.mod"
-        ).decode('utf-8')
-        match = re.search(r'github\.com/stellar/go-stellar-sdk\s+(\S+)', go_mod)
-        if match:
-            version = match.group(1)
-            # A Go pseudo-version is not a git tag; its ref is the trailing commit
-            # hash. Both pseudo-version forms carry a 14-digit UTC timestamp directly
-            # before the final 12-hex segment (vX.Y.Z-yyyymmddhhmmss-<hash> and the
-            # base-incremented vX.Y.Z-0.yyyymmddhhmmss-<hash>). A normal release tag
-            # is used as-is.
-            pseudo = re.match(r'^v\S*\d{14}-([0-9a-f]{12})$', version)
-            ref = pseudo.group(1) if pseudo else version
-    except GitHubFetchError:
-        ref = "master"
+    go_mod_url = f"https://raw.githubusercontent.com/stellar/stellar-rpc/{rpc_tag}/go.mod"
+    go_mod = _make_request(go_mod_url).decode('utf-8')
+    ref = go_stellar_sdk_ref_from_go_mod(go_mod, go_mod_url)
 
     _GO_SDK_REF_BY_RPC_TAG[rpc_tag] = ref
     return ref
@@ -498,7 +666,8 @@ def fetch_rpc_response_file(tag: str, method_name: str) -> str:
 
     Raises:
         SourceFileNotFoundError: If source file cannot be fetched
-        GitHubFetchError: If request fails
+        GitHubFetchError: If the go.mod of the release cannot be fetched
+        ValueError: If the go.mod of the release has no go-stellar-sdk requirement
     """
     if not method_name:
         raise ValueError("method_name parameter cannot be empty")
@@ -524,31 +693,26 @@ def fetch_all_rpc_response_files(tag: str, method_names: List[str]) -> Dict[str,
     """
     Fetch multiple RPC response files for a given tag.
 
+    Every method must have a response file, so the first failed fetch raises.
+
     Args:
-        tag: Git tag name (e.g., 'v21.5.0')
+        tag: Git tag name (e.g., 'v28.0.1')
         method_names: List of method names in camelCase (e.g., ['getLatestLedger', 'getHealth'])
 
     Returns:
-        Dictionary mapping method_name -> file content
-        Failed fetches are omitted from the result
+        Dictionary mapping each method_name to its file content
 
     Raises:
-        GitHubFetchError: If request fails
+        SourceFileNotFoundError: If a response file cannot be fetched
+        GitHubFetchError: If the go-stellar-sdk ref cannot be resolved
+        ValueError: If the go.mod of the release has no go-stellar-sdk requirement
     """
     results = {}
 
     for method_name in method_names:
         # The response file is named after the full method name in snake_case:
         # getLatestLedger -> get_latest_ledger.go, sendTransaction -> send_transaction.go.
-        from common import camel_to_snake
-        snake_case = camel_to_snake(method_name)
-
-        try:
-            content = fetch_rpc_response_file(tag, snake_case)
-            results[method_name] = content
-        except SourceFileNotFoundError:
-            # Skip methods that have no response struct file at this ref.
-            continue
+        results[method_name] = fetch_rpc_response_file(tag, camel_to_snake(method_name))
 
     return results
 

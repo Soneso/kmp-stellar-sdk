@@ -63,7 +63,7 @@ python3 tools/matrix-generator/horizon/run_horizon_analysis.py --verbose
 python3 tools/matrix-generator/rpc/run_rpc_analysis.py
 
 # Use a specific RPC version
-python3 tools/matrix-generator/rpc/run_rpc_analysis.py --rpc-version v22.0.0
+python3 tools/matrix-generator/rpc/run_rpc_analysis.py --rpc-version v28.0.1
 
 # Use a local jsonrpc.go file
 python3 tools/matrix-generator/rpc/run_rpc_analysis.py --local /path/to/jsonrpc.go
@@ -71,6 +71,10 @@ python3 tools/matrix-generator/rpc/run_rpc_analysis.py --local /path/to/jsonrpc.
 # Enable verbose output
 python3 tools/matrix-generator/rpc/run_rpc_analysis.py --verbose
 ```
+
+The default run cites the newest stable stellar-rpc release: the highest `vX.Y.Z` tag in the full release list that is neither a draft nor a prerelease. `--rpc-version` must name a non-draft release with a `vX.Y.Z` or `vX.Y.Z-suffix` tag, which may be a prerelease. The matrix header takes the version, release date, and source URL from that release record. `--local` reads the go-stellar-sdk version from the `go.mod` of the stellar-rpc checkout that holds the given `jsonrpc.go`.
+
+The run exits non-zero and writes no matrix when the release lookup fails or any mapped RPC method lacks its request or response file.
 
 ### SEPs
 
@@ -109,6 +113,7 @@ tools/matrix-generator/
 │   ├── sep_parser.py            # Fetches and parses SEP specs from GitHub
 │   ├── sep_analyzer.py          # Analyzes SDK source for SEP implementation
 │   └── generate_sep_comparison.py
+├── tests/                       # Offline unit tests (unittest)
 └── data/                        # Intermediate JSON (gitignored)
     ├── horizon/
     ├── rpc/
@@ -124,6 +129,14 @@ Each pipeline follows the same pattern:
 3. **Compare** the two and generate a Markdown compatibility matrix with coverage percentages
 
 SDK version is read from `gradle.properties` (`version=x.y.z`). Intermediate JSON files are written to `data/` for debugging. Only the final Markdown reports in `compatibility/` are committed.
+
+## Tests
+
+The tests patch every network call. Run them from the repository root:
+
+```bash
+python3 -m unittest discover -s tools/matrix-generator/tests
+```
 
 ## Adding a New SEP
 

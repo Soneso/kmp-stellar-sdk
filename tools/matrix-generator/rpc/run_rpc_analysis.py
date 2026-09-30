@@ -14,7 +14,7 @@ Usage:
     python run_rpc_analysis.py
 
     # Use specific RPC version
-    python run_rpc_analysis.py --rpc-version v22.0.0
+    python run_rpc_analysis.py --rpc-version v28.0.1
 
     # Use local jsonrpc.go (for testing/development)
     python run_rpc_analysis.py --local /path/to/jsonrpc.go
@@ -45,14 +45,15 @@ try:
     )
     from github_fetcher import (
         get_latest_rpc_release,
+        get_rpc_release,
+        go_stellar_sdk_ref_from_go_mod,
         fetch_rpc_jsonrpc_source,
-        fetch_all_rpc_response_files,
         GitHubFetchError,
         ReleaseNotFoundError,
         SourceFileNotFoundError,
         is_authenticated,
     )
-    from rpc_parser import RPCMethodParser
+    from rpc_parser import GoProtocolParser, RPCMethodParser, verify_method_set
     from generate_rpc_comparison import (
         SorobanSDKAnalyzer,
         RPCComparisonAnalyzer,
@@ -61,6 +62,36 @@ except ImportError as e:
     print(f"ERROR: Failed to import required module: {e}")
     print("Please ensure all required modules are in the same directory.")
     sys.exit(1)
+
+
+def local_go_stellar_sdk_ref(jsonrpc_path: Path) -> str:
+    """
+    Resolve the go-stellar-sdk ref pinned by the stellar-rpc checkout that
+    holds a local jsonrpc.go.
+
+    The pin comes from the nearest go.mod above the file, the module root of
+    the checkout.
+
+    Args:
+        jsonrpc_path: Path of the local jsonrpc.go.
+
+    Returns:
+        A git ref of go-stellar-sdk (release tag or commit hash).
+
+    Raises:
+        FileNotFoundError: If no go.mod lies above the file.
+        ValueError: If that go.mod has no go-stellar-sdk requirement.
+    """
+    for directory in jsonrpc_path.resolve().parents:
+        go_mod_path = directory / "go.mod"
+        if go_mod_path.is_file():
+            return go_stellar_sdk_ref_from_go_mod(
+                go_mod_path.read_text(encoding="utf-8"), str(go_mod_path)
+            )
+    raise FileNotFoundError(
+        f"No go.mod above {jsonrpc_path}; --local needs the jsonrpc.go of a "
+        f"stellar-rpc checkout to resolve the go-stellar-sdk version"
+    )
 
 
 class RPCAnalysisPipeline:
@@ -76,7 +107,7 @@ class RPCAnalysisPipeline:
         Initialize the pipeline.
 
         Args:
-            rpc_version: Specific RPC version tag (e.g., 'v22.0.0'). None = latest.
+            rpc_version: Specific RPC version tag (e.g., 'v28.0.1'). None = newest stable release.
             local_jsonrpc_path: Path to local jsonrpc.go file. None = fetch from GitHub.
             verbose: Enable verbose output.
         """
@@ -102,6 +133,9 @@ class RPCAnalysisPipeline:
         # Runtime data
         self.release_info: Optional[Dict[str, Any]] = None
         self.jsonrpc_source: Optional[str] = None
+        # Base URL of the go-stellar-sdk request structs in local mode; network
+        # mode resolves it from the go.mod of the release.
+        self.protocol_source: Optional[str] = None
 
     def run(self) -> int:
         """
@@ -156,6 +190,14 @@ class RPCAnalysisPipeline:
             self.progress.log(f"Using local file: {local_path}", force=True)
             self.jsonrpc_source = local_path.read_text(encoding="utf-8")
 
+            go_sdk_ref = local_go_stellar_sdk_ref(local_path)
+            self.protocol_source = GoProtocolParser.GITHUB_METHODS_BASE_URL_TEMPLATE.format(
+                ref=go_sdk_ref
+            )
+            self.progress.log(
+                f"go-stellar-sdk ref from local go.mod: {go_sdk_ref}", force=True
+            )
+
             # Create minimal release info for local mode
             self.release_info = {
                 "version": "local",
@@ -185,31 +227,21 @@ class RPCAnalysisPipeline:
                     )
 
                 if self.rpc_version:
-                    # Use specific version
                     self.progress.log(
                         f"Fetching RPC version: {self.rpc_version}", force=True
                     )
-                    self.jsonrpc_source = fetch_rpc_jsonrpc_source(self.rpc_version)
-                    self.release_info = {
-                        "version": self.rpc_version,
-                        "published_at": "unknown",
-                        "html_url": (
-                            f"https://github.com/stellar/stellar-rpc/releases/tag/"
-                            f"{self.rpc_version}"
-                        ),
-                        "source": "GitHub",
-                    }
+                    release = get_rpc_release(self.rpc_version)
                 else:
-                    # Fetch latest release
                     self.progress.log("Fetching latest RPC release...", force=True)
                     release = get_latest_rpc_release()
-                    self.jsonrpc_source = fetch_rpc_jsonrpc_source(release.version)
-                    self.release_info = {
-                        "version": release.version,
-                        "published_at": release.published_at.strftime("%Y-%m-%d"),
-                        "html_url": release.html_url,
-                        "source": "GitHub",
-                    }
+
+                self.jsonrpc_source = fetch_rpc_jsonrpc_source(release.version)
+                self.release_info = {
+                    "version": release.version,
+                    "published_at": release.published_at.strftime("%Y-%m-%d"),
+                    "html_url": release.html_url,
+                    "source": "GitHub",
+                }
 
                 self.progress.log(
                     f"Version: {self.release_info['version']}", force=True
@@ -235,10 +267,12 @@ class RPCAnalysisPipeline:
         # and fetches method definitions from GitHub
         extractor = RPCMethodParser(
             rpc_version=self.release_info["version"],
+            protocol_source=self.protocol_source,
         )
         rpc_data = extractor.extract_methods()
 
-        methods = rpc_data.get("methods", {})
+        methods = rpc_data["methods"]
+        verify_method_set(methods)
         methods_count = len(methods)
         self.progress.log(f"Found {methods_count} RPC methods", force=True)
 
@@ -247,30 +281,10 @@ class RPCAnalysisPipeline:
             self.progress.log(
                 "Fetching response struct definitions...", force=True
             )
-            try:
-                extractor.enrich_with_response_fields(rpc_data)
-                # Every method has a response struct in go-stellar-sdk. Zero fields
-                # across all methods means the source resolution is broken (not that
-                # the methods have no responses) — fail loudly instead of emitting a
-                # matrix with an empty Response Field Coverage table.
-                enriched = sum(
-                    1 for m in rpc_data.get("methods", {}).values()
-                    if m.get("response_fields")
-                )
-                if methods and enriched == 0:
-                    raise GitHubFetchError(
-                        "response struct enrichment produced no fields for any of the "
-                        f"{methods_count} RPC methods; refusing to emit a matrix with an "
-                        "empty Response Field Coverage table"
-                    )
-                self.progress.log(
-                    "Response fields enriched successfully", force=True
-                )
-            except (GitHubFetchError, Exception) as e:
-                self.progress.log(
-                    f"Error: Could not fetch response files: {e}", force=True
-                )
-                raise
+            extractor.enrich_with_response_fields(rpc_data)
+            self.progress.log(
+                "Response fields enriched successfully", force=True
+            )
 
         # Add version metadata
         rpc_data.setdefault("metadata", {}).update({
@@ -402,7 +416,7 @@ Examples:
   %(prog)s
 
   # Use specific RPC version
-  %(prog)s --rpc-version v22.0.0
+  %(prog)s --rpc-version v28.0.1
 
   # Use local jsonrpc.go file (for testing/development)
   %(prog)s --local /path/to/jsonrpc.go
@@ -411,7 +425,7 @@ Examples:
   %(prog)s --verbose
 
   # Combine options
-  %(prog)s --rpc-version v21.5.0 --verbose
+  %(prog)s --rpc-version v28.0.1 --verbose
         """,
     )
 
@@ -419,7 +433,7 @@ Examples:
         "--rpc-version",
         type=str,
         metavar="VERSION",
-        help="Specific RPC version tag (e.g., v22.0.0). Default: latest release",
+        help="Specific RPC version tag (e.g., v28.0.1). Default: newest stable release",
     )
 
     parser.add_argument(
