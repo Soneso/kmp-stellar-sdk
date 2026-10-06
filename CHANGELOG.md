@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- XDR definitions regenerated from stellar/stellar-xdr commit
+  `c2612cf534e4448fa263e252afe1bdbac5512d14`. `StellarValueType` gains `STELLAR_VALUE_SIGNED_MS` (3)
+  and `STELLAR_VALUE_EMPTY_TX_SET_MS` (4), and `StellarValue.ext` the arms `signedMsValue`
+  (`closeTimeMs`, `lcValueSignature`) and `proposedMsValue` (the `proposedValue` fields plus
+  `closeTimeMs`); `closeTimeMs` is the ledger close time in milliseconds, the new `uint64` typedef
+  `TimePointMs`. In Kotlin: the two members on `StellarValueTypeXdr`, the sealed arms
+  `StellarValueExtXdr.SignedMsValue` (`StellarValueSignedMsValueXdr`) and
+  `StellarValueExtXdr.ProposedMsValue` (`StellarValueProposedMsValueXdr`), and `TimePointMsXdr`.
+  XDR-JSON keys: `signed_ms`, `empty_tx_set_ms`, `close_time_ms`; existing members, arms, and
+  renderings keep their values and keys. A `when` over `StellarValueTypeXdr` or
+  `StellarValueExtXdr` without an `else` branch needs the new branches; all other code compiles
+  unchanged.
+
 ## [1.14.0] - 2026-09-28
 
 ### Added

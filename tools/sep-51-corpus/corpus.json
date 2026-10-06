@@ -4,10 +4,16 @@
     "reference_tool": "stellar-xdr",
     "reference_version": "28.0.1",
     "reference_xdr_commit": "9c9c145953e80990d6ff1ae3a6a973a0ce6d0694",
-    "sdk_xdr_commit": "c40231c76bf2ebce76b24aa11c72508ac3eaa329",
-    "entry_count": 350,
-    "unresolvable_enum_members": [],
-    "unresolvable_struct_types": []
+    "sdk_xdr_commit": "c2612cf534e4448fa263e252afe1bdbac5512d14",
+    "entry_count": 351,
+    "unresolvable_enum_members": [
+      "StellarValueType.STELLAR_VALUE_EMPTY_TX_SET_MS",
+      "StellarValueType.STELLAR_VALUE_SIGNED_MS"
+    ],
+    "unresolvable_struct_types": [
+      "proposedMsValue",
+      "signedMsValue"
+    ]
   },
   "entries": [
     {
@@ -2422,6 +2428,13 @@
       "kmp_type": "ContractCostTypeXdr",
       "xdr": "AAAAAA==",
       "json": "\"wasm_insn_exec\"",
+      "oracle": "reference"
+    },
+    {
+      "type": "StellarValueType",
+      "kmp_type": "StellarValueTypeXdr",
+      "xdr": "AAAAAg==",
+      "json": "\"empty_tx_set\"",
       "oracle": "reference"
     },
     {
