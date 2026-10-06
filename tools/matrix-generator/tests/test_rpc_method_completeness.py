@@ -21,6 +21,7 @@ from github_fetcher import (
     SourceFileNotFoundError,
     fetch_all_rpc_response_files,
 )
+from generate_rpc_comparison import RPCComparisonAnalyzer
 from rpc_parser import GoProtocolParser, RPCMethodExtractor, verify_method_set
 
 enter_context = support.enter_context
@@ -106,10 +107,10 @@ class RequestFileTest(unittest.TestCase):
     def test_parse_error_propagates(self) -> None:
         original = GoProtocolParser._parse_request_content
 
-        def parse(parser: GoProtocolParser, content: str, prefix: str, source: str) -> Any:
+        def parse(parser: GoProtocolParser, content: str, prefix: str) -> Any:
             if prefix == "GetEvents":
                 raise ValueError("unbalanced struct body")
-            return original(parser, content, prefix, source)
+            return original(parser, content, prefix)
 
         with mock.patch.object(GoProtocolParser, "_parse_request_content", parse):
             with self.assertRaisesRegex(ValueError, "unbalanced struct body"):
@@ -122,7 +123,7 @@ class ResponseFileTest(unittest.TestCase):
         enter_context(self, mock.patch.object(
             github_fetcher, "_resolve_go_stellar_sdk_ref", return_value="v0.7.2"
         ))
-        self.extractor = RPCMethodExtractor(rpc_version="v28.0.1")
+        self.extractor = RPCMethodExtractor(support.RELEASE_INFO)
         self.data = {
             "metadata": {"rpc_version": "v28.0.1"},
             "methods": {name: {} for name in ALL_METHODS},
@@ -158,22 +159,60 @@ class ResponseFileTest(unittest.TestCase):
                 name,
             )
 
+    def test_embedded_struct_declared_in_another_file_resolves(self) -> None:
+        files = {
+            "get_transaction": "type GetTransactionResponse struct {\n\tLatestLedger uint32 `json:\"latestLedger\"`\n"
+                               "\tTransactionDetails\n\tLedgerCloseTime int64 `json:\"createdAt,string\"`\n}\n",
+            "get_transactions": "type TransactionDetails struct {\n\tStatus string `json:\"status\"`\n}\n"
+                                + support.response_file("GetTransactions"),
+        }
+        self.serve(lambda tag, stem: files.get(stem) or support.response_file(_prefix_for_file(stem)))
+        self.extractor.enrich_with_response_fields(self.data)
+        fields = self.data["methods"]["getTransaction"]["response_fields"]
+        self.assertEqual([f["json_name"] for f in fields], ["latestLedger", "status", "createdAt"])
+
+    def test_undeclared_embedded_struct_raises(self) -> None:
+        content = "type GetTransactionResponse struct {\n\tTransactionDetails\n}\n"
+        self.serve(_serve_response_files("get_transaction", content=content))
+        with self.assertRaisesRegex(ValueError, "GetTransactionResponse embeds TransactionDetails"):
+            self.extractor.enrich_with_response_fields(self.data)
+
+    def test_json_variants_are_not_counted(self) -> None:
+        metadata = {"rpc_version": "v28.0.1", "rpc_release_date": "2026-08-27", "rpc_release_url": ""}
+        with mock.patch("generate_rpc_comparison.get_sdk_version", return_value="1.14.0"):
+            analyzer = RPCComparisonAnalyzer({"metadata": metadata, "methods": {}}, {})
+        metrics = analyzer._compare_response_fields(["status", "envelopeXdr", "envelopeJson"], ["status"])
+        self.assertEqual((metrics.total, metrics.supported, metrics.missing), (2, 1, ["envelopeXdr"]))
+
+    def test_json_variants_are_not_counted_for_a_missing_method(self) -> None:
+        metadata = {"rpc_version": "v28.0.1", "rpc_release_date": "2026-08-27", "rpc_release_url": ""}
+        fields = [{"json_name": "envelopeXdr"}, {"json_name": "envelopeJson"}]
+        with mock.patch("generate_rpc_comparison.get_sdk_version", return_value="1.14.0"):
+            analyzer = RPCComparisonAnalyzer(
+                {"metadata": metadata, "methods": {"getTransaction": {"response_fields": fields}}}, {})
+        analyzer.analyze()
+        self.assertEqual(analyzer.comparisons[0].response_fields.missing, ["envelopeXdr"])
+
 
 class MethodSetTest(unittest.TestCase):
+    """The mapped methods are checked against the registrations in jsonrpc.go."""
 
     def test_full_set_passes(self) -> None:
-        verify_method_set({name: {} for name in ALL_METHODS})
+        verify_method_set(support.jsonrpc_file())
 
     def test_missing_method_is_named(self) -> None:
-        methods = {name: {} for name in ALL_METHODS if name != "getEvents"}
+        prefixes = [p for p in support.METHOD_PREFIXES if p != "GetEvents"]
         with self.assertRaisesRegex(ValueError, r"missing: getEvents\b"):
-            verify_method_set(methods)
+            verify_method_set(support.jsonrpc_file(prefixes))
 
     def test_unexpected_method_is_named(self) -> None:
-        methods = {name: {} for name in ALL_METHODS}
-        methods["getLedgerState"] = {}
+        prefixes = support.METHOD_PREFIXES + ("GetLedgerState",)
         with self.assertRaisesRegex(ValueError, r"unexpected: getLedgerState\b"):
-            verify_method_set(methods)
+            verify_method_set(support.jsonrpc_file(prefixes))
+
+    def test_string_literal_registrations_raise(self) -> None:
+        with self.assertRaisesRegex(ValueError, "No methodName: protocol.<Name>MethodName registrations"):
+            verify_method_set('handlers := []struct{}{\n\t{methodName: "getHealth"},\n}\n')
 
 
 class PipelineMethodSetTest(unittest.TestCase):
@@ -183,31 +222,26 @@ class PipelineMethodSetTest(unittest.TestCase):
         enter_context(self, mock.patch.object(run_rpc_analysis, "DATA_DIR", tmp / "data"))
         enter_context(self, contextlib.redirect_stdout(io.StringIO()))
         self.extractor = mock.Mock(spec=RPCMethodExtractor)
+        self.extractor.extract_methods.return_value = {"metadata": {}, "methods": {}}
         self.pipeline = run_rpc_analysis.RPCAnalysisPipeline(rpc_version="v28.0.1")
-        self.pipeline.release_info = {
-            "version": "v28.0.1",
-            "published_at": "2026-08-27",
-            "html_url": "https://github.com/stellar/stellar-rpc/releases/tag/v28.0.1",
-            "source": "GitHub",
-        }
+        self.pipeline.release_info = support.RELEASE_INFO
 
-    def run_with(self, methods: Dict[str, Any]) -> None:
-        self.extractor.extract_methods.return_value = {
-            "metadata": {"rpc_version": "v28.0.1"},
-            "methods": methods,
-        }
-        with mock.patch.object(run_rpc_analysis, "RPCMethodParser", return_value=self.extractor):
+    def run_with(self, jsonrpc_source: str) -> mock.Mock:
+        self.pipeline.jsonrpc_source = jsonrpc_source
+        with mock.patch.object(run_rpc_analysis, "RPCMethodExtractor", return_value=self.extractor) as cls:
             self.pipeline.parse_rpc_methods()
+        return cls
 
-    def test_incomplete_method_set_raises_before_writing(self) -> None:
-        methods = {name: {} for name in ALL_METHODS if name != "getEvents"}
+    def test_unregistered_method_raises_before_parsing(self) -> None:
+        prefixes = [p for p in support.METHOD_PREFIXES if p != "GetEvents"]
         with self.assertRaisesRegex(ValueError, "missing: getEvents"):
-            self.run_with(methods)
+            self.run_with(support.jsonrpc_file(prefixes))
         self.assertFalse(self.pipeline.rpc_methods_file.exists())
-        self.extractor.enrich_with_response_fields.assert_not_called()
+        self.extractor.extract_methods.assert_not_called()
 
-    def test_complete_method_set_is_written(self) -> None:
-        self.run_with({name: {} for name in ALL_METHODS})
+    def test_registered_method_set_is_written(self) -> None:
+        cls = self.run_with(support.jsonrpc_file())
+        cls.assert_called_once_with(support.RELEASE_INFO, protocol_source=None)
         self.assertTrue(self.pipeline.rpc_methods_file.exists())
         self.extractor.enrich_with_response_fields.assert_called_once()
 
@@ -241,7 +275,7 @@ class PipelineRequestStructTest(unittest.TestCase):
             mock.patch.object(run_rpc_analysis, "COMPATIBILITY_DIR", self.compatibility_dir),
             mock.patch.object(run_rpc_analysis, "get_latest_rpc_release", return_value=release),
             mock.patch.object(run_rpc_analysis, "fetch_rpc_jsonrpc_source",
-                              return_value="package internal\n"),
+                              return_value=support.jsonrpc_file()),
             mock.patch.object(run_rpc_analysis, "SorobanSDKAnalyzer", **{
                 "return_value.analyze.return_value": sdk_analysis,
             }),
@@ -270,9 +304,12 @@ class PipelineRequestStructTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("**RPC Version:** v28.0.1 (released 2026-08-27)  \n", matrix)
+        url = support.RELEASE_INFO["html_url"]
+        self.assertIn(f"**RPC Source:** [{url}]({url})  \n", matrix)
         self.assertIn("- ❌ **Not Supported:** 12/12\n", matrix)
-        # getEvents lists the one required parameter parsed from its request struct.
-        self.assertRegex(matrix, r"\| `getEvents` \| ❌ Not Supported \| [^|]* \| 0/1 \| 0/1 \|")
+        # getEvents lists the one required parameter parsed from its request struct and no
+        # Kotlin method.
+        self.assertIn("| `getEvents` | ❌ Not Supported | - | 0/1 | 0/1 |", matrix)
 
 
 if __name__ == "__main__":

@@ -19,12 +19,12 @@ Authentication:
 
 Example usage:
     from github_fetcher import (
-        get_latest_release, fetch_router_source,
+        get_horizon_release, fetch_router_source,
         get_latest_rpc_release, fetch_rpc_jsonrpc_source
     )
 
     # Horizon
-    release = get_latest_release()
+    release = get_horizon_release()
     print(f"Latest Horizon version: {release.version}")
     source = fetch_router_source(release.version)
 
@@ -70,7 +70,6 @@ class GitHubRelease:
     version: str
     published_at: datetime
     html_url: str
-    commit_sha: Optional[str] = None
 
     @classmethod
     def from_api_response(cls, data: Dict) -> 'GitHubRelease':
@@ -92,14 +91,20 @@ class GitHubRelease:
             '%Y-%m-%dT%H:%M:%SZ'
         )
 
-        commit_sha = data.get('target_commitish')
-
         return cls(
             version=data['tag_name'],
             published_at=published_at,
             html_url=data['html_url'],
-            commit_sha=commit_sha
         )
+
+    def release_info(self) -> Dict[str, str]:
+        """Return the version, UTC release date, URL and source ("GitHub") that the pipelines store for the release."""
+        return {
+            "version": self.version,
+            "published_at": self.published_at.strftime("%Y-%m-%d"),
+            "html_url": self.html_url,
+            "source": "GitHub",
+        }
 
 
 class GitHubFetchError(Exception):
@@ -266,40 +271,35 @@ def fetch_url(url: str) -> bytes:
     return _make_request(url)
 
 
-def get_latest_release() -> GitHubRelease:
+def get_horizon_release(tag: Optional[str] = None) -> GitHubRelease:
     """
-    Fetch the latest Horizon release metadata from GitHub API.
+    Fetch a Horizon release record from the GitHub API.
+
+    Args:
+        tag: Release tag (e.g. 'v28.0.1'). None selects the latest release.
 
     Returns:
         GitHubRelease instance with release metadata
 
     Raises:
         ReleaseNotFoundError: If no release is found
-        GitHubFetchError: If API request fails
+        GitHubFetchError: If API request fails or the response is invalid
     """
-    api_url = 'https://api.github.com/repos/stellar/stellar-horizon/releases/latest'
+    api_url = 'https://api.github.com/repos/stellar/stellar-horizon/releases/' + (
+        f'tags/{tag}' if tag else 'latest'
+    )
 
     try:
-        response_data = _make_request(api_url)
-        data = json.loads(response_data.decode('utf-8'))
-
-        if not data:
-            raise ReleaseNotFoundError("No release data returned from GitHub API")
-
-        return GitHubRelease.from_api_response(data)
-
-    except json.JSONDecodeError as e:
+        data = json.loads(_make_request(api_url).decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise GitHubFetchError(
             f"Invalid JSON response from GitHub API: {e}"
         ) from e
-    except KeyError as e:
-        raise GitHubFetchError(
-            f"Missing required field in API response: {e}"
-        ) from e
-    except ValueError as e:
-        raise GitHubFetchError(
-            f"Invalid data format in API response: {e}"
-        ) from e
+
+    if not data:
+        raise ReleaseNotFoundError("No release data returned from GitHub API")
+
+    return _release_from_record(data)
 
 
 def fetch_router_source(tag: str) -> str:
@@ -307,7 +307,7 @@ def fetch_router_source(tag: str) -> str:
     Fetch router.go source code for a specific Horizon release tag.
 
     Args:
-        tag: Git tag name (e.g., 'v2.31.0')
+        tag: Git tag name (e.g., 'v28.0.1')
 
     Returns:
         Content of router.go as string
@@ -502,62 +502,6 @@ def get_rpc_release(tag: str) -> GitHubRelease:
     return _release_from_record(_published_release(records, tag))
 
 
-def get_latest_go_stellar_sdk_release() -> GitHubRelease:
-    """
-    Fetch the latest go-stellar-sdk module release metadata from GitHub API.
-
-    The RPC request/response struct definitions (protocols/rpc) live in the
-    go-stellar-sdk module, versioned as bare ``vX.Y.Z`` tags (e.g. ``v0.6.0``).
-    Module-scoped tags such as ``horizon-*`` / ``horizonclient-*`` are excluded.
-    Reading the structs from a released tag (instead of master) keeps fields that
-    are not yet in a released RPC out of the compatibility matrix.
-
-    Returns:
-        GitHubRelease instance for the latest go-stellar-sdk module release
-
-    Raises:
-        ReleaseNotFoundError: If no module release is found
-        GitHubFetchError: If API request fails
-    """
-    api_url = 'https://api.github.com/repos/stellar/go-stellar-sdk/releases'
-
-    try:
-        response_data = _make_request(api_url)
-        releases = json.loads(response_data.decode('utf-8'))
-
-        if not releases:
-            raise ReleaseNotFoundError("No release data returned from GitHub API")
-
-        # Module releases are bare vX.Y.Z tags; exclude module-scoped tags
-        # (horizon-*, horizonclient-*, etc.) which carry a '-'.
-        module_releases = [
-            release for release in releases
-            if release.get('tag_name', '').startswith('v')
-            and '-' not in release.get('tag_name', '')
-        ]
-
-        if not module_releases:
-            raise ReleaseNotFoundError(
-                "No go-stellar-sdk module releases found (only module-scoped tags)"
-            )
-
-        # Releases are already sorted by published date (newest first).
-        return GitHubRelease.from_api_response(module_releases[0])
-
-    except json.JSONDecodeError as e:
-        raise GitHubFetchError(
-            f"Invalid JSON response from GitHub API: {e}"
-        ) from e
-    except KeyError as e:
-        raise GitHubFetchError(
-            f"Missing required field in API response: {e}"
-        ) from e
-    except ValueError as e:
-        raise GitHubFetchError(
-            f"Invalid data format in API response: {e}"
-        ) from e
-
-
 def fetch_rpc_jsonrpc_source(tag: str) -> str:
     """
     Fetch jsonrpc.go source code for a specific Stellar RPC release tag.
@@ -628,9 +572,8 @@ def _resolve_go_stellar_sdk_ref(rpc_tag: str) -> str:
 
     The RPC request/response structs (protocols/rpc) live in go-stellar-sdk, which
     versions independently of stellar-rpc. Reading them from the ref that the RPC
-    release actually depends on (per its go.mod) keeps the comparison matched to
-    exactly what that RPC release exposes, rather than to a lagging go-stellar-sdk
-    module tag.
+    release depends on (per its go.mod) matches the comparison to what that RPC
+    release exposes.
 
     Raises:
         GitHubFetchError: If the go.mod of the release cannot be fetched
@@ -715,66 +658,3 @@ def fetch_all_rpc_response_files(tag: str, method_names: List[str]) -> Dict[str,
         results[method_name] = fetch_rpc_response_file(tag, camel_to_snake(method_name))
 
     return results
-
-
-def main() -> None:
-    """
-    Main function for standalone testing.
-
-    Fetches latest Horizon release and displays information.
-    """
-    print("GitHub Fetcher for Stellar Horizon")
-    print("-" * 60)
-
-    # Show authentication status
-    if is_authenticated():
-        print("Authentication: Enabled (5,000 requests/hour)")
-    else:
-        print("Authentication: Not configured (60 requests/hour)")
-        print("  Tip: Set GITHUB_TOKEN env var for higher rate limits")
-    print("-" * 60)
-
-    print("Fetching latest Horizon release...")
-
-    try:
-        release = get_latest_release()
-        source = fetch_router_source(release.version)
-
-        print(f"Version: {release.version}")
-        print(f"Published: {release.published_at.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-        print(f"URL: {release.html_url}")
-        if release.commit_sha:
-            print(f"Commit SHA: {release.commit_sha}")
-        print("-" * 60)
-        print(f"Router source length: {len(source)} bytes")
-        print(f"Router source lines: {source.count(chr(10)) + 1}")
-        print("-" * 60)
-
-        # Display first 20 lines of router.go
-        lines = source.split('\n')
-        print("First 20 lines of router.go:")
-        for i, line in enumerate(lines[:20], 1):
-            print(f"{i:3d}: {line}")
-
-        if len(lines) > 20:
-            print(f"... ({len(lines) - 20} more lines)")
-
-        print("-" * 60)
-        print("Fetch successful!")
-
-    except ReleaseNotFoundError as e:
-        print(f"ERROR: {e}")
-        return
-    except SourceFileNotFoundError as e:
-        print(f"ERROR: {e}")
-        return
-    except GitHubFetchError as e:
-        print(f"ERROR: {e}")
-        return
-    except Exception as e:
-        print(f"UNEXPECTED ERROR: {e}")
-        raise
-
-
-if __name__ == '__main__':
-    main()

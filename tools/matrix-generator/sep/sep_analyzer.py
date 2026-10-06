@@ -23,11 +23,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import json
 import re
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional, Set, Tuple
+from typing import Collection, Dict, List, Any, Optional, Set, Tuple
 
 from common import (
-    CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, SDK_ROOT, STRKEY_TEST_FILE,
-    get_sdk_version, snake_to_camel,
+    CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, SDK_PACKAGE_PATH, SDK_ROOT, SDK_TEST_PACKAGE_PATH,
+    STRKEY_TEST_FILE, get_sdk_version, snake_to_camel,
 )
 
 
@@ -138,33 +138,32 @@ class SEPAnalyzer:
         self.sep_number = sep_number.zfill(4)
         # Directory naming uses short form: sep01, sep02, sep45 (not zero-padded)
         sep_dir_name = f'sep{str(int(self.sep_number)).zfill(2)}'
-        self.sep_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/sep' / sep_dir_name
-        self.test_dir_unit = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep' / sep_dir_name
-        self.test_dir_integration = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/integrationTests/sep' / sep_dir_name
+        self.sep_dir = SDK_ROOT / SDK_PACKAGE_PATH / 'sep' / sep_dir_name
+        self.test_dir_unit = SDK_ROOT / SDK_TEST_PACKAGE_PATH / 'unitTests/sep' / sep_dir_name
+        self.test_dir_integration = SDK_ROOT / SDK_TEST_PACKAGE_PATH / 'integrationTests/sep' / sep_dir_name
         # Special case: SEP-53 lives in KeyPair.kt, not in sep53/ directory
-        self.keypair_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/KeyPair.kt'
+        self.keypair_file = SDK_ROOT / SDK_PACKAGE_PATH / 'KeyPair.kt'
         # Special case: SEP-46, SEP-47, SEP-48 live in the contract/ directory
-        self.contract_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract'
+        self.contract_dir = SDK_ROOT / SDK_PACKAGE_PATH / 'contract'
         # Special case: SEP-51 lives in the generated xdr/ package
-        self.xdr_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr'
+        self.xdr_dir = SDK_ROOT / SDK_PACKAGE_PATH / 'xdr'
         self._xdr_sources: Dict[str, str] = {}
         # Special case: SEP-29 lives in the horizon/ package, next to the submit methods it guards
-        self.horizon_dir = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/horizon'
+        self.horizon_dir = SDK_ROOT / SDK_PACKAGE_PATH / 'horizon'
         self.sep29_files = (
             self.horizon_dir / 'Sep29Checker.kt',
             self.horizon_dir / 'HorizonServer.kt',
             self.horizon_dir / 'exceptions' / 'AccountRequiresMemoException.kt',
         )
-        self.operation_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/Operation.kt'
+        self.operation_file = SDK_ROOT / SDK_PACKAGE_PATH / 'Operation.kt'
         # Special case: SEP-23 is the StrKey object in the package root; its test vectors are
         # quoted in the StrKey unit test files
-        self.strkey_file = SDK_ROOT / 'stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/StrKey.kt'
-        self.common_test_dir = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk'
+        self.strkey_file = SDK_ROOT / SDK_PACKAGE_PATH / 'StrKey.kt'
+        self.common_test_dir = SDK_ROOT / SDK_TEST_PACKAGE_PATH
         self.strkey_test_files = tuple(
             self.common_test_dir / name for name in (STRKEY_TEST_FILE, CLAIMABLE_BALANCE_VECTORS_FILE)
         )
         self._source_texts: Dict[Path, str] = {}
-        self.analysis_data: Dict[str, Any] = {}
 
     def find_sep_files(self) -> List[Path]:
         """
@@ -230,14 +229,14 @@ class SEPAnalyzer:
 
         # Special case: SEP-53 test is Sep53Test.kt in unitTests/sep/sep53/
         if self.sep_number == '0053':
-            sep53_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/sep/sep53/Sep53Test.kt'
+            sep53_test_file = SDK_ROOT / SDK_TEST_PACKAGE_PATH / 'unitTests/sep/sep53/Sep53Test.kt'
             if sep53_test_file.exists():
                 files.append(sep53_test_file)
             return sorted(files)
 
         # Special case: SEP-29 test is Sep29CheckerTest.kt in unitTests/horizon/
         if self.sep_number == '0029':
-            sep29_test_file = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/horizon/Sep29CheckerTest.kt'
+            sep29_test_file = SDK_ROOT / SDK_TEST_PACKAGE_PATH / 'unitTests/horizon/Sep29CheckerTest.kt'
             if sep29_test_file.exists():
                 files.append(sep29_test_file)
             return sorted(files)
@@ -251,7 +250,7 @@ class SEPAnalyzer:
 
         # Special case: SEP-46, SEP-47, SEP-48 tests live in contract/
         if self.sep_number in ('0046', '0047', '0048'):
-            contract_test_dir = SDK_ROOT / 'stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/contract'
+            contract_test_dir = SDK_ROOT / SDK_TEST_PACKAGE_PATH / 'unitTests/contract'
             if contract_test_dir.exists() and contract_test_dir.is_dir():
                 files.extend(contract_test_dir.glob('*Test.kt'))
             return sorted(files)
@@ -587,11 +586,8 @@ class SEPAnalyzer:
 
         # Load SEP definition
         sep_def_path = DATA_DIR / 'sep' / f'sep_{self.sep_number}_definition.json'
-
-        sep_definition = {}
-        if sep_def_path.exists():
-            with open(sep_def_path, 'r', encoding='utf-8') as f:
-                sep_definition = json.load(f)
+        with open(sep_def_path, 'r', encoding='utf-8') as f:
+            sep_definition = json.load(f)
 
         # Analyze each file
         all_classes = []
@@ -669,6 +665,22 @@ class SEPAnalyzer:
         }
         mapper = mappers.get(self.sep_number, self.map_generic_fields)
         return mapper(classes, sep_definition)
+
+    @staticmethod
+    def _map_names(sep_fields: List[Dict[str, Any]], name_map: Dict[str, Optional[str]],
+                   available: Optional[Collection[str]] = None) -> Dict[str, Optional[str]]:
+        """
+        Map each SEP field to its SDK name in *name_map*.
+
+        A field without a mapped name, or whose name is not in *available* when
+        given, maps to None.
+        """
+        mappings: Dict[str, Optional[str]] = {}
+        for field in sep_fields:
+            field_name = field.get('name', '')
+            sdk_name = name_map.get(field_name)
+            mappings[field_name] = sdk_name if sdk_name and (available is None or sdk_name in available) else None
+        return mappings
 
     def map_sep_01_fields(self, classes: List[Dict[str, Any]],
                           sep_definition: Dict[str, Any]) -> Dict[str, Dict[str, Optional[str]]]:
@@ -833,7 +845,7 @@ class SEPAnalyzer:
                 for field in sep_fields:
                     field_name = field.get('name', '')
                     # These are implicit in method signatures
-                    section_mappings[field_name] = f"(handled by service methods)"
+                    section_mappings[field_name] = "(handled by service methods)"
 
             elif section_key == 'request_types':
                 # Map request types to service methods
@@ -843,13 +855,7 @@ class SEPAnalyzer:
                     'txid': 'resolveTransactionId',
                     'forward': 'resolveForward'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = method_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, method_map, all_methods)
 
             elif section_key == 'response_fields':
                 # Map response fields to FederationResponse properties
@@ -859,13 +865,7 @@ class SEPAnalyzer:
                     'memo_type': 'memoType',
                     'memo': 'memo'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_property = property_map.get(field_name)
-                    if sdk_property and sdk_property in all_properties:
-                        section_mappings[field_name] = sdk_property
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, all_properties)
 
             field_mappings[section_key] = section_mappings
 
@@ -916,13 +916,7 @@ class SEPAnalyzer:
                     'generate_mnemonic_with_strength': 'generateMnemonic',
                     'generate_mnemonic_with_language': 'generateMnemonic'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = method_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, method_map, all_methods)
 
             elif section_key == 'mnemonic_validation':
                 # Map validation functions
@@ -932,14 +926,8 @@ class SEPAnalyzer:
                     'from_mnemonic': 'from',
                     'validate_checksum': 'isValidMnemonic'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = method_map.get(field_name)
-                    # isValidMnemonic and detectLanguage are static methods in MnemonicUtils
-                    if sdk_method:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = None
+                # isValidMnemonic and detectLanguage are static methods in MnemonicUtils
+                section_mappings = self._map_names(sep_fields, method_map)
 
             elif section_key == 'language_support':
                 # Map language enum values (MnemonicLanguage enum)
@@ -966,13 +954,7 @@ class SEPAnalyzer:
                     'mnemonic_to_seed': 'from',  # from() method handles mnemonic to seed
                     'passphrase_support': 'from'  # from() supports passphrase parameter
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = seed_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = sdk_method if sdk_method else None
+                section_mappings = self._map_names(sep_fields, seed_map)
 
             elif section_key == 'slip0010_key_derivation' or section_key == 'slip-0010_key_derivation':
                 # Map SLIP-0010 HD key derivation features
@@ -983,13 +965,7 @@ class SEPAnalyzer:
                     'ed25519_master_key_generation': 'getKeyPair',  # Internal algorithm
                     'ed25519_child_key_derivation': 'getKeyPair'  # Internal algorithm
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = slip_map.get(field_name)
-                    if sdk_method and sdk_method in all_methods:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = sdk_method if sdk_method else None
+                section_mappings = self._map_names(sep_fields, slip_map)
 
             elif section_key == 'key_export':
                 # Map key export methods
@@ -1000,13 +976,7 @@ class SEPAnalyzer:
                     'get_account_id': 'getKeyPair',  # KeyPair.getAccountId()
                     'get_private_key': 'getKeyPair'  # KeyPair exposes private key via getSecretSeed()
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_method = export_map.get(field_name)
-                    if sdk_method:
-                        section_mappings[field_name] = sdk_method
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, export_map)
 
             elif section_key == 'test_vectors':
                 # Test vectors are validation tests, not API features
@@ -1192,10 +1162,7 @@ class SEPAnalyzer:
                     'action_required': 'ActionRequired',
                     'rejected': 'Rejected'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    variant = status_map.get(field_name)
-                    section_mappings[field_name] = variant if variant else None
+                section_mappings = self._map_names(sep_fields, status_map)
 
             elif section_key == 'success_response_fields':
                 # Map to Success sealed class properties
@@ -1204,14 +1171,7 @@ class SEPAnalyzer:
                     'tx': 'tx',
                     'message': 'message'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    if sdk_prop and (sdk_prop == '(implicit)' or
-                                   ('Success' in all_properties and sdk_prop in all_properties.get('Success', set()))):
-                        section_mappings[field_name] = sdk_prop
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, {'(implicit)'} | all_properties.get('Success', set()))
 
             elif section_key == 'revised_response_fields':
                 # Map to Revised sealed class properties
@@ -1220,14 +1180,7 @@ class SEPAnalyzer:
                     'tx': 'tx',
                     'message': 'message'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    if sdk_prop and (sdk_prop == '(implicit)' or
-                                   ('Revised' in all_properties and sdk_prop in all_properties.get('Revised', set()))):
-                        section_mappings[field_name] = sdk_prop
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, {'(implicit)'} | all_properties.get('Revised', set()))
 
             elif section_key == 'pending_response_fields':
                 # Map to Pending sealed class properties
@@ -1236,14 +1189,7 @@ class SEPAnalyzer:
                     'timeout': 'timeout',
                     'message': 'message'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    if sdk_prop and (sdk_prop == '(implicit)' or
-                                   ('Pending' in all_properties and sdk_prop in all_properties.get('Pending', set()))):
-                        section_mappings[field_name] = sdk_prop
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, {'(implicit)'} | all_properties.get('Pending', set()))
 
             elif section_key == 'action_required_response_fields':
                 # Map to ActionRequired sealed class properties
@@ -1254,14 +1200,7 @@ class SEPAnalyzer:
                     'action_method': 'actionMethod',
                     'action_fields': 'actionFields'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    if sdk_prop and (sdk_prop == '(implicit)' or
-                                   ('ActionRequired' in all_properties and sdk_prop in all_properties.get('ActionRequired', set()))):
-                        section_mappings[field_name] = sdk_prop
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, {'(implicit)'} | all_properties.get('ActionRequired', set()))
 
             elif section_key == 'rejected_response_fields':
                 # Map to Rejected sealed class properties
@@ -1269,14 +1208,7 @@ class SEPAnalyzer:
                     'status': '(implicit)',
                     'error': 'error'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    if sdk_prop and (sdk_prop == '(implicit)' or
-                                   ('Rejected' in all_properties and sdk_prop in all_properties.get('Rejected', set()))):
-                        section_mappings[field_name] = sdk_prop
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, property_map, {'(implicit)'} | all_properties.get('Rejected', set()))
 
             elif section_key == 'action_url_handling':
                 # Map to postAction method and response handling
@@ -1286,13 +1218,7 @@ class SEPAnalyzer:
                     'action_url_post_response_no_further_action': 'Done',
                     'action_url_post_response_follow_next_url': 'NextUrl'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_item = action_map.get(field_name)
-                    if sdk_item:
-                        section_mappings[field_name] = sdk_item
-                    else:
-                        section_mappings[field_name] = None
+                section_mappings = self._map_names(sep_fields, action_map)
 
             elif section_key == 'stellar_toml_fields':
                 # Map to RegulatedAsset properties
@@ -1301,10 +1227,7 @@ class SEPAnalyzer:
                     'approval_server': 'approvalServer',
                     'approval_criteria': 'approvalCriteria'
                 }
-                for field in sep_fields:
-                    field_name = field.get('name', '')
-                    sdk_prop = property_map.get(field_name)
-                    section_mappings[field_name] = sdk_prop if sdk_prop else None
+                section_mappings = self._map_names(sep_fields, property_map)
 
             elif section_key == 'authorization_flags':
                 # Authorization flags are in Stellar core, not SDK-specific
@@ -1561,19 +1484,8 @@ class SEPAnalyzer:
         for section in sep_definition.get('sections', []):
             section_key = section.get('key', '')
             feature_map = section_maps.get(section_key, {})
-            section_mappings: Dict[str, Optional[str]] = {}
-
-            for field in section.get('fields', []):
-                field_name = field.get('name', '')
-                sdk_method = feature_map.get(field_name)
-                # Verify the mapped method actually exists in the SDK classes.
-                if sdk_method and sdk_method in all_methods:
-                    section_mappings[field_name] = sdk_method
-                else:
-                    # Method not found or no mapping defined.
-                    section_mappings[field_name] = None
-
-            field_mappings[section_key] = section_mappings
+            # A mapped method counts only when it exists in the SDK classes.
+            field_mappings[section_key] = self._map_names(section.get('fields', []), feature_map, all_methods)
 
         return field_mappings
 
@@ -2232,11 +2144,7 @@ class SEPAnalyzer:
         for section in sep_definition.get('sections', []):
             section_key = section.get('key', '')
             section_map = section_maps.get(section_key, {})
-            section_mappings: Dict[str, Optional[str]] = {}
-            for field in section.get('fields', []):
-                field_name = field.get('name', '')
-                section_mappings[field_name] = section_map.get(field_name)
-            field_mappings[section_key] = section_mappings
+            field_mappings[section_key] = self._map_names(section.get('fields', []), section_map)
 
         return field_mappings
 
@@ -2330,12 +2238,7 @@ class SEPAnalyzer:
                 'implementation_support': implementation_support_map,
             }.get(section_key, {})
 
-            section_mappings: Dict[str, Optional[str]] = {}
-            for field in sep_fields:
-                field_name = field.get('name', '')
-                section_mappings[field_name] = section_map.get(field_name)
-
-            field_mappings[section_key] = section_mappings
+            field_mappings[section_key] = self._map_names(sep_fields, section_map)
 
         return field_mappings
 
@@ -2383,12 +2286,7 @@ class SEPAnalyzer:
                 'implementation_support': implementation_support_map,
             }.get(section_key, {})
 
-            section_mappings: Dict[str, Optional[str]] = {}
-            for field in sep_fields:
-                field_name = field.get('name', '')
-                section_mappings[field_name] = section_map.get(field_name)
-
-            field_mappings[section_key] = section_mappings
+            field_mappings[section_key] = self._map_names(sep_fields, section_map)
 
         return field_mappings
 
@@ -2474,12 +2372,7 @@ class SEPAnalyzer:
             sep_fields = section.get('fields', [])
             section_map = section_dispatch.get(section_key, {})
 
-            section_mappings: Dict[str, Optional[str]] = {}
-            for field in sep_fields:
-                field_name = field.get('name', '')
-                section_mappings[field_name] = section_map.get(field_name)
-
-            field_mappings[section_key] = section_mappings
+            field_mappings[section_key] = self._map_names(sep_fields, section_map)
 
         return field_mappings
 

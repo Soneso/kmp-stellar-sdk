@@ -12,13 +12,12 @@ License: Apache-2.0
 
 import json
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Set, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from common import Colors, DATA_DIR, SDK_ROOT, get_sdk_version, camel_to_snake
+from common import SDK_PACKAGE_PATH, SDK_ROOT, get_sdk_version, camel_to_snake
 
 
 @dataclass
@@ -85,11 +84,11 @@ class KmpSDKAnalyzer:
         "forBuyingAsset": "buying_asset",
         "forSellingAsset": "selling_asset",
         "forOffer": "offer_id",
-        "forOfferId": "offer_id",  # FIX Issue 6: TradesRequestBuilder.forOfferId()
+        "forOfferId": "offer_id",  # TradesRequestBuilder.forOfferId()
         "forTransaction": "transaction_id",
         "forLedger": "ledger_sequence",
         "forType": "type",
-        "forTradeType": "type",  # FIX Issues 2-4: Maps to "type" parameter in Horizon API
+        "forTradeType": "type",  # Horizon names the trade type parameter "type"
         "forReserveAssets": "reserves",
         "forPoolId": "liquidity_pool_id",
         "forClaimableBalance": "claimable_balance_id",
@@ -102,7 +101,7 @@ class KmpSDKAnalyzer:
         # TradesRequestBuilder methods
         "baseAsset": "base_asset",
         "counterAsset": "counter_asset",
-        "tradeType": "type",  # FIX Issues 2-4: Alternative mapping
+        "tradeType": "type",
         "offerId": "offer_id",
         "liquidityPoolId": "liquidity_pool_id",
         # OrderBookRequestBuilder methods
@@ -119,15 +118,8 @@ class KmpSDKAnalyzer:
         "destinationAmount": "destination_amount",
     }
 
-    # Parameter name aliases - maps Horizon API parameter names to SDK parameter names
-    # FIX Issues 2-4 and 5: Allow parameter name variations
-    PARAMETER_ALIASES = {
-        'type': ['trade_type', 'tradeType'],  # FIX Issues 2-4: trade_type <-> type
-        'tx': ['transactionEnvelopeXdr'],     # FIX Issue 5: transactionEnvelopeXdr -> tx
-    }
-
-    # Endpoint equivalences - different API patterns that access the same functionality
-    # FIX Issue 6: Query parameter approach vs path-based approach
+    # Endpoint equivalences - different API patterns that access the same functionality:
+    # a path segment in Horizon, a query parameter in the SDK
     ENDPOINT_EQUIVALENCES = {
         '/offers/{offer_id}/trades': {
             'equivalent_to': '/trades?offer_id={id}',
@@ -140,32 +132,8 @@ class KmpSDKAnalyzer:
     def __init__(self) -> None:
         """Initialize analyzer using SDK_ROOT from common module."""
         self.sdk_root = SDK_ROOT
-        self.requests_dir = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "horizon"
-            / "requests"
-        )
-        self.horizon_server = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "horizon"
-            / "HorizonServer.kt"
-        )
+        self.requests_dir = SDK_ROOT / SDK_PACKAGE_PATH / "horizon" / "requests"
+        self.horizon_server = SDK_ROOT / SDK_PACKAGE_PATH / "horizon" / "HorizonServer.kt"
         self.request_builder_base = self.requests_dir / "RequestBuilder.kt"
         self.builders: List[RequestBuilderInfo] = []
         self.exposed_builders: Set[str] = set()
@@ -183,7 +151,7 @@ class KmpSDKAnalyzer:
         print("\nStep 1: Analyzing base RequestBuilder class...")
         self._analyze_base_request_builder()
 
-        # Step 2: Find exposed builders in HorizonServer class (FIXED: now detects factory methods)
+        # Step 2: Find exposed builders in HorizonServer class, including factory methods
         print("\nStep 2: Analyzing HorizonServer class for exposed builders...")
         self._analyze_horizon_server_class()
 
@@ -191,7 +159,7 @@ class KmpSDKAnalyzer:
         print("\nStep 3: Analyzing utility classes...")
         self._analyze_utility_classes()
 
-        # Step 4: Analyze each request builder (FIXED: now detects multi-endpoint patterns)
+        # Step 4: Analyze each request builder, including multi-endpoint patterns
         print("\nStep 4: Analyzing request builders...")
         self._analyze_request_builders()
 
@@ -200,7 +168,7 @@ class KmpSDKAnalyzer:
         self._build_sdk_methods_mapping()
 
         print(f"\n{'='*70}")
-        print(f"ANALYSIS COMPLETE")
+        print("ANALYSIS COMPLETE")
         print(f"{'='*70}")
         print(f"Analyzed {len(self.builders)} request builders")
         print(f"Found {len(self.exposed_builders)} exposed in HorizonServer class")
@@ -211,7 +179,6 @@ class KmpSDKAnalyzer:
         """
         Analyze the base RequestBuilder class to extract methods that all builders inherit.
 
-        PRIORITY 2 FIX: This addresses the streaming support detection failure.
         All RequestBuilder classes inherit from the base RequestBuilder class which provides
         universal methods like stream(), cursor(), limit(), order(), etc.
         """
@@ -253,7 +220,7 @@ class KmpSDKAnalyzer:
 
         # Check specifically for streaming support
         if 'stream' in methods:
-            print(f"  Base class provides universal streaming support via stream() method")
+            print("  Base class provides universal streaming support via stream() method")
 
         print(f"  Total base class methods: {len(methods)}")
 
@@ -261,9 +228,8 @@ class KmpSDKAnalyzer:
         """
         Analyze HorizonServer class to find exposed builders and direct endpoint implementations.
 
-        PRIORITY 1 FIX: This now correctly detects factory methods that return RequestBuilder
-        instances. Previous version only looked for zero-argument methods, missing methods with
-        parameters like tradeAggregations(...).
+        Factory methods that return a RequestBuilder count with or without parameters
+        (tradeAggregations(...) takes parameters).
         """
         if not self.horizon_server.exists():
             print(f"  WARNING: HorizonServer file not found: {self.horizon_server}")
@@ -271,7 +237,6 @@ class KmpSDKAnalyzer:
 
         content = self.horizon_server.read_text()
 
-        # PRIORITY 1 FIX: Improved factory method detection
         # Pattern 1: fun methodName(): BuilderType (zero arguments)
         # Pattern 2: fun methodName(...): BuilderType (with arguments, like tradeAggregations)
         # Pattern 3: fun methodName(): fully.qualified.BuilderType (with package name)
@@ -280,7 +245,7 @@ class KmpSDKAnalyzer:
         factory_pattern = r'fun\s+(\w+)\s*\([^)]*\)\s*:\s*(?:[\w.]+\.)?(\w+RequestBuilder)'
         factory_matches = re.findall(factory_pattern, content)
 
-        print(f"  Scanning for factory methods returning RequestBuilder...")
+        print("  Scanning for factory methods returning RequestBuilder...")
         for method_name, builder_class in factory_matches:
             self.exposed_builders.add(builder_class)
             self.builder_properties[builder_class] = method_name
@@ -298,7 +263,7 @@ class KmpSDKAnalyzer:
         Direct endpoints are those implemented directly in HorizonServer without
         using a RequestBuilder class (e.g., submitTransaction, root).
         """
-        print(f"  Scanning for direct endpoint implementations...")
+        print("  Scanning for direct endpoint implementations...")
 
         # Look for root() method
         root_pattern = r'suspend\s+fun\s+root\s*\(\s*\)\s*:\s*(\w+)'
@@ -309,7 +274,7 @@ class KmpSDKAnalyzer:
                 "return_type": "RootResponse",
                 "implemented": True
             }
-            print(f"    Found: GET / -> root()")
+            print("    Found: GET / -> root()")
 
         # Look for submitTransaction() method
         submit_pattern = r'suspend\s+fun\s+submitTransaction\s*\('
@@ -320,41 +285,30 @@ class KmpSDKAnalyzer:
                 "return_type": "SubmitTransactionResponse",
                 "implemented": True
             }
-            print(f"    Found: POST /transactions -> submitTransaction()")
+            print("    Found: POST /transactions -> submitTransaction()")
 
         # Look for submitTransactionAsync() or submitAsyncTransaction() method
         async_submit_pattern = r'suspend\s+fun\s+submit(?:Transaction)?Async(?:Transaction)?\s*\('
         if re.search(async_submit_pattern, content):
-            # FIX Issue 5: Check if method maps transactionEnvelopeXdr to tx parameter
+            # Check if the method maps transactionEnvelopeXdr to the tx parameter
             has_tx_mapping = 'append("tx"' in content or "append('tx'" in content
             self.direct_endpoints["/transactions_async"] = {
                 "method": "submitTransactionAsync",
                 "http_method": "POST",
                 "return_type": "SubmitTransactionAsyncResponse",
                 "implemented": True,
-                "parameters": ["tx"],  # FIX Issue 5: Document tx parameter support
+                "parameters": ["tx"],
                 "notes": "Parameter transactionEnvelopeXdr is mapped to tx internally" if has_tx_mapping else ""
             }
-            print(f"    Found: POST /transactions_async -> submitTransactionAsync()")
+            print("    Found: POST /transactions_async -> submitTransactionAsync()")
             if has_tx_mapping:
-                print(f"      Note: transactionEnvelopeXdr parameter mapped to 'tx'")
+                print("      Note: transactionEnvelopeXdr parameter mapped to 'tx'")
 
         print(f"  Total direct endpoints: {len(self.direct_endpoints)}")
 
     def _analyze_utility_classes(self) -> None:
         """Analyze utility classes like FriendBot that provide direct endpoint access"""
-        util_path = (
-            SDK_ROOT
-            / "stellar-sdk"
-            / "src"
-            / "commonMain"
-            / "kotlin"
-            / "com"
-            / "soneso"
-            / "stellar"
-            / "sdk"
-            / "FriendBot.kt"
-        )
+        util_path = SDK_ROOT / SDK_PACKAGE_PATH / "FriendBot.kt"
         if not util_path.exists():
             print(f"  FriendBot utility class not found at: {util_path}")
             return
@@ -375,9 +329,9 @@ class KmpSDKAnalyzer:
                         "implemented": True,
                         "notes": "Implemented via FriendBot utility class (testnet/futurenet only)"
                     }
-                    print(f"  Found utility class: FriendBot")
-                    print(f"    Methods: fundTestnetAccount(), fundFuturenetAccount()")
-                    print(f"    Maps to: GET /friendbot endpoint")
+                    print("  Found utility class: FriendBot")
+                    print("    Methods: fundTestnetAccount(), fundFuturenetAccount()")
+                    print("    Maps to: GET /friendbot endpoint")
 
     def _analyze_request_builders(self) -> None:
         """Analyze all request builder files"""
@@ -397,8 +351,8 @@ class KmpSDKAnalyzer:
         """
         Analyze a single request builder file.
 
-        PRIORITY 3 FIX: Now detects multi-endpoint patterns by analyzing setSegments() calls
-        in methods like forAccount(), forLedger(), etc.
+        Detects multi-endpoint patterns by analyzing setSegments() calls in methods
+        like forAccount(), forLedger(), etc.
         """
         content = file_path.read_text()
 
@@ -410,7 +364,7 @@ class KmpSDKAnalyzer:
 
         class_name = class_match.group(1)
 
-        # PRIORITY 3 FIX: Extract endpoints dynamically from setSegments() calls
+        # Extract endpoints dynamically from setSegments() calls
         endpoints = self._extract_endpoints_from_builder(content, class_name)
 
         # If no endpoints found via analysis, fall back to hardcoded list
@@ -423,8 +377,7 @@ class KmpSDKAnalyzer:
         # Extract filter methods
         filter_methods = self._extract_filter_methods(content, class_name)
 
-        # PRIORITY 2 FIX: Check for streaming support via base class inheritance
-        # All RequestBuilder subclasses inherit stream() method
+        # All RequestBuilder subclasses inherit the stream() method
         streaming_support = True  # All builders inherit from RequestBuilder which has stream()
 
         # Check if exposed in SDK
@@ -454,8 +407,8 @@ class KmpSDKAnalyzer:
 
     def _extract_endpoints_from_builder(self, content: str, class_name: str) -> List[str]:
         """
-        PRIORITY 3 FIX: Extract endpoint paths by analyzing setSegments() calls.
-        FIX Issue 1: Also detect endpoint-specific methods like accountData().
+        Extract endpoint paths by analyzing setSegments() calls, including
+        endpoint-specific methods like accountData().
 
         This detects multi-endpoint patterns like:
         - fun forAccount(account: String) { setSegments("accounts", account, "transactions") }
@@ -478,7 +431,7 @@ class KmpSDKAnalyzer:
         # setSegments("accounts", accountId)
         # setSegments("accounts", account, "transactions")
         # setSegments("ledgers", ledgerSeq.toString(), "transactions")
-        # setSegments("accounts", accountId, "data", key)  # FIX Issue 1
+        # setSegments("accounts", accountId, "data", key)
         def _setsegments_arg_lists(text):
             idx = 0
             while True:
@@ -530,7 +483,7 @@ class KmpSDKAnalyzer:
                     path_parts.append(segment_clean)
                 elif any(keyword in segment for keyword in ['.toString()', 'account', 'ledger', 'transaction',
                                                             'operation', 'claimable', 'liquidity', 'offer', 'pool',
-                                                            'key', 'data']):  # FIX Issue 1: Added 'key', 'data'
+                                                            'key', 'data']):
                     # Variable reference - create placeholder
                     # Infer the placeholder name from common patterns
                     if 'account' in segment.lower():
@@ -548,7 +501,7 @@ class KmpSDKAnalyzer:
                     elif 'offer' in segment.lower():
                         path_parts.append('{offer_id}')
                     elif 'key' in segment.lower():
-                        # FIX Issue 1: data entry key placeholder
+                        # Data entry key placeholder
                         path_parts.append('{key}')
                     else:
                         # Generic variable: infer the placeholder from the
@@ -585,9 +538,9 @@ class KmpSDKAnalyzer:
 
     def _extract_methods(self, content: str, class_name: str) -> List[Dict[str, str]]:
         """
-        PRIORITY 5 FIX: Extract public methods with enhanced Kotlin pattern recognition.
+        Extract public methods from a Kotlin source file.
 
-        Now detects:
+        Detects:
         - Regular methods: fun methodName(...): ReturnType
         - Suspend functions: suspend fun methodName(...): ReturnType
         - Generic methods: fun <T> methodName(...): ReturnType
@@ -596,7 +549,6 @@ class KmpSDKAnalyzer:
         """
         methods = []
 
-        # PRIORITY 5 FIX: Enhanced pattern for Kotlin method definitions
         # Matches: [inline] [suspend] fun [<generics>] methodName(...): ReturnType[?]
         method_pattern = r'(?:inline\s+)?(?:suspend\s+)?fun\s+(?:<[^>]+>\s+)?(\w+)\s*\([^)]*\)\s*:\s*([\w<>?]+)'
 
@@ -630,7 +582,7 @@ class KmpSDKAnalyzer:
 
     def _extract_filter_methods(self, content: str, class_name: str) -> List[Dict[str, str]]:
         """
-        PRIORITY 4 FIX: Extract filter methods from builder with improved parameter detection.
+        Extract filter methods from a builder with their parameters.
 
         Detects methods that return the builder itself (fluent API pattern) and extracts
         parameters they set on the URI.
@@ -657,7 +609,7 @@ class KmpSDKAnalyzer:
                     "parameter": param_name
                 })
             else:
-                # PRIORITY 4 FIX: Try to infer parameter name from method name
+                # Infer the parameter name from the method name
                 # Common patterns: forXxx -> xxx, includeXxx -> include_xxx, withXxx -> xxx
                 if method_name.startswith('for'):
                     # forAccount -> account_id, forLedger -> ledger_sequence, etc.
@@ -731,7 +683,7 @@ class KmpSDKAnalyzer:
             elif "Implemented via" not in notes:
                 notes = f"Implemented via {method_name}() method. {notes}"
 
-            # FIX Issue 5: Include parameters list if present
+            # Include the parameters list if present
             filters = endpoint_info.get("parameters", [])
 
             self.sdk_methods[key] = {
@@ -764,7 +716,7 @@ class KmpSDKAnalyzer:
                     "class": builder.class_name,
                     "streaming": builder.streaming_support,
                     "deprecated": False,
-                    "filters": list(set(filters)),  # Remove duplicates
+                    "filters": sorted(set(filters)),  # Unique, in a stable order
                     "notes": f"Implemented via {builder.class_name}" if implemented else ""
                 }
 
@@ -790,8 +742,7 @@ class KmpSDKAnalyzer:
                                     "notes": f"Implemented via {sub_builder.class_name}"
                                 }
 
-        # FIX Issue 6: Add endpoint equivalences
-        # These are endpoints that are implemented via alternative patterns
+        # Add endpoint equivalences: endpoints implemented via alternative patterns
         for equiv_endpoint, equiv_info in self.ENDPOINT_EQUIVALENCES.items():
             if equiv_endpoint not in self.sdk_methods:
                 # Find the builder that implements the equivalent functionality
@@ -814,7 +765,7 @@ class KmpSDKAnalyzer:
                             "class": builder_name,
                             "streaming": builder.streaming_support,
                             "deprecated": False,
-                            "filters": list(set(filters)),
+                            "filters": sorted(set(filters)),
                             "notes": f"{equiv_info['note']}. Use {builder.sdk_property}().{method_name}()"
                         }
 
@@ -875,52 +826,3 @@ class KmpSDKAnalyzer:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
         print(f"Saved SDK analysis to: {output_path}")
-
-
-def main() -> int:
-    """Main entry point"""
-    print("=" * 70)
-    print("KMP Stellar SDK Implementation Analyzer")
-    print("=" * 70)
-    print()
-
-    output_path = DATA_DIR / "horizon" / "kmp_sdk_implementation.json"
-
-    try:
-        analyzer = KmpSDKAnalyzer()
-        analyzer.analyze()
-
-        analyzer.save_json(output_path)
-
-        print()
-        print("=" * 70)
-        print("SUMMARY")
-        print("=" * 70)
-        print(f"SDK Version: {get_sdk_version()}")
-        print(f"Total Request Builders: {len(analyzer.builders)}")
-        print(f"Exposed in HorizonServer: {len(analyzer.exposed_builders)}")
-        print()
-        print("Request Builders:")
-        for builder in sorted(analyzer.builders, key=lambda b: b.class_name):
-            status = "v" if builder.exposed_in_sdk else " "
-            streaming = "S" if builder.streaming_support else " "
-            print(f"  [{status}] [{streaming}] {builder.class_name:40s} "
-                  f"({len(builder.endpoints)} endpoints, {len(builder.filter_methods)} filters)")
-        print()
-        print("Legend: [v] = Exposed in SDK, [S] = Streaming support")
-        print()
-        print("=" * 70)
-        print("Analysis completed successfully!")
-        print("=" * 70)
-
-        return 0
-
-    except Exception as e:
-        print(f"\nERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

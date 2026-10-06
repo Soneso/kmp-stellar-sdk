@@ -14,9 +14,13 @@ SDK_ROOT = TOOLS_DIR.parent.parent
 DATA_DIR = TOOLS_DIR / 'data'
 COMPATIBILITY_DIR = SDK_ROOT / 'compatibility'
 
-# Unit test files that quote the SEP-23 test vectors, relative to the SDK's commonTest package
-# root com/soneso/stellar/sdk/. The SEP parser names the file each vector is quoted in and the
-# SEP analyzer reads that file.
+# Package roots com/soneso/stellar/sdk/ of the SDK sources (commonMain) and tests (commonTest),
+# relative to SDK_ROOT.
+SDK_PACKAGE_PATH = Path('stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk')
+SDK_TEST_PACKAGE_PATH = Path('stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk')
+
+# Unit test files that quote the SEP-23 test vectors, relative to SDK_TEST_PACKAGE_PATH. The SEP
+# parser names the file each vector is quoted in and the SEP analyzer reads that file.
 STRKEY_TEST_FILE = 'unitTests/StrKeyTest.kt'
 CLAIMABLE_BALANCE_VECTORS_FILE = 'unitTests/ClaimableBalanceVectors.kt'
 
@@ -30,14 +34,13 @@ class Colors:
     YELLOW = '\033[93m'
     RED = '\033[91m'
     BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
     END = '\033[0m'
 
     @classmethod
     def disable(cls):
         """Disable colors (for non-TTY output)"""
         for attr in ('HEADER', 'BLUE', 'CYAN', 'GREEN', 'YELLOW',
-                      'RED', 'BOLD', 'UNDERLINE', 'END'):
+                      'RED', 'BOLD', 'END'):
             setattr(cls, attr, '')
 
 
@@ -124,6 +127,20 @@ class ProgressTracker:
         """Log a message (only in verbose mode unless forced)."""
         if self.verbose or force:
             print(f"  {message}")
+
+    def log_github_access(self, authenticated: bool) -> None:
+        """Log the GitHub API rate limit that applies to the run."""
+        if authenticated:
+            self.log("GitHub: Authenticated (5,000 req/hour)", force=True)
+        else:
+            self.log("GitHub: Unauthenticated (60 req/hour)", force=True)
+            self.log("  Tip: Set GITHUB_TOKEN for higher limits", force=True)
+
+    def log_release(self, release_info: Dict[str, str]) -> None:
+        """Log the version, release date and source of the analysed release."""
+        self.log(f"Version: {release_info['version']}", force=True)
+        self.log(f"Published: {release_info['published_at']}", force=True)
+        self.log(f"Source: {release_info['html_url']}", force=True)
 
     def print_summary(self, stats: Dict[str, Any]) -> None:
         """Print final summary with coverage stats."""

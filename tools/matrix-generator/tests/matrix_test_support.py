@@ -13,7 +13,7 @@ from typing import Any, ContextManager, Dict, List, Optional, Sequence, TypeVar
 
 TOOLS_DIR = Path(__file__).resolve().parent.parent
 
-for _path in (TOOLS_DIR / "rpc", TOOLS_DIR / "sep", TOOLS_DIR):
+for _path in (TOOLS_DIR / "horizon", TOOLS_DIR / "rpc", TOOLS_DIR / "sep", TOOLS_DIR):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
@@ -25,6 +25,14 @@ METHOD_PREFIXES = (
 )
 
 RELEASE_PAGE_2_URL = "https://api.github.com/repositories/1/releases?per_page=100&page=2"
+
+# The release_info of stellar-rpc v28.0.1, as the RPC pipeline stores it.
+RELEASE_INFO = {
+    "version": "v28.0.1",
+    "published_at": "2026-08-27",
+    "html_url": "https://github.com/stellar/stellar-rpc/releases/tag/v28.0.1",
+    "source": "GitHub",
+}
 
 _T = TypeVar("_T")
 
@@ -52,6 +60,16 @@ def release_record(
         "html_url": f"https://github.com/stellar/stellar-rpc/releases/tag/{tag}",
         "target_commitish": "main",
     }
+
+
+def jsonrpc_file(prefixes: Sequence[str] = METHOD_PREFIXES) -> str:
+    """Return a stellar-rpc jsonrpc.go registering *prefixes* in the layout of v28.0.1."""
+    registrations = "".join(
+        f"\t\t{{\n\t\t\tmethodName:{' ' * (1 + 10 * (index % 2))}protocol.{prefix}MethodName,\n"
+        f"\t\t\tlongName:             toSnakeCase(protocol.{prefix}MethodName),\n\t\t}},\n"
+        for index, prefix in enumerate(prefixes)
+    )
+    return f"package internal\n\nvar handlers = []struct{{}}{{\n{registrations}}}\n"
 
 
 def request_file(prefix: str) -> str:

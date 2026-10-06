@@ -11,17 +11,11 @@ License: Apache-2.0
 
 import json
 import re
-import sys
-import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from common import Colors, DATA_DIR, COMPATIBILITY_DIR, SDK_ROOT, get_sdk_version  # noqa: E402
 
 
 class CompatibilityStatus(Enum):
@@ -73,9 +67,6 @@ class HorizonSDKComparator:
         self.horizon_data: Dict[str, Any] = {}
         self.sdk_data: Dict[str, Any] = {}
         self.comparisons: List[EndpointComparison] = []
-        self.horizon_version: str = "Unknown"
-        self.horizon_release_date: str = "Unknown"
-        self.horizon_release_url: str = ""
         self._cached_stats: Optional[Dict[str, Any]] = None
 
     def load_data(self) -> None:
@@ -89,10 +80,10 @@ class HorizonSDKComparator:
             self.sdk_data = json.load(f)
 
         # Extract Horizon version information from metadata
-        metadata = self.horizon_data.get('metadata', {})
-        self.horizon_version = metadata.get('horizon_version', 'Unknown')
-        self.horizon_release_date = metadata.get('horizon_release_date', 'Unknown')
-        self.horizon_release_url = metadata.get('horizon_release_url', '')
+        metadata = self.horizon_data['metadata']
+        self.horizon_version: str = metadata['horizon_version']
+        self.horizon_release_date: str = metadata['horizon_release_date']
+        self.horizon_release_url: str = metadata['horizon_release_url']
 
         print(f"Loaded {self.horizon_data['metadata']['total_endpoints']} Horizon endpoints")
         print(f"Horizon version: {self.horizon_version}")
@@ -286,9 +277,6 @@ class HorizonSDKComparator:
                 # Find the first method that looks like a detail-fetch
                 # (returns a non-builder type, is not a filter/pagination).
                 pagination = {'cursor', 'limit', 'order'}
-                filter_params = {
-                    fm.get('parameter', '') for fm in builder.get('filter_methods', [])
-                }
                 for m in builder.get('methods', []):
                     method_name = m.get('name', '')
                     return_type = m.get('return_type', '')
@@ -826,13 +814,8 @@ class HorizonSDKComparator:
             f.write("# Horizon API vs KMP Stellar SDK Compatibility Matrix\n\n")
 
             # Horizon Version Information
-            horizon_version_display = self.horizon_version
-            if self.horizon_release_date != "Unknown":
-                horizon_version_display += f" (released {self.horizon_release_date})"
-
-            f.write(f"**Horizon Version:** {horizon_version_display}  \n")
-            if self.horizon_release_url:
-                f.write(f"**Horizon Source:** [{self.horizon_version}]({self.horizon_release_url})  \n")
+            f.write(f"**Horizon Version:** {self.horizon_version} (released {self.horizon_release_date})  \n")
+            f.write(f"**Horizon Source:** [{self.horizon_version}]({self.horizon_release_url})  \n")
             f.write(f"**SDK Version:** {self.sdk_data['metadata']['sdk_version']}  \n")
             f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
@@ -1036,7 +1019,6 @@ class HorizonSDKComparator:
             'horizon_version': self.horizon_version,
             'horizon_release_date': self.horizon_release_date,
             'horizon_release_url': self.horizon_release_url,
-            'horizon_commit': self.horizon_data['metadata'].get('commit', 'unknown'),
             'sdk_version': self.sdk_data['metadata']['sdk_version'],
             'overall': stats['overall'],
             'by_category': stats['by_category'],
@@ -1051,109 +1033,3 @@ class HorizonSDKComparator:
             json.dump(report, f, indent=2, ensure_ascii=False)
 
         print(f"✓ Statistics report written to {output_path}")
-
-    def print_summary(self) -> None:
-        """Print a summary of the comparison results to console"""
-        stats = self.calculate_statistics()
-
-        print("\n" + "=" * 70)
-        print("HORIZON API vs KMP STELLAR SDK COMPATIBILITY SUMMARY")
-        print("=" * 70)
-
-        # Display Horizon version information
-        horizon_version_display = self.horizon_version
-        if self.horizon_release_date != "Unknown":
-            horizon_version_display += f" (released {self.horizon_release_date})"
-        print(f"\nHorizon Version: {horizon_version_display}")
-        if self.horizon_release_url:
-            print(f"Horizon Source:  {self.horizon_release_url}")
-        print(f"SDK Version:     {self.sdk_data['metadata']['sdk_version']}")
-
-        overall = stats['overall']
-        print(f"\nOverall Coverage: {overall['coverage_percentage']}%")
-        print(f"  ✅ Fully Supported:     {overall['fully_supported']}/{overall['total_endpoints']}")
-        print(f"  ⚠️  Partially Supported: {overall['partially_supported']}/{overall['total_endpoints']}")
-        print(f"  ❌ Not Supported:       {overall['not_supported']}/{overall['total_endpoints']}")
-        print(f"  🔄 Deprecated:          {overall['deprecated']}/{overall['total_endpoints']}")
-
-        print("\nCategory Breakdown:")
-        for category, cat_stats in sorted(stats['by_category'].items()):
-            print(f"  {category:20s}: {cat_stats['percentage']:5.1f}% "
-                  f"({cat_stats['supported']}/{cat_stats['total']})")
-
-        streaming = stats['streaming']
-        print(f"\nStreaming Support: {streaming['percentage']:.1f}% "
-              f"({streaming['supported']}/{streaming['total_streaming_endpoints']})")
-
-        print("\nImplementation Gaps by Priority:")
-        gaps = stats['gaps_summary']
-        for priority in [GapPriority.CRITICAL.value, GapPriority.HIGH.value,
-                        GapPriority.MEDIUM.value, GapPriority.LOW.value]:
-            count = len(gaps[priority])
-            if count > 0:
-                icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}
-                print(f"  {icon[priority]} {priority.upper():10s}: {count} gaps")
-
-        print("\n" + "=" * 70)
-
-
-def main():
-    """Main entry point for the script"""
-    print("Horizon API vs KMP Stellar SDK Compatibility Analysis")
-    print("=" * 70)
-
-    horizon_data_dir = DATA_DIR / 'horizon'
-    horizon_data_path = horizon_data_dir / 'horizon_endpoints.json'
-    sdk_data_path = horizon_data_dir / 'kmp_sdk_implementation.json'
-    comparison_output_path = horizon_data_dir / 'compatibility_comparison.json'
-    statistics_output_path = horizon_data_dir / 'coverage_stats.json'
-    markdown_output_path = COMPATIBILITY_DIR / 'horizon' / 'HORIZON_COMPATIBILITY_MATRIX.md'
-
-    # Verify input files exist
-    if not horizon_data_path.exists():
-        print(f"ERROR: Horizon endpoints file not found: {horizon_data_path}")
-        print("Please run horizon_parser.py first.")
-        return 1
-
-    if not sdk_data_path.exists():
-        print(f"ERROR: SDK implementation file not found: {sdk_data_path}")
-        print("Please run sdk_analyzer.py first.")
-        return 1
-
-    # Create comparator
-    comparator = HorizonSDKComparator(
-        str(horizon_data_path),
-        str(sdk_data_path)
-    )
-
-    try:
-        # Load data
-        comparator.load_data()
-
-        # Compare endpoints
-        comparator.compare_endpoints()
-
-        # Generate reports
-        comparator.generate_comparison_report(str(comparison_output_path))
-        comparator.generate_statistics_report(str(statistics_output_path))
-        comparator.generate_markdown_report(str(markdown_output_path))
-
-        # Print summary
-        comparator.print_summary()
-
-        print("\n✓ Comparison complete!")
-        print(f"\nOutput files:")
-        print(f"  - Comparison: {comparison_output_path}")
-        print(f"  - Statistics: {statistics_output_path}")
-        print(f"  - Markdown:   {markdown_output_path}")
-
-        return 0
-
-    except Exception as e:
-        print(f"\n❌ ERROR: {str(e)}")
-        traceback.print_exc()
-        return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

@@ -9,10 +9,8 @@ gaps analysis, and prioritized recommendations.
 License: Apache-2.0
 """
 
-import json
 import re
 import sys
-import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
@@ -22,8 +20,7 @@ from enum import Enum
 # Add parent directory to path for shared modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from common import DATA_DIR, COMPATIBILITY_DIR, SDK_ROOT, get_sdk_version
-from rpc_parser import GoProtocolParser
+from common import get_sdk_version
 
 
 class SupportStatus(Enum):
@@ -31,7 +28,6 @@ class SupportStatus(Enum):
     FULLY_SUPPORTED = "✅ Fully Supported"
     PARTIALLY_SUPPORTED = "⚠️ Partially Supported"
     NOT_SUPPORTED = "❌ Not Supported"
-    DEPRECATED = "🔄 Deprecated"
 
 
 class Priority(Enum):
@@ -48,11 +44,6 @@ class ComparisonMetrics:
     total: int = 0
     supported: int = 0
     missing: List[str] = field(default_factory=list)
-
-    @property
-    def percentage(self) -> float:
-        """Calculate support percentage."""
-        return (self.supported / self.total * 100) if self.total > 0 else 0.0
 
 
 @dataclass
@@ -326,16 +317,11 @@ class RPCComparisonAnalyzer:
     # - xdrFormat: SDK uses XDR exclusively; JSON format is not supported
     IGNORED_OPTIONAL_PARAMS = {"xdrFormat"}
 
-    # Response fields excluded from compatibility checks by design. These are the
-    # JSON-format variants the server returns only when the request sets
-    # xdrFormat=json; the SDK uses XDR exclusively (see IGNORED_OPTIONAL_PARAMS),
-    # so the XDR-variant fields are its supported surface.
-    IGNORED_RESPONSE_FIELDS = {
-        "errorResultJson",
-        "diagnosticEventsJson",
-        "transactionDataJson",
-        "eventsJson",
-    }
+    # Response fields with this suffix are excluded from compatibility checks by
+    # design. They are the JSON-format variants the server returns only when the
+    # request sets xdrFormat=json; the SDK uses XDR exclusively (see
+    # IGNORED_OPTIONAL_PARAMS), so the XDR-variant fields are its supported surface.
+    IGNORED_RESPONSE_FIELD_SUFFIX = "Json"
 
     def __init__(self, rpc_data: Dict[str, Any], kotlin_data: Dict[str, Any]):
         """
@@ -351,15 +337,15 @@ class RPCComparisonAnalyzer:
         self.sdk_version: str = get_sdk_version()
         self._cached_stats: Optional[Dict[str, Any]] = None
 
-        metadata = rpc_data.get("metadata", {})
-        self.rpc_version: str = metadata.get("rpc_version", "Unknown")
-        self.rpc_release_date: str = metadata.get("rpc_release_date", "Unknown")
-        self.rpc_release_url: str = metadata.get("rpc_release_url", "")
+        metadata = rpc_data["metadata"]
+        self.rpc_version: str = metadata["rpc_version"]
+        self.rpc_release_date: str = metadata["rpc_release_date"]
+        self.rpc_release_url: str = metadata["rpc_release_url"]
 
     def analyze(self) -> None:
         """Perform complete comparison analysis"""
         self._cached_stats = None
-        rpc_methods = self.rpc_data.get("methods", {})
+        rpc_methods = self.rpc_data["methods"]
         kotlin_methods = self.kotlin_data.get("implemented_methods", {})
 
         for method_name, method_data in rpc_methods.items():
@@ -401,14 +387,7 @@ class RPCComparisonAnalyzer:
 
             rpc_response_fields = rpc_method.get("response_fields", [])
             if rpc_response_fields:
-                comparison.response_fields = ComparisonMetrics(
-                    total=len(rpc_response_fields),
-                    supported=0,
-                    missing=[
-                        f["json_name"] if isinstance(f, dict) else f
-                        for f in rpc_response_fields
-                    ]
-                )
+                comparison.response_fields = self._compare_response_fields(rpc_response_fields, [])
 
             return comparison
 
@@ -483,7 +462,7 @@ class RPCComparisonAnalyzer:
 
         rpc_names = [
             n for n in (_extract_name(f) for f in rpc_response_fields)
-            if n not in self.IGNORED_RESPONSE_FIELDS
+            if not n.endswith(self.IGNORED_RESPONSE_FIELD_SUFFIX)
         ]
         kotlin_names_lower = {
             (_extract_name(f) if isinstance(f, dict) else str(f)).lower()
@@ -557,7 +536,7 @@ class RPCComparisonAnalyzer:
         """Generate complete comparison data structure"""
         return {
             "metadata": {
-                "rpc_methods": len(self.rpc_data.get("methods", {})),
+                "rpc_methods": len(self.rpc_data["methods"]),
                 "sdk_methods": len(self.kotlin_data.get("implemented_methods", {})),
                 "comparison_date": datetime.now().isoformat(),
                 "coverage_percentage": self._calculate_overall_coverage(),
@@ -670,16 +649,8 @@ class RPCComparisonAnalyzer:
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write("# Soroban RPC vs KMP Stellar SDK Compatibility Matrix\n\n")
 
-            f.write(f"**RPC Version:** {self.rpc_version}")
-            if self.rpc_release_date != "Unknown":
-                f.write(f" (released {self.rpc_release_date})")
-            f.write("  \n")
-
-            if self.rpc_release_url:
-                f.write(
-                    f"**RPC Source:** [{self.rpc_release_url}]({self.rpc_release_url})  \n"
-                )
-
+            f.write(f"**RPC Version:** {self.rpc_version} (released {self.rpc_release_date})  \n")
+            f.write(f"**RPC Source:** [{self.rpc_release_url}]({self.rpc_release_url})  \n")
             f.write(f"**SDK Version:** {self.sdk_version}  \n")
             f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
 
@@ -712,7 +683,8 @@ class RPCComparisonAnalyzer:
             )
 
             for comp in sorted(self.comparisons, key=lambda x: x.rpc_method):
-                kotlin_method = comp.sdk_implementation.get("kotlin_method", "-")
+                kotlin_method = comp.sdk_implementation.get("kotlin_method")
+                kotlin_cell = f"`{kotlin_method}`" if kotlin_method else "-"
                 required = comp.parameters.get("required", ComparisonMetrics())
                 param_status = (
                     f"{required.supported}/{required.total}"
@@ -728,7 +700,7 @@ class RPCComparisonAnalyzer:
 
                 f.write(
                     f"| `{comp.rpc_method}` | {comp.status} | "
-                    f"`{kotlin_method}` | {param_status} | {response_status}"
+                    f"{kotlin_cell} | {param_status} | {response_status}"
                     f" | {comp.notes} |\n"
                 )
 
@@ -784,172 +756,3 @@ class RPCComparisonAnalyzer:
                         f.write("\n")
 
         print(f"  ✓ Markdown report written to {output_path}")
-
-
-def main() -> int:
-    """Main execution function"""
-    print("=" * 70)
-    print("Stellar RPC API vs KMP Stellar SDK Comparison Generator")
-    print("=" * 70)
-    print()
-
-    # Paths resolved via shared common module
-    rpc_data_dir = DATA_DIR / 'rpc'
-    rpc_methods_file = rpc_data_dir / 'rpc_methods.json'
-    kmp_implementation_file = rpc_data_dir / 'kmp_soroban_implementation.json'
-    comparison_output_file = rpc_data_dir / 'rpc_comparison.json'
-    stats_output_file = rpc_data_dir / 'rpc_coverage_stats.json'
-    markdown_output_file = COMPATIBILITY_DIR / 'rpc' / 'RPC_COMPATIBILITY_MATRIX.md'
-
-    soroban_server_path = (
-        SDK_ROOT
-        / "stellar-sdk"
-        / "src"
-        / "commonMain"
-        / "kotlin"
-        / "com"
-        / "soneso"
-        / "stellar"
-        / "sdk"
-        / "rpc"
-        / "SorobanServer.kt"
-    )
-
-    try:
-        # Stage 1: Load RPC methods (from JSON produced by rpc_parser, or fallback metadata)
-        print("Step 1/3: Loading RPC method definitions")
-        print("-" * 60)
-
-        rpc_data: Optional[Dict[str, Any]] = None
-        if rpc_methods_file.exists():
-            try:
-                with open(rpc_methods_file, 'r', encoding='utf-8') as f:
-                    loaded = json.load(f)
-                if "methods" in loaded:
-                    rpc_data = loaded
-                    print(f"  ✓ Loaded RPC methods from: {rpc_methods_file}")
-            except (json.JSONDecodeError, IOError):
-                pass
-
-        if rpc_data is None:
-            # rpc_methods.json has not been generated yet.
-            # Build a minimal stub from the known method names so that
-            # the comparison can still run; run rpc_parser.py to get full
-            # parameter data fetched from the upstream Go source.
-            print(
-                "  rpc_methods.json not found — using method-name stubs.\n"
-                "  Run rpc_parser.py (or run_rpc_analysis.py) to generate full data."
-            )
-            stub_methods: Dict[str, Any] = {
-                name: {
-                    "description": GoProtocolParser._METHOD_DESCRIPTIONS.get(name, ""),
-                    "required_params": [],
-                    "optional_params": [],
-                    "response_fields": []
-                }
-                for name in GoProtocolParser.METHOD_NAME_MAPPING.values()
-            }
-            rpc_data = {
-                "metadata": {
-                    "source": "built-in stubs",
-                    "generated_at": datetime.now().isoformat(),
-                    "total_methods": len(stub_methods),
-                    "rpc_version": "Unknown",
-                    "rpc_release_date": "Unknown",
-                    "rpc_release_url": ""
-                },
-                "methods": stub_methods
-            }
-
-        # Save RPC methods snapshot
-        rpc_data_dir.mkdir(parents=True, exist_ok=True)
-        with open(rpc_methods_file, 'w', encoding='utf-8') as f:
-            json.dump(rpc_data, f, indent=2, ensure_ascii=False)
-        print(f"  ✓ Saved RPC methods to: {rpc_methods_file}")
-
-        # Stage 2: Analyze KMP SDK Soroban implementation
-        print()
-        print("Step 2/3: Analyzing KMP Soroban implementation")
-        print("-" * 60)
-        print(f"  Source: {soroban_server_path}")
-
-        soroban_analyzer = SorobanSDKAnalyzer(str(soroban_server_path))
-        kotlin_data = soroban_analyzer.analyze()
-
-        with open(kmp_implementation_file, 'w', encoding='utf-8') as f:
-            json.dump(kotlin_data, f, indent=2, ensure_ascii=False)
-        print(f"  ✓ Saved KMP implementation to: {kmp_implementation_file}")
-        print(
-            f"  ✓ Detected {kotlin_data['metadata']['total_methods']} implemented methods"
-        )
-
-        # Stage 3: Compare and generate outputs
-        print()
-        print("Step 3/3: Generating comparison and reports")
-        print("-" * 60)
-
-        analyzer = RPCComparisonAnalyzer(rpc_data, kotlin_data)
-        analyzer.analyze()
-
-        comparison_data = analyzer.generate_comparison_data()
-        with open(comparison_output_file, 'w', encoding='utf-8') as f:
-            json.dump(comparison_data, f, indent=2, ensure_ascii=False)
-        print(f"  ✓ Saved comparison to: {comparison_output_file}")
-
-        coverage_stats = analyzer.generate_coverage_stats()
-        with open(stats_output_file, 'w', encoding='utf-8') as f:
-            json.dump(coverage_stats, f, indent=2, ensure_ascii=False)
-        print(f"  ✓ Saved statistics to: {stats_output_file}")
-
-        analyzer.generate_markdown_report(str(markdown_output_file))
-
-        # Summary
-        print()
-        print("=" * 70)
-        print("SUMMARY")
-        print("=" * 70)
-        metadata = comparison_data['metadata']
-        if metadata['rpc_version'] != "Unknown":
-            print(f"RPC Version: {metadata['rpc_version']}")
-            if metadata['rpc_release_date'] != "Unknown":
-                print(f"RPC Release Date: {metadata['rpc_release_date']}")
-        print(f"SDK Version: {metadata['sdk_version']}")
-        print()
-        print(f"Total RPC Methods: {metadata['rpc_methods']}")
-        print(f"SDK Methods: {metadata['sdk_methods']}")
-        print(f"Overall Coverage: {metadata['coverage_percentage']}%")
-        print()
-
-        overall = coverage_stats['overall']
-        print(f"✅ Fully Supported: {overall['fully_supported']}")
-        print(f"⚠️  Partially Supported: {overall['partially_supported']}")
-        print(f"❌ Not Supported: {overall['not_supported']}")
-        print()
-
-        gaps = comparison_data['gaps']
-        if gaps['missing_methods']:
-            print(f"Missing Methods: {len(gaps['missing_methods'])}")
-        if gaps['partial_implementations']:
-            print(f"Partial Implementations: {len(gaps['partial_implementations'])}")
-
-        print()
-        print("=" * 70)
-        print("✓ Comparison completed successfully!")
-        print("=" * 70)
-
-        return 0
-
-    except FileNotFoundError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
-    except json.JSONDecodeError as exc:
-        print(f"ERROR: Invalid JSON: {exc}", file=sys.stderr)
-        return 1
-    except Exception as exc:
-        print(f"ERROR: Unexpected error: {exc}", file=sys.stderr)
-        traceback.print_exc()
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

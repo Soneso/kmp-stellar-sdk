@@ -20,12 +20,11 @@ import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Dict, List, Any, Optional, Set, Union
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from common import CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, SDK_ROOT, STRKEY_TEST_FILE
+from common import CLAIMABLE_BALANCE_VECTORS_FILE, Colors, DATA_DIR, STRKEY_TEST_FILE
 
 
 @dataclass
