@@ -296,7 +296,7 @@ bash tools/sep-51-corpus/refresh_corpus.sh   # the conformance corpus vs the ref
 ```
 
 The last two need the pinned reference CLI (`cargo install stellar-xdr --features cli --version
-28.0.0 --locked`) and run locally, not in CI. The first three need only Ruby and run in CI as the
+28.0.1 --locked`) and run locally, not in CI. The first three need only Ruby and run in CI as the
 `xdr-generator` job of `tests.yml`. A new enum member or union arm changes the wire surface, so
 review whether any newly added type needs a type-level override in
 `tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_overrides.rb`.
