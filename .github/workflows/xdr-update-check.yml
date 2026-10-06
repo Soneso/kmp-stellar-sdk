@@ -9,7 +9,7 @@ on:
       dry_run:
         description: 'Run without creating an issue (for testing)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 permissions:
@@ -204,13 +204,15 @@ jobs:
           echo "open_issues=$count" >> "$GITHUB_OUTPUT"
           echo "issue_number=$number" >> "$GITHUB_OUTPUT"
 
+      # The dry-run guard runs in shell. An if: expression compares the boolean inputs.dry_run
+      # with a string as numbers, and that comparison never detects a dry run.
       - name: Comment on existing issue if upstream advanced
         if: >-
           steps.diff.outputs.any_x_changed == 'true'
           && steps.existing.outputs.open_issues != '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
           ISSUE_NUMBER: ${{ steps.existing.outputs.issue_number }}
           PINNED: ${{ steps.pinned.outputs.commit }}
           PINNED_SHORT: ${{ steps.pinned.outputs.commit_short }}
@@ -218,6 +220,9 @@ jobs:
           UPSTREAM_SHORT: ${{ steps.upstream.outputs.commit_short }}
           COMMIT_COUNT: ${{ steps.diff.outputs.commit_count }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           if [ -z "$ISSUE_NUMBER" ]; then
             echo "::warning::Open xdr-update issue detected but its number could not be determined — skipping comment"
             exit 0
@@ -268,7 +273,11 @@ jobs:
         if: steps.diff.outputs.any_x_changed == 'true' && steps.existing.outputs.open_issues == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           gh label create "xdr-update" \
             --description "Upstream XDR definition changes detected" \
             --color "1d76db" \
@@ -318,7 +327,7 @@ jobs:
             printf '10. Build and run unit tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
             printf '11. If the XDR changes introduce new types or modify existing ones, evaluate whether the SDK needs updated high-level APIs (operation builders, SEP implementations, etc.)\n'
             printf '12. Update the changelog with any breaking changes or new features. A changed XDR-JSON rendering is a wire-format change and belongs there; `Sep51RollbackRehearsalTest` fails until its frozen constants are updated, which is what makes such a change deliberate\n'
-            printf '\nSteps 5 and 7 need the pinned XDR-JSON reference CLI: `cargo install stellar-xdr --features cli --version 28.0.0 --locked`. See `tools/sep-51-oracle/README.md`.\n'
+            printf '\nSteps 5 and 7 need the pinned XDR-JSON reference CLI: `cargo install stellar-xdr --features cli --version 28.0.1 --locked`. See `tools/sep-51-oracle/README.md`.\n'
           } >> /tmp/issue_body.md
 
           printf '\n---\n*This issue was created automatically by the [XDR update check workflow](.github/workflows/xdr-update-check.yml).*\n' >> /tmp/issue_body.md
@@ -327,10 +336,13 @@ jobs:
         if: >-
           steps.diff.outputs.any_x_changed == 'true'
           && steps.existing.outputs.open_issues == '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           UPSTREAM_SHORT="${{ steps.upstream.outputs.commit_short }}"
           gh issue create \
             --title "Update XDR definitions from upstream stellar-xdr ($UPSTREAM_SHORT)" \
@@ -341,7 +353,11 @@ jobs:
         if: >-
           steps.diff.outputs.any_x_changed == 'true'
           && steps.existing.outputs.open_issues == '0'
-          && inputs.dry_run == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" != "true" ]; then
+            exit 0
+          fi
           echo "::notice::Dry run: issue would have been created. Body:"
           cat /tmp/issue_body.md

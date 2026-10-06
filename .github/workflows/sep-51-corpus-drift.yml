@@ -23,7 +23,7 @@ on:
       dry_run:
         description: 'Run without creating an issue (for testing)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 permissions:
@@ -194,14 +194,19 @@ jobs:
           echo "open_issues=$(jq 'length' <<< "$issues")" >> "$GITHUB_OUTPUT"
           echo "issue_number=$(jq -r '.[0].number // empty' <<< "$issues")" >> "$GITHUB_OUTPUT"
 
+      # The dry-run guard runs in shell. An if: expression compares the boolean inputs.dry_run
+      # with a string as numbers, and that comparison never detects a dry run.
       - name: Ensure the label exists
         if: >-
           steps.summary.outputs.drift == 'true'
           && steps.existing.outputs.open_issues == '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           gh label create "sep-51-corpus-drift" \
             --description "SEP-0051 artefacts differ from the pinned reference build" \
             --color "5319e7" \
@@ -211,10 +216,13 @@ jobs:
         if: >-
           steps.summary.outputs.drift == 'true'
           && steps.existing.outputs.open_issues == '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           gh issue create \
             --title "SEP-51 artefacts drifted from the pinned reference build" \
             --label "sep-51-corpus-drift" \
@@ -224,12 +232,15 @@ jobs:
         if: >-
           steps.summary.outputs.drift == 'true'
           && steps.existing.outputs.open_issues != '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
           ISSUE_NUMBER: ${{ steps.existing.outputs.issue_number }}
           FINGERPRINT: ${{ steps.summary.outputs.fingerprint }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           # The same drift would otherwise be re-reported every week. Only a report whose
           # content differs from everything already in the thread is worth a comment.
           thread=$(gh issue view "$ISSUE_NUMBER" --json body,comments --jq '.body + "\n" + ([.comments[].body] | join("\n"))')
@@ -241,10 +252,14 @@ jobs:
           gh issue comment "$ISSUE_NUMBER" --body-file /tmp/report.md
 
       - name: Dry run summary
-        if: steps.summary.outputs.drift == 'true' && inputs.dry_run == 'true'
+        if: steps.summary.outputs.drift == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "::notice::Dry run: no issue was filed. Report:"
-          cat /tmp/report.md
+          if [ "$DRY_RUN" != "true" ]; then
+            exit 0
+          fi
+          echo "::notice::Dry run: no issue was filed. The report is in the step 'Summarise'."
 
       # --- Upstream watch --------------------------------------------------------------
       #
@@ -501,10 +516,13 @@ jobs:
         if: >-
           steps.watch.outputs.report == 'true'
           && steps.watch-existing.outputs.open_issues == '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           gh label create "sep-51-reference-release" \
             --description "A newer XDR-JSON reference release or specification revision is available" \
             --color "0e8a16" \
@@ -514,10 +532,13 @@ jobs:
         if: >-
           steps.watch.outputs.report == 'true'
           && steps.watch-existing.outputs.open_issues == '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           gh issue create \
             --title "${{ steps.watch.outputs.title }}" \
             --label "sep-51-reference-release" \
@@ -527,12 +548,15 @@ jobs:
         if: >-
           steps.watch.outputs.report == 'true'
           && steps.watch-existing.outputs.open_issues != '0'
-          && inputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
           ISSUE_NUMBER: ${{ steps.watch-existing.outputs.issue_number }}
           FINGERPRINT: ${{ steps.watch.outputs.fingerprint }}
         run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            exit 0
+          fi
           # The same upstream state is reported every week until it is acted on, so only a
           # report whose content differs from everything already in the thread is a comment.
           thread=$(gh issue view "$ISSUE_NUMBER" --json body,comments --jq '.body + "\n" + ([.comments[].body] | join("\n"))')
@@ -544,7 +568,11 @@ jobs:
           gh issue comment "$ISSUE_NUMBER" --body-file /tmp/watch.md
 
       - name: Dry run summary for the upstream watch
-        if: steps.watch.outputs.report == 'true' && inputs.dry_run == 'true'
+        if: steps.watch.outputs.report == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "::notice::Dry run: no issue was filed. Report:"
-          cat /tmp/watch.md
+          if [ "$DRY_RUN" != "true" ]; then
+            exit 0
+          fi
+          echo "::notice::Dry run: no issue was filed. The report is in the step 'Summarise the upstream watch'."
