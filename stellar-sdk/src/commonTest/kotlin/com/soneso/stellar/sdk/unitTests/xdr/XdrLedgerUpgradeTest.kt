@@ -2,6 +2,10 @@ package com.soneso.stellar.sdk.unitTests.xdr
 
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Tests for LedgerUpgrade, LedgerHeader, StellarValue, and related types.
@@ -124,6 +128,65 @@ class XdrLedgerUpgradeTest {
         XdrTestHelpers.assertXdrRoundTrip(v, { a, w -> a.encode(w) }, { r -> StellarValueXdr.decode(r) })
     }
 
+    // ---- StellarValue with the millisecond close-time arms ----
+
+    @Test fun testStellarValueSignedMs() {
+        val v = stellarValue(StellarValueExtXdr.SignedMsValue(StellarValueSignedMsValueXdr(
+            closeTimeMs = TimePointMsXdr(Uint64Xdr(1700000000123UL)),
+            lcValueSignature = closeSignature()
+        )))
+        val json = v.toXdrJson()
+        assertTrue(json.contains("\"ext\":{\"signed_ms\":{\"close_time_ms\":\"1700000000123\",\"lc_value_signature\":{"), json)
+        for (decoded in decodeFromBytesAndJson(v)) {
+            val arm = assertIs<StellarValueExtXdr.SignedMsValue>(decoded.ext).value
+            assertEquals(1700000000123UL, arm.closeTimeMs.value.value)
+            assertContentEquals(byteArrayOf(10, 20, 30, 40), arm.lcValueSignature.signature.value)
+        }
+    }
+
+    @Test fun testStellarValueEmptyTxSetMs() {
+        val v = stellarValue(StellarValueExtXdr.ProposedMsValue(StellarValueProposedMsValueXdr(
+            closeTimeMs = TimePointMsXdr(Uint64Xdr(1700000000456UL)),
+            txSetHash = XdrTestHelpers.hashXdrAlt(),
+            previousLedgerHash = XdrTestHelpers.hashXdr(),
+            previousLedgerVersion = Uint32Xdr(29u),
+            lcValueSignature = closeSignature()
+        )))
+        val json = v.toXdrJson()
+        assertTrue(json.contains("\"ext\":{\"empty_tx_set_ms\":{\"close_time_ms\":\"1700000000456\",\"tx_set_hash\":\"6465666768696a6b"), json)
+        for (decoded in decodeFromBytesAndJson(v)) {
+            val arm = assertIs<StellarValueExtXdr.ProposedMsValue>(decoded.ext).value
+            assertEquals(1700000000456UL, arm.closeTimeMs.value.value)
+            assertContentEquals(XdrTestHelpers.hash32Alt(), arm.txSetHash.value)
+            assertContentEquals(XdrTestHelpers.hash32(), arm.previousLedgerHash.value)
+            assertEquals(29u, arm.previousLedgerVersion.value)
+        }
+    }
+
+    private fun stellarValue(ext: StellarValueExtXdr) = StellarValueXdr(
+        txSetHash = XdrTestHelpers.hashXdr(),
+        closeTime = TimePointXdr(Uint64Xdr(1700000000UL)),
+        upgrades = emptyList(),
+        ext = ext
+    )
+
+    private fun closeSignature() = LedgerCloseValueSignatureXdr(
+        nodeId = NodeIDXdr(XdrTestHelpers.publicKeyEd25519()),
+        signature = SignatureXdr(byteArrayOf(10, 20, 30, 40))
+    )
+
+    /** Decodes [v] from its own bytes and from its XDR-JSON; the JSON decoding must encode to those same bytes. */
+    private fun decodeFromBytesAndJson(v: StellarValueXdr): List<StellarValueXdr> {
+        val writer = XdrWriter()
+        v.encode(writer)
+        val bytes = writer.toByteArray()
+        val fromJson = StellarValueXdr.fromXdrJson(v.toXdrJson())
+        val rewriter = XdrWriter()
+        fromJson.encode(rewriter)
+        XdrTestHelpers.assertBytesEqual(bytes, rewriter.toByteArray(), "XDR-JSON round trip")
+        return listOf(StellarValueXdr.decode(XdrReader(bytes)), fromJson)
+    }
+
     // ---- LedgerHeaderFlags enum ----
 
     @Test fun testLedgerHeaderFlagsEnum() {
@@ -157,12 +220,7 @@ class XdrLedgerUpgradeTest {
 
     // ---- LedgerHeader ----
 
-    private fun stellarValueBasic() = StellarValueXdr(
-        txSetHash = XdrTestHelpers.hashXdr(),
-        closeTime = TimePointXdr(Uint64Xdr(1700000000UL)),
-        upgrades = emptyList(),
-        ext = StellarValueExtXdr.Void
-    )
+    private fun stellarValueBasic() = stellarValue(StellarValueExtXdr.Void)
 
     @Test fun testLedgerHeader() {
         val v = LedgerHeaderXdr(

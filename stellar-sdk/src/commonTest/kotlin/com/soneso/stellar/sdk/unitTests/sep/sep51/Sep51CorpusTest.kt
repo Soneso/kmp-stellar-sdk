@@ -2,7 +2,6 @@ package com.soneso.stellar.sdk.unitTests.sep.sep51
 
 import com.soneso.stellar.sdk.unitTests.xdr.json.SEP51_CORPUS
 import com.soneso.stellar.sdk.unitTests.xdr.json.SEP51_UNRESOLVABLE_ENUM_MEMBERS
-import com.soneso.stellar.sdk.unitTests.xdr.json.SEP51_UNRESOLVABLE_STRUCT_TYPES
 import com.soneso.stellar.sdk.unitTests.xdr.json.Sep51CorpusEntry
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.io.encoding.Base64
@@ -618,6 +617,12 @@ class Sep51CorpusTest {
             SorobanTransactionMetaExtXdr.Companion::decode,
             SorobanTransactionMetaExtXdr::encode
         )
+        "StellarValueTypeXdr" -> Codec(
+            StellarValueTypeXdr.Companion::fromXdrJson,
+            StellarValueTypeXdr::toXdrJson,
+            StellarValueTypeXdr.Companion::decode,
+            StellarValueTypeXdr::encode
+        )
         "TTLEntryXdr" -> Codec(
             TTLEntryXdr.Companion::fromXdrJson,
             TTLEntryXdr::toXdrJson,
@@ -787,20 +792,16 @@ class Sep51CorpusTest {
             )
         }
 
+        // Unresolvable enum members are pinned through a resolvable member of the same enum, which shares
+        // the prefix rule. Unresolvable structs get no corpus entry: the corpus generator accepts only
+        // seeds for types the reference knows, and their field keys are pinned by the name table through
+        // emitted_names.rb.
         for (label in SEP51_UNRESOLVABLE_ENUM_MEMBERS) {
             val enumType = label.substringBefore('.') + "Xdr"
             assertTrue(
                 SEP51_CORPUS.any { it.kmpType == enumType },
                 "the name table could not resolve $label against the reference, so the corpus " +
                     "must carry an entry for $enumType; add a seed for it"
-            )
-        }
-        for (name in SEP51_UNRESOLVABLE_STRUCT_TYPES) {
-            val structType = name + "Xdr"
-            assertTrue(
-                SEP51_CORPUS.any { it.kmpType == structType },
-                "the name table could not resolve $name against the reference, so the corpus " +
-                    "must carry an entry for $structType; add a seed for it"
             )
         }
     }

@@ -35,6 +35,9 @@ internal fun sampleTimePointXdr(seed: Int, depth: Int): TimePointXdr =
 internal fun sampleDurationXdr(seed: Int, depth: Int): DurationXdr =
   DurationXdr(sampleUint64Xdr(seed, depth + 1))
 
+internal fun sampleTimePointMsXdr(seed: Int, depth: Int): TimePointMsXdr =
+  TimePointMsXdr(sampleUint64Xdr(seed, depth + 1))
+
 internal fun sampleExtensionPointXdrVoidArm(seed: Int, depth: Int): ExtensionPointXdr =
   ExtensionPointXdr.Void
 
@@ -329,9 +332,32 @@ class XdrJsonTypesTest {
 
 
   @Test
+  fun timePointMsXdrRoundTripsThroughItsJsonTree() {
+    assertRoundTripTimePointMsXdr(sampleTimePointMsXdr(815, 0))
+    assertRoundTripTimePointMsXdr(sampleTimePointMsXdr(815, SAMPLE_DEPTH))
+  }
+
+  private fun assertRoundTripTimePointMsXdr(value: TimePointMsXdr) {
+    val tree = value.toXdrJsonElement()
+    val text = TimePointMsXdr.fromXdrJsonElement(tree).toXdrJson()
+    assertEquals(tree, TimePointMsXdr.fromXdrJson(text).toXdrJsonElement())
+    assertEquals(text, TimePointMsXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    TimePointMsXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, TimePointMsXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
+  }
+
+  @Test
+  fun timePointMsXdrRejectsInputOfTheWrongShape() {
+    assertFailsWith<IllegalArgumentException> { TimePointMsXdr.fromXdrJsonElement(JsonNull) }
+  }
+
+
+  @Test
   fun extensionPointXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripExtensionPointXdr(sampleExtensionPointXdr(815, 0))
-    assertRoundTripExtensionPointXdr(sampleExtensionPointXdr(815, SAMPLE_DEPTH))
+    assertRoundTripExtensionPointXdr(sampleExtensionPointXdr(916, 0))
+    assertRoundTripExtensionPointXdr(sampleExtensionPointXdr(916, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripExtensionPointXdr(value: ExtensionPointXdr) {
@@ -347,7 +373,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun extensionPointXdrRendersVoidArmAsV0() {
-    val value = sampleExtensionPointXdrVoidArm(815, 0)
+    val value = sampleExtensionPointXdrVoidArm(916, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = ExtensionPointXdr.fromXdrJsonElement(tree)
@@ -487,8 +513,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun publicKeyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripPublicKeyXdr(samplePublicKeyXdr(1219, 0))
-    assertRoundTripPublicKeyXdr(samplePublicKeyXdr(1219, SAMPLE_DEPTH))
+    assertRoundTripPublicKeyXdr(samplePublicKeyXdr(1320, 0))
+    assertRoundTripPublicKeyXdr(samplePublicKeyXdr(1320, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripPublicKeyXdr(value: PublicKeyXdr) {
@@ -504,7 +530,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun publicKeyXdrRendersEd25519ArmAsPublicKeyTypeEd25519() {
-    val value = samplePublicKeyXdrEd25519Arm(1219, 0)
+    val value = samplePublicKeyXdrEd25519Arm(1320, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = PublicKeyXdr.fromXdrJsonElement(tree)
@@ -531,8 +557,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyEd25519SignedPayloadXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSignerKeyEd25519SignedPayloadXdr(sampleSignerKeyEd25519SignedPayloadXdr(1320, 0))
-    assertRoundTripSignerKeyEd25519SignedPayloadXdr(sampleSignerKeyEd25519SignedPayloadXdr(1320, SAMPLE_DEPTH))
+    assertRoundTripSignerKeyEd25519SignedPayloadXdr(sampleSignerKeyEd25519SignedPayloadXdr(1421, 0))
+    assertRoundTripSignerKeyEd25519SignedPayloadXdr(sampleSignerKeyEd25519SignedPayloadXdr(1421, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSignerKeyEd25519SignedPayloadXdr(value: SignerKeyEd25519SignedPayloadXdr) {
@@ -555,8 +581,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSignerKeyXdr(sampleSignerKeyXdr(1421, 0))
-    assertRoundTripSignerKeyXdr(sampleSignerKeyXdr(1421, SAMPLE_DEPTH))
+    assertRoundTripSignerKeyXdr(sampleSignerKeyXdr(1522, 0))
+    assertRoundTripSignerKeyXdr(sampleSignerKeyXdr(1522, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSignerKeyXdr(value: SignerKeyXdr) {
@@ -572,7 +598,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyXdrRendersEd25519ArmAsEd25519() {
-    val value = sampleSignerKeyXdrEd25519Arm(1421, 0)
+    val value = sampleSignerKeyXdrEd25519Arm(1522, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SignerKeyXdr.fromXdrJsonElement(tree)
@@ -582,7 +608,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyXdrRendersPreAuthTxArmAsPreAuthTx() {
-    val value = sampleSignerKeyXdrPreAuthTxArm(1426, 0)
+    val value = sampleSignerKeyXdrPreAuthTxArm(1527, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SignerKeyXdr.fromXdrJsonElement(tree)
@@ -592,7 +618,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyXdrRendersHashXArmAsHashX() {
-    val value = sampleSignerKeyXdrHashXArm(1431, 0)
+    val value = sampleSignerKeyXdrHashXArm(1532, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SignerKeyXdr.fromXdrJsonElement(tree)
@@ -602,7 +628,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun signerKeyXdrRendersEd25519SignedPayloadArmAsEd25519SignedPayload() {
-    val value = sampleSignerKeyXdrEd25519SignedPayloadArm(1436, 0)
+    val value = sampleSignerKeyXdrEd25519SignedPayloadArm(1537, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SignerKeyXdr.fromXdrJsonElement(tree)
@@ -629,8 +655,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun signatureXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSignatureXdr(sampleSignatureXdr(1522, 0))
-    assertRoundTripSignatureXdr(sampleSignatureXdr(1522, SAMPLE_DEPTH))
+    assertRoundTripSignatureXdr(sampleSignatureXdr(1623, 0))
+    assertRoundTripSignatureXdr(sampleSignatureXdr(1623, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSignatureXdr(value: SignatureXdr) {
@@ -652,8 +678,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun signatureHintXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSignatureHintXdr(sampleSignatureHintXdr(1623, 0))
-    assertRoundTripSignatureHintXdr(sampleSignatureHintXdr(1623, SAMPLE_DEPTH))
+    assertRoundTripSignatureHintXdr(sampleSignatureHintXdr(1724, 0))
+    assertRoundTripSignatureHintXdr(sampleSignatureHintXdr(1724, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSignatureHintXdr(value: SignatureHintXdr) {
@@ -675,8 +701,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun nodeIDXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripNodeIDXdr(sampleNodeIDXdr(1724, 0))
-    assertRoundTripNodeIDXdr(sampleNodeIDXdr(1724, SAMPLE_DEPTH))
+    assertRoundTripNodeIDXdr(sampleNodeIDXdr(1825, 0))
+    assertRoundTripNodeIDXdr(sampleNodeIDXdr(1825, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripNodeIDXdr(value: NodeIDXdr) {
@@ -698,8 +724,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun accountIDXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripAccountIDXdr(sampleAccountIDXdr(1825, 0))
-    assertRoundTripAccountIDXdr(sampleAccountIDXdr(1825, SAMPLE_DEPTH))
+    assertRoundTripAccountIDXdr(sampleAccountIDXdr(1926, 0))
+    assertRoundTripAccountIDXdr(sampleAccountIDXdr(1926, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripAccountIDXdr(value: AccountIDXdr) {
@@ -721,8 +747,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun contractIDXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractIDXdr(sampleContractIDXdr(1926, 0))
-    assertRoundTripContractIDXdr(sampleContractIDXdr(1926, SAMPLE_DEPTH))
+    assertRoundTripContractIDXdr(sampleContractIDXdr(2027, 0))
+    assertRoundTripContractIDXdr(sampleContractIDXdr(2027, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractIDXdr(value: ContractIDXdr) {
@@ -744,8 +770,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun curve25519SecretXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripCurve25519SecretXdr(sampleCurve25519SecretXdr(2027, 0))
-    assertRoundTripCurve25519SecretXdr(sampleCurve25519SecretXdr(2027, SAMPLE_DEPTH))
+    assertRoundTripCurve25519SecretXdr(sampleCurve25519SecretXdr(2128, 0))
+    assertRoundTripCurve25519SecretXdr(sampleCurve25519SecretXdr(2128, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripCurve25519SecretXdr(value: Curve25519SecretXdr) {
@@ -768,8 +794,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun curve25519PublicXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripCurve25519PublicXdr(sampleCurve25519PublicXdr(2128, 0))
-    assertRoundTripCurve25519PublicXdr(sampleCurve25519PublicXdr(2128, SAMPLE_DEPTH))
+    assertRoundTripCurve25519PublicXdr(sampleCurve25519PublicXdr(2229, 0))
+    assertRoundTripCurve25519PublicXdr(sampleCurve25519PublicXdr(2229, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripCurve25519PublicXdr(value: Curve25519PublicXdr) {
@@ -792,8 +818,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun hmacSha256KeyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripHmacSha256KeyXdr(sampleHmacSha256KeyXdr(2229, 0))
-    assertRoundTripHmacSha256KeyXdr(sampleHmacSha256KeyXdr(2229, SAMPLE_DEPTH))
+    assertRoundTripHmacSha256KeyXdr(sampleHmacSha256KeyXdr(2330, 0))
+    assertRoundTripHmacSha256KeyXdr(sampleHmacSha256KeyXdr(2330, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripHmacSha256KeyXdr(value: HmacSha256KeyXdr) {
@@ -816,8 +842,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun hmacSha256MacXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripHmacSha256MacXdr(sampleHmacSha256MacXdr(2330, 0))
-    assertRoundTripHmacSha256MacXdr(sampleHmacSha256MacXdr(2330, SAMPLE_DEPTH))
+    assertRoundTripHmacSha256MacXdr(sampleHmacSha256MacXdr(2431, 0))
+    assertRoundTripHmacSha256MacXdr(sampleHmacSha256MacXdr(2431, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripHmacSha256MacXdr(value: HmacSha256MacXdr) {
@@ -840,8 +866,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun shortHashSeedXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripShortHashSeedXdr(sampleShortHashSeedXdr(2431, 0))
-    assertRoundTripShortHashSeedXdr(sampleShortHashSeedXdr(2431, SAMPLE_DEPTH))
+    assertRoundTripShortHashSeedXdr(sampleShortHashSeedXdr(2532, 0))
+    assertRoundTripShortHashSeedXdr(sampleShortHashSeedXdr(2532, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripShortHashSeedXdr(value: ShortHashSeedXdr) {
@@ -901,8 +927,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun serializedBinaryFuseFilterXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSerializedBinaryFuseFilterXdr(sampleSerializedBinaryFuseFilterXdr(2633, 0))
-    assertRoundTripSerializedBinaryFuseFilterXdr(sampleSerializedBinaryFuseFilterXdr(2633, SAMPLE_DEPTH))
+    assertRoundTripSerializedBinaryFuseFilterXdr(sampleSerializedBinaryFuseFilterXdr(2734, 0))
+    assertRoundTripSerializedBinaryFuseFilterXdr(sampleSerializedBinaryFuseFilterXdr(2734, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSerializedBinaryFuseFilterXdr(value: SerializedBinaryFuseFilterXdr) {
@@ -925,8 +951,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun poolIDXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripPoolIDXdr(samplePoolIDXdr(2734, 0))
-    assertRoundTripPoolIDXdr(samplePoolIDXdr(2734, SAMPLE_DEPTH))
+    assertRoundTripPoolIDXdr(samplePoolIDXdr(2835, 0))
+    assertRoundTripPoolIDXdr(samplePoolIDXdr(2835, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripPoolIDXdr(value: PoolIDXdr) {
@@ -965,8 +991,8 @@ class XdrJsonTypesTest {
 
   @Test
   fun claimableBalanceIDXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripClaimableBalanceIDXdr(sampleClaimableBalanceIDXdr(2936, 0))
-    assertRoundTripClaimableBalanceIDXdr(sampleClaimableBalanceIDXdr(2936, SAMPLE_DEPTH))
+    assertRoundTripClaimableBalanceIDXdr(sampleClaimableBalanceIDXdr(3037, 0))
+    assertRoundTripClaimableBalanceIDXdr(sampleClaimableBalanceIDXdr(3037, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripClaimableBalanceIDXdr(value: ClaimableBalanceIDXdr) {
@@ -982,7 +1008,7 @@ class XdrJsonTypesTest {
 
   @Test
   fun claimableBalanceIDXdrRendersV0ArmAsClaimableBalanceIdTypeV0() {
-    val value = sampleClaimableBalanceIDXdrV0Arm(2936, 0)
+    val value = sampleClaimableBalanceIDXdrV0Arm(3037, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = ClaimableBalanceIDXdr.fromXdrJsonElement(tree)

@@ -173,10 +173,6 @@ corpus_lines << '/** Enum members the reference could not resolve when the name 
 corpus_lines << kotlin_string_list('SEP51_UNRESOLVABLE_ENUM_MEMBERS',
                                    metadata.fetch('unresolvable_enum_members'))
 corpus_lines << ''
-corpus_lines << '/** Struct types the reference could not resolve when the name table was last built. */'
-corpus_lines << kotlin_string_list('SEP51_UNRESOLVABLE_STRUCT_TYPES',
-                                   metadata.fetch('unresolvable_struct_types'))
-corpus_lines << ''
 
 File.write(CORPUS_OUTPUT, corpus_lines.join("\n"))
 

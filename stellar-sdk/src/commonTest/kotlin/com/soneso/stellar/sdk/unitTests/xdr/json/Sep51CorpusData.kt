@@ -18,7 +18,7 @@ internal data class Sep51CorpusEntry(
   val source: String
 )
 
-/** SEP-0051 conformance cases for the XDR definitions pinned at c40231c76bf2ebce76b24aa11c72508ac3eaa329. */
+/** SEP-0051 conformance cases for the XDR definitions pinned at c2612cf534e4448fa263e252afe1bdbac5512d14. */
 internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
   Sep51CorpusEntry(
     "ScAddress",
@@ -2401,6 +2401,13 @@ internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
     "reference"
   ),
   Sep51CorpusEntry(
+    "StellarValueType",
+    "StellarValueTypeXdr",
+    "AAAAAg==",
+    "\"empty_tx_set\"",
+    "reference"
+  ),
+  Sep51CorpusEntry(
     "ClaimAtom",
     "ClaimAtomXdr",
     "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAC",
@@ -2474,8 +2481,6 @@ internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
 
 /** Enum members the reference could not resolve when the name table was last built. */
 internal val SEP51_UNRESOLVABLE_ENUM_MEMBERS: List<String> = listOf(
-)
-
-/** Struct types the reference could not resolve when the name table was last built. */
-internal val SEP51_UNRESOLVABLE_STRUCT_TYPES: List<String> = listOf(
+  "StellarValueType.STELLAR_VALUE_EMPTY_TX_SET_MS",
+  "StellarValueType.STELLAR_VALUE_SIGNED_MS",
 )

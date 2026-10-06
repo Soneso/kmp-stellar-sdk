@@ -25,6 +25,21 @@ private const val XDR_JSON_TYPE = "StellarValueExtXdr"
  *             uint32 previousLedgerVersion;
  *             LedgerCloseValueSignature lcValueSignature;
  *         } proposedValue;
+ *     case STELLAR_VALUE_SIGNED_MS:
+ *         struct
+ *         {
+ *             TimePointMs closeTimeMs; // closeTime == closeTimeMs / 1000
+ *             LedgerCloseValueSignature lcValueSignature;
+ *         } signedMsValue;
+ *     case STELLAR_VALUE_EMPTY_TX_SET_MS:
+ *         struct
+ *         {
+ *             TimePointMs closeTimeMs; // closeTime == closeTimeMs / 1000
+ *             Hash txSetHash;
+ *             Hash previousLedgerHash;
+ *             uint32 previousLedgerVersion;
+ *             LedgerCloseValueSignature lcValueSignature;
+ *         } proposedMsValue;
  *     }
  */
 sealed class StellarValueExtXdr {
@@ -40,6 +55,18 @@ sealed class StellarValueExtXdr {
     val value: StellarValueProposedValueXdr
   ) : StellarValueExtXdr() {
     override val discriminant: StellarValueTypeXdr = StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET
+  }
+
+  data class SignedMsValue(
+    val value: StellarValueSignedMsValueXdr
+  ) : StellarValueExtXdr() {
+    override val discriminant: StellarValueTypeXdr = StellarValueTypeXdr.STELLAR_VALUE_SIGNED_MS
+  }
+
+  data class ProposedMsValue(
+    val value: StellarValueProposedMsValueXdr
+  ) : StellarValueExtXdr() {
+    override val discriminant: StellarValueTypeXdr = StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET_MS
   }
 
   data object Void : StellarValueExtXdr() {
@@ -60,6 +87,14 @@ sealed class StellarValueExtXdr {
           val value = StellarValueProposedValueXdr.decode(reader)
           ProposedValue(value)
         }
+        StellarValueTypeXdr.STELLAR_VALUE_SIGNED_MS -> {
+          val value = StellarValueSignedMsValueXdr.decode(reader)
+          SignedMsValue(value)
+        }
+        StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET_MS -> {
+          val value = StellarValueProposedMsValueXdr.decode(reader)
+          ProposedMsValue(value)
+        }
         else -> throw IllegalArgumentException("Unknown StellarValueExtXdr discriminant: $discriminant")
       }
     }
@@ -74,6 +109,8 @@ sealed class StellarValueExtXdr {
         return when (arm) {
           "signed" -> LcValueSignature(LedgerCloseValueSignatureXdr.fromXdrJsonTree(value))
           "empty_tx_set" -> ProposedValue(StellarValueProposedValueXdr.fromXdrJsonTree(value))
+          "signed_ms" -> SignedMsValue(StellarValueSignedMsValueXdr.fromXdrJsonTree(value))
+          "empty_tx_set_ms" -> ProposedMsValue(StellarValueProposedMsValueXdr.fromXdrJsonTree(value))
           else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
         }
       }
@@ -94,6 +131,12 @@ sealed class StellarValueExtXdr {
       is ProposedValue -> {
         value.encode(writer)
       }
+      is SignedMsValue -> {
+        value.encode(writer)
+      }
+      is ProposedMsValue -> {
+        value.encode(writer)
+      }
     }
   }
 
@@ -101,6 +144,8 @@ sealed class StellarValueExtXdr {
     is Void -> XdrJson.name("basic")
     is LcValueSignature -> buildJsonObject { put("signed", value.toXdrJsonElement()) }
     is ProposedValue -> buildJsonObject { put("empty_tx_set", value.toXdrJsonElement()) }
+    is SignedMsValue -> buildJsonObject { put("signed_ms", value.toXdrJsonElement()) }
+    is ProposedMsValue -> buildJsonObject { put("empty_tx_set_ms", value.toXdrJsonElement()) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

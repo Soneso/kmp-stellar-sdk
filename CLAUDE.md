@@ -301,6 +301,9 @@ The last two need the pinned reference CLI (`cargo install stellar-xdr --feature
 review whether any newly added type needs a type-level override in
 `tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_overrides.rb`.
 
+A struct the pinned reference cannot resolve gets a hand-written round-trip test (bytes and
+XDR-JSON, field-level checks), not a corpus seed: seeds exist only for types the reference knows.
+
 Never hand-edit a generated XDR type or an emitted test: the CI drift guard regenerates both and
 fails on any difference.
 

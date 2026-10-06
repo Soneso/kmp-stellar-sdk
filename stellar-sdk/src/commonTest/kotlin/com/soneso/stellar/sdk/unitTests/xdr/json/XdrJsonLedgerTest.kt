@@ -28,6 +28,19 @@ internal fun sampleStellarValueProposedValueXdr(seed: Int, depth: Int): StellarV
   sampleLedgerCloseValueSignatureXdr(seed + 9, depth + 1)
 )
 
+internal fun sampleStellarValueSignedMsValueXdr(seed: Int, depth: Int): StellarValueSignedMsValueXdr = StellarValueSignedMsValueXdr(
+  sampleTimePointMsXdr(seed, depth + 1),
+  sampleLedgerCloseValueSignatureXdr(seed + 3, depth + 1)
+)
+
+internal fun sampleStellarValueProposedMsValueXdr(seed: Int, depth: Int): StellarValueProposedMsValueXdr = StellarValueProposedMsValueXdr(
+  sampleTimePointMsXdr(seed, depth + 1),
+  sampleHashXdr(seed + 3, depth + 1),
+  sampleHashXdr(seed + 6, depth + 1),
+  sampleUint32Xdr(seed + 9, depth + 1),
+  sampleLedgerCloseValueSignatureXdr(seed + 12, depth + 1)
+)
+
 internal fun sampleStellarValueExtXdrVoidArm(seed: Int, depth: Int): StellarValueExtXdr =
   StellarValueExtXdr.Void
 
@@ -37,11 +50,19 @@ internal fun sampleStellarValueExtXdrLcValueSignatureArm(seed: Int, depth: Int):
 internal fun sampleStellarValueExtXdrProposedValueArm(seed: Int, depth: Int): StellarValueExtXdr =
   StellarValueExtXdr.ProposedValue(sampleStellarValueProposedValueXdr(seed, depth + 1))
 
+internal fun sampleStellarValueExtXdrSignedMsValueArm(seed: Int, depth: Int): StellarValueExtXdr =
+  StellarValueExtXdr.SignedMsValue(sampleStellarValueSignedMsValueXdr(seed, depth + 1))
+
+internal fun sampleStellarValueExtXdrProposedMsValueArm(seed: Int, depth: Int): StellarValueExtXdr =
+  StellarValueExtXdr.ProposedMsValue(sampleStellarValueProposedMsValueXdr(seed, depth + 1))
+
 internal fun sampleStellarValueExtXdr(seed: Int, depth: Int): StellarValueExtXdr =
-  when (seed.mod(3)) {
+  when (seed.mod(5)) {
     0 -> sampleStellarValueExtXdrVoidArm(seed, depth)
     1 -> sampleStellarValueExtXdrLcValueSignatureArm(seed + 3, depth)
-    else -> sampleStellarValueExtXdrProposedValueArm(seed + 6, depth)
+    2 -> sampleStellarValueExtXdrProposedValueArm(seed + 6, depth)
+    3 -> sampleStellarValueExtXdrSignedMsValueArm(seed + 9, depth)
+    else -> sampleStellarValueExtXdrProposedMsValueArm(seed + 12, depth)
   }
 
 internal fun sampleStellarValueXdr(seed: Int, depth: Int): StellarValueXdr = StellarValueXdr(
@@ -559,6 +580,26 @@ class XdrJsonLedgerTest {
   }
 
   @Test
+  fun stellarValueTypeXdrRendersStellarValueSignedMsAsSignedMs() {
+    val member = StellarValueTypeXdr.STELLAR_VALUE_SIGNED_MS
+    assertEquals(3, member.value)
+    assertEquals(JsonPrimitive("signed_ms"), member.toXdrJsonElement())
+    assertEquals("\"signed_ms\"", member.toXdrJson())
+    assertEquals(member, StellarValueTypeXdr.fromXdrJson("\"signed_ms\""))
+    assertEquals(member, StellarValueTypeXdr.fromXdrJsonElement(JsonPrimitive("signed_ms")))
+  }
+
+  @Test
+  fun stellarValueTypeXdrRendersStellarValueEmptyTxSetMsAsEmptyTxSetMs() {
+    val member = StellarValueTypeXdr.STELLAR_VALUE_EMPTY_TX_SET_MS
+    assertEquals(4, member.value)
+    assertEquals(JsonPrimitive("empty_tx_set_ms"), member.toXdrJsonElement())
+    assertEquals("\"empty_tx_set_ms\"", member.toXdrJson())
+    assertEquals(member, StellarValueTypeXdr.fromXdrJson("\"empty_tx_set_ms\""))
+    assertEquals(member, StellarValueTypeXdr.fromXdrJsonElement(JsonPrimitive("empty_tx_set_ms")))
+  }
+
+  @Test
   fun stellarValueTypeXdrRejectsAMemberItDoesNotDeclare() {
     assertFailsWith<IllegalArgumentException> { StellarValueTypeXdr.fromXdrJsonElement(JsonPrimitive("not_a_name_this_type_declares")) }
     assertFailsWith<IllegalArgumentException> { StellarValueTypeXdr.fromXdrJsonElement(JsonNull) }
@@ -614,9 +655,57 @@ class XdrJsonLedgerTest {
 
 
   @Test
+  fun stellarValueSignedMsValueXdrRoundTripsThroughItsJsonTree() {
+    assertRoundTripStellarValueSignedMsValueXdr(sampleStellarValueSignedMsValueXdr(411, 0))
+    assertRoundTripStellarValueSignedMsValueXdr(sampleStellarValueSignedMsValueXdr(411, SAMPLE_DEPTH))
+  }
+
+  private fun assertRoundTripStellarValueSignedMsValueXdr(value: StellarValueSignedMsValueXdr) {
+    val tree = value.toXdrJsonElement()
+    val text = StellarValueSignedMsValueXdr.fromXdrJsonElement(tree).toXdrJson()
+    assertEquals(tree, StellarValueSignedMsValueXdr.fromXdrJson(text).toXdrJsonElement())
+    assertEquals(text, StellarValueSignedMsValueXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    StellarValueSignedMsValueXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, StellarValueSignedMsValueXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
+  }
+
+  @Test
+  fun stellarValueSignedMsValueXdrRejectsInputThatIsNotItsObject() {
+    assertFailsWith<IllegalArgumentException> { StellarValueSignedMsValueXdr.fromXdrJsonElement(JsonNull) }
+    assertFailsWith<IllegalArgumentException> { StellarValueSignedMsValueXdr.fromXdrJsonElement(buildJsonObject { }) }
+  }
+
+
+  @Test
+  fun stellarValueProposedMsValueXdrRoundTripsThroughItsJsonTree() {
+    assertRoundTripStellarValueProposedMsValueXdr(sampleStellarValueProposedMsValueXdr(512, 0))
+    assertRoundTripStellarValueProposedMsValueXdr(sampleStellarValueProposedMsValueXdr(512, SAMPLE_DEPTH))
+  }
+
+  private fun assertRoundTripStellarValueProposedMsValueXdr(value: StellarValueProposedMsValueXdr) {
+    val tree = value.toXdrJsonElement()
+    val text = StellarValueProposedMsValueXdr.fromXdrJsonElement(tree).toXdrJson()
+    assertEquals(tree, StellarValueProposedMsValueXdr.fromXdrJson(text).toXdrJsonElement())
+    assertEquals(text, StellarValueProposedMsValueXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    StellarValueProposedMsValueXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, StellarValueProposedMsValueXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
+  }
+
+  @Test
+  fun stellarValueProposedMsValueXdrRejectsInputThatIsNotItsObject() {
+    assertFailsWith<IllegalArgumentException> { StellarValueProposedMsValueXdr.fromXdrJsonElement(JsonNull) }
+    assertFailsWith<IllegalArgumentException> { StellarValueProposedMsValueXdr.fromXdrJsonElement(buildJsonObject { }) }
+  }
+
+
+  @Test
   fun stellarValueExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripStellarValueExtXdr(sampleStellarValueExtXdr(411, 0))
-    assertRoundTripStellarValueExtXdr(sampleStellarValueExtXdr(411, SAMPLE_DEPTH))
+    assertRoundTripStellarValueExtXdr(sampleStellarValueExtXdr(613, 0))
+    assertRoundTripStellarValueExtXdr(sampleStellarValueExtXdr(613, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripStellarValueExtXdr(value: StellarValueExtXdr) {
@@ -632,7 +721,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun stellarValueExtXdrRendersVoidArmAsBasic() {
-    val value = sampleStellarValueExtXdrVoidArm(411, 0)
+    val value = sampleStellarValueExtXdrVoidArm(613, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("basic"), tree)
     val decoded = StellarValueExtXdr.fromXdrJsonElement(tree)
@@ -642,7 +731,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun stellarValueExtXdrRendersLcValueSignatureArmAsSigned() {
-    val value = sampleStellarValueExtXdrLcValueSignatureArm(416, 0)
+    val value = sampleStellarValueExtXdrLcValueSignatureArm(618, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("signed"), jsonKeys(tree))
     val decoded = StellarValueExtXdr.fromXdrJsonElement(tree)
@@ -652,9 +741,29 @@ class XdrJsonLedgerTest {
 
   @Test
   fun stellarValueExtXdrRendersProposedValueArmAsEmptyTxSet() {
-    val value = sampleStellarValueExtXdrProposedValueArm(421, 0)
+    val value = sampleStellarValueExtXdrProposedValueArm(623, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("empty_tx_set"), jsonKeys(tree))
+    val decoded = StellarValueExtXdr.fromXdrJsonElement(tree)
+    assertEquals(value.discriminant, decoded.discriminant)
+    assertEquals(tree, decoded.toXdrJsonElement())
+  }
+
+  @Test
+  fun stellarValueExtXdrRendersSignedMsValueArmAsSignedMs() {
+    val value = sampleStellarValueExtXdrSignedMsValueArm(628, 0)
+    val tree = value.toXdrJsonElement()
+    assertEquals(listOf("signed_ms"), jsonKeys(tree))
+    val decoded = StellarValueExtXdr.fromXdrJsonElement(tree)
+    assertEquals(value.discriminant, decoded.discriminant)
+    assertEquals(tree, decoded.toXdrJsonElement())
+  }
+
+  @Test
+  fun stellarValueExtXdrRendersProposedMsValueArmAsEmptyTxSetMs() {
+    val value = sampleStellarValueExtXdrProposedMsValueArm(633, 0)
+    val tree = value.toXdrJsonElement()
+    assertEquals(listOf("empty_tx_set_ms"), jsonKeys(tree))
     val decoded = StellarValueExtXdr.fromXdrJsonElement(tree)
     assertEquals(value.discriminant, decoded.discriminant)
     assertEquals(tree, decoded.toXdrJsonElement())
@@ -682,8 +791,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun stellarValueXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripStellarValueXdr(sampleStellarValueXdr(512, 0))
-    assertRoundTripStellarValueXdr(sampleStellarValueXdr(512, SAMPLE_DEPTH))
+    assertRoundTripStellarValueXdr(sampleStellarValueXdr(714, 0))
+    assertRoundTripStellarValueXdr(sampleStellarValueXdr(714, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripStellarValueXdr(value: StellarValueXdr) {
@@ -743,8 +852,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtensionV1ExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderExtensionV1ExtXdr(sampleLedgerHeaderExtensionV1ExtXdr(714, 0))
-    assertRoundTripLedgerHeaderExtensionV1ExtXdr(sampleLedgerHeaderExtensionV1ExtXdr(714, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderExtensionV1ExtXdr(sampleLedgerHeaderExtensionV1ExtXdr(916, 0))
+    assertRoundTripLedgerHeaderExtensionV1ExtXdr(sampleLedgerHeaderExtensionV1ExtXdr(916, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderExtensionV1ExtXdr(value: LedgerHeaderExtensionV1ExtXdr) {
@@ -760,7 +869,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtensionV1ExtXdrRendersVoidArmAsV0() {
-    val value = sampleLedgerHeaderExtensionV1ExtXdrVoidArm(714, 0)
+    val value = sampleLedgerHeaderExtensionV1ExtXdrVoidArm(916, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = LedgerHeaderExtensionV1ExtXdr.fromXdrJsonElement(tree)
@@ -779,8 +888,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtensionV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderExtensionV1Xdr(sampleLedgerHeaderExtensionV1Xdr(815, 0))
-    assertRoundTripLedgerHeaderExtensionV1Xdr(sampleLedgerHeaderExtensionV1Xdr(815, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderExtensionV1Xdr(sampleLedgerHeaderExtensionV1Xdr(1017, 0))
+    assertRoundTripLedgerHeaderExtensionV1Xdr(sampleLedgerHeaderExtensionV1Xdr(1017, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderExtensionV1Xdr(value: LedgerHeaderExtensionV1Xdr) {
@@ -803,8 +912,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderExtXdr(sampleLedgerHeaderExtXdr(916, 0))
-    assertRoundTripLedgerHeaderExtXdr(sampleLedgerHeaderExtXdr(916, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderExtXdr(sampleLedgerHeaderExtXdr(1118, 0))
+    assertRoundTripLedgerHeaderExtXdr(sampleLedgerHeaderExtXdr(1118, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderExtXdr(value: LedgerHeaderExtXdr) {
@@ -820,7 +929,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtXdrRendersVoidArmAsV0() {
-    val value = sampleLedgerHeaderExtXdrVoidArm(916, 0)
+    val value = sampleLedgerHeaderExtXdrVoidArm(1118, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = LedgerHeaderExtXdr.fromXdrJsonElement(tree)
@@ -830,7 +939,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderExtXdrRendersV1ArmAsV1() {
-    val value = sampleLedgerHeaderExtXdrV1Arm(921, 0)
+    val value = sampleLedgerHeaderExtXdrV1Arm(1123, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = LedgerHeaderExtXdr.fromXdrJsonElement(tree)
@@ -860,8 +969,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderXdr(sampleLedgerHeaderXdr(1017, 0))
-    assertRoundTripLedgerHeaderXdr(sampleLedgerHeaderXdr(1017, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderXdr(sampleLedgerHeaderXdr(1219, 0))
+    assertRoundTripLedgerHeaderXdr(sampleLedgerHeaderXdr(1219, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderXdr(value: LedgerHeaderXdr) {
@@ -961,8 +1070,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun configUpgradeSetKeyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripConfigUpgradeSetKeyXdr(sampleConfigUpgradeSetKeyXdr(1219, 0))
-    assertRoundTripConfigUpgradeSetKeyXdr(sampleConfigUpgradeSetKeyXdr(1219, SAMPLE_DEPTH))
+    assertRoundTripConfigUpgradeSetKeyXdr(sampleConfigUpgradeSetKeyXdr(1421, 0))
+    assertRoundTripConfigUpgradeSetKeyXdr(sampleConfigUpgradeSetKeyXdr(1421, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripConfigUpgradeSetKeyXdr(value: ConfigUpgradeSetKeyXdr) {
@@ -985,8 +1094,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerUpgradeXdr(sampleLedgerUpgradeXdr(1320, 0))
-    assertRoundTripLedgerUpgradeXdr(sampleLedgerUpgradeXdr(1320, SAMPLE_DEPTH))
+    assertRoundTripLedgerUpgradeXdr(sampleLedgerUpgradeXdr(1522, 0))
+    assertRoundTripLedgerUpgradeXdr(sampleLedgerUpgradeXdr(1522, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerUpgradeXdr(value: LedgerUpgradeXdr) {
@@ -1002,7 +1111,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewLedgerVersionArmAsVersion() {
-    val value = sampleLedgerUpgradeXdrNewLedgerVersionArm(1320, 0)
+    val value = sampleLedgerUpgradeXdrNewLedgerVersionArm(1522, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("version"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1012,7 +1121,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewBaseFeeArmAsBaseFee() {
-    val value = sampleLedgerUpgradeXdrNewBaseFeeArm(1325, 0)
+    val value = sampleLedgerUpgradeXdrNewBaseFeeArm(1527, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("base_fee"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1022,7 +1131,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewMaxTxSetSizeArmAsMaxTxSetSize() {
-    val value = sampleLedgerUpgradeXdrNewMaxTxSetSizeArm(1330, 0)
+    val value = sampleLedgerUpgradeXdrNewMaxTxSetSizeArm(1532, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("max_tx_set_size"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1032,7 +1141,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewBaseReserveArmAsBaseReserve() {
-    val value = sampleLedgerUpgradeXdrNewBaseReserveArm(1335, 0)
+    val value = sampleLedgerUpgradeXdrNewBaseReserveArm(1537, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("base_reserve"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1042,7 +1151,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewFlagsArmAsFlags() {
-    val value = sampleLedgerUpgradeXdrNewFlagsArm(1340, 0)
+    val value = sampleLedgerUpgradeXdrNewFlagsArm(1542, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("flags"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1052,7 +1161,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewConfigArmAsConfig() {
-    val value = sampleLedgerUpgradeXdrNewConfigArm(1345, 0)
+    val value = sampleLedgerUpgradeXdrNewConfigArm(1547, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("config"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1062,7 +1171,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerUpgradeXdrRendersNewMaxSorobanTxSetSizeArmAsMaxSorobanTxSetSize() {
-    val value = sampleLedgerUpgradeXdrNewMaxSorobanTxSetSizeArm(1350, 0)
+    val value = sampleLedgerUpgradeXdrNewMaxSorobanTxSetSizeArm(1552, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("max_soroban_tx_set_size"), jsonKeys(tree))
     val decoded = LedgerUpgradeXdr.fromXdrJsonElement(tree)
@@ -1089,8 +1198,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun configUpgradeSetXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripConfigUpgradeSetXdr(sampleConfigUpgradeSetXdr(1421, 0))
-    assertRoundTripConfigUpgradeSetXdr(sampleConfigUpgradeSetXdr(1421, SAMPLE_DEPTH))
+    assertRoundTripConfigUpgradeSetXdr(sampleConfigUpgradeSetXdr(1623, 0))
+    assertRoundTripConfigUpgradeSetXdr(sampleConfigUpgradeSetXdr(1623, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripConfigUpgradeSetXdr(value: ConfigUpgradeSetXdr) {
@@ -1130,8 +1239,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun dependentTxClusterXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripDependentTxClusterXdr(sampleDependentTxClusterXdr(1623, 0))
-    assertRoundTripDependentTxClusterXdr(sampleDependentTxClusterXdr(1623, SAMPLE_DEPTH))
+    assertRoundTripDependentTxClusterXdr(sampleDependentTxClusterXdr(1825, 0))
+    assertRoundTripDependentTxClusterXdr(sampleDependentTxClusterXdr(1825, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripDependentTxClusterXdr(value: DependentTxClusterXdr) {
@@ -1153,8 +1262,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun parallelTxExecutionStageXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripParallelTxExecutionStageXdr(sampleParallelTxExecutionStageXdr(1724, 0))
-    assertRoundTripParallelTxExecutionStageXdr(sampleParallelTxExecutionStageXdr(1724, SAMPLE_DEPTH))
+    assertRoundTripParallelTxExecutionStageXdr(sampleParallelTxExecutionStageXdr(1926, 0))
+    assertRoundTripParallelTxExecutionStageXdr(sampleParallelTxExecutionStageXdr(1926, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripParallelTxExecutionStageXdr(value: ParallelTxExecutionStageXdr) {
@@ -1176,8 +1285,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun parallelTxsComponentXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripParallelTxsComponentXdr(sampleParallelTxsComponentXdr(1825, 0))
-    assertRoundTripParallelTxsComponentXdr(sampleParallelTxsComponentXdr(1825, SAMPLE_DEPTH))
+    assertRoundTripParallelTxsComponentXdr(sampleParallelTxsComponentXdr(2027, 0))
+    assertRoundTripParallelTxsComponentXdr(sampleParallelTxsComponentXdr(2027, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripParallelTxsComponentXdr(value: ParallelTxsComponentXdr) {
@@ -1200,8 +1309,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun txSetComponentTxsMaybeDiscountedFeeXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTxSetComponentTxsMaybeDiscountedFeeXdr(sampleTxSetComponentTxsMaybeDiscountedFeeXdr(1926, 0))
-    assertRoundTripTxSetComponentTxsMaybeDiscountedFeeXdr(sampleTxSetComponentTxsMaybeDiscountedFeeXdr(1926, SAMPLE_DEPTH))
+    assertRoundTripTxSetComponentTxsMaybeDiscountedFeeXdr(sampleTxSetComponentTxsMaybeDiscountedFeeXdr(2128, 0))
+    assertRoundTripTxSetComponentTxsMaybeDiscountedFeeXdr(sampleTxSetComponentTxsMaybeDiscountedFeeXdr(2128, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTxSetComponentTxsMaybeDiscountedFeeXdr(value: TxSetComponentTxsMaybeDiscountedFeeXdr) {
@@ -1224,8 +1333,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun txSetComponentXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTxSetComponentXdr(sampleTxSetComponentXdr(2027, 0))
-    assertRoundTripTxSetComponentXdr(sampleTxSetComponentXdr(2027, SAMPLE_DEPTH))
+    assertRoundTripTxSetComponentXdr(sampleTxSetComponentXdr(2229, 0))
+    assertRoundTripTxSetComponentXdr(sampleTxSetComponentXdr(2229, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTxSetComponentXdr(value: TxSetComponentXdr) {
@@ -1241,7 +1350,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun txSetComponentXdrRendersTxsMaybeDiscountedFeeArmAsTxsetCompTxsMaybeDiscountedFee() {
-    val value = sampleTxSetComponentXdrTxsMaybeDiscountedFeeArm(2027, 0)
+    val value = sampleTxSetComponentXdrTxsMaybeDiscountedFeeArm(2229, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("txset_comp_txs_maybe_discounted_fee"), jsonKeys(tree))
     val decoded = TxSetComponentXdr.fromXdrJsonElement(tree)
@@ -1268,8 +1377,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionPhaseXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionPhaseXdr(sampleTransactionPhaseXdr(2128, 0))
-    assertRoundTripTransactionPhaseXdr(sampleTransactionPhaseXdr(2128, SAMPLE_DEPTH))
+    assertRoundTripTransactionPhaseXdr(sampleTransactionPhaseXdr(2330, 0))
+    assertRoundTripTransactionPhaseXdr(sampleTransactionPhaseXdr(2330, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionPhaseXdr(value: TransactionPhaseXdr) {
@@ -1285,7 +1394,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionPhaseXdrRendersV0ComponentsArmAsV0() {
-    val value = sampleTransactionPhaseXdrV0ComponentsArm(2128, 0)
+    val value = sampleTransactionPhaseXdrV0ComponentsArm(2330, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v0"), jsonKeys(tree))
     val decoded = TransactionPhaseXdr.fromXdrJsonElement(tree)
@@ -1295,7 +1404,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionPhaseXdrRendersParallelTxsComponentArmAsV1() {
-    val value = sampleTransactionPhaseXdrParallelTxsComponentArm(2133, 0)
+    val value = sampleTransactionPhaseXdrParallelTxsComponentArm(2335, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = TransactionPhaseXdr.fromXdrJsonElement(tree)
@@ -1322,8 +1431,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionSetXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionSetXdr(sampleTransactionSetXdr(2229, 0))
-    assertRoundTripTransactionSetXdr(sampleTransactionSetXdr(2229, SAMPLE_DEPTH))
+    assertRoundTripTransactionSetXdr(sampleTransactionSetXdr(2431, 0))
+    assertRoundTripTransactionSetXdr(sampleTransactionSetXdr(2431, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionSetXdr(value: TransactionSetXdr) {
@@ -1346,8 +1455,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionSetV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionSetV1Xdr(sampleTransactionSetV1Xdr(2330, 0))
-    assertRoundTripTransactionSetV1Xdr(sampleTransactionSetV1Xdr(2330, SAMPLE_DEPTH))
+    assertRoundTripTransactionSetV1Xdr(sampleTransactionSetV1Xdr(2532, 0))
+    assertRoundTripTransactionSetV1Xdr(sampleTransactionSetV1Xdr(2532, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionSetV1Xdr(value: TransactionSetV1Xdr) {
@@ -1370,8 +1479,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun generalizedTransactionSetXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripGeneralizedTransactionSetXdr(sampleGeneralizedTransactionSetXdr(2431, 0))
-    assertRoundTripGeneralizedTransactionSetXdr(sampleGeneralizedTransactionSetXdr(2431, SAMPLE_DEPTH))
+    assertRoundTripGeneralizedTransactionSetXdr(sampleGeneralizedTransactionSetXdr(2633, 0))
+    assertRoundTripGeneralizedTransactionSetXdr(sampleGeneralizedTransactionSetXdr(2633, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripGeneralizedTransactionSetXdr(value: GeneralizedTransactionSetXdr) {
@@ -1387,7 +1496,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun generalizedTransactionSetXdrRendersV1TxSetArmAsV1() {
-    val value = sampleGeneralizedTransactionSetXdrV1TxSetArm(2431, 0)
+    val value = sampleGeneralizedTransactionSetXdrV1TxSetArm(2633, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = GeneralizedTransactionSetXdr.fromXdrJsonElement(tree)
@@ -1414,8 +1523,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionResultPairXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionResultPairXdr(sampleTransactionResultPairXdr(2532, 0))
-    assertRoundTripTransactionResultPairXdr(sampleTransactionResultPairXdr(2532, SAMPLE_DEPTH))
+    assertRoundTripTransactionResultPairXdr(sampleTransactionResultPairXdr(2734, 0))
+    assertRoundTripTransactionResultPairXdr(sampleTransactionResultPairXdr(2734, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionResultPairXdr(value: TransactionResultPairXdr) {
@@ -1438,8 +1547,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionResultSetXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionResultSetXdr(sampleTransactionResultSetXdr(2633, 0))
-    assertRoundTripTransactionResultSetXdr(sampleTransactionResultSetXdr(2633, SAMPLE_DEPTH))
+    assertRoundTripTransactionResultSetXdr(sampleTransactionResultSetXdr(2835, 0))
+    assertRoundTripTransactionResultSetXdr(sampleTransactionResultSetXdr(2835, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionResultSetXdr(value: TransactionResultSetXdr) {
@@ -1462,8 +1571,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryEntryExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionHistoryEntryExtXdr(sampleTransactionHistoryEntryExtXdr(2734, 0))
-    assertRoundTripTransactionHistoryEntryExtXdr(sampleTransactionHistoryEntryExtXdr(2734, SAMPLE_DEPTH))
+    assertRoundTripTransactionHistoryEntryExtXdr(sampleTransactionHistoryEntryExtXdr(2936, 0))
+    assertRoundTripTransactionHistoryEntryExtXdr(sampleTransactionHistoryEntryExtXdr(2936, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionHistoryEntryExtXdr(value: TransactionHistoryEntryExtXdr) {
@@ -1479,7 +1588,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryEntryExtXdrRendersVoidArmAsV0() {
-    val value = sampleTransactionHistoryEntryExtXdrVoidArm(2734, 0)
+    val value = sampleTransactionHistoryEntryExtXdrVoidArm(2936, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = TransactionHistoryEntryExtXdr.fromXdrJsonElement(tree)
@@ -1489,7 +1598,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryEntryExtXdrRendersGeneralizedTxSetArmAsV1() {
-    val value = sampleTransactionHistoryEntryExtXdrGeneralizedTxSetArm(2739, 0)
+    val value = sampleTransactionHistoryEntryExtXdrGeneralizedTxSetArm(2941, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = TransactionHistoryEntryExtXdr.fromXdrJsonElement(tree)
@@ -1519,8 +1628,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryEntryXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionHistoryEntryXdr(sampleTransactionHistoryEntryXdr(2835, 0))
-    assertRoundTripTransactionHistoryEntryXdr(sampleTransactionHistoryEntryXdr(2835, SAMPLE_DEPTH))
+    assertRoundTripTransactionHistoryEntryXdr(sampleTransactionHistoryEntryXdr(3037, 0))
+    assertRoundTripTransactionHistoryEntryXdr(sampleTransactionHistoryEntryXdr(3037, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionHistoryEntryXdr(value: TransactionHistoryEntryXdr) {
@@ -1543,8 +1652,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryResultEntryExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionHistoryResultEntryExtXdr(sampleTransactionHistoryResultEntryExtXdr(2936, 0))
-    assertRoundTripTransactionHistoryResultEntryExtXdr(sampleTransactionHistoryResultEntryExtXdr(2936, SAMPLE_DEPTH))
+    assertRoundTripTransactionHistoryResultEntryExtXdr(sampleTransactionHistoryResultEntryExtXdr(3138, 0))
+    assertRoundTripTransactionHistoryResultEntryExtXdr(sampleTransactionHistoryResultEntryExtXdr(3138, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionHistoryResultEntryExtXdr(value: TransactionHistoryResultEntryExtXdr) {
@@ -1560,7 +1669,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryResultEntryExtXdrRendersVoidArmAsV0() {
-    val value = sampleTransactionHistoryResultEntryExtXdrVoidArm(2936, 0)
+    val value = sampleTransactionHistoryResultEntryExtXdrVoidArm(3138, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = TransactionHistoryResultEntryExtXdr.fromXdrJsonElement(tree)
@@ -1579,8 +1688,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionHistoryResultEntryXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionHistoryResultEntryXdr(sampleTransactionHistoryResultEntryXdr(3037, 0))
-    assertRoundTripTransactionHistoryResultEntryXdr(sampleTransactionHistoryResultEntryXdr(3037, SAMPLE_DEPTH))
+    assertRoundTripTransactionHistoryResultEntryXdr(sampleTransactionHistoryResultEntryXdr(3239, 0))
+    assertRoundTripTransactionHistoryResultEntryXdr(sampleTransactionHistoryResultEntryXdr(3239, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionHistoryResultEntryXdr(value: TransactionHistoryResultEntryXdr) {
@@ -1603,8 +1712,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderHistoryEntryExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderHistoryEntryExtXdr(sampleLedgerHeaderHistoryEntryExtXdr(3138, 0))
-    assertRoundTripLedgerHeaderHistoryEntryExtXdr(sampleLedgerHeaderHistoryEntryExtXdr(3138, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderHistoryEntryExtXdr(sampleLedgerHeaderHistoryEntryExtXdr(3340, 0))
+    assertRoundTripLedgerHeaderHistoryEntryExtXdr(sampleLedgerHeaderHistoryEntryExtXdr(3340, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderHistoryEntryExtXdr(value: LedgerHeaderHistoryEntryExtXdr) {
@@ -1620,7 +1729,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderHistoryEntryExtXdrRendersVoidArmAsV0() {
-    val value = sampleLedgerHeaderHistoryEntryExtXdrVoidArm(3138, 0)
+    val value = sampleLedgerHeaderHistoryEntryExtXdrVoidArm(3340, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = LedgerHeaderHistoryEntryExtXdr.fromXdrJsonElement(tree)
@@ -1639,8 +1748,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerHeaderHistoryEntryXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerHeaderHistoryEntryXdr(sampleLedgerHeaderHistoryEntryXdr(3239, 0))
-    assertRoundTripLedgerHeaderHistoryEntryXdr(sampleLedgerHeaderHistoryEntryXdr(3239, SAMPLE_DEPTH))
+    assertRoundTripLedgerHeaderHistoryEntryXdr(sampleLedgerHeaderHistoryEntryXdr(3441, 0))
+    assertRoundTripLedgerHeaderHistoryEntryXdr(sampleLedgerHeaderHistoryEntryXdr(3441, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerHeaderHistoryEntryXdr(value: LedgerHeaderHistoryEntryXdr) {
@@ -1663,8 +1772,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerSCPMessagesXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerSCPMessagesXdr(sampleLedgerSCPMessagesXdr(3340, 0))
-    assertRoundTripLedgerSCPMessagesXdr(sampleLedgerSCPMessagesXdr(3340, SAMPLE_DEPTH))
+    assertRoundTripLedgerSCPMessagesXdr(sampleLedgerSCPMessagesXdr(3542, 0))
+    assertRoundTripLedgerSCPMessagesXdr(sampleLedgerSCPMessagesXdr(3542, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerSCPMessagesXdr(value: LedgerSCPMessagesXdr) {
@@ -1687,8 +1796,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sCPHistoryEntryV0XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCPHistoryEntryV0Xdr(sampleSCPHistoryEntryV0Xdr(3441, 0))
-    assertRoundTripSCPHistoryEntryV0Xdr(sampleSCPHistoryEntryV0Xdr(3441, SAMPLE_DEPTH))
+    assertRoundTripSCPHistoryEntryV0Xdr(sampleSCPHistoryEntryV0Xdr(3643, 0))
+    assertRoundTripSCPHistoryEntryV0Xdr(sampleSCPHistoryEntryV0Xdr(3643, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCPHistoryEntryV0Xdr(value: SCPHistoryEntryV0Xdr) {
@@ -1711,8 +1820,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sCPHistoryEntryXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCPHistoryEntryXdr(sampleSCPHistoryEntryXdr(3542, 0))
-    assertRoundTripSCPHistoryEntryXdr(sampleSCPHistoryEntryXdr(3542, SAMPLE_DEPTH))
+    assertRoundTripSCPHistoryEntryXdr(sampleSCPHistoryEntryXdr(3744, 0))
+    assertRoundTripSCPHistoryEntryXdr(sampleSCPHistoryEntryXdr(3744, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCPHistoryEntryXdr(value: SCPHistoryEntryXdr) {
@@ -1728,7 +1837,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sCPHistoryEntryXdrRendersV0ArmAsV0() {
-    val value = sampleSCPHistoryEntryXdrV0Arm(3542, 0)
+    val value = sampleSCPHistoryEntryXdrV0Arm(3744, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v0"), jsonKeys(tree))
     val decoded = SCPHistoryEntryXdr.fromXdrJsonElement(tree)
@@ -1812,8 +1921,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerEntryChangeXdr(sampleLedgerEntryChangeXdr(3744, 0))
-    assertRoundTripLedgerEntryChangeXdr(sampleLedgerEntryChangeXdr(3744, SAMPLE_DEPTH))
+    assertRoundTripLedgerEntryChangeXdr(sampleLedgerEntryChangeXdr(3946, 0))
+    assertRoundTripLedgerEntryChangeXdr(sampleLedgerEntryChangeXdr(3946, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerEntryChangeXdr(value: LedgerEntryChangeXdr) {
@@ -1829,7 +1938,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRendersCreatedArmAsCreated() {
-    val value = sampleLedgerEntryChangeXdrCreatedArm(3744, 0)
+    val value = sampleLedgerEntryChangeXdrCreatedArm(3946, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("created"), jsonKeys(tree))
     val decoded = LedgerEntryChangeXdr.fromXdrJsonElement(tree)
@@ -1839,7 +1948,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRendersUpdatedArmAsUpdated() {
-    val value = sampleLedgerEntryChangeXdrUpdatedArm(3749, 0)
+    val value = sampleLedgerEntryChangeXdrUpdatedArm(3951, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("updated"), jsonKeys(tree))
     val decoded = LedgerEntryChangeXdr.fromXdrJsonElement(tree)
@@ -1849,7 +1958,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRendersRemovedArmAsRemoved() {
-    val value = sampleLedgerEntryChangeXdrRemovedArm(3754, 0)
+    val value = sampleLedgerEntryChangeXdrRemovedArm(3956, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("removed"), jsonKeys(tree))
     val decoded = LedgerEntryChangeXdr.fromXdrJsonElement(tree)
@@ -1859,7 +1968,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRendersStateArmAsState() {
-    val value = sampleLedgerEntryChangeXdrStateArm(3759, 0)
+    val value = sampleLedgerEntryChangeXdrStateArm(3961, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("state"), jsonKeys(tree))
     val decoded = LedgerEntryChangeXdr.fromXdrJsonElement(tree)
@@ -1869,7 +1978,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangeXdrRendersRestoredArmAsRestored() {
-    val value = sampleLedgerEntryChangeXdrRestoredArm(3764, 0)
+    val value = sampleLedgerEntryChangeXdrRestoredArm(3966, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("restored"), jsonKeys(tree))
     val decoded = LedgerEntryChangeXdr.fromXdrJsonElement(tree)
@@ -1896,8 +2005,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerEntryChangesXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerEntryChangesXdr(sampleLedgerEntryChangesXdr(3845, 0))
-    assertRoundTripLedgerEntryChangesXdr(sampleLedgerEntryChangesXdr(3845, SAMPLE_DEPTH))
+    assertRoundTripLedgerEntryChangesXdr(sampleLedgerEntryChangesXdr(4047, 0))
+    assertRoundTripLedgerEntryChangesXdr(sampleLedgerEntryChangesXdr(4047, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerEntryChangesXdr(value: LedgerEntryChangesXdr) {
@@ -1919,8 +2028,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun operationMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripOperationMetaXdr(sampleOperationMetaXdr(3946, 0))
-    assertRoundTripOperationMetaXdr(sampleOperationMetaXdr(3946, SAMPLE_DEPTH))
+    assertRoundTripOperationMetaXdr(sampleOperationMetaXdr(4148, 0))
+    assertRoundTripOperationMetaXdr(sampleOperationMetaXdr(4148, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripOperationMetaXdr(value: OperationMetaXdr) {
@@ -1943,8 +2052,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionMetaV1Xdr(sampleTransactionMetaV1Xdr(4047, 0))
-    assertRoundTripTransactionMetaV1Xdr(sampleTransactionMetaV1Xdr(4047, SAMPLE_DEPTH))
+    assertRoundTripTransactionMetaV1Xdr(sampleTransactionMetaV1Xdr(4249, 0))
+    assertRoundTripTransactionMetaV1Xdr(sampleTransactionMetaV1Xdr(4249, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionMetaV1Xdr(value: TransactionMetaV1Xdr) {
@@ -1967,8 +2076,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaV2XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionMetaV2Xdr(sampleTransactionMetaV2Xdr(4148, 0))
-    assertRoundTripTransactionMetaV2Xdr(sampleTransactionMetaV2Xdr(4148, SAMPLE_DEPTH))
+    assertRoundTripTransactionMetaV2Xdr(sampleTransactionMetaV2Xdr(4350, 0))
+    assertRoundTripTransactionMetaV2Xdr(sampleTransactionMetaV2Xdr(4350, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionMetaV2Xdr(value: TransactionMetaV2Xdr) {
@@ -2028,8 +2137,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun contractEventV0XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractEventV0Xdr(sampleContractEventV0Xdr(4350, 0))
-    assertRoundTripContractEventV0Xdr(sampleContractEventV0Xdr(4350, SAMPLE_DEPTH))
+    assertRoundTripContractEventV0Xdr(sampleContractEventV0Xdr(4552, 0))
+    assertRoundTripContractEventV0Xdr(sampleContractEventV0Xdr(4552, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractEventV0Xdr(value: ContractEventV0Xdr) {
@@ -2052,8 +2161,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun contractEventBodyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractEventBodyXdr(sampleContractEventBodyXdr(4451, 0))
-    assertRoundTripContractEventBodyXdr(sampleContractEventBodyXdr(4451, SAMPLE_DEPTH))
+    assertRoundTripContractEventBodyXdr(sampleContractEventBodyXdr(4653, 0))
+    assertRoundTripContractEventBodyXdr(sampleContractEventBodyXdr(4653, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractEventBodyXdr(value: ContractEventBodyXdr) {
@@ -2069,7 +2178,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun contractEventBodyXdrRendersV0ArmAsV0() {
-    val value = sampleContractEventBodyXdrV0Arm(4451, 0)
+    val value = sampleContractEventBodyXdrV0Arm(4653, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v0"), jsonKeys(tree))
     val decoded = ContractEventBodyXdr.fromXdrJsonElement(tree)
@@ -2096,8 +2205,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun contractEventXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractEventXdr(sampleContractEventXdr(4552, 0))
-    assertRoundTripContractEventXdr(sampleContractEventXdr(4552, SAMPLE_DEPTH))
+    assertRoundTripContractEventXdr(sampleContractEventXdr(4754, 0))
+    assertRoundTripContractEventXdr(sampleContractEventXdr(4754, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractEventXdr(value: ContractEventXdr) {
@@ -2120,8 +2229,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun diagnosticEventXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripDiagnosticEventXdr(sampleDiagnosticEventXdr(4653, 0))
-    assertRoundTripDiagnosticEventXdr(sampleDiagnosticEventXdr(4653, SAMPLE_DEPTH))
+    assertRoundTripDiagnosticEventXdr(sampleDiagnosticEventXdr(4855, 0))
+    assertRoundTripDiagnosticEventXdr(sampleDiagnosticEventXdr(4855, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripDiagnosticEventXdr(value: DiagnosticEventXdr) {
@@ -2144,8 +2253,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaExtV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSorobanTransactionMetaExtV1Xdr(sampleSorobanTransactionMetaExtV1Xdr(4754, 0))
-    assertRoundTripSorobanTransactionMetaExtV1Xdr(sampleSorobanTransactionMetaExtV1Xdr(4754, SAMPLE_DEPTH))
+    assertRoundTripSorobanTransactionMetaExtV1Xdr(sampleSorobanTransactionMetaExtV1Xdr(4956, 0))
+    assertRoundTripSorobanTransactionMetaExtV1Xdr(sampleSorobanTransactionMetaExtV1Xdr(4956, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSorobanTransactionMetaExtV1Xdr(value: SorobanTransactionMetaExtV1Xdr) {
@@ -2168,8 +2277,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSorobanTransactionMetaExtXdr(sampleSorobanTransactionMetaExtXdr(4855, 0))
-    assertRoundTripSorobanTransactionMetaExtXdr(sampleSorobanTransactionMetaExtXdr(4855, SAMPLE_DEPTH))
+    assertRoundTripSorobanTransactionMetaExtXdr(sampleSorobanTransactionMetaExtXdr(5057, 0))
+    assertRoundTripSorobanTransactionMetaExtXdr(sampleSorobanTransactionMetaExtXdr(5057, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSorobanTransactionMetaExtXdr(value: SorobanTransactionMetaExtXdr) {
@@ -2185,7 +2294,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaExtXdrRendersVoidArmAsV0() {
-    val value = sampleSorobanTransactionMetaExtXdrVoidArm(4855, 0)
+    val value = sampleSorobanTransactionMetaExtXdrVoidArm(5057, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = SorobanTransactionMetaExtXdr.fromXdrJsonElement(tree)
@@ -2195,7 +2304,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaExtXdrRendersV1ArmAsV1() {
-    val value = sampleSorobanTransactionMetaExtXdrV1Arm(4860, 0)
+    val value = sampleSorobanTransactionMetaExtXdrV1Arm(5062, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = SorobanTransactionMetaExtXdr.fromXdrJsonElement(tree)
@@ -2225,8 +2334,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSorobanTransactionMetaXdr(sampleSorobanTransactionMetaXdr(4956, 0))
-    assertRoundTripSorobanTransactionMetaXdr(sampleSorobanTransactionMetaXdr(4956, SAMPLE_DEPTH))
+    assertRoundTripSorobanTransactionMetaXdr(sampleSorobanTransactionMetaXdr(5158, 0))
+    assertRoundTripSorobanTransactionMetaXdr(sampleSorobanTransactionMetaXdr(5158, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSorobanTransactionMetaXdr(value: SorobanTransactionMetaXdr) {
@@ -2249,8 +2358,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaV3XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionMetaV3Xdr(sampleTransactionMetaV3Xdr(5057, 0))
-    assertRoundTripTransactionMetaV3Xdr(sampleTransactionMetaV3Xdr(5057, SAMPLE_DEPTH))
+    assertRoundTripTransactionMetaV3Xdr(sampleTransactionMetaV3Xdr(5259, 0))
+    assertRoundTripTransactionMetaV3Xdr(sampleTransactionMetaV3Xdr(5259, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionMetaV3Xdr(value: TransactionMetaV3Xdr) {
@@ -2273,8 +2382,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun operationMetaV2XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripOperationMetaV2Xdr(sampleOperationMetaV2Xdr(5158, 0))
-    assertRoundTripOperationMetaV2Xdr(sampleOperationMetaV2Xdr(5158, SAMPLE_DEPTH))
+    assertRoundTripOperationMetaV2Xdr(sampleOperationMetaV2Xdr(5360, 0))
+    assertRoundTripOperationMetaV2Xdr(sampleOperationMetaV2Xdr(5360, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripOperationMetaV2Xdr(value: OperationMetaV2Xdr) {
@@ -2297,8 +2406,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun sorobanTransactionMetaV2XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSorobanTransactionMetaV2Xdr(sampleSorobanTransactionMetaV2Xdr(5259, 0))
-    assertRoundTripSorobanTransactionMetaV2Xdr(sampleSorobanTransactionMetaV2Xdr(5259, SAMPLE_DEPTH))
+    assertRoundTripSorobanTransactionMetaV2Xdr(sampleSorobanTransactionMetaV2Xdr(5461, 0))
+    assertRoundTripSorobanTransactionMetaV2Xdr(sampleSorobanTransactionMetaV2Xdr(5461, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSorobanTransactionMetaV2Xdr(value: SorobanTransactionMetaV2Xdr) {
@@ -2358,8 +2467,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionEventXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionEventXdr(sampleTransactionEventXdr(5461, 0))
-    assertRoundTripTransactionEventXdr(sampleTransactionEventXdr(5461, SAMPLE_DEPTH))
+    assertRoundTripTransactionEventXdr(sampleTransactionEventXdr(5663, 0))
+    assertRoundTripTransactionEventXdr(sampleTransactionEventXdr(5663, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionEventXdr(value: TransactionEventXdr) {
@@ -2382,8 +2491,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaV4XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionMetaV4Xdr(sampleTransactionMetaV4Xdr(5562, 0))
-    assertRoundTripTransactionMetaV4Xdr(sampleTransactionMetaV4Xdr(5562, SAMPLE_DEPTH))
+    assertRoundTripTransactionMetaV4Xdr(sampleTransactionMetaV4Xdr(5764, 0))
+    assertRoundTripTransactionMetaV4Xdr(sampleTransactionMetaV4Xdr(5764, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionMetaV4Xdr(value: TransactionMetaV4Xdr) {
@@ -2406,8 +2515,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun invokeHostFunctionSuccessPreImageXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripInvokeHostFunctionSuccessPreImageXdr(sampleInvokeHostFunctionSuccessPreImageXdr(5663, 0))
-    assertRoundTripInvokeHostFunctionSuccessPreImageXdr(sampleInvokeHostFunctionSuccessPreImageXdr(5663, SAMPLE_DEPTH))
+    assertRoundTripInvokeHostFunctionSuccessPreImageXdr(sampleInvokeHostFunctionSuccessPreImageXdr(5865, 0))
+    assertRoundTripInvokeHostFunctionSuccessPreImageXdr(sampleInvokeHostFunctionSuccessPreImageXdr(5865, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripInvokeHostFunctionSuccessPreImageXdr(value: InvokeHostFunctionSuccessPreImageXdr) {
@@ -2430,8 +2539,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionMetaXdr(sampleTransactionMetaXdr(5764, 0))
-    assertRoundTripTransactionMetaXdr(sampleTransactionMetaXdr(5764, SAMPLE_DEPTH))
+    assertRoundTripTransactionMetaXdr(sampleTransactionMetaXdr(5966, 0))
+    assertRoundTripTransactionMetaXdr(sampleTransactionMetaXdr(5966, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionMetaXdr(value: TransactionMetaXdr) {
@@ -2447,7 +2556,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRendersOperationsArmAsV0() {
-    val value = sampleTransactionMetaXdrOperationsArm(5764, 0)
+    val value = sampleTransactionMetaXdrOperationsArm(5966, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v0"), jsonKeys(tree))
     val decoded = TransactionMetaXdr.fromXdrJsonElement(tree)
@@ -2457,7 +2566,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRendersV1ArmAsV1() {
-    val value = sampleTransactionMetaXdrV1Arm(5769, 0)
+    val value = sampleTransactionMetaXdrV1Arm(5971, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = TransactionMetaXdr.fromXdrJsonElement(tree)
@@ -2467,7 +2576,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRendersV2ArmAsV2() {
-    val value = sampleTransactionMetaXdrV2Arm(5774, 0)
+    val value = sampleTransactionMetaXdrV2Arm(5976, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v2"), jsonKeys(tree))
     val decoded = TransactionMetaXdr.fromXdrJsonElement(tree)
@@ -2477,7 +2586,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRendersV3ArmAsV3() {
-    val value = sampleTransactionMetaXdrV3Arm(5779, 0)
+    val value = sampleTransactionMetaXdrV3Arm(5981, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v3"), jsonKeys(tree))
     val decoded = TransactionMetaXdr.fromXdrJsonElement(tree)
@@ -2487,7 +2596,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionMetaXdrRendersV4ArmAsV4() {
-    val value = sampleTransactionMetaXdrV4Arm(5784, 0)
+    val value = sampleTransactionMetaXdrV4Arm(5986, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v4"), jsonKeys(tree))
     val decoded = TransactionMetaXdr.fromXdrJsonElement(tree)
@@ -2514,8 +2623,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionResultMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionResultMetaXdr(sampleTransactionResultMetaXdr(5865, 0))
-    assertRoundTripTransactionResultMetaXdr(sampleTransactionResultMetaXdr(5865, SAMPLE_DEPTH))
+    assertRoundTripTransactionResultMetaXdr(sampleTransactionResultMetaXdr(6067, 0))
+    assertRoundTripTransactionResultMetaXdr(sampleTransactionResultMetaXdr(6067, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionResultMetaXdr(value: TransactionResultMetaXdr) {
@@ -2538,8 +2647,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun transactionResultMetaV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripTransactionResultMetaV1Xdr(sampleTransactionResultMetaV1Xdr(5966, 0))
-    assertRoundTripTransactionResultMetaV1Xdr(sampleTransactionResultMetaV1Xdr(5966, SAMPLE_DEPTH))
+    assertRoundTripTransactionResultMetaV1Xdr(sampleTransactionResultMetaV1Xdr(6168, 0))
+    assertRoundTripTransactionResultMetaV1Xdr(sampleTransactionResultMetaV1Xdr(6168, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripTransactionResultMetaV1Xdr(value: TransactionResultMetaV1Xdr) {
@@ -2562,8 +2671,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun upgradeEntryMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripUpgradeEntryMetaXdr(sampleUpgradeEntryMetaXdr(6067, 0))
-    assertRoundTripUpgradeEntryMetaXdr(sampleUpgradeEntryMetaXdr(6067, SAMPLE_DEPTH))
+    assertRoundTripUpgradeEntryMetaXdr(sampleUpgradeEntryMetaXdr(6269, 0))
+    assertRoundTripUpgradeEntryMetaXdr(sampleUpgradeEntryMetaXdr(6269, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripUpgradeEntryMetaXdr(value: UpgradeEntryMetaXdr) {
@@ -2586,8 +2695,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaV0XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaV0Xdr(sampleLedgerCloseMetaV0Xdr(6168, 0))
-    assertRoundTripLedgerCloseMetaV0Xdr(sampleLedgerCloseMetaV0Xdr(6168, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaV0Xdr(sampleLedgerCloseMetaV0Xdr(6370, 0))
+    assertRoundTripLedgerCloseMetaV0Xdr(sampleLedgerCloseMetaV0Xdr(6370, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaV0Xdr(value: LedgerCloseMetaV0Xdr) {
@@ -2610,8 +2719,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaExtV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaExtV1Xdr(sampleLedgerCloseMetaExtV1Xdr(6269, 0))
-    assertRoundTripLedgerCloseMetaExtV1Xdr(sampleLedgerCloseMetaExtV1Xdr(6269, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaExtV1Xdr(sampleLedgerCloseMetaExtV1Xdr(6471, 0))
+    assertRoundTripLedgerCloseMetaExtV1Xdr(sampleLedgerCloseMetaExtV1Xdr(6471, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaExtV1Xdr(value: LedgerCloseMetaExtV1Xdr) {
@@ -2634,8 +2743,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaExtXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaExtXdr(sampleLedgerCloseMetaExtXdr(6370, 0))
-    assertRoundTripLedgerCloseMetaExtXdr(sampleLedgerCloseMetaExtXdr(6370, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaExtXdr(sampleLedgerCloseMetaExtXdr(6572, 0))
+    assertRoundTripLedgerCloseMetaExtXdr(sampleLedgerCloseMetaExtXdr(6572, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaExtXdr(value: LedgerCloseMetaExtXdr) {
@@ -2651,7 +2760,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaExtXdrRendersVoidArmAsV0() {
-    val value = sampleLedgerCloseMetaExtXdrVoidArm(6370, 0)
+    val value = sampleLedgerCloseMetaExtXdrVoidArm(6572, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("v0"), tree)
     val decoded = LedgerCloseMetaExtXdr.fromXdrJsonElement(tree)
@@ -2661,7 +2770,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaExtXdrRendersV1ArmAsV1() {
-    val value = sampleLedgerCloseMetaExtXdrV1Arm(6375, 0)
+    val value = sampleLedgerCloseMetaExtXdrV1Arm(6577, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = LedgerCloseMetaExtXdr.fromXdrJsonElement(tree)
@@ -2691,8 +2800,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaV1XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaV1Xdr(sampleLedgerCloseMetaV1Xdr(6471, 0))
-    assertRoundTripLedgerCloseMetaV1Xdr(sampleLedgerCloseMetaV1Xdr(6471, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaV1Xdr(sampleLedgerCloseMetaV1Xdr(6673, 0))
+    assertRoundTripLedgerCloseMetaV1Xdr(sampleLedgerCloseMetaV1Xdr(6673, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaV1Xdr(value: LedgerCloseMetaV1Xdr) {
@@ -2715,8 +2824,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaV2XdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaV2Xdr(sampleLedgerCloseMetaV2Xdr(6572, 0))
-    assertRoundTripLedgerCloseMetaV2Xdr(sampleLedgerCloseMetaV2Xdr(6572, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaV2Xdr(sampleLedgerCloseMetaV2Xdr(6774, 0))
+    assertRoundTripLedgerCloseMetaV2Xdr(sampleLedgerCloseMetaV2Xdr(6774, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaV2Xdr(value: LedgerCloseMetaV2Xdr) {
@@ -2739,8 +2848,8 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripLedgerCloseMetaXdr(sampleLedgerCloseMetaXdr(6673, 0))
-    assertRoundTripLedgerCloseMetaXdr(sampleLedgerCloseMetaXdr(6673, SAMPLE_DEPTH))
+    assertRoundTripLedgerCloseMetaXdr(sampleLedgerCloseMetaXdr(6875, 0))
+    assertRoundTripLedgerCloseMetaXdr(sampleLedgerCloseMetaXdr(6875, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripLedgerCloseMetaXdr(value: LedgerCloseMetaXdr) {
@@ -2756,7 +2865,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaXdrRendersV0ArmAsV0() {
-    val value = sampleLedgerCloseMetaXdrV0Arm(6673, 0)
+    val value = sampleLedgerCloseMetaXdrV0Arm(6875, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v0"), jsonKeys(tree))
     val decoded = LedgerCloseMetaXdr.fromXdrJsonElement(tree)
@@ -2766,7 +2875,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaXdrRendersV1ArmAsV1() {
-    val value = sampleLedgerCloseMetaXdrV1Arm(6678, 0)
+    val value = sampleLedgerCloseMetaXdrV1Arm(6880, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v1"), jsonKeys(tree))
     val decoded = LedgerCloseMetaXdr.fromXdrJsonElement(tree)
@@ -2776,7 +2885,7 @@ class XdrJsonLedgerTest {
 
   @Test
   fun ledgerCloseMetaXdrRendersV2ArmAsV2() {
-    val value = sampleLedgerCloseMetaXdrV2Arm(6683, 0)
+    val value = sampleLedgerCloseMetaXdrV2Arm(6885, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("v2"), jsonKeys(tree))
     val decoded = LedgerCloseMetaXdr.fromXdrJsonElement(tree)

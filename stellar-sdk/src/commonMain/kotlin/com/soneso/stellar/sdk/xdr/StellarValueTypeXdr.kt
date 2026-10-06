@@ -13,13 +13,17 @@ private const val XDR_JSON_TYPE = "StellarValueTypeXdr"
  * {
  *     STELLAR_VALUE_BASIC = 0,
  *     STELLAR_VALUE_SIGNED = 1,
- *     STELLAR_VALUE_EMPTY_TX_SET = 2
+ *     STELLAR_VALUE_EMPTY_TX_SET = 2,
+ *     STELLAR_VALUE_SIGNED_MS = 3,
+ *     STELLAR_VALUE_EMPTY_TX_SET_MS = 4
  * };
  */
 enum class StellarValueTypeXdr(val value: Int, internal val xdrJsonName: String) {
   STELLAR_VALUE_BASIC(0, "basic"),
   STELLAR_VALUE_SIGNED(1, "signed"),
-  STELLAR_VALUE_EMPTY_TX_SET(2, "empty_tx_set");
+  STELLAR_VALUE_EMPTY_TX_SET(2, "empty_tx_set"),
+  STELLAR_VALUE_SIGNED_MS(3, "signed_ms"),
+  STELLAR_VALUE_EMPTY_TX_SET_MS(4, "empty_tx_set_ms");
 
   companion object {
 
