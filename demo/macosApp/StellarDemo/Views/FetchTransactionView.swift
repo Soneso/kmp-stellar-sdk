@@ -505,7 +505,11 @@ struct RpcTransactionView: View {
 
             // Events
             if let events = transaction.events {
-                EventsCard(events: events, ledger: transaction.ledger?.int64Value)
+                EventsCard(
+                    events: events,
+                    diagnosticEvents: transaction.parseDiagnosticEventsXdr(),
+                    ledger: transaction.ledger?.int64Value
+                )
             }
 
             // Return Value
@@ -765,6 +769,7 @@ struct OperationDetails: View {
 
 struct EventsCard: View {
     let events: Events
+    let diagnosticEvents: [DiagnosticEventXdr]?
     let ledger: Int64?
     @State private var expandedIndices: Set<Int> = []
 
@@ -786,7 +791,7 @@ struct EventsCard: View {
                     .foregroundStyle(Material3Colors.onSurfaceVariant)
                     .textSelection(.enabled)
 
-                if let diagnostic = events.parseDiagnosticEventsXdr() {
+                if let diagnostic = diagnosticEvents {
                     Text("Diagnostic events: \(diagnostic.count)")
                         .font(.system(size: 12))
                         .foregroundStyle(Material3Colors.onSurfaceVariant)
@@ -873,7 +878,7 @@ struct EventsCard: View {
     private func parseAllEvents() -> [EventItem] {
         var result: [EventItem] = []
 
-        if let diagnostic = events.parseDiagnosticEventsXdr() {
+        if let diagnostic = diagnosticEvents {
             for (index, event) in diagnostic.enumerated() {
                 result.append(EventItem(
                     title: "Diagnostic Event \(index + 1)",

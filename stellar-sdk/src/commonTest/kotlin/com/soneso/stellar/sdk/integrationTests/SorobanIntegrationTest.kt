@@ -1602,16 +1602,14 @@ class SorobanIntegrationTest {
 
         // Step 7: Validate transaction events XDR parsing from GetTransactionResponse
         // This validates that events can be parsed from transaction results
+        // Parse diagnostic events (debugging info)
+        val diagnosticXdrs = assertNotNull(rpcResponse.diagnosticEventsXdr, "Should have diagnostic events")
+        assertTrue(diagnosticXdrs.isNotEmpty(), "Should have diagnostic events")
+        val diagnosticEvents = assertNotNull(rpcResponse.parseDiagnosticEventsXdr(), "Diagnostic events should parse")
+        assertEquals(diagnosticXdrs.size, diagnosticEvents.size, "Every diagnostic event should decode")
+
         if (rpcResponse.events != null) {
             val events = rpcResponse.events
-
-            // Parse diagnostic events (debugging info)
-            events.diagnosticEventsXdr?.let { diagnosticXdrs ->
-                assertTrue(diagnosticXdrs.isNotEmpty(), "Should have diagnostic events")
-                val diagnosticEvents = events.parseDiagnosticEventsXdr()
-                assertNotNull(diagnosticEvents, "Diagnostic events should parse")
-                println("Parsed ${diagnosticEvents.size} diagnostic events")
-            }
 
             // Parse transaction events (system-level events)
             events.transactionEventsXdr?.let { txEventsXdrs ->

@@ -7,19 +7,18 @@ import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import kotlinx.serialization.Serializable
 
 /**
- * Container for Soroban events emitted during transaction execution or simulation.
+ * Container for Soroban events emitted during transaction execution.
  *
- * Events provide insight into smart contract execution, including diagnostic information,
- * transaction-level events, and contract-specific events. Events are returned as base64-encoded
- * XDR strings and can be parsed into typed XDR objects for detailed analysis.
+ * Events provide insight into smart contract execution, including transaction-level events
+ * and contract-specific events. Events are returned as base64-encoded XDR strings and can be
+ * parsed into typed XDR objects for detailed analysis.
  *
- * This class is used by various response types including SimulateTransactionResponse,
- * GetTransactionResponse, and GetEventsResponse to encapsulate event data.
+ * This class is used by GetTransactionResponse and GetTransactionsResponse.TransactionInfo
+ * to encapsulate event data.
  *
- * @property diagnosticEventsXdr List of diagnostic events in base64-encoded XDR format.
- *                               Diagnostic events are emitted by the runtime for debugging purposes
- *                               and include detailed information about contract execution.
- *                               Can be parsed using [parseDiagnosticEventsXdr].
+ * @property diagnosticEventsXdr Not sent by stellar-rpc. Diagnostic events are in
+ *                               [GetTransactionResponse.diagnosticEventsXdr] and
+ *                               [GetTransactionsResponse.TransactionInfo.diagnosticEventsXdr].
  * @property transactionEventsXdr List of transaction-level events in base64-encoded XDR format.
  *                                These events are associated with the transaction as a whole.
  *                                Can be parsed using [parseTransactionEventsXdr].
@@ -33,6 +32,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class Events(
+    @Deprecated("stellar-rpc does not send this field, so read diagnosticEventsXdr on the transaction response instead.")
     val diagnosticEventsXdr: List<String>? = null,
     val transactionEventsXdr: List<String>? = null,
     val contractEventsXdr: List<List<String>>? = null
@@ -48,9 +48,11 @@ data class Events(
      * - Resource consumption metrics
      * - Error conditions
      *
-     * @return A list of parsed DiagnosticEvent XDR objects, or null if no diagnostic events exist.
+     * @return A list of parsed DiagnosticEvent XDR objects, or null if [diagnosticEventsXdr] is null.
      * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded.
      */
+    @Deprecated("stellar-rpc does not send diagnosticEventsXdr in events, so use parseDiagnosticEventsXdr() on the transaction response instead.")
+    @Suppress("DEPRECATION")
     fun parseDiagnosticEventsXdr(): List<DiagnosticEventXdr>? {
         return diagnosticEventsXdr?.map { xdr ->
             DiagnosticEventXdr.fromXdrBase64(xdr)

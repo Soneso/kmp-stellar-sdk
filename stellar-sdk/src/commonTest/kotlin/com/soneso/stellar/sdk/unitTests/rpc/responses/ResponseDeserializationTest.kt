@@ -701,6 +701,7 @@ class ResponseDeserializationTest {
         assertNull(response.applicationOrder)
         assertNull(response.feeBump)
         assertNull(response.events)
+        assertNull(response.diagnosticEventsXdr)
     }
 
     @Test
@@ -719,8 +720,9 @@ class ResponseDeserializationTest {
             "resultMetaXdr": "AAAA...meta...",
             "ledger": 49999,
             "createdAt": 1699999999,
+            "diagnosticEventsXdr": ["AAAAAQ=="],
             "events": {
-                "diagnosticEventsXdr": ["AAAAAQ=="]
+                "transactionEventsXdr": ["AAAAAg=="]
             }
         }"""
 
@@ -739,8 +741,8 @@ class ResponseDeserializationTest {
         assertEquals("AAAA...meta...", response.resultMetaXdr)
         assertEquals(49999L, response.ledger)
         assertEquals(1699999999L, response.createdAt)
-        assertNotNull(response.events)
-        assertEquals(listOf("AAAAAQ=="), response.events?.diagnosticEventsXdr)
+        assertEquals(listOf("AAAAAQ=="), response.diagnosticEventsXdr)
+        assertEquals(listOf("AAAAAg=="), response.events?.transactionEventsXdr)
     }
 
     @Test
@@ -797,6 +799,7 @@ class ResponseDeserializationTest {
         assertNull(response.parseEnvelopeXdr())
         assertNull(response.parseResultXdr())
         assertNull(response.parseResultMetaXdr())
+        assertNull(response.parseDiagnosticEventsXdr())
         assertNull(response.getResultValue())
         assertNull(response.getWasmId())
         assertNull(response.getCreatedContractId())
@@ -841,7 +844,6 @@ class ResponseDeserializationTest {
                     "createdAt": 1609459200,
                     "diagnosticEventsXdr": ["AAAAAQ=="],
                     "events": {
-                        "diagnosticEventsXdr": ["AAAAAQ=="],
                         "transactionEventsXdr": ["AAAAAQ=="],
                         "contractEventsXdr": [["AAAAAQ=="]]
                     }
@@ -884,17 +886,14 @@ class ResponseDeserializationTest {
         assertEquals("AAAAAQ==", tx1.resultMetaXdr)
         assertEquals(5000L, tx1.ledger)
         assertEquals(1609459200L, tx1.createdAt)
-        @Suppress("DEPRECATION")
-        assertNotNull(tx1.diagnosticEventsXdr)
+        assertEquals(listOf("AAAAAQ=="), tx1.diagnosticEventsXdr)
         assertNotNull(tx1.events)
-        assertNotNull(tx1.events!!.diagnosticEventsXdr)
         assertNotNull(tx1.events!!.transactionEventsXdr)
         assertNotNull(tx1.events!!.contractEventsXdr)
 
         val tx2 = response.transactions[1]
         assertEquals(TransactionStatus.FAILED, tx2.status)
         assertTrue(tx2.feeBump)
-        @Suppress("DEPRECATION")
         assertNull(tx2.diagnosticEventsXdr)
         assertNull(tx2.events)
     }
@@ -1395,6 +1394,7 @@ class ResponseDeserializationTest {
 
     // ========== Events Tests ==========
 
+    @Suppress("DEPRECATION")
     @Test
     fun testEvents_allNull_deserializes() {
         val jsonString = """{}"""
@@ -1409,6 +1409,7 @@ class ResponseDeserializationTest {
         assertNull(response.parseContractEventsXdr())
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testEvents_withDiagnosticEvents_deserializes() {
         val jsonString = """{
@@ -1436,6 +1437,7 @@ class ResponseDeserializationTest {
         assertEquals(1, response.contractEventsXdr!![1].size)
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testEvents_allEventTypes_deserializes() {
         val jsonString = """{
@@ -1639,6 +1641,7 @@ class ResponseDeserializationTest {
 
     // ========== Events XDR Parsing ==========
 
+    @Suppress("DEPRECATION")
     @Test
     fun testEvents_parseDiagnosticEventsXdr_returnsTypedEvents() {
         // Given: Two base64-encoded diagnostic events
@@ -1706,6 +1709,7 @@ class ResponseDeserializationTest {
         assertEquals(emptyList(), parsed[1].map { it.toXdrBase64() })
     }
 
+    @Suppress("DEPRECATION")
     @Test
     fun testEvents_parseHelpers_malformedXdr_throwsException() {
         // Given: An event list holding a value that is not valid XDR
@@ -1885,7 +1889,6 @@ class ResponseDeserializationTest {
 
     // ========== GetTransactionsResponse XDR Parsing ==========
 
-    @Suppress("DEPRECATION")
     @Test
     fun testTransactionInfo_parseXdrHelpers_returnTypedObjects() {
         // Given: A transaction info carrying envelope, result, meta and diagnostic XDR
@@ -1925,10 +1928,9 @@ class ResponseDeserializationTest {
         )
     }
 
-    @Suppress("DEPRECATION")
     @Test
     fun testTransactionInfo_parseDiagnosticEventsXdr_absentField_returnsNull() {
-        // Given: A transaction info without the deprecated diagnostic events field
+        // Given: A transaction info without the diagnostic events field
         val info = GetTransactionsResponse.TransactionInfo(
             status = TransactionStatus.FAILED,
             txHash = "ccdd",

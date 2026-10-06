@@ -1023,7 +1023,7 @@ private fun RpcTransactionCards(
 
     // Events Card with expandable details (if present)
     transaction.events?.let { events ->
-        EventsCard(events, transaction.ledger, onCopy)
+        EventsCard(events, transaction.parseDiagnosticEventsXdr(), transaction.ledger, onCopy)
     }
 
     // Ledger Window Card (Blue - Nebula)
@@ -1151,21 +1151,23 @@ private fun RpcTransactionCards(
  * Each event can be individually expanded/collapsed by clicking on it. The display follows
  * the same pattern as the operations display for consistency.
  *
- * @param events The Events object containing diagnostic, transaction, and contract events
+ * @param events The Events object containing transaction and contract events
+ * @param diagnosticEvents The diagnostic events of the transaction, or null if there are none
  * @param ledger The ledger number where the transaction was included (for context)
  * @param onCopy Callback function for copying text to clipboard with label
  */
 @Composable
 private fun EventsCard(
     events: com.soneso.stellar.sdk.rpc.responses.Events,
+    diagnosticEvents: List<DiagnosticEventXdr>?,
     ledger: Long?,
     onCopy: (String, String) -> Unit
 ) {
     // Parse all events and flatten them into a single list with metadata
-    val allEvents = remember(events) {
+    val allEvents = remember(events, diagnosticEvents) {
         buildList {
             // Diagnostic events
-            events.parseDiagnosticEventsXdr()?.forEachIndexed { index, diagnosticEvent ->
+            diagnosticEvents?.forEachIndexed { index, diagnosticEvent ->
                 add(EventItem.DiagnosticEvent(index, diagnosticEvent))
             }
 
@@ -1212,12 +1214,11 @@ private fun EventsCard(
                 )
 
                 // Show parsing results
-                val diagnostic = events.parseDiagnosticEventsXdr()
                 val transaction = events.parseTransactionEventsXdr()
                 val contract = events.parseContractEventsXdr()
 
                 Text(
-                    text = "Diagnostic events: ${diagnostic?.size ?: "null"}",
+                    text = "Diagnostic events: ${diagnosticEvents?.size ?: "null"}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -44,7 +44,7 @@ data class GetTransactionsResponse(
      * @property resultMetaXdr Base64-encoded TransactionMeta XDR
      * @property ledger The ledger sequence number that included this transaction
      * @property createdAt Unix timestamp of when the transaction was included in the ledger
-     * @property diagnosticEventsXdr Deprecated - List of base64-encoded DiagnosticEvent XDR objects. Use [events] instead.
+     * @property diagnosticEventsXdr List of base64-encoded DiagnosticEvent XDR objects emitted during execution (null if none)
      * @property events Transaction events data
      */
     @Serializable
@@ -58,7 +58,6 @@ data class GetTransactionsResponse(
         val resultMetaXdr: String,
         val ledger: Long,
         val createdAt: Long,
-        @Deprecated("Use events.diagnosticEventsXdr instead. This field will be removed in a future version.")
         val diagnosticEventsXdr: List<String>? = null,
         val events: Events? = null
     ) {
@@ -93,16 +92,12 @@ data class GetTransactionsResponse(
         }
 
         /**
-         * Parses the deprecated [diagnosticEventsXdr] field from a list of base64-encoded strings
+         * Parses the [diagnosticEventsXdr] field from a list of base64-encoded strings
          * to a list of DiagnosticEvent XDR objects.
-         *
-         * This method is deprecated and will be removed in a future version.
-         * Use [events].[Events.parseDiagnosticEventsXdr] instead.
          *
          * @return list of parsed DiagnosticEvent objects, or null if diagnosticEventsXdr is null
          * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
          */
-        @Deprecated("Use events.parseDiagnosticEventsXdr() instead. This method will be removed in a future version.")
         fun parseDiagnosticEventsXdr(): List<DiagnosticEventXdr>? {
             return diagnosticEventsXdr?.map { DiagnosticEventXdr.fromXdrBase64(it) }
         }
