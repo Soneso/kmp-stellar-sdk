@@ -80,6 +80,10 @@ class SorobanServerTest {
   }
 }"""
 
+        // Recorded fn_call diagnostic event of an `increment` contract invocation.
+        private const val RECORDED_DIAGNOSTIC_EVENT_XDR =
+            "AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAADAAAADwAAAAdmbl9jYWxsAAAAAA0AAAAg6bfni71JNBarlvcR3WP2056a8vvFXQ0/CGfiBeDQA/wAAAAPAAAACWluY3JlbWVudAAAAAAAABAAAAABAAAAAgAAABIAAAAAAAAAAFi3xKLI8peqjz0kcSgf38zsr+SOVmMxPsGOEqc+ypihAAAAAwAAAAo="
+
         private const val SIMULATE_TRANSACTION_RESPONSE = """{
   "jsonrpc": "2.0",
   "id": "7a469b9d6ed4444893491be530862ce3",
@@ -87,7 +91,7 @@ class SorobanServerTest {
     "transactionData": "AAAAAAAAAAIAAAAGAAAAAem354u9STQWq5b3Ed1j9tOemvL7xV0NPwhn4gXg0AP8AAAAFAAAAAEAAAAH8dTe2OoI0BnhlDbH0fWvXmvprkBvBAgKIcL9busuuMEAAAABAAAABgAAAAHpt+eLvUk0FquW9xHdY/bTnpry+8VdDT8IZ+IF4NAD/AAAABAAAAABAAAAAgAAAA8AAAAHQ291bnRlcgAAAAASAAAAAAAAAABYt8SiyPKXqo89JHEoH9/M7K/kjlZjMT7BjhKnPsqYoQAAAAEAHifGAAAFlAAAAIgAAAAAAAAAAg==",
     "minResourceFee": "58181",
     "events": [
-      "AAAAAQAAAAAAAAAAAAAAAgAAAAAAAAADAAAADwAAAAdmbl9jYWxsAAAAAA0AAAAg6bfni71JNBarlvcR3WP2056a8vvFXQ0/CGfiBeDQA/wAAAAPAAAACWluY3JlbWVudAAAAAAAABAAAAABAAAAAgAAABIAAAAAAAAAAFi3xKLI8peqjz0kcSgf38zsr+SOVmMxPsGOEqc+ypihAAAAAwAAAAo="
+      "$RECORDED_DIAGNOSTIC_EVENT_XDR"
     ],
     "results": [
       {
@@ -871,6 +875,39 @@ class SorobanServerTest {
             assertEquals(1690594566L, response.latestLedgerCloseTime)
             assertEquals(1000L, response.oldestLedger)
             assertEquals(1690500000L, response.oldestLedgerCloseTime)
+        }
+    }
+
+    @Test
+    fun testGetTransaction_topLevelDiagnosticEvents_parsesAndDecodes() = runTest {
+        // Given: A getTransaction response carrying a recorded diagnostic event at the top level
+        val responseJson = """{
+  "jsonrpc": "2.0",
+  "id": "198cb1a8-9104-4446-a269-88bf000c2721",
+  "result": {
+    "status": "SUCCESS",
+    "latestLedger": 14245,
+    "diagnosticEventsXdr": ["$RECORDED_DIAGNOSTIC_EVENT_XDR"],
+    "events": {
+      "transactionEventsXdr": [],
+      "contractEventsXdr": [[]]
+    }
+  }
+}"""
+        createMockServer(responseJson).use { server ->
+            // When: Getting the transaction
+            val response = server.getTransaction(
+                "a4721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
+            )
+
+            // Then: The field holds the event and the helper decodes it
+            assertEquals(listOf(RECORDED_DIAGNOSTIC_EVENT_XDR), response.diagnosticEventsXdr)
+            val event = assertNotNull(response.parseDiagnosticEventsXdr()).single()
+            assertTrue(event.inSuccessfulContractCall)
+            assertEquals(ContractEventTypeXdr.DIAGNOSTIC, event.event.type)
+            val body = assertIs<ContractEventBodyXdr.V0>(event.event.body)
+            assertEquals(Scv.toSymbol("fn_call"), body.value.topics[0])
+            assertEquals(Scv.toSymbol("increment"), body.value.topics[2])
         }
     }
 

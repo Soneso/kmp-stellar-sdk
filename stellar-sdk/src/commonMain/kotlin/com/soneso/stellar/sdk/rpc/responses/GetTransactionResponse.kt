@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.rpc.responses
 
+import com.soneso.stellar.sdk.xdr.DiagnosticEventXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanTransactionMetaXdr
 import com.soneso.stellar.sdk.xdr.TransactionEnvelopeXdr
@@ -29,6 +30,7 @@ import kotlinx.serialization.Serializable
  * @property ledger The ledger sequence number that included this transaction (null if not found)
  * @property createdAt Unix timestamp of when the transaction was included in the ledger (null if not found)
  * @property events Transaction events data (null if not found or no events)
+ * @property diagnosticEventsXdr List of base64-encoded DiagnosticEvent XDR objects emitted during execution (null if not found or none)
  *
  * @see <a href="https://developers.stellar.org/docs/data/rpc/api-reference/methods/getTransaction">getTransaction documentation</a>
  */
@@ -47,7 +49,8 @@ data class GetTransactionResponse(
     val resultMetaXdr: String? = null,
     val ledger: Long? = null,
     val createdAt: Long? = null,
-    val events: Events? = null
+    val events: Events? = null,
+    val diagnosticEventsXdr: List<String>? = null
 ) {
     /**
      * Parses the [envelopeXdr] field from a base64-encoded string to a TransactionEnvelope XDR object.
@@ -77,6 +80,17 @@ data class GetTransactionResponse(
      */
     fun parseResultMetaXdr(): TransactionMetaXdr? {
         return resultMetaXdr?.let { TransactionMetaXdr.fromXdrBase64(it) }
+    }
+
+    /**
+     * Parses the [diagnosticEventsXdr] field from a list of base64-encoded strings
+     * to a list of DiagnosticEvent XDR objects.
+     *
+     * @return list of parsed DiagnosticEvent objects, or null if diagnosticEventsXdr is null
+     * @throws IllegalArgumentException if any XDR string is malformed or cannot be decoded
+     */
+    fun parseDiagnosticEventsXdr(): List<DiagnosticEventXdr>? {
+        return diagnosticEventsXdr?.map { DiagnosticEventXdr.fromXdrBase64(it) }
     }
 
     /**
