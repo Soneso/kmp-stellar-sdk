@@ -137,7 +137,8 @@ class WebAuthForContractsTest {
     }
 
     /**
-     * Builds a single authorization entry with empty signature.
+     * Builds a single unsigned authorization entry, with the void signature a server's
+     * recording-mode simulation returns.
      */
     private fun buildAuthEntry(
         credentialsAddress: String,
@@ -155,7 +156,7 @@ class WebAuthForContractsTest {
                 address = address,
                 nonce = Int64Xdr(nonce),
                 signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt()),
-                signature = SCValXdr.Vec(SCVecXdr(emptyList())) // Empty signature vector
+                signature = Scv.toVoid()
             )
         )
 

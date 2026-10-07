@@ -21,6 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StellarValueExtXdr` without an `else` branch needs the new branches; all other code compiles
   unchanged.
 
+### Fixed
+- `AssembledTransaction.signAuthEntries` keeps the signature expiration ledger of an entry that
+  already carries a signature on any node, including a second cosigner on the same node, since
+  every signature on the entry commits to that one value. Without `validUntilLedgerSequence` it
+  reuses the stored value; the latest ledger is fetched at most once per call, and only for
+  entries that need the default. An explicit value that differs from the stored one raises
+  `IllegalArgumentException` naming both values, and the transaction keeps its auth entries.
+  `Auth.authorizeEntry` applies the same check to `validUntilLedgerSeq`.
+- `Asset.compareTo` orders credit assets with the same code by the issuer's raw 32-byte public
+  key, as stellar-core does, not by the strkey text. The `LiquidityPool` order check, its decoding
+  from XDR and the pool id follow this order.
+- `Scv.toMap` emits map entries in the Soroban host's key order and raises
+  `IllegalArgumentException` for two keys that are equal in that order. The new overload
+  `Scv.toMap(List<SCMapEntryXdr>)` keeps keys that convert to the same value apart so the check
+  sees them. `ContractSpec` builds map and struct values through it and reports a duplicate key
+  as `ContractSpecException`. The comparator is public as `scval.compareScValHostOrder` and
+  compares `I32`, `I64`, `I128`, `I256` and `LedgerKeyNonce` values as signed integers. Decoding
+  keeps the wire order.
+
 ## [1.14.0] - 2026-09-28
 
 ### Added

@@ -831,6 +831,42 @@ class AuthP27Test {
     }
 
     @Test
+    fun testAuthorizeEntryKeepsExpirationThatExistingSignaturesCommitTo() = runTest {
+        val topSigner = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val delegateSigner = KeyPair.fromSecretSeed(DELEGATE_B_SEED)
+        val delegateOptions = Auth.AuthOptions(forAddress = DELEGATE_B_ACCOUNT)
+        val withDelegates = Auth.attachDelegates(
+            goldenLegacyEntry(), EXPIRATION, listOf(DelegateDescriptor(address = DELEGATE_B_ACCOUNT))
+        )
+        val delegateSigned = Auth.authorizeEntry(withDelegates, delegateSigner, EXPIRATION, NETWORK, delegateOptions)
+
+        // The delegate's signature fixes the expiration for the top level and for the delegate
+        // node itself, whose signature vector a new signature joins.
+        for ((signer, options) in listOf(topSigner to Auth.AuthOptions(), delegateSigner to delegateOptions)) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                Auth.authorizeEntry(delegateSigned, signer, EXPIRATION + 1, NETWORK, options)
+            }
+            assertTrue("${EXPIRATION + 1} differs from $EXPIRATION" in error.message!!, error.message)
+        }
+        Auth.authorizeEntry(delegateSigned, topSigner, EXPIRATION, NETWORK)
+    }
+
+    @Test
+    fun testAuthorizeEntrySecondCosignerOnTopLevelKeepsExpiration() = runTest {
+        // Two signers of one multisig account sign the same top-level node in turn.
+        val topSigned = Auth.authorizeEntry(goldenV2Entry(), KeyPair.fromSecretSeed(SIGNER_SEED), EXPIRATION, NETWORK)
+        val cosigner = KeyPair.fromSecretSeed(DELEGATE_B_SEED)
+
+        assertFailsWith<IllegalArgumentException> {
+            Auth.authorizeEntry(topSigned, cosigner, EXPIRATION + 1, NETWORK)
+        }
+        val cosigned = Auth.authorizeEntry(topSigned, cosigner, EXPIRATION, NETWORK)
+        val creds = (cosigned.credentials as SorobanCredentialsXdr.AddressV2).value
+        assertEquals(EXPIRATION.toUInt(), creds.signatureExpirationLedger.value)
+        assertEquals(2, (creds.signature as SCValXdr.Vec).value!!.value.size)
+    }
+
+    @Test
     fun testForAddressNoMatchThrows() = runTest {
         val signer = KeyPair.fromSecretSeed(SIGNER_SEED)
         val entry = goldenLegacyEntry()

@@ -15,7 +15,7 @@ import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
-import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.core.WalletException
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig

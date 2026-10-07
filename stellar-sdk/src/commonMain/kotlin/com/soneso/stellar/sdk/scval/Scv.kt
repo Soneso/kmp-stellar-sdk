@@ -606,16 +606,35 @@ object Scv {
     /**
      * Build a [SCValXdr] with the type of [SCValTypeXdr.SCV_MAP].
      *
-     * Uses LinkedHashMap to preserve the order of map entries for deterministic XDR generation.
+     * The entries are emitted in the Soroban host's key order ([compareScValHostOrder]), which
+     * the host requires of every map argument; the iteration order of [map] does not matter.
      *
-     * @param map map to convert (order is preserved)
+     * @param map map to convert
      * @return [SCValXdr] with the type of [SCValTypeXdr.SCV_MAP]
+     * @throws IllegalArgumentException if two keys are equal in host order
      */
-    fun toMap(map: LinkedHashMap<SCValXdr, SCValXdr>): SCValXdr {
-        val entries = map.map { (key, value) ->
-            SCMapEntryXdr(key = key, `val` = value)
+    fun toMap(map: LinkedHashMap<SCValXdr, SCValXdr>): SCValXdr =
+        toMap(map.map { (key, value) -> SCMapEntryXdr(key = key, `val` = value) })
+
+    /**
+     * Build a [SCValXdr] with the type of [SCValTypeXdr.SCV_MAP] from [entries], sorted into
+     * the Soroban host's key order ([compareScValHostOrder]).
+     *
+     * This overload preserves separate entries whose converted keys compare equal, allowing
+     * duplicate-key validation.
+     *
+     * @param entries map entries in any order
+     * @return [SCValXdr] with the type of [SCValTypeXdr.SCV_MAP]
+     * @throws IllegalArgumentException if two keys are equal in host order
+     */
+    fun toMap(entries: List<SCMapEntryXdr>): SCValXdr {
+        val sorted = entries.sortedWith { x, y -> compareScValHostOrder(x.key, y.key) }
+        for (i in 1 until sorted.size) {
+            require(compareScValHostOrder(sorted[i - 1].key, sorted[i].key) != 0) {
+                "Duplicate ScMap key: ${sorted[i].key.toXdrJson()}"
+            }
         }
-        return SCValXdr.Map(SCMapXdr(entries))
+        return SCValXdr.Map(SCMapXdr(sorted))
     }
 
     /**

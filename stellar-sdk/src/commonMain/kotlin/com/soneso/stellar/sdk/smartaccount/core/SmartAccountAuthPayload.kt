@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 

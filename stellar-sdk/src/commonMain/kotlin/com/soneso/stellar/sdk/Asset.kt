@@ -45,10 +45,13 @@ import com.soneso.stellar.sdk.xdr.*
  *
  * ## Comparison and Sorting
  *
- * Assets implement [Comparable] and are ordered by:
+ * Assets implement [Comparable] and are ordered the way stellar-core compares the XDR assets of a
+ * liquidity pool:
  * 1. Type (native < alphanum4 < alphanum12)
- * 2. Code (alphabetically)
- * 3. Issuer (alphabetically)
+ * 2. Code, by its zero-padded XDR bytes (for the ASCII codes an asset accepts, string order with
+ *    the shorter code first on a common prefix)
+ * 3. Issuer, by its raw 32-byte ed25519 public key as unsigned bytes. Strkey text order differs:
+ *    the base32 digits `2` to `7` encode the values 26 to 31 but sort before `A` in ASCII.
  *
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/stellar-data-structures/assets">Stellar Assets</a>
  */
@@ -319,8 +322,11 @@ sealed class AssetTypeCreditAlphaNum : Asset() {
             return codeComparison
         }
 
-        // If codes are equal, compare issuers
-        return this.issuer.compareTo(other.issuer)
+        // If codes are equal, compare the issuers' raw public keys
+        return Util.compareBytesUnsigned(
+            StrKey.decodeEd25519PublicKey(this.issuer),
+            StrKey.decodeEd25519PublicKey(other.issuer)
+        )
     }
 }
 

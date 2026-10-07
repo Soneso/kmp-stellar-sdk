@@ -31,6 +31,14 @@ import com.soneso.stellar.sdk.xdr.*
  * multi-sig). Calling [authorizeEntry] twice with the same key on the same
  * node appends a duplicate the host will reject.
  *
+ * ## Expiration
+ *
+ * An entry stores one signature expiration ledger, and every signature on it, top-level and
+ * delegate, commits to that value. [authorizeEntry] stamps `validUntilLedgerSeq` before
+ * hashing. When any node already carries a signature (anything other than the `SCV_VOID`
+ * placeholder), including the node being signed, `validUntilLedgerSeq` must equal the
+ * stored expiration; otherwise [authorizeEntry] throws.
+ *
  * ## Protocol gating
  *
  * Emitting `ADDRESS_V2` or `ADDRESS_WITH_DELEGATES` on a network below
@@ -54,7 +62,8 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the entry cannot be decoded or the signature is invalid
+     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid, or
+     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth])
      */
     suspend fun authorizeEntry(
         entry: String,
@@ -80,7 +89,8 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the signature is invalid
+     * @throws IllegalArgumentException if the signature is invalid, or [validUntilLedgerSeq] differs
+     *   from the expiration an existing signature commits to (see [Auth])
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
@@ -106,7 +116,8 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the entry cannot be decoded or the signature is invalid
+     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid, or
+     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth])
      */
     suspend fun authorizeEntry(
         entry: String,
@@ -132,7 +143,8 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the signature is invalid
+     * @throws IllegalArgumentException if the signature is invalid, or [validUntilLedgerSeq] differs
+     *   from the expiration an existing signature commits to (see [Auth])
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
@@ -352,7 +364,8 @@ object Auth {
      * Core authorization logic.
      *
      * Source-account (Void) credentials are returned unchanged (clone only).
-     * For all three address arms, expiration is set before hashing, and the
+     * For all three address arms, the expiration is checked against existing
+     * signatures (see [Auth]) and set before hashing, and the
      * preimage type is selected per the arm. When [AuthOptions.forAddress] is
      * set, the signature is routed into every matching node in the tree; when
      * null the top-level credentials are signed.
@@ -370,7 +383,9 @@ object Auth {
         val addressCredentials = clone.credentials.addressCredentials()
             ?: return clone
 
-        // Set expiration before building the preimage — the network reconstructs
+        requireMatchingExpiration(clone.credentials.committedExpiration(), validUntilLedgerSeq)
+
+        // Set expiration before building the preimage: the network reconstructs
         // the preimage from the submitted credentials, so the expiration value
         // must be present at hash time.
         val updatedCredentials = addressCredentials.copy(

@@ -13,7 +13,7 @@ import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountConstants
-import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
 import com.soneso.stellar.sdk.xdr.AccountEntryExtXdr
 import com.soneso.stellar.sdk.xdr.AccountEntryXdr

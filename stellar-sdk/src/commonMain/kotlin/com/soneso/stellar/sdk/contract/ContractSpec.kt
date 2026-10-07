@@ -529,11 +529,16 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 "Expected SCV_MAP for struct with named fields, got ${scVal.discriminant}"
             }
             val map = scVal.value?.value ?: emptyList()
+            // Entries match fields by key name: the host keeps struct maps in key order,
+            // which need not be the order of the spec's fields.
+            val fieldsByName = fields.associateBy { it.name }
             val result = mutableMapOf<String, Any?>()
-            map.forEachIndexed { index, entry ->
-                val field = fields[index]
-                val fieldName = field.name
-                result[fieldName] = scValToNative(entry.`val`, field.type)
+            map.forEach { entry ->
+                val field = fieldsByName[(entry.key as? SCValXdr.Sym)?.value?.value]
+                    ?: throw ContractSpecException.invalidType(
+                        "Struct ${structDef.name} has no field ${entry.key.toXdrJson()}"
+                    )
+                result[field.name] = scValToNative(entry.`val`, field.type)
             }
             return result
         }
@@ -959,8 +964,19 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
             SCMapEntryXdr(keyVal, valueVal)
         }
 
-        return SCValXdr.Map(SCMapXdr(entries))
+        return toHostOrderMap(entries)
     }
+
+    /**
+     * Builds an SCV_MAP with [Scv.toMap], which emits the entries in the Soroban host's key
+     * order, and reports duplicate keys as a conversion failure.
+     */
+    private fun toHostOrderMap(entries: List<SCMapEntryXdr>): SCValXdr =
+        try {
+            Scv.toMap(entries)
+        } catch (e: IllegalArgumentException) {
+            throw ContractSpecException.conversionFailed(e.message.orEmpty())
+        }
 
     /**
      * Handle tuple type
@@ -1057,7 +1073,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 val fieldValue = nativeToXdrSCVal(valueMap[field.name], field.type)
                 SCMapEntryXdr(keyVal, fieldValue)
             }
-            return SCValXdr.Map(SCMapXdr(entries))
+            return toHostOrderMap(entries)
         } else {
             // Use vector representation (all fields are numeric)
             val sortedFields = structDef.fields.sortedBy { it.name.toInt() }

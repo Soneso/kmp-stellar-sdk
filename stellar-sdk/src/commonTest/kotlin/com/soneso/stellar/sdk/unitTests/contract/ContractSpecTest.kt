@@ -4,6 +4,8 @@ import com.soneso.stellar.sdk.contract.*
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
+import com.soneso.stellar.sdk.unitTests.smartaccount.core.hostOrderShuffle
+import com.soneso.stellar.sdk.unitTests.smartaccount.core.hostOrderVector
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.*
 
@@ -694,6 +696,32 @@ class ContractSpecTest {
     }
 
     @Test
+    fun testMapTypeEmitsKeysInHostOrder() {
+        val spec = ContractSpec(emptyList())
+        val valType = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_VAL)
+        val mapTypeDef = SCSpecTypeDefXdr.Map(SCSpecTypeMapXdr(valType, valType))
+        val keys = hostOrderVector()
+        val input = LinkedHashMap<SCValXdr, SCValXdr>()
+        keys.hostOrderShuffle().forEach { input[it] = SCValXdr.Void(SCValTypeXdr.SCV_VOID) }
+
+        val result = spec.nativeToXdrSCVal(input, mapTypeDef) as SCValXdr.Map
+        assertEquals(keys.map { it.toXdrBase64() }, result.value!!.value.map { it.key.toXdrBase64() })
+    }
+
+    @Test
+    fun testMapTypeRejectsKeysConvertingToTheSameValue() {
+        val spec = ContractSpec(emptyList())
+        val u32 = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+        val mapTypeDef = SCSpecTypeDefXdr.Map(SCSpecTypeMapXdr(u32, u32))
+
+        // Int 1 and Long 1L are distinct Kotlin keys that both convert to U32(1).
+        val error = assertFailsWith<ContractSpecException> {
+            spec.nativeToXdrSCVal(mapOf(1 to 1, 1L to 2), mapTypeDef)
+        }
+        assertTrue("Duplicate ScMap key" in error.message!!, error.message)
+    }
+
+    @Test
     fun testTupleType() {
         val spec = ContractSpec(emptyList())
         val tupleTypeDef = SCSpecTypeDefXdr.Tuple(
@@ -818,6 +846,8 @@ class ContractSpecTest {
         val map = result.value
         assertNotNull(map)
         assertEquals(2, map.value.size)
+        // Field keys are emitted in host order, not in spec order (name, age).
+        assertEquals(listOf("age", "name"), map.value.map { (it.key as SCValXdr.Sym).value.value })
     }
 
     @Test
@@ -1123,6 +1153,18 @@ class ContractSpecTest {
 
         assertTrue(result is UInt)
         assertEquals(1u, result)
+    }
+
+    @Test
+    fun testScValToNativeStructRejectsUnknownField() {
+        val spec = ContractSpec(listOf(createStructEntry("Person", listOf("age" to SCSpecTypeXdr.SC_SPEC_TYPE_U32))))
+        val structVal = SCValXdr.Map(SCMapXdr(listOf(
+            SCMapEntryXdr(SCValXdr.Sym(SCSymbolXdr("nickname")), SCValXdr.U32(Uint32Xdr(30u)))
+        )))
+        val error = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(structVal, createUdtTypeDef("Person"))
+        }
+        assertTrue("nickname" in error.message!!, error.message)
     }
 
     @Test

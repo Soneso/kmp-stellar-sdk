@@ -144,6 +144,21 @@ object Util {
     }
 
     /**
+     * Compares two byte arrays lexicographically as unsigned bytes; on a common prefix the
+     * shorter array sorts first. stellar-core and the Soroban host apply this order to keys,
+     * hashes and byte content.
+     *
+     * @return a negative number, zero, or a positive number as [a] sorts before, equal to, or after [b]
+     */
+    internal fun compareBytesUnsigned(a: ByteArray, b: ByteArray): Int {
+        for (i in 0 until minOf(a.size, b.size)) {
+            val cmp = (a[i].toInt() and 0xFF).compareTo(b[i].toInt() and 0xFF)
+            if (cmp != 0) return cmp
+        }
+        return a.size.compareTo(b.size)
+    }
+
+    /**
      * Returns SHA-256 hash of the input data.
      *
      * Note: This is an internal utility function and should not be used directly by
