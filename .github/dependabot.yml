@@ -4,3 +4,41 @@ updates:
     directory: /
     schedule:
       interval: monthly
+  - package-ecosystem: gradle
+    # Root settings include the demo and smart-account-demo child projects. The smart-account-demo parent build is listed separately.
+    directories:
+      - /
+      - /smart-account-demo
+    schedule:
+      interval: monthly
+    groups:
+      gradle:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: npm
+    directories:
+      - /demo/webApp
+      - /smart-account-demo/webApp
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: bundler
+    directory: /tools/xdrgen-kt
+    schedule:
+      interval: monthly
+    groups:
+      bundler:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
