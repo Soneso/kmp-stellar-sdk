@@ -16,6 +16,9 @@ jobs:
   jvm-tests:
     name: JVM Tests (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
@@ -53,8 +56,8 @@ jobs:
         run: |
           XML_REPORT="stellar-sdk/build/reports/kover/reportJvmOnly.xml"
           if [ -f "$XML_REPORT" ]; then
-            echo "## Coverage Summary" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
 
             # Extract coverage counters from JaCoCo XML
             LINE_MISSED=$(grep -o 'type="LINE" missed="[0-9]*"' "$XML_REPORT" | tail -1 | grep -o 'missed="[0-9]*"' | grep -o '[0-9]*')
@@ -67,9 +70,11 @@ jobs:
               TOTAL=$((LINE_COVERED + LINE_MISSED))
               if [ "$TOTAL" -gt 0 ]; then
                 PCT=$((LINE_COVERED * 100 / TOTAL))
-                echo "| Metric | Covered | Missed | Total | % |" >> $GITHUB_STEP_SUMMARY
-                echo "|--------|---------|--------|-------|---|" >> $GITHUB_STEP_SUMMARY
-                echo "| Lines | $LINE_COVERED | $LINE_MISSED | $TOTAL | ${PCT}% |" >> $GITHUB_STEP_SUMMARY
+                {
+                  echo "| Metric | Covered | Missed | Total | % |"
+                  echo "|--------|---------|--------|-------|---|"
+                  echo "| Lines | $LINE_COVERED | $LINE_MISSED | $TOTAL | ${PCT}% |"
+                } >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
 
@@ -77,20 +82,20 @@ jobs:
               TOTAL=$((BRANCH_COVERED + BRANCH_MISSED))
               if [ "$TOTAL" -gt 0 ]; then
                 PCT=$((BRANCH_COVERED * 100 / TOTAL))
-                echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $TOTAL | ${PCT}% |" >> $GITHUB_STEP_SUMMARY
+                echo "| Branches | $BRANCH_COVERED | $BRANCH_MISSED | $TOTAL | ${PCT}% |" >> "$GITHUB_STEP_SUMMARY"
               fi
             fi
           else
-            echo "Coverage report not found at $XML_REPORT" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage report not found at $XML_REPORT" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload coverage to Codecov
         if: always() && matrix.java == '25'
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           files: stellar-sdk/build/reports/kover/reportJvmOnly.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           verbose: true
 
       - name: Upload coverage report
@@ -213,14 +218,14 @@ jobs:
 
       - name: Check the committed output against a fresh generation
         run: |
-          GENERATED_DIRS="stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/xdr/json"
+          GENERATED_DIRS=(stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/xdr/json)
           # --porcelain rather than `git diff`, so a file the generator added or dropped
           # counts as drift too.
-          CHANGED=$(git status --porcelain -- $GENERATED_DIRS)
+          CHANGED=$(git status --porcelain -- "${GENERATED_DIRS[@]}")
           if [ -n "$CHANGED" ]; then
             echo "::error::Committed generated output does not match a fresh generation."
             echo "$CHANGED"
-            git diff -- $GENERATED_DIRS
+            git diff -- "${GENERATED_DIRS[@]}"
             echo "Generated files are never edited by hand. Change the generator under"
             echo "tools/xdrgen-kt/lib/xdrgen/generators/, then run and commit:"
             echo "  make -C tools/xdrgen-kt generate"
