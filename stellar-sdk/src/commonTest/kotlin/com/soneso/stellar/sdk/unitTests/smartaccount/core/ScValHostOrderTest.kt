@@ -370,6 +370,46 @@ class ScValHostOrderTest {
         }
     }
 
+    // I256 with equal hi_hi: hi_lo, then lo_hi, then lo_lo decide, each as an unsigned limb.
+    @Test
+    fun testI256Comparands_lowerLimbsUnsigned() {
+        val max = ULong.MAX_VALUE
+        fun i256(hiLo: ULong, loHi: ULong, loLo: ULong) =
+            SCValXdr.I256(Int256PartsXdr(Int64Xdr(-1), Uint64Xdr(hiLo), Uint64Xdr(loHi), Uint64Xdr(loLo)))
+        val pairs = mapOf(
+            "hi_lo" to (i256(1u, 0u, 0u) to i256(max, 0u, 0u)),
+            "lo_hi" to (i256(0u, 1u, 0u) to i256(0u, max, 0u)),
+            "lo_lo" to (i256(0u, 0u, 1u) to i256(0u, 0u, max))
+        )
+        for ((limb, pair) in pairs) {
+            assertTrue(compareScValHostOrder(pair.first, pair.second) < 0, "$limb: 1 must sort before max")
+            assertTrue(compareScValHostOrder(pair.second, pair.first) > 0, "$limb: max must sort after 1")
+        }
+    }
+
+    // External-ref executables: the owner decides, the tag only between equal owners.
+    @Test
+    fun testExternalRefExecutables_ownerThenTag() {
+        fun instance(ownerFill: Int, tag: String) = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                ContractExecutableXdr.ExternalRef(
+                    ContractExecutableExternalRefXdr(
+                        SCAddressXdr.ContractId(ContractIDXdr(HashXdr(ByteArray(32) { ownerFill.toByte() }))),
+                        tag.encodeToByteArray()
+                    )
+                ),
+                null
+            )
+        )
+        val ordered = listOf(instance(0x00, "aa"), instance(0x00, "b"), instance(0xff, "aa"), instance(0xff, "b"))
+        for (i in ordered.indices) {
+            for (j in i + 1 until ordered.size) {
+                assertTrue(compareScValHostOrder(ordered[i], ordered[j]) < 0, "executable $i must sort before $j")
+                assertTrue(compareScValHostOrder(ordered[j], ordered[i]) > 0, "executable $j must sort after $i")
+            }
+        }
+    }
+
     // Decoding keeps the wire order: a map whose keys are out of host order re-encodes byte-identically.
     @Test
     fun testDecodedMap_keepsWireOrder() {

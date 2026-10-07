@@ -590,6 +590,25 @@ class AssembledTransactionP27Test {
     }
 
     @Test
+    fun testSignAuthEntriesFetchesDefaultExpirationOncePerCall() = runTest {
+        // Each getLatestLedger answer is 10000 above the previous one, from 20000.
+        var ledgerCalls = 0
+        val second = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.AddressV2(baseCredentials().copy(nonce = Int64Xdr(NONCE + 1))),
+            rootInvocation = invocation()
+        )
+        mockServer(listOf(v2Entry(), second), latestLedgerSeq = { ledgerCalls++; 10000L + 10000L * ledgerCalls }).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            ledgerCalls = 0
+            tx.signAuthEntries(KeyPair.fromSecretSeed(SIGNER_SEED))
+
+            val auth = (tx.builtTransaction!!.operations.first() as InvokeHostFunctionOperation).auth
+            assertEquals(listOf(20100u, 20100u), auth.map { it.credentials.addressCredentials()!!.signatureExpirationLedger.value })
+            assertEquals(1, ledgerCalls)
+        }
+    }
+
+    @Test
     fun testSignAuthEntriesConflictingExpirationThrowsAndKeepsAuthEntries() = runTest {
         // The fresh entry for the delegate signer is signed first; the second entry's
         // top-level signature then makes the explicit expiration conflict.

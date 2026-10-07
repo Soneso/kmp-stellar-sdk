@@ -1168,6 +1168,17 @@ class ContractSpecTest {
     }
 
     @Test
+    fun testScValToNativeStructRejectsNonSymbolKey() {
+        val spec = ContractSpec(listOf(createStructEntry("Person", listOf("age" to SCSpecTypeXdr.SC_SPEC_TYPE_U32))))
+        val key = SCValXdr.U32(Uint32Xdr(7u))
+        val structVal = SCValXdr.Map(SCMapXdr(listOf(SCMapEntryXdr(key, SCValXdr.U32(Uint32Xdr(30u))))))
+        val error = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(structVal, createUdtTypeDef("Person"))
+        }
+        assertTrue(key.toXdrJson() in error.message!!, error.message)
+    }
+
+    @Test
     fun testScValToNativeStruct() {
         val entries = listOf(
             createStructEntry("Person", listOf(
