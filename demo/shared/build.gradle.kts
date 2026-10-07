@@ -97,8 +97,8 @@ kotlin {
                 // ============================================================
                 // Voyager for multi-screen navigation across all platforms
                 // Using 1.1.0-beta02 for better JS/WASM support
-                implementation("cafe.adriel.voyager:voyager-navigator:1.1.0-beta02")
-                implementation("cafe.adriel.voyager:voyager-transitions:1.1.0-beta02")
+                implementation("cafe.adriel.voyager:voyager-navigator:2.2.21-1.10.3")
+                implementation("cafe.adriel.voyager:voyager-transitions:2.2.21-1.10.3")
 
                 // ============================================================
                 // Stellar SDK
