@@ -16,8 +16,10 @@ import com.soneso.stellar.sdk.xdr.*
  * ```
  *
  * ## Asset Ordering
- * Assets must be in lexicographic order (assetA < assetB). The constructor
- * will automatically validate this ordering.
+ * Assets must be in the order stellar-core requires, assetA < assetB under
+ * [Asset.compareTo]: type, then code, then the issuer's raw public key bytes.
+ * The constructor, and therefore [fromXdr], validates this ordering, and the
+ * pool id is computed over the assets in this order.
  *
  * @property assetA The first asset in the pool (must be less than assetB)
  * @property assetB The second asset in the pool (must be greater than assetA)

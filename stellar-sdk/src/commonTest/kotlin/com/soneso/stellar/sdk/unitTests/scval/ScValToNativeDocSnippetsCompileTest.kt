@@ -46,7 +46,7 @@ class ScValToNativeDocSnippetsCompileTest {
         assertEquals(30u, age)
         assertEquals(BigInteger.parseString("1000000000"), balance)
         assertEquals(owner, ownerAddress)
-        assertEquals(listOf("name", "age", "balance", "owner"), fields.keys.toList())
+        assertEquals(listOf("age", "balance", "name", "owner"), fields.keys.toList())
 
         // A vec converts to a List with each element converted in turn
         val items = Scv.toVec(

@@ -165,12 +165,12 @@ class AssembledTransactionP27Test {
 
     /**
      * Builds a MockEngine routing on the JSON-RPC method name. The simulate response
-     * carries [authEntries]; [onSimulate] (when set) receives the captured simulate
-     * request body for assertions.
+     * carries [authEntries]; [latestLedgerSeq] answers each getLatestLedger call;
+     * [onSimulate] (when set) receives the captured simulate request body for assertions.
      */
     private fun mockServer(
         authEntries: List<SorobanAuthorizationEntryXdr>,
-        latestLedgerSeq: Long = 20000L,
+        latestLedgerSeq: () -> Long = { 20000L },
         onSimulate: ((String) -> Unit)? = null
     ): SorobanServer {
         val engine = MockEngine { request ->
@@ -182,7 +182,7 @@ class AssembledTransactionP27Test {
                     simulateResultJson(authEntries)
                 }
                 "\"getLatestLedger\"" in body ->
-                    """{ "id": "abc", "protocolVersion": 22, "sequence": $latestLedgerSeq, "closeTime": 1700000000, "headerXdr": "AA==", "metadataXdr": "AA==" }"""
+                    """{ "id": "abc", "protocolVersion": 22, "sequence": ${latestLedgerSeq()}, "closeTime": 1700000000, "headerXdr": "AA==", "metadataXdr": "AA==" }"""
                 else -> "{}"
             }
             respond(
@@ -514,11 +514,151 @@ class AssembledTransactionP27Test {
 
     @Test
     fun testSignAuthEntriesDefaultExpirationUsesLatestLedgerPlus100() = runTest {
-        mockServer(listOf(v2Entry()), latestLedgerSeq = 20000L).use { server ->
+        mockServer(listOf(v2Entry()), latestLedgerSeq = { 20000L }).use { server ->
             val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
             tx.signAuthEntries(KeyPair.fromSecretSeed(SIGNER_SEED))
             val creds = firstEntry(tx).credentials as SorobanCredentialsXdr.AddressV2
             assertEquals(20100u, creds.value.signatureExpirationLedger.value)
+        }
+    }
+
+    // ========================================================================
+    // signAuthEntries: one shared expiration per entry
+    // ========================================================================
+
+    private fun delegatesCreds(tx: AssembledTransaction<SCValXdr>) =
+        (firstEntry(tx).credentials as SorobanCredentialsXdr.AddressWithDelegates).value
+
+    private fun authXdr(tx: AssembledTransaction<SCValXdr>): List<String> =
+        (tx.builtTransaction!!.operations.first() as InvokeHostFunctionOperation).auth.map { it.toXdrBase64() }
+
+    /** Asserts that [signature] holds one signature by [signer] that verifies against [entry]'s payload. */
+    private suspend fun assertVerifies(entry: SorobanAuthorizationEntryXdr, signature: SCValXdr, signer: KeyPair) {
+        val writer = XdrWriter()
+        Auth.buildHashIDPreimage(entry.credentials, NETWORK.networkId(), entry.rootInvocation).encode(writer)
+        val fields = (signature as SCValXdr.Vec).value!!.value.map { element ->
+            (element as SCValXdr.Map).value!!.value.associate {
+                (it.key as SCValXdr.Sym).value.value to (it.`val` as SCValXdr.Bytes).value.value
+            }
+        }.single { it.getValue("public_key").contentEquals(signer.getPublicKey()) }
+        assertTrue(signer.verify(Util.hash(writer.toByteArray()), fields.getValue("signature")), "signature must verify")
+    }
+
+    @Test
+    fun testSignAuthEntriesSecondSignerKeepsStoredExpiration() = runTest {
+        var latest = 20000L
+        var ledgerCalls = 0
+        mockServer(listOf(withDelegatesEntry()), latestLedgerSeq = { ledgerCalls++; latest }).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            ledgerCalls = 0
+            tx.signAuthEntries(KeyPair.fromSecretSeed(SIGNER_SEED))
+            latest = 20500L
+            tx.signAuthEntries(KeyPair.fromSecretSeed(DELEGATE_SEED))
+
+            val creds = delegatesCreds(tx)
+            assertEquals(20100u, creds.addressCredentials.signatureExpirationLedger.value)
+            assertEquals(1, ledgerCalls, "the second call reuses the stored expiration without fetching")
+            assertVerifies(firstEntry(tx), creds.addressCredentials.signature, KeyPair.fromSecretSeed(SIGNER_SEED))
+            assertVerifies(firstEntry(tx), creds.delegates.single().signature, KeyPair.fromSecretSeed(DELEGATE_SEED))
+        }
+    }
+
+    @Test
+    fun testSignAuthEntriesSecondCosignerOnTopLevelKeepsStoredExpiration() = runTest {
+        // Two signers of the multisig account SIGNER_ACCOUNT sign its top-level node in turn;
+        // the second signs remotely through the callback with the expiration it is handed.
+        var latest = 20000L
+        val cosigner = KeyPair.fromSecretSeed(DELEGATE_SEED)
+        val viaCosigner: suspend (SorobanAuthorizationEntryXdr, Network) -> SorobanAuthorizationEntryXdr = { e, n ->
+            Auth.authorizeEntry(e, cosigner, e.credentials.addressCredentials()!!.signatureExpirationLedger.value.toLong(), n)
+        }
+        mockServer(listOf(v2Entry()), latestLedgerSeq = { latest }).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            tx.signAuthEntries(KeyPair.fromSecretSeed(SIGNER_SEED))
+            latest = 20500L
+            val account = KeyPair.fromAccountId(SIGNER_ACCOUNT)
+            assertFailsWith<IllegalArgumentException> {
+                tx.signAuthEntries(account, validUntilLedgerSequence = 20600L, authorizeEntryDelegate = viaCosigner)
+            }
+            tx.signAuthEntries(account, authorizeEntryDelegate = viaCosigner)
+
+            val creds = (firstEntry(tx).credentials as SorobanCredentialsXdr.AddressV2).value
+            assertEquals(20100u, creds.signatureExpirationLedger.value)
+            assertVerifies(firstEntry(tx), creds.signature, KeyPair.fromSecretSeed(SIGNER_SEED))
+            assertVerifies(firstEntry(tx), creds.signature, cosigner)
+        }
+    }
+
+    @Test
+    fun testSignAuthEntriesFetchesDefaultExpirationOncePerCall() = runTest {
+        // Each getLatestLedger answer is 10000 above the previous one, from 20000.
+        var ledgerCalls = 0
+        val second = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.AddressV2(baseCredentials().copy(nonce = Int64Xdr(NONCE + 1))),
+            rootInvocation = invocation()
+        )
+        mockServer(listOf(v2Entry(), second), latestLedgerSeq = { ledgerCalls++; 10000L + 10000L * ledgerCalls }).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            ledgerCalls = 0
+            tx.signAuthEntries(KeyPair.fromSecretSeed(SIGNER_SEED))
+
+            val auth = (tx.builtTransaction!!.operations.first() as InvokeHostFunctionOperation).auth
+            assertEquals(listOf(20100u, 20100u), auth.map { it.credentials.addressCredentials()!!.signatureExpirationLedger.value })
+            assertEquals(1, ledgerCalls)
+        }
+    }
+
+    @Test
+    fun testSignAuthEntriesConflictingExpirationThrowsAndKeepsAuthEntries() = runTest {
+        // The fresh entry for the delegate signer is signed first; the second entry's
+        // top-level signature then makes the explicit expiration conflict.
+        val freshForDelegate = SorobanAuthorizationEntryXdr(
+            credentials = SorobanCredentialsXdr.AddressV2(
+                baseCredentials().copy(address = Address(DELEGATE_ACCOUNT).toSCAddress())
+            ),
+            rootInvocation = invocation()
+        )
+        val topSigned = Auth.authorizeEntry(withDelegatesEntry(), KeyPair.fromSecretSeed(SIGNER_SEED), EXPIRATION, NETWORK)
+        mockServer(listOf(freshForDelegate, topSigned)).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            val before = authXdr(tx)
+            val error = assertFailsWith<IllegalArgumentException> {
+                tx.signAuthEntries(KeyPair.fromSecretSeed(DELEGATE_SEED), validUntilLedgerSequence = EXPIRATION + 1)
+            }
+            assertTrue("${EXPIRATION + 1} differs from $EXPIRATION" in error.message!!, error.message)
+            assertEquals(before, authXdr(tx), "the transaction keeps its auth entries byte for byte")
+        }
+    }
+
+    @Test
+    fun testSignAuthEntriesMatchingExpirationOnPartlySignedEntrySucceeds() = runTest {
+        val topSigned = Auth.authorizeEntry(withDelegatesEntry(), KeyPair.fromSecretSeed(SIGNER_SEED), EXPIRATION, NETWORK)
+        mockServer(listOf(topSigned)).use { server ->
+            val tx = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            tx.signAuthEntries(KeyPair.fromSecretSeed(DELEGATE_SEED), validUntilLedgerSequence = EXPIRATION)
+
+            val creds = delegatesCreds(tx)
+            assertEquals(EXPIRATION.toUInt(), creds.addressCredentials.signatureExpirationLedger.value)
+            assertVerifies(firstEntry(tx), creds.addressCredentials.signature, KeyPair.fromSecretSeed(SIGNER_SEED))
+            assertVerifies(firstEntry(tx), creds.delegates.single().signature, KeyPair.fromSecretSeed(DELEGATE_SEED))
+        }
+    }
+
+    @Test
+    fun testSignAuthEntriesFreshEntryStampsExplicitOrDefaultExpiration() = runTest {
+        var ledgerCalls = 0
+        mockServer(listOf(withDelegatesEntry()), latestLedgerSeq = { ledgerCalls++; 30000L }).use { server ->
+            val explicit = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            ledgerCalls = 0
+            explicit.signAuthEntries(KeyPair.fromSecretSeed(DELEGATE_SEED), validUntilLedgerSequence = EXPIRATION + 7)
+            assertEquals((EXPIRATION + 7).toUInt(), delegatesCreds(explicit).addressCredentials.signatureExpirationLedger.value)
+            assertEquals(0, ledgerCalls)
+
+            val defaulted = assembled(server, KeyPair.fromSecretSeed(SIGNER_SEED)).simulate(restore = false)
+            ledgerCalls = 0
+            defaulted.signAuthEntries(KeyPair.fromSecretSeed(DELEGATE_SEED))
+            assertEquals(30100u, delegatesCreds(defaulted).addressCredentials.signatureExpirationLedger.value)
+            assertEquals(1, ledgerCalls)
         }
     }
 

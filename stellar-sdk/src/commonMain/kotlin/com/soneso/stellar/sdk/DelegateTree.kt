@@ -83,6 +83,48 @@ internal fun SorobanCredentialsXdr.withUpdatedAddressCredentials(
         )
 }
 
+/**
+ * Returns the stored signature expiration ledger when any node of these credentials carries a
+ * signature, or null when none does.
+ *
+ * Every signature on an entry, top-level and delegate, commits to the one expiration stored in
+ * the top-level address credentials. A node carries a signature when its value is anything
+ * other than the `SCV_VOID` placeholder. Signing appends to a node's signature vector, so a
+ * signature on the node about to be signed counts as well.
+ *
+ * @throws IllegalArgumentException if the credentials are source-account (Void) credentials or
+ *   the delegate tree exceeds [DELEGATE_TRAVERSAL_CAP]
+ */
+internal fun SorobanCredentialsXdr.committedExpiration(): Long? {
+    val top = requireAddressCredentials()
+    val delegates = (this as? SorobanCredentialsXdr.AddressWithDelegates)?.value?.delegates.orEmpty()
+    val signed = top.signature.discriminant != SCValTypeXdr.SCV_VOID || delegates.anySigned()
+    return if (signed) top.signatureExpirationLedger.value.toLong() else null
+}
+
+/**
+ * Throws when [requested] differs from [committed], the expiration ledger that signatures
+ * already on an entry commit to ([committedExpiration]).
+ */
+internal fun requireMatchingExpiration(committed: Long?, requested: Long) {
+    require(committed == null || committed == requested) {
+        "Signature expiration ledger $requested differs from $committed, the expiration ledger " +
+            "that signatures already on this authorization entry commit to"
+    }
+}
+
+/** Walks the delegate tree for a node that carries a signature. */
+private fun List<SorobanDelegateSignatureXdr>.anySigned(depth: Int = 0): Boolean {
+    if (depth > DELEGATE_TRAVERSAL_CAP) {
+        throw IllegalArgumentException(
+            "Delegate tree traversal depth $depth exceeds cap $DELEGATE_TRAVERSAL_CAP"
+        )
+    }
+    return any { node ->
+        node.signature.discriminant != SCValTypeXdr.SCV_VOID || node.nestedDelegates.anySigned(depth + 1)
+    }
+}
+
 // ============================================================================
 // XDR byte-comparison utilities for delegate ordering
 // ============================================================================
@@ -107,16 +149,8 @@ internal fun SCAddressXdr.toXdrBytes(): ByteArray {
  *
  * This implements the host-enforced ordering for delegate arrays.
  */
-internal fun compareAddressByXdrBytes(a: SCAddressXdr, b: SCAddressXdr): Int {
-    val aBytes = a.toXdrBytes()
-    val bBytes = b.toXdrBytes()
-    val minLen = minOf(aBytes.size, bBytes.size)
-    for (i in 0 until minLen) {
-        val diff = (aBytes[i].toInt() and 0xFF) - (bBytes[i].toInt() and 0xFF)
-        if (diff != 0) return diff
-    }
-    return aBytes.size - bBytes.size
-}
+internal fun compareAddressByXdrBytes(a: SCAddressXdr, b: SCAddressXdr): Int =
+    Util.compareBytesUnsigned(a.toXdrBytes(), b.toXdrBytes())
 
 /**
  * Sorts a list of [SorobanDelegateSignatureXdr] ascending by the XDR bytes of

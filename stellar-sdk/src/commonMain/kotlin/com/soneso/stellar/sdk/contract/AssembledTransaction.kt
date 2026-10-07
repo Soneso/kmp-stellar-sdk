@@ -364,20 +364,28 @@ class AssembledTransaction<T> internal constructor(
      *    entries, every delegate node address in the tree.
      * 2. For each matching entry:
      *    - Sets the expiration ledger on the inner credentials, preserving the
-     *      credential arm (ADDRESS, ADDRESS_V2, or ADDRESS_WITH_DELEGATES)
+     *      credential arm (ADDRESS, ADDRESS_V2, or ADDRESS_WITH_DELEGATES). Every
+     *      signature on an entry commits to its one stored expiration, so when any
+     *      node, including one this signer signs again, already carries a signature,
+     *      the stored expiration is kept.
      *    - Signs at the top level when the top-level address matches, or routes the
      *      signature into the matching delegate node(s) when a delegate matches
      *    - Updates the signature in the entry
-     * 3. Rebuilds the transaction with the updated auth entries
+     * 3. Rebuilds the transaction with the updated auth entries once every matching
+     *    entry is signed; on any failure the transaction keeps its entries
      *
      * @param authEntriesSigner The KeyPair to sign auth entries with (must match the
      *   top-level address or a delegate node address in an entry)
-     * @param validUntilLedgerSequence Ledger sequence until which signatures are valid (null = current + 100)
+     * @param validUntilLedgerSequence Ledger sequence until which signatures are valid. When
+     *   null, an entry that already carries a signature keeps its stored expiration, and any
+     *   other entry gets the latest ledger + 100, fetched at most once per call.
      * @param authorizeEntryDelegate Optional function for custom signing logic (enables remote signing)
      * @return This AssembledTransaction for chaining
      * @throws NotYetSimulatedException if not yet simulated
      * @throws IllegalStateException if no entries need signing or wrong signer
-     * @throws IllegalArgumentException if signer missing private key (when delegate not provided)
+     * @throws IllegalArgumentException if signer missing private key (when delegate not provided),
+     *   or if [validUntilLedgerSequence] differs from the stored expiration of an entry that
+     *   already carries a signature
      */
     suspend fun signAuthEntries(
         authEntriesSigner: KeyPair,
@@ -412,11 +420,9 @@ class AssembledTransaction<T> internal constructor(
             }
         }
 
-        // Get or calculate expiration ledger (default: current + 100)
-        val expirationLedger = validUntilLedgerSequence ?: run {
-            val latestLedger = server.getLatestLedger()
-            latestLedger.sequence + 100
-        }
+        // Default expiration (latest ledger + 100), fetched at most once and only when an
+        // entry needs it.
+        var defaultExpiration: Long? = null
 
         // Get the operation and its auth entries
         val operation = builtTransaction!!.operations.first()
@@ -424,7 +430,8 @@ class AssembledTransaction<T> internal constructor(
             throw IllegalStateException("Expected InvokeHostFunctionOperation, got ${operation::class.simpleName}")
         }
 
-        // Create mutable list of auth entries
+        // Signed copies collect here; builtTransaction is replaced only after every entry
+        // is signed, so a failure mid-loop leaves the transaction unchanged.
         val updatedAuthEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
         // Iterate through auth entries and sign matching ones
@@ -452,7 +459,14 @@ class AssembledTransaction<T> internal constructor(
                 continue
             }
 
-            // Apply the new expiration to the inner credentials before signing,
+            // Signatures already on the entry commit to the stored expiration, which then
+            // stays; otherwise the requested or default expiration is stamped.
+            val committed = entry.credentials.committedExpiration()
+            validUntilLedgerSequence?.let { requireMatchingExpiration(committed, it) }
+            val expirationLedger = committed ?: validUntilLedgerSequence ?: defaultExpiration
+                ?: (server.getLatestLedger().sequence + 100).also { defaultExpiration = it }
+
+            // Apply the expiration to the inner credentials before signing,
             // preserving the credential arm.
             val updatedAddressCreds = addressCreds.copy(
                 signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt())

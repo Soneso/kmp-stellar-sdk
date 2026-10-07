@@ -13,7 +13,7 @@ import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.smartaccount.core.DelegatedSigner
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
-import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.PolicyInstallParams
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
 import com.ionspin.kotlin.bignum.integer.BigInteger

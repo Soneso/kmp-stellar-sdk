@@ -307,8 +307,8 @@ class ScvTest {
     }
 
     @Test
-    fun testMapOrderPreservation() {
-        // LinkedHashMap should preserve insertion order
+    fun testMapEmitsHostKeyOrder() {
+        // Entries are emitted in the host's key order, whatever the insertion order
         val map = linkedMapOf<SCValXdr, SCValXdr>()
         map[Scv.toSymbol("c")] = Scv.toInt32(3)
         map[Scv.toSymbol("a")] = Scv.toInt32(1)
@@ -318,7 +318,8 @@ class ScvTest {
         val result = Scv.fromMap(scMap)
 
         val keys = result.keys.map { Scv.fromSymbol(it) }
-        assertEquals(listOf("c", "a", "b"), keys)
+        assertEquals(listOf("a", "b", "c"), keys)
+        assertEquals(listOf(1, 2, 3), result.values.map { Scv.fromInt32(it) })
     }
 
     @Test

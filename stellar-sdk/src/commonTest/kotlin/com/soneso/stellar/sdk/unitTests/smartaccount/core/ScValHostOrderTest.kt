@@ -9,23 +9,24 @@ package com.soneso.stellar.sdk.unitTests.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayload
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
-import com.soneso.stellar.sdk.smartaccount.core.compareScValHostOrder
 import com.soneso.stellar.sdk.smartaccount.oz.OZPolicyManager
-import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * Host-order ScMap key comparator ([compareScValHostOrder]) and its effect on the
- * smart-account signer maps. The Soroban host orders keys by content (Rust slice `Ord`),
- * with length only a tiebreaker on a common prefix. Sorting by the length-major XDR-byte
- * encoding instead diverges for variable-length keys whose lengths differ, producing a map
- * the host rejects with `InvalidInput`; this suite pins the correct order.
+ * Host-order ScMap key comparator ([compareScValHostOrder]), the [Scv.toMap] builder, and the
+ * smart-account signer maps built with them. The Soroban host orders keys by content (Rust
+ * slice `Ord`), with length only a tiebreaker on a common prefix, and rejects a map argument
+ * whose keys are out of order with `InvalidInput`. [hostOrderVector] lists keys of every
+ * comparable type in ascending host order.
  */
 class ScValHostOrderTest {
 
@@ -310,4 +311,156 @@ class ScValHostOrderTest {
             OZPolicyManager.scValToXdrBytes(signerKeys[1])
         )
     }
+
+    // ========== Shared host-order vector ==========
+
+    // Every pair i < j of the vector compares as less, in both directions.
+    @Test
+    fun testHostOrderVector_everyPairOrdered() {
+        val keys = hostOrderVector()
+        assertEquals(63, keys.size)
+        for (i in keys.indices) {
+            assertEquals(0, compareScValHostOrder(keys[i], keys[i]), "key ${i + 1} must equal itself")
+            for (j in i + 1 until keys.size) {
+                assertTrue(compareScValHostOrder(keys[i], keys[j]) < 0, "key ${i + 1} must sort before key ${j + 1}")
+                assertTrue(compareScValHostOrder(keys[j], keys[i]) > 0, "key ${j + 1} must sort after key ${i + 1}")
+            }
+        }
+    }
+
+    // Scv.toMap emits the vector's order from a fixed shuffle and rejects a duplicate key.
+    @Test
+    fun testToMap_sortsIntoHostOrderAndRejectsDuplicateKey() {
+        val keys = hostOrderVector()
+        val shuffled = LinkedHashMap<SCValXdr, SCValXdr>()
+        keys.hostOrderShuffle().forEach { shuffled[it] = Scv.toVoid() }
+        val emitted = (Scv.toMap(shuffled) as SCValXdr.Map).value!!.value.map { it.key.toXdrBase64() }
+        assertEquals(keys.map { it.toXdrBase64() }, emitted)
+
+        // Built separately, the two keys are distinct Kotlin objects but equal in host order.
+        val duplicate = linkedMapOf(bytes(0x01) to Scv.toVoid(), bytes(0x01) to Scv.toUint32(1u))
+        assertEquals(2, duplicate.size)
+        val error = assertFailsWith<IllegalArgumentException> { Scv.toMap(duplicate) }
+        assertTrue(bytes(0x01).toXdrJson() in error.message!!, error.message)
+    }
+
+    // ContractInstance: executable first (an external-ref tag by content), then storage
+    // (absent first, then entry-wise by content).
+    @Test
+    fun testContractInstanceComparands_executableThenStorage() {
+        fun instance(executable: ContractExecutableXdr, vararg keys: String) = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                executable,
+                if (keys.isEmpty()) null else SCMapXdr(keys.map { SCMapEntryXdr(Scv.toSymbol(it), Scv.toVoid()) })
+            )
+        )
+        fun externalRef(tag: String) = ContractExecutableXdr.ExternalRef(
+            ContractExecutableExternalRefXdr(Address(verifier).toSCAddress(), tag.encodeToByteArray())
+        )
+        val wasm = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32)))
+        val ordered = listOf(
+            instance(wasm), instance(wasm, "aa"), instance(wasm, "b"),
+            instance(ContractExecutableXdr.Void), instance(externalRef("aa")), instance(externalRef("b"))
+        )
+        for (i in ordered.indices) {
+            for (j in i + 1 until ordered.size) {
+                assertTrue(compareScValHostOrder(ordered[i], ordered[j]) < 0, "instance $i must sort before $j")
+                assertTrue(compareScValHostOrder(ordered[j], ordered[i]) > 0, "instance $j must sort after $i")
+            }
+        }
+    }
+
+    // I256 with equal hi_hi: hi_lo, then lo_hi, then lo_lo decide, each as an unsigned limb.
+    @Test
+    fun testI256Comparands_lowerLimbsUnsigned() {
+        val max = ULong.MAX_VALUE
+        fun i256(hiLo: ULong, loHi: ULong, loLo: ULong) =
+            SCValXdr.I256(Int256PartsXdr(Int64Xdr(-1), Uint64Xdr(hiLo), Uint64Xdr(loHi), Uint64Xdr(loLo)))
+        val pairs = mapOf(
+            "hi_lo" to (i256(1u, 0u, 0u) to i256(max, 0u, 0u)),
+            "lo_hi" to (i256(0u, 1u, 0u) to i256(0u, max, 0u)),
+            "lo_lo" to (i256(0u, 0u, 1u) to i256(0u, 0u, max))
+        )
+        for ((limb, pair) in pairs) {
+            assertTrue(compareScValHostOrder(pair.first, pair.second) < 0, "$limb: 1 must sort before max")
+            assertTrue(compareScValHostOrder(pair.second, pair.first) > 0, "$limb: max must sort after 1")
+        }
+    }
+
+    // External-ref executables: the owner decides, the tag only between equal owners.
+    @Test
+    fun testExternalRefExecutables_ownerThenTag() {
+        fun instance(ownerFill: Int, tag: String) = SCValXdr.Instance(
+            SCContractInstanceXdr(
+                ContractExecutableXdr.ExternalRef(
+                    ContractExecutableExternalRefXdr(
+                        SCAddressXdr.ContractId(ContractIDXdr(HashXdr(ByteArray(32) { ownerFill.toByte() }))),
+                        tag.encodeToByteArray()
+                    )
+                ),
+                null
+            )
+        )
+        val ordered = listOf(instance(0x00, "aa"), instance(0x00, "b"), instance(0xff, "aa"), instance(0xff, "b"))
+        for (i in ordered.indices) {
+            for (j in i + 1 until ordered.size) {
+                assertTrue(compareScValHostOrder(ordered[i], ordered[j]) < 0, "executable $i must sort before $j")
+                assertTrue(compareScValHostOrder(ordered[j], ordered[i]) > 0, "executable $j must sort after $i")
+            }
+        }
+    }
+
+    // Decoding keeps the wire order: a map whose keys are out of host order re-encodes byte-identically.
+    @Test
+    fun testDecodedMap_keepsWireOrder() {
+        val entries = hostOrderVector().hostOrderShuffle().map { SCMapEntryXdr(it, Scv.toVoid()) }
+        val wire = SCValXdr.Map(SCMapXdr(entries)).toXdrBase64()
+        assertEquals(wire, SCValXdr.fromXdrBase64(wire).toXdrBase64())
+    }
 }
+
+/** The cross-SDK host-order vector: 63 keys in ascending Soroban host order. */
+internal fun hostOrderVector(): List<SCValXdr> {
+    val max = ULong.MAX_VALUE
+    fun u64(v: ULong) = Uint64Xdr(v)
+    fun u32(v: UInt) = Scv.toUint32(v)
+    fun bytes(vararg v: Int) = Scv.toBytes(ByteArray(v.size) { v[it].toByte() })
+    fun key32(fill: Int) = ByteArray(32) { fill.toByte() }
+    fun map(vararg e: Pair<UInt, UInt>) =
+        SCValXdr.Map(SCMapXdr(e.map { SCMapEntryXdr(u32(it.first), u32(it.second)) }))
+    fun account(fill: Int) = Scv.toAddress(SCAddressXdr.AccountId(AccountIDXdr(PublicKeyXdr.Ed25519(Uint256Xdr(key32(fill))))))
+    fun contract(fill: Int) = Scv.toAddress(SCAddressXdr.ContractId(ContractIDXdr(HashXdr(key32(fill)))))
+    fun muxed(id: ULong, fill: Int) =
+        Scv.toAddress(SCAddressXdr.MuxedAccount(MuxedEd25519AccountXdr(u64(id), Uint256Xdr(key32(fill)))))
+    fun i128(hi: Long, lo: ULong) = SCValXdr.I128(Int128PartsXdr(Int64Xdr(hi), u64(lo)))
+    fun nonce(n: Long) = SCValXdr.NonceKey(SCNonceKeyXdr(Int64Xdr(n)))
+    return listOf(
+        Scv.toBoolean(false), Scv.toBoolean(true), Scv.toVoid(),
+        Scv.toError(SCErrorXdr.ContractCode(Uint32Xdr(1u))), Scv.toError(SCErrorXdr.ContractCode(Uint32Xdr(2u))),
+        Scv.toError(SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_INVALID_INPUT)),
+        u32(0u), u32(UInt.MAX_VALUE),
+        Scv.toInt32(Int.MIN_VALUE), Scv.toInt32(-1), Scv.toInt32(0), Scv.toInt32(1),
+        Scv.toUint64(0u), Scv.toUint64(max),
+        Scv.toInt64(Long.MIN_VALUE), Scv.toInt64(-1), Scv.toInt64(0),
+        Scv.toTimePoint(0u), Scv.toTimePoint(1u), Scv.toDuration(0u),
+        SCValXdr.U128(UInt128PartsXdr(u64(0u), u64(1u))), SCValXdr.U128(UInt128PartsXdr(u64(0u), u64(max))),
+        SCValXdr.U128(UInt128PartsXdr(u64(1u), u64(0u))),
+        i128(-1, max), i128(0, 0u), i128(0, max), i128(1, 0u),
+        SCValXdr.U256(UInt256PartsXdr(u64(0u), u64(0u), u64(0u), u64(1u))),
+        SCValXdr.U256(UInt256PartsXdr(u64(1u), u64(0u), u64(0u), u64(0u))),
+        SCValXdr.I256(Int256PartsXdr(Int64Xdr(-1), u64(max), u64(max), u64(max))),
+        SCValXdr.I256(Int256PartsXdr(Int64Xdr(0), u64(0u), u64(0u), u64(0u))),
+        bytes(), bytes(0x01), bytes(0x01, 0x00), bytes(0x02), bytes(0xff),
+        Scv.toString(""), Scv.toString("a"), Scv.toString("ab"), Scv.toString("b"),
+        Scv.toSymbol("A"), Scv.toSymbol("AB"), Scv.toSymbol("B"), Scv.toSymbol("_"), Scv.toSymbol("a"),
+        Scv.toVec(emptyList()), Scv.toVec(listOf(u32(1u))), Scv.toVec(listOf(u32(1u), u32(0u))),
+        Scv.toVec(listOf(u32(2u))), Scv.toVec(listOf(Scv.toInt32(-1))),
+        map(), map(1u to 1u), map(1u to 2u), map(2u to 0u),
+        account(0x00), account(0xff), contract(0x00), contract(0xff), muxed(0u, 0xff), muxed(1u, 0x00),
+        SCValXdr.Void(SCValTypeXdr.SCV_LEDGER_KEY_CONTRACT_INSTANCE),
+        nonce(-1), nonce(0)
+    )
+}
+
+/** The fixed shuffle of [hostOrderVector]: reverse the list, then swap each neighbour pair. */
+internal fun <T> List<T>.hostOrderShuffle(): List<T> = reversed().chunked(2).flatMap { it.reversed() }

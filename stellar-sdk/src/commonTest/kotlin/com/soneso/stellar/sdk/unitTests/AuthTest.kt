@@ -477,8 +477,9 @@ class AuthTest {
     fun testAuthorizeEntryAppendsToVecWithNullInnerValue() = runTest {
         val signer = KeyPair.fromSecretSeed(SECRET_SEED)
         val baseEntry = createUnsignedEntry(signer.getAccountId())
+        // A non-void signature fixes the stored expiration, so the entry stores the requested one.
         val degenerateCredentials = (baseEntry.credentials as SorobanCredentialsXdr.Address).value
-            .copy(signature = SCValXdr.Vec(null))
+            .copy(signatureExpirationLedger = Uint32Xdr(VALID_UNTIL_LEDGER_SEQ.toUInt()), signature = SCValXdr.Vec(null))
         val entryWithDegenerateVec = baseEntry.copy(
             credentials = SorobanCredentialsXdr.Address(degenerateCredentials)
         )

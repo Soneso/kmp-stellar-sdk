@@ -42,8 +42,9 @@ class ScValToNativeTest {
     private val claimableBalanceId = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
     private val liquidityPoolId = "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"
 
+    /** Builds a map with its entries in the given order, as a decoded wire value carries them. */
     private fun scMap(vararg entries: Pair<SCValXdr, SCValXdr>): SCValXdr =
-        Scv.toMap(linkedMapOf(*entries))
+        SCValXdr.Map(SCMapXdr(entries.map { (key, value) -> SCMapEntryXdr(key, value) }))
 
     private fun nativeMap(scVal: SCValXdr): Map<*, *> = assertIs<Map<*, *>>(scVal.toNative())
 
@@ -743,19 +744,22 @@ class ScValToNativeTest {
     @Test
     fun testDecodedValueConvertsLikeFactoryBuiltValue() {
         val amount = BigInteger.parseString("-170141183460469231731687303715884105728")
-        val original = scMap(
-            Scv.toSymbol("items") to Scv.toVec(listOf(Scv.toUint32(1u), Scv.toSymbol("two"))),
-            Scv.toSymbol("amount") to Scv.toInt128(amount),
-            Scv.toSymbol("owner") to addressValue(contractId),
-            Scv.toSymbol("count") to Scv.toUint64(9223372036854775808uL),
-            Scv.toSymbol("data") to Scv.toBytes(byteArrayOf(0, 1, 255.toByte()))
+        val original = Scv.toMap(
+            linkedMapOf(
+                Scv.toSymbol("items") to Scv.toVec(listOf(Scv.toUint32(1u), Scv.toSymbol("two"))),
+                Scv.toSymbol("amount") to Scv.toInt128(amount),
+                Scv.toSymbol("owner") to addressValue(contractId),
+                Scv.toSymbol("count") to Scv.toUint64(9223372036854775808uL),
+                Scv.toSymbol("data") to Scv.toBytes(byteArrayOf(0, 1, 255.toByte()))
+            )
         )
         val decoded = SCValXdr.fromXdrBase64(original.toXdrBase64())
 
         val fromOriginal = nativeMap(original)
         val fromDecoded = nativeMap(decoded)
 
-        assertEquals(listOf("items", "amount", "owner", "count", "data"), fromDecoded.keys.toList())
+        // The factory emits the entries in host key order, and the conversion keeps it.
+        assertEquals(listOf("amount", "count", "data", "items", "owner"), fromDecoded.keys.toList())
         assertEquals(fromOriginal.keys.toList(), fromDecoded.keys.toList())
 
         assertEquals(listOf(1u, "two"), fromDecoded["items"])

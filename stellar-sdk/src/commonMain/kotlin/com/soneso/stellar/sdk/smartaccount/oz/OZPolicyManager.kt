@@ -11,6 +11,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.ionspin.kotlin.bignum.integer.BigInteger
