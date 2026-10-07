@@ -206,7 +206,7 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test-junit5"))
-                implementation("org.junit.jupiter:junit-jupiter:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter:6.1.3")
                 // Add SLF4J implementation to fix logging warnings
                 implementation("org.slf4j:slf4j-simple:2.0.9")
             }
