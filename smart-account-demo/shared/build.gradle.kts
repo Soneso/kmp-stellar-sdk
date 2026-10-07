@@ -59,8 +59,8 @@ kotlin {
                 // ============================================================
                 // Navigation
                 // ============================================================
-                implementation("cafe.adriel.voyager:voyager-navigator:1.1.0-beta02")
-                implementation("cafe.adriel.voyager:voyager-transitions:1.1.0-beta02")
+                implementation("cafe.adriel.voyager:voyager-navigator:1.1.0-beta03")
+                implementation("cafe.adriel.voyager:voyager-transitions:1.1.0-beta03")
 
                 // ============================================================
                 // Stellar SDK
