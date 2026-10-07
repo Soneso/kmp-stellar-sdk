@@ -9,14 +9,14 @@ buildscript {
 }
 
 plugins {
-    kotlin("multiplatform") version "2.2.20" apply false
-    kotlin("jvm") version "2.2.20" apply false
-    kotlin("plugin.serialization") version "2.2.20" apply false
-    kotlin("plugin.compose") version "2.2.20" apply false
-    kotlin("android") version "2.2.20" apply false
-    id("org.jetbrains.compose") version "1.9.1" apply false
-    id("org.jetbrains.dokka") version "2.1.0" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.9.4" apply false
+    kotlin("multiplatform") version "2.4.20" apply false
+    kotlin("jvm") version "2.4.20" apply false
+    kotlin("plugin.serialization") version "2.4.20" apply false
+    kotlin("plugin.compose") version "2.4.20" apply false
+    kotlin("android") version "2.4.20" apply false
+    id("org.jetbrains.compose") version "1.12.1" apply false
+    id("org.jetbrains.dokka") version "2.2.0" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.9.11" apply false
     id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
 }
 

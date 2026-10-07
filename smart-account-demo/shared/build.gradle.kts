@@ -75,27 +75,27 @@ kotlin {
                 // ============================================================
                 // Coroutines
                 // ============================================================
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
                 // ============================================================
                 // Date/Time
                 // ============================================================
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
 
                 // ============================================================
                 // Coordination server client (agent-signer flow)
                 // Ktor + kotlinx.serialization. Versions track the stellar-sdk.
                 // ============================================================
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("io.ktor:ktor-client-core:3.3.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                implementation("io.ktor:ktor-client-core:3.6.0")
             }
         }
 
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-                implementation("io.ktor:ktor-client-mock:3.3.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation("io.ktor:ktor-client-mock:3.6.0")
             }
         }
 
@@ -105,15 +105,15 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("androidx.activity:activity-compose:1.8.2")
-                implementation("androidx.appcompat:appcompat:1.6.1")
+                implementation("androidx.appcompat:appcompat:1.8.0")
 
                 // Ktor engine for the coordination client on Android.
-                implementation("io.ktor:ktor-client-cio:3.3.2")
+                implementation("io.ktor:ktor-client-cio:3.6.0")
 
                 // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
                 // Required by ReownConnector which implements WalletConnector for Android.
-                implementation("com.reown:android-core:1.6.12")
-                implementation("com.reown:sign:1.6.12")
+                implementation("com.reown:android-core:1.6.17")
+                implementation("com.reown:sign:1.6.17")
             }
         }
 
@@ -124,7 +124,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on iOS.
-                implementation("io.ktor:ktor-client-darwin:3.3.2")
+                implementation("io.ktor:ktor-client-darwin:3.6.0")
             }
         }
 
@@ -147,7 +147,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on macOS.
-                implementation("io.ktor:ktor-client-darwin:3.3.2")
+                implementation("io.ktor:ktor-client-darwin:3.6.0")
             }
         }
 
@@ -169,7 +169,7 @@ kotlin {
                 implementation(npm("@stellar/freighter-api", "6.0.1"))
 
                 // Ktor engine for the coordination client on the web.
-                implementation("io.ktor:ktor-client-js:3.3.2")
+                implementation("io.ktor:ktor-client-js:3.6.0")
             }
         }
     }

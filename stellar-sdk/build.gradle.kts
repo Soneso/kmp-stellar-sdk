@@ -174,12 +174,12 @@ kotlin {
                 // JSON tree types for multiplatform. Exposed via `api` because the SDK's
                 // public surface (the XDR-JSON methods on every generated XDR type) takes
                 // and returns kotlinx.serialization.json.JsonElement.
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-                implementation("io.ktor:ktor-client-core:3.3.2")
-                implementation("io.ktor:ktor-client-content-negotiation:3.3.2")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.2")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+                implementation("io.ktor:ktor-client-core:3.6.0")
+                implementation("io.ktor:ktor-client-content-negotiation:3.6.0")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
                 // BigInteger support for multiplatform. Exposed via `api` because the
                 // SDK's public surface (e.g. Scv.toInt128) and generated contract bindings
                 // return com.ionspin.kotlin.bignum.integer.BigInteger.
@@ -190,16 +190,16 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-                implementation("io.ktor:ktor-client-mock:3.3.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation("io.ktor:ktor-client-mock:3.6.0")
             }
         }
 
         val jvmMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:3.3.2")
-                implementation("org.bouncycastle:bcprov-jdk18on:1.78")
-                implementation("commons-codec:commons-codec:1.16.1")
+                implementation("io.ktor:ktor-client-cio:3.6.0")
+                implementation("org.bouncycastle:bcprov-jdk18on:1.86")
+                implementation("commons-codec:commons-codec:1.22.1")
             }
         }
 
@@ -208,7 +208,7 @@ kotlin {
                 implementation(kotlin("test-junit5"))
                 implementation("org.junit.jupiter:junit-jupiter:5.10.2")
                 // Add SLF4J implementation to fix logging warnings
-                implementation("org.slf4j:slf4j-simple:2.0.9")
+                implementation("org.slf4j:slf4j-simple:2.0.20")
             }
         }
 
@@ -235,7 +235,7 @@ kotlin {
 
         val jsMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-js:3.3.2")
+                implementation("io.ktor:ktor-client-js:3.6.0")
                 // Use libsodium-wrappers-sumo instead of standard build
                 // The sumo build includes all functions including crypto_hash_sha256
                 // which is needed for SHA-256 hashing (used in contract deployment)
@@ -264,7 +264,7 @@ kotlin {
         val iosMain by creating {
             dependsOn(nativeMain)
             dependencies {
-                implementation("io.ktor:ktor-client-darwin:3.3.2")
+                implementation("io.ktor:ktor-client-darwin:3.6.0")
             }
         }
 
@@ -285,7 +285,7 @@ kotlin {
         val macosMain by creating {
             dependsOn(nativeMain)
             dependencies {
-                implementation("io.ktor:ktor-client-darwin:3.3.2")
+                implementation("io.ktor:ktor-client-darwin:3.6.0")
             }
         }
 

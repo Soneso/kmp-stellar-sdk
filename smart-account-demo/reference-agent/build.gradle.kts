@@ -21,7 +21,7 @@ java {
 }
 
 // Ktor 3.x (current stable line). Client side: the agent talks to the coordination server.
-val ktorVersion = "3.5.0"
+val ktorVersion = "3.6.0"
 
 dependencies {
     // KMP SDK JVM variant. Headless connect and the multi-signer pipeline come from here.
@@ -33,12 +33,12 @@ dependencies {
 
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 
     // Gated end-to-end test only: drives the REAL coordination server in-process
     // (RUN_COORDINATION_E2E=true). Pulls in the actual server module plus the Ktor
