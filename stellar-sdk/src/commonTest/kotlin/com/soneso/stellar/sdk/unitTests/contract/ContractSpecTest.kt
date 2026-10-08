@@ -3,6 +3,7 @@ package com.soneso.stellar.sdk.unitTests.contract
 import com.soneso.stellar.sdk.contract.*
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
 import com.soneso.stellar.sdk.unitTests.smartaccount.core.hostOrderShuffle
 import com.soneso.stellar.sdk.unitTests.smartaccount.core.hostOrderVector
@@ -631,6 +632,98 @@ class ContractSpecTest {
 
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(123, typeDef)
+        }
+    }
+
+    private val accountStrKey = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
+    private val contractStrKey = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
+    private val muxedAccountStrKey = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAAAJLK"
+    private val muxedContractStrKey = "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC"
+    private val claimableBalanceStrKey = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
+    private val liquidityPoolStrKey = "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"
+    private val addressTakes = "Address takes an account (G...) or contract (C...) address"
+    private val muxedAddressTakes = "MuxedAddress takes an account (G...), muxed account (M...), " +
+        "contract (C...) or muxed contract (W...) address"
+
+    /** Converts [value] for [specType] and asserts the address it yields renders as [strKey]. */
+    private fun assertConvertsTo(specType: SCSpecTypeXdr, value: Any, strKey: String) {
+        val result = ContractSpec(emptyList()).nativeToXdrSCVal(value, createTypeDef(specType))
+        assertEquals(strKey, Address.fromSCVal(assertIs<SCValXdr.Address>(result)).toString())
+    }
+
+    /** Asserts that converting [value] for [specType] throws with the message [expected]. */
+    private fun assertAddressRejected(specType: SCSpecTypeXdr, value: Any, expected: String) {
+        val e = assertFailsWith<ContractSpecException>("$value") {
+            ContractSpec(emptyList()).nativeToXdrSCVal(value, createTypeDef(specType))
+        }
+        assertEquals("Invalid type: $expected", e.message)
+    }
+
+    @Test
+    fun testAddressParameterTakesAccountsAndContracts() {
+        for (strKey in listOf(accountStrKey, contractStrKey)) {
+            assertConvertsTo(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS, strKey, strKey)
+            assertConvertsTo(SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS, Address(strKey), strKey)
+        }
+    }
+
+    @Test
+    fun testAddressParameterRejectsMuxedAddresses() {
+        for (strKey in listOf(muxedAccountStrKey, muxedContractStrKey)) {
+            for (value in listOf(strKey, Address(strKey))) {
+                assertAddressRejected(
+                    SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS, value,
+                    "$addressTakes, got the muxed address $strKey, which needs a MuxedAddress parameter"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testAddressParametersRejectHostProducedAddresses() {
+        val cases = listOf(
+            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS to addressTakes,
+            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS to muxedAddressTakes
+        )
+        for ((specType, takes) in cases) {
+            for (value in listOf(claimableBalanceStrKey, Address(claimableBalanceStrKey))) {
+                assertAddressRejected(
+                    specType, value,
+                    "$takes, got the claimable balance address $claimableBalanceStrKey, which is " +
+                        "produced by the host and is not a contract input"
+                )
+            }
+            for (value in listOf(liquidityPoolStrKey, Address(liquidityPoolStrKey))) {
+                assertAddressRejected(
+                    specType, value,
+                    "$takes, got the liquidity pool address $liquidityPoolStrKey, which is " +
+                        "produced by the host and is not a contract input"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testAddressParametersRejectMalformedStringsAndOtherTypes() {
+        val cases = listOf(
+            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS to addressTakes,
+            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS to muxedAddressTakes
+        )
+        for ((specType, takes) in cases) {
+            assertAddressRejected(specType, "INVALID", "Invalid address format: INVALID; $takes")
+            assertAddressRejected(specType, 123, "$takes, got Int")
+        }
+    }
+
+    @Test
+    fun testAddressParametersRejectAStrkeyOfAnotherKind() {
+        val preAuthTx = StrKey.encodePreAuthTx(ByteArray(32) { 0x11 })
+        val cases = listOf(
+            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS to addressTakes,
+            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS to muxedAddressTakes
+        )
+        for ((specType, takes) in cases) {
+            assertAddressRejected(specType, preAuthTx, "Invalid address format: $preAuthTx; $takes")
         }
     }
 
@@ -1372,6 +1465,41 @@ class ContractSpecTest {
         // Verify round-trip conversion
         val convertedAddress3 = Address.fromSCVal(result3)
         assertEquals(contractAddress, convertedAddress3.toString())
+    }
+
+    // ========== MuxedAddress parameter ==========
+
+    @Test
+    fun testMuxedAddressParameterTakesAccountsContractsAndTheirMuxedForms() {
+        for (strKey in listOf(accountStrKey, muxedAccountStrKey, contractStrKey, muxedContractStrKey)) {
+            assertConvertsTo(SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS, strKey, strKey)
+            assertConvertsTo(SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS, Address(strKey), strKey)
+        }
+    }
+
+    @Test
+    fun testFuncArgsConvertATransferToAMuxedContract() {
+        val spec = ContractSpec(
+            listOf(
+                createFunctionEntryWithTypes(
+                    "transfer",
+                    listOf(
+                        "from" to SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS,
+                        "to" to SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS,
+                        "amount" to SCSpecTypeXdr.SC_SPEC_TYPE_I128
+                    )
+                )
+            )
+        )
+        val values = spec.funcArgsToXdrSCValues(
+            "transfer",
+            mapOf("from" to accountStrKey, "to" to muxedContractStrKey, "amount" to 100)
+        )
+
+        assertEquals(3, values.size)
+        assertEquals(accountStrKey, Address.fromSCVal(values[0]).toString())
+        assertEquals(muxedContractStrKey, Address.fromSCVal(values[1]).toString())
+        assertIs<SCValXdr.I128>(values[2])
     }
 
     @Test

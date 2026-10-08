@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without), `toSCAddress`, `fromSCAddress`, and `toAddress`.
 
 ### Changed
+- `ContractSpec.nativeToXdrSCVal` and `funcArgsToXdrSCValues` accept for an `Address` parameter a
+  `G...` or `C...` strkey or an `Address` of type `ACCOUNT` or `CONTRACT`, and for a
+  `MuxedAddress` parameter also an `M...` or `W...` strkey or an `Address` of type
+  `MUXED_ACCOUNT` or `MUXED_CONTRACT`. A `B...` or `L...` address, a muxed address for an
+  `Address` parameter, a malformed string, or a value of another type throws
+  `ContractSpecException` naming the parameter type, the kinds it takes, and the value given.
+  These checks apply to `String` and `Address` values; `null` converts to void and a prebuilt
+  `SCValXdr` passes through unchanged. Before this change both parameter types took every strkey
+  kind `Address` parses and refused an `Address` instance.
 - XDR definitions regenerated from stellar/stellar-xdr commit
   `579a90b2654e3811e8b672e128a5e094c7325b27` (CAP-0084 muxed contract addresses, CAP-0087 ML-DSA
   cost types). `SCAddressTypeXdr` gains `SC_ADDRESS_TYPE_MUXED_CONTRACT` (5), and `SCAddressXdr`
