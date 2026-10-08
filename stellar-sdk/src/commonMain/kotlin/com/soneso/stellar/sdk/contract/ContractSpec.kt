@@ -16,7 +16,9 @@ import com.soneso.stellar.sdk.xdr.*
  * ## Core Features
  *
  * - **Automatic Type Conversion**: Convert native Kotlin types to XDR values based on contract specs
- * - **Address Auto-Detection**: Strings starting with "G" or "M" become account addresses, "C" becomes contract addresses
+ * - **Address Detection**: A strkey becomes the address it encodes; an `Address` parameter takes
+ *   accounts (G...) and contracts (C...), a `MuxedAddress` parameter also muxed accounts (M...) and
+ *   muxed contracts (W...)
  * - **Collection Handling**: Automatic conversion of Lists, Maps, and tuples
  * - **Complex Types**: Full support for structs, unions, and enums
  * - **BigInteger Support**: Handle large numbers (u128/i128/u256/i256)
@@ -599,7 +601,14 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Converts a native Kotlin value to an SCValXdr based on the type specification.
      *
      * This is the core conversion method that handles all type mappings from Kotlin
-     * native types to Stellar XDR values.
+     * native types to Stellar XDR values. `null` converts to void and an [SCValXdr]
+     * passes through unchanged.
+     *
+     * A parameter of spec type `Address` takes an account (G...) or contract (C...)
+     * strkey, or an [Address] of type [Address.AddressType.ACCOUNT] or
+     * [Address.AddressType.CONTRACT]. A parameter of spec type `MuxedAddress` also
+     * takes a muxed account (M...) or muxed contract (W...) strkey, or an [Address] of
+     * type [Address.AddressType.MUXED_ACCOUNT] or [Address.AddressType.MUXED_CONTRACT].
      *
      * @param value The native Kotlin value to convert
      * @param typeDef The target type specification
@@ -699,8 +708,8 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 }
                 SCValXdr.Sym(SCSymbolXdr(value))
             }
-            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS -> handleAddressType(value)
-            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS -> handleAddressType(value)  // Uses existing handler
+            SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS,
+            SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS -> handleAddressType(value, typeDiscriminant)
             SCSpecTypeXdr.SC_SPEC_TYPE_ERROR -> handleErrorType(value!!)
             SCSpecTypeXdr.SC_SPEC_TYPE_VAL -> handleValType(value!!)
             else -> throw ContractSpecException.invalidType("Unsupported value type: $typeDiscriminant")
@@ -804,21 +813,57 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     }
 
     /**
-     * Handle address type conversion with auto-detection
+     * Converts [value] for a parameter of spec type `Address` or `MuxedAddress` ([specType]).
+     *
+     * [value] is a strkey, whose kind the strkey codec decides, or an [Address]. An `Address`
+     * parameter takes an account (G...) or a contract (C...); a `MuxedAddress` parameter also
+     * takes a muxed account (M...) or a muxed contract (W...). A claimable balance (B...) or
+     * liquidity pool (L...) address is produced by the host and is not a contract input.
+     *
+     * @throws ContractSpecException naming the parameter type, the kinds it takes and the value
+     *   given, for any other address kind, a malformed string or a value of another type
      */
-    private fun handleAddressType(value: Any?): SCValXdr {
-        if (value !is String) {
-            throw ContractSpecException.invalidType("Expected String address, got ${value?.let { it::class.simpleName } ?: "null"}")
+    private fun handleAddressType(value: Any?, specType: SCSpecTypeXdr): SCValXdr {
+        val muxed = specType == SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS
+        val expected = if (muxed) {
+            "MuxedAddress takes an account (G...), muxed account (M...), contract (C...) or " +
+                "muxed contract (W...) address"
+        } else {
+            "Address takes an account (G...) or contract (C...) address"
         }
 
-        // Auto-detect address type by prefix
-        val address = try {
-            Address(value)
-        } catch (e: Exception) {
-            throw ContractSpecException.invalidType("Invalid address format: $value - ${e.message}")
+        val address = when (value) {
+            is Address -> value
+            is String -> try {
+                Address(value)
+            } catch (e: IllegalArgumentException) {
+                throw ContractSpecException.invalidType("Invalid address format: $value; $expected")
+            }
+            else -> throw ContractSpecException.invalidType(
+                "$expected, got ${value?.let { it::class.simpleName } ?: "null"}"
+            )
         }
 
-        return address.toSCVal()
+        return when (address.addressType) {
+            Address.AddressType.ACCOUNT, Address.AddressType.CONTRACT -> address.toSCVal()
+            Address.AddressType.MUXED_ACCOUNT, Address.AddressType.MUXED_CONTRACT ->
+                if (muxed) {
+                    address.toSCVal()
+                } else {
+                    throw ContractSpecException.invalidType(
+                        "$expected, got the muxed address $address, which needs a MuxedAddress " +
+                            "parameter"
+                    )
+                }
+            Address.AddressType.CLAIMABLE_BALANCE -> throw ContractSpecException.invalidType(
+                "$expected, got the claimable balance address $address, which is produced by the " +
+                    "host and is not a contract input"
+            )
+            Address.AddressType.LIQUIDITY_POOL -> throw ContractSpecException.invalidType(
+                "$expected, got the liquidity pool address $address, which is produced by the " +
+                    "host and is not a contract input"
+            )
+        }
     }
 
     /**
