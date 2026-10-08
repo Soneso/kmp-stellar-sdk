@@ -41,6 +41,7 @@ class ScValToNativeTest {
     private val muxedAccountId = "MAQAA5L65LSYH7CQ3VTJ7F3HHLGCL3DSLAR2Y47263D56MNNGHSQSAAAAAAAAAAE2LP26"
     private val claimableBalanceId = "BAAD6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGR4TU"
     private val liquidityPoolId = "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"
+    private val muxedContractId = "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC"
 
     /** Builds a map with its entries in the given order, as a decoded wire value carries them. */
     private fun scMap(vararg entries: Pair<SCValXdr, SCValXdr>): SCValXdr =
@@ -372,17 +373,19 @@ class ScValToNativeTest {
                 addressValue(contractId) to Scv.toSymbol("contract"),
                 addressValue(muxedAccountId) to Scv.toSymbol("muxed"),
                 addressValue(claimableBalanceId) to Scv.toSymbol("claimable balance"),
-                addressValue(liquidityPoolId) to Scv.toSymbol("liquidity pool")
+                addressValue(liquidityPoolId) to Scv.toSymbol("liquidity pool"),
+                addressValue(muxedContractId) to Scv.toSymbol("muxed contract")
             )
         )
-        assertEquals(5, result.size)
+        assertEquals(6, result.size)
         assertEquals("account", result[accountId])
         assertEquals("contract", result[contractId])
         assertEquals("muxed", result[muxedAccountId])
         assertEquals("claimable balance", result[claimableBalanceId])
         assertEquals("liquidity pool", result[liquidityPoolId])
+        assertEquals("muxed contract", result[muxedContractId])
         assertEquals(
-            listOf(accountId, contractId, muxedAccountId, claimableBalanceId, liquidityPoolId),
+            listOf(accountId, contractId, muxedAccountId, claimableBalanceId, liquidityPoolId, muxedContractId),
             result.keys.toList()
         )
     }
@@ -695,6 +698,7 @@ class ScValToNativeTest {
         assertEquals(muxedAccountId, addressValue(muxedAccountId).toNative())
         assertEquals(claimableBalanceId, addressValue(claimableBalanceId).toNative())
         assertEquals(liquidityPoolId, addressValue(liquidityPoolId).toNative())
+        assertEquals(muxedContractId, addressValue(muxedContractId).toNative())
     }
 
     @Test

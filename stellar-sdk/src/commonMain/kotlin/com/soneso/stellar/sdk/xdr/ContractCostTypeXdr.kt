@@ -192,7 +192,25 @@ private const val XDR_JSON_TYPE = "ContractCostTypeXdr"
  *      // Cost of performing BN254 scalar element inversion
  *     Bn254FrInv = 84,
  *     // Cost of performing BN254 G1 multi-scalar multiplication (MSM)
- *     Bn254G1Msm = 85
+ *     Bn254G1Msm = 85,
+ *     // Cost of decoding and expanding an ML-DSA-44 verifying key
+ *     MlDsa44DecodeVerifyingKey = 86,
+ *     // Cost of decoding and expanding an ML-DSA-65 verifying key
+ *     MlDsa65DecodeVerifyingKey = 87,
+ *     // Cost of decoding and expanding an ML-DSA-87 verifying key
+ *     MlDsa87DecodeVerifyingKey = 88,
+ *     // Cost of decoding an ML-DSA-44 signature
+ *     MlDsa44DecodeSignature = 89,
+ *     // Cost of decoding an ML-DSA-65 signature
+ *     MlDsa65DecodeSignature = 90,
+ *     // Cost of decoding an ML-DSA-87 signature
+ *     MlDsa87DecodeSignature = 91,
+ *     // Cost of verifying an ML-DSA-44 signature, linear in message + context length
+ *     VerifyMlDsa44Sig = 92,
+ *     // Cost of verifying an ML-DSA-65 signature, linear in message + context length
+ *     VerifyMlDsa65Sig = 93,
+ *     // Cost of verifying an ML-DSA-87 signature, linear in message + context length
+ *     VerifyMlDsa87Sig = 94
  * };
  */
 enum class ContractCostTypeXdr(val value: Int, internal val xdrJsonName: String) {
@@ -383,7 +401,25 @@ enum class ContractCostTypeXdr(val value: Int, internal val xdrJsonName: String)
   /** Cost of performing BN254 scalar element inversion */
   Bn254FrInv(84, "bn254_fr_inv"),
   /** Cost of performing BN254 G1 multi-scalar multiplication (MSM) */
-  Bn254G1Msm(85, "bn254_g1_msm");
+  Bn254G1Msm(85, "bn254_g1_msm"),
+  /** Cost of decoding and expanding an ML-DSA-44 verifying key */
+  MlDsa44DecodeVerifyingKey(86, "ml_dsa44_decode_verifying_key"),
+  /** Cost of decoding and expanding an ML-DSA-65 verifying key */
+  MlDsa65DecodeVerifyingKey(87, "ml_dsa65_decode_verifying_key"),
+  /** Cost of decoding and expanding an ML-DSA-87 verifying key */
+  MlDsa87DecodeVerifyingKey(88, "ml_dsa87_decode_verifying_key"),
+  /** Cost of decoding an ML-DSA-44 signature */
+  MlDsa44DecodeSignature(89, "ml_dsa44_decode_signature"),
+  /** Cost of decoding an ML-DSA-65 signature */
+  MlDsa65DecodeSignature(90, "ml_dsa65_decode_signature"),
+  /** Cost of decoding an ML-DSA-87 signature */
+  MlDsa87DecodeSignature(91, "ml_dsa87_decode_signature"),
+  /** Cost of verifying an ML-DSA-44 signature, linear in message + context length */
+  VerifyMlDsa44Sig(92, "verify_ml_dsa44_sig"),
+  /** Cost of verifying an ML-DSA-65 signature, linear in message + context length */
+  VerifyMlDsa65Sig(93, "verify_ml_dsa65_sig"),
+  /** Cost of verifying an ML-DSA-87 signature, linear in message + context length */
+  VerifyMlDsa87Sig(94, "verify_ml_dsa87_sig");
 
   companion object {
 

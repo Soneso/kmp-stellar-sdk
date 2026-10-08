@@ -14,7 +14,7 @@ import com.soneso.stellar.sdk.xdr.*
  * time by [Auth.attachDelegates]; this type is a plain data carrier.
  *
  * @property address The StrKey-encoded address of this delegate (G... or C...;
- *   muxed M... addresses are rejected by the host and are not accepted here).
+ *   muxed M... and W... addresses are rejected by the host and are not accepted here).
  * @property signature The initial signature SCVal for this node. Defaults to
  *   void; callers may use [Auth.authorizeEntry] with [Auth.AuthOptions.forAddress]
  *   to append a real signature after tree construction.
@@ -271,8 +271,12 @@ internal fun DelegateDescriptor.toXdr(depth: Int = 0): SorobanDelegateSignatureX
         )
     }
     val addr = Address(address)
-    require(addr.addressType != Address.AddressType.MUXED_ACCOUNT) {
-        "Muxed (M...) addresses are not valid Soroban delegate addresses: $address"
+    require(
+        addr.addressType != Address.AddressType.MUXED_ACCOUNT &&
+            addr.addressType != Address.AddressType.MUXED_CONTRACT
+    ) {
+        "Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban " +
+            "delegate addresses: $address"
     }
     val xdrAddress = addr.toSCAddress()
     val nestedXdr = sortAndValidateDelegates(

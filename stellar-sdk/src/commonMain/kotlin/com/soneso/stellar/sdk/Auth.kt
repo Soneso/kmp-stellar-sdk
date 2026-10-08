@@ -62,8 +62,10 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid, or
-     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth])
+     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid,
+     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth]),
+     *   or the credential address or [AuthOptions.forAddress] is a muxed account (M...) or muxed
+     *   contract (W...) address
      */
     suspend fun authorizeEntry(
         entry: String,
@@ -89,8 +91,10 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the signature is invalid, or [validUntilLedgerSeq] differs
-     *   from the expiration an existing signature commits to (see [Auth])
+     * @throws IllegalArgumentException if the signature is invalid, [validUntilLedgerSeq] differs
+     *   from the expiration an existing signature commits to (see [Auth]), or the credential
+     *   address or [AuthOptions.forAddress] is a muxed account (M...) or muxed contract (W...)
+     *   address
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
@@ -116,8 +120,10 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid, or
-     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth])
+     * @throws IllegalArgumentException if the entry cannot be decoded, the signature is invalid,
+     *   [validUntilLedgerSeq] differs from the expiration an existing signature commits to (see [Auth]),
+     *   or the credential address or [AuthOptions.forAddress] is a muxed account (M...) or muxed
+     *   contract (W...) address
      */
     suspend fun authorizeEntry(
         entry: String,
@@ -143,8 +149,10 @@ object Auth {
      * @param network Network for replay protection
      * @param options Signing options; see [AuthOptions]
      * @return Signed authorization entry
-     * @throws IllegalArgumentException if the signature is invalid, or [validUntilLedgerSeq] differs
-     *   from the expiration an existing signature commits to (see [Auth])
+     * @throws IllegalArgumentException if the signature is invalid, [validUntilLedgerSeq] differs
+     *   from the expiration an existing signature commits to (see [Auth]), or the credential
+     *   address or [AuthOptions.forAddress] is a muxed account (M...) or muxed contract (W...)
+     *   address
      */
     suspend fun authorizeEntry(
         entry: SorobanAuthorizationEntryXdr,
@@ -206,6 +214,8 @@ object Auth {
      *   false for the legacy ADDRESS arm, required on networks below Protocol 27,
      *   where ADDRESS_V2 entries invalidate the transaction.
      * @return Signed authorization entry
+     * @throws IllegalArgumentException if [publicKey] is a muxed account (M...) or muxed
+     *   contract (W...) address
      */
     suspend fun authorizeInvocation(
         signer: Signer,
@@ -303,8 +313,8 @@ object Auth {
      * @property forAddress When null (default), the top-level credential address is
      *   signed. When set to a StrKey address, the signature is routed to every node
      *   in the credential tree (top-level or delegate, depth-first) whose address
-     *   matches; throws if no matching node is found. Muxed (M...) addresses are
-     *   not valid Soroban auth addresses and are not accepted.
+     *   matches; throws if no matching node is found. Muxed account (M...) and muxed
+     *   contract (W...) addresses are not valid Soroban auth addresses and are not accepted.
      */
     data class AuthOptions(
         val forAddress: String? = null
@@ -364,8 +374,9 @@ object Auth {
      * Core authorization logic.
      *
      * Source-account (Void) credentials are returned unchanged (clone only).
-     * For all three address arms, the expiration is checked against existing
-     * signatures (see [Auth]) and set before hashing, and the
+     * A muxed account (M...) or muxed contract (W...) credential address is
+     * rejected. For all three address arms, the expiration is checked against
+     * existing signatures (see [Auth]) and set before hashing, and the
      * preimage type is selected per the arm. When [AuthOptions.forAddress] is
      * set, the signature is routed into every matching node in the tree; when
      * null the top-level credentials are signed.
@@ -382,6 +393,14 @@ object Auth {
         // Source-account credentials need no signing.
         val addressCredentials = clone.credentials.addressCredentials()
             ?: return clone
+
+        val credentialAddress = addressCredentials.address
+        require(
+            credentialAddress !is SCAddressXdr.MuxedAccount &&
+                credentialAddress !is SCAddressXdr.MuxedContract
+        ) {
+            muxedAuthAddressMessage(Address.fromSCAddress(credentialAddress).toString())
+        }
 
         requireMatchingExpiration(clone.credentials.committedExpiration(), validUntilLedgerSeq)
 
@@ -415,6 +434,14 @@ object Auth {
     }
 
     /**
+     * The message rejecting a muxed account (M...) or muxed contract (W...) [address] as an
+     * auth address.
+     */
+    private fun muxedAuthAddressMessage(address: String): String =
+        "Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban " +
+            "auth addresses: $address"
+
+    /**
      * Routes a signature to every node in the credential tree whose address
      * matches [targetAddress] (StrKey).
      *
@@ -422,8 +449,8 @@ object Auth {
      * (depth-first). Throws if no matching node is found. The top-level
      * expiration is always set; signature is only appended to matching nodes.
      *
-     * Muxed (M...) target addresses are rejected; they are not valid Soroban
-     * auth addresses.
+     * Muxed account (M...) and muxed contract (W...) target addresses are rejected;
+     * they are not valid Soroban auth addresses.
      */
     private fun signForAddress(
         clone: SorobanAuthorizationEntryXdr,
@@ -433,8 +460,11 @@ object Auth {
         targetAddress: String
     ): SorobanAuthorizationEntryXdr {
         val targetAddr = Address(targetAddress)
-        require(targetAddr.addressType != Address.AddressType.MUXED_ACCOUNT) {
-            "Muxed (M...) addresses are not valid Soroban auth addresses: $targetAddress"
+        require(
+            targetAddr.addressType != Address.AddressType.MUXED_ACCOUNT &&
+                targetAddr.addressType != Address.AddressType.MUXED_CONTRACT
+        ) {
+            muxedAuthAddressMessage(targetAddress)
         }
         val targetBytes = targetAddr.toSCAddress().toXdrBytes()
 

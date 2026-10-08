@@ -18,7 +18,7 @@ internal data class Sep51CorpusEntry(
   val source: String
 )
 
-/** SEP-0051 conformance cases for the XDR definitions pinned at c2612cf534e4448fa263e252afe1bdbac5512d14. */
+/** SEP-0051 conformance cases for the XDR definitions pinned at 579a90b2654e3811e8b672e128a5e094c7325b27. */
 internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
   Sep51CorpusEntry(
     "ScAddress",
@@ -2408,6 +2408,13 @@ internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
     "reference"
   ),
   Sep51CorpusEntry(
+    "ScAddressType",
+    "SCAddressTypeXdr",
+    "AAAAAg==",
+    "\"muxed_account\"",
+    "reference"
+  ),
+  Sep51CorpusEntry(
     "ClaimAtom",
     "ClaimAtomXdr",
     "AAAAAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gAAAAAAAAAAEAAAAAAAAAAAAAAAEAAAABVVNEAAAAAAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fIAAAAAAAAAAC",
@@ -2481,6 +2488,16 @@ internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
 
 /** Enum members the reference could not resolve when the name table was last built. */
 internal val SEP51_UNRESOLVABLE_ENUM_MEMBERS: List<String> = listOf(
+  "ContractCostType.MlDsa44DecodeSignature",
+  "ContractCostType.MlDsa44DecodeVerifyingKey",
+  "ContractCostType.MlDsa65DecodeSignature",
+  "ContractCostType.MlDsa65DecodeVerifyingKey",
+  "ContractCostType.MlDsa87DecodeSignature",
+  "ContractCostType.MlDsa87DecodeVerifyingKey",
+  "ContractCostType.VerifyMlDsa44Sig",
+  "ContractCostType.VerifyMlDsa65Sig",
+  "ContractCostType.VerifyMlDsa87Sig",
+  "SCAddressType.SC_ADDRESS_TYPE_MUXED_CONTRACT",
   "StellarValueType.STELLAR_VALUE_EMPTY_TX_SET_MS",
   "StellarValueType.STELLAR_VALUE_SIGNED_MS",
 )

@@ -487,20 +487,23 @@ internal object XdrJson {
     // ---------------------------------------------------------------------------------------
 
     /**
-     * Packs the payload an M-strkey carries: the 32-byte account key followed by the
-     * multiplexing id, most significant byte first. The strkey orders the two the other way
-     * round from the XDR structure, which lists the id first.
+     * Packs the payload an M-strkey or a W-strkey carries: the 32-byte account key or contract
+     * id followed by the multiplexing id, most significant byte first. The strkey orders the
+     * two the other way round from the XDR structure, which lists the id first.
      */
-    fun muxedPayload(ed25519: ByteArray, id: ULong): ByteArray {
-        require(ed25519.size == 32) { "Muxed account key must be 32 bytes, got ${ed25519.size}" }
-        val payload = ed25519.copyOf(40)
+    fun muxedPayload(key: ByteArray, id: ULong): ByteArray {
+        require(key.size == 32) { "Muxed key must be 32 bytes, got ${key.size}" }
+        val payload = key.copyOf(40)
         for (index in 39 downTo 32) {
             payload[index] = ((id shr ((39 - index) * 8)) and 0xFFuL).toByte()
         }
         return payload
     }
 
-    /** Reads the multiplexing id back out of the 40-byte payload an M-strkey carries. */
+    /**
+     * Reads the multiplexing id back out of the 40-byte payload an M-strkey or a W-strkey
+     * carries.
+     */
     fun muxedId(payload: ByteArray): ULong {
         var id = 0uL
         for (index in 32 until 40) {

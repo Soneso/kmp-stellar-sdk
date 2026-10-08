@@ -951,6 +951,76 @@ class StrKeyTest {
         }
     }
 
+    // ========== Muxed contract (W...) vectors ==========
+    //
+    // A W strkey carries the 32-byte contract id followed by the multiplexing id, most significant
+    // byte first. Each vector spells the contract id of the C strkey beside it.
+
+    private class MuxedContractVector(val strKey: String, val contractId: String, val idHex: String)
+
+    private val muxedContractVectors = listOf(
+        MuxedContractVector(
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC",
+            sep23ContractId, "0000000000000000"
+        ),
+        MuxedContractVector(
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAACWJY",
+            sep23ContractId, "8000000000000000"
+        ),
+        MuxedContractVector(
+            "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG",
+            "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE", "000000000001e240"
+        )
+    )
+
+    @Test
+    fun testMuxedContractVectorsDecodeToTheContractIdFollowedByTheId() {
+        for (vector in muxedContractVectors) {
+            assertTrue(StrKey.isValidMuxedContract(vector.strKey), vector.strKey)
+            val data = StrKey.decodeMuxedContract(vector.strKey)
+            assertEquals(
+                bytesToHex(StrKey.decodeContract(vector.contractId)) + vector.idHex,
+                bytesToHex(data),
+                vector.strKey
+            )
+            assertEquals(vector.strKey, StrKey.encodeMuxedContract(data))
+            assertFalse(StrKey.isValidMed25519PublicKey(vector.strKey), vector.strKey)
+        }
+    }
+
+    @Test
+    fun testMuxedContractInvalidVectorsAreRejected() {
+        val base = "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAA"
+        val invalid = listOf(
+            base + "WWD" to "Unused bits should be set to 0",
+            base + "WWCA" to "Invalid encoded length, expected 69 characters, got 70",
+            base + "AIOUI" to "Invalid encoded length, expected 69 characters, got 71",
+            // The algorithm bits of the version byte set to 7, with and without the checksum
+            // recomputed.
+            "W47QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAADXHW" to
+                "Version byte is invalid",
+            "W47QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC" to
+                "Version byte is invalid",
+            base + "WWA" to "Checksum invalid",
+            base + "WWC===" to "Invalid encoded length, expected 69 characters, got 72"
+        )
+        for ((strKey, rejection) in invalid) {
+            assertFalse(StrKey.isValidMuxedContract(strKey), strKey)
+            val failure = assertFailsWith<IllegalArgumentException>(strKey) {
+                StrKey.decodeMuxedContract(strKey)
+            }
+            assertEquals(rejection, failure.message, strKey)
+        }
+    }
+
+    @Test
+    fun testEncodeMuxedContractInvalidLengthThrows() {
+        val failure = assertFailsWith<IllegalArgumentException> {
+            StrKey.encodeMuxedContract(ByteArray(39))
+        }
+        assertEquals("Muxed contract address must be 40 bytes, got 39", failure.message)
+    }
+
     // Test pre-auth transaction hashes
     @Test
     fun testPreAuthTxEncodeDecode() {

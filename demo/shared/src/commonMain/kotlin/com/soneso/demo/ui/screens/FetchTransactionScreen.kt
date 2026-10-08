@@ -1626,6 +1626,9 @@ private fun formatAddress(address: SCAddressXdr): String {
         is SCAddressXdr.LiquidityPoolId -> {
             "Liquidity Pool: ${address.value}"
         }
+        is SCAddressXdr.MuxedContract -> {
+            com.soneso.stellar.sdk.Address.fromSCAddress(address).toString()
+        }
     }
 }
 

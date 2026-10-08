@@ -59,6 +59,10 @@ class AuthP27Test {
         // A valid muxed (M...) address derived deterministically from SIGNER_ACCOUNT
         // with a fixed multiplexing id.
         val MUXED_ADDRESS: String = MuxedAccount(SIGNER_ACCOUNT, 42UL).address
+
+        // A valid muxed contract (W...) address.
+        const val MUXED_CONTRACT_ADDRESS =
+            "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
     }
 
     // ========================================================================
@@ -113,6 +117,10 @@ class AuthP27Test {
             rootInvocation = goldenInvocation()
         )
     }
+
+    private fun muxedAuthMessage(address: String): String =
+        "Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban auth " +
+            "addresses: $address"
 
     private fun xdrBytes(preimage: HashIDPreimageXdr): ByteArray {
         val writer = XdrWriter()
@@ -902,6 +910,49 @@ class AuthP27Test {
     }
 
     @Test
+    fun testForAddressMuxedContractThrows() = runTest {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Auth.authorizeEntry(
+                goldenLegacyEntry(),
+                KeyPair.fromSecretSeed(SIGNER_SEED),
+                EXPIRATION,
+                NETWORK,
+                Auth.AuthOptions(forAddress = MUXED_CONTRACT_ADDRESS)
+            )
+        }
+        assertEquals(muxedAuthMessage(MUXED_CONTRACT_ADDRESS), ex.message)
+    }
+
+    @Test
+    fun testDefaultSigningRejectsMuxedCredentialAddresses() = runTest {
+        val signer = KeyPair.fromSecretSeed(SIGNER_SEED)
+        for (muxed in listOf(MUXED_ADDRESS, MUXED_CONTRACT_ADDRESS)) {
+            val entry = SorobanAuthorizationEntryXdr(
+                credentials = SorobanCredentialsXdr.Address(
+                    baseCredentials().copy(address = Address(muxed).toSCAddress())
+                ),
+                rootInvocation = goldenInvocation()
+            )
+            val ex = assertFailsWith<IllegalArgumentException>(muxed) {
+                Auth.authorizeEntry(entry, signer, EXPIRATION, NETWORK)
+            }
+            assertEquals(muxedAuthMessage(muxed), ex.message)
+        }
+    }
+
+    @Test
+    fun testAuthorizeInvocationRejectsAMuxedContractPublicKey() = runTest {
+        val keyPair = KeyPair.fromSecretSeed(SIGNER_SEED)
+        val signer = Auth.Signer { preimage ->
+            Auth.Signature(keyPair.getAccountId(), keyPair.sign(Util.hash(xdrBytes(preimage))))
+        }
+        val ex = assertFailsWith<IllegalArgumentException> {
+            Auth.authorizeInvocation(signer, MUXED_CONTRACT_ADDRESS, EXPIRATION, goldenInvocation(), NETWORK)
+        }
+        assertEquals(muxedAuthMessage(MUXED_CONTRACT_ADDRESS), ex.message)
+    }
+
+    @Test
     fun testForAddressMatchingTopLevelLegacyAddressArm() = runTest {
         // forAddress == the top-level credential address on a legacy ADDRESS entry.
         // The signature must land on the top-level credentials and the arm is preserved.
@@ -1152,6 +1203,18 @@ class AuthP27Test {
             DelegateDescriptor(address = MUXED_ADDRESS).toXdr()
         }
         assertTrue(ex.message!!.contains("Muxed"), "message must name muxed rejection; got: ${ex.message}")
+    }
+
+    @Test
+    fun testDelegateDescriptorToXdrRejectsMuxedContractAddress() {
+        val ex = assertFailsWith<IllegalArgumentException> {
+            DelegateDescriptor(address = MUXED_CONTRACT_ADDRESS).toXdr()
+        }
+        assertEquals(
+            "Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban " +
+                "delegate addresses: $MUXED_CONTRACT_ADDRESS",
+            ex.message
+        )
     }
 
     @Test

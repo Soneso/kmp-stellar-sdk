@@ -409,4 +409,44 @@ class AddressTest {
         assertEquals(address1.addressType, address2.addressType)
         assertNotEquals(address1, address2)
     }
+
+    // ========== Muxed contract (W...) ==========
+
+    private val muxedContractId = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+    private val muxedContractHash = "363eaa3867841fbad0f4ed88c779e4fe66e56a2470dc98c0ec9c073d05c7b103"
+
+    @Test
+    fun testMuxedContractAddressCarriesTheIdAndTheContractIdIntoXdr() {
+        val address = Address(muxedContractId)
+        assertEquals(Address.AddressType.MUXED_CONTRACT, address.addressType)
+        assertEquals(muxedContractId, address.toString())
+
+        val arm = assertIs<SCAddressXdr.MuxedContract>(address.toSCAddress()).value
+        assertEquals(123456UL, arm.id.value)
+        assertEquals(muxedContractHash, Util.bytesToHex(arm.contractId.value.value))
+    }
+
+    @Test
+    fun testFromSCAddressMuxedContract() {
+        val arm = MuxedContractXdr(Uint64Xdr(123456UL), ContractIDXdr(HashXdr(Util.hexToBytes(muxedContractHash))))
+        val address = Address.fromSCAddress(SCAddressXdr.MuxedContract(arm))
+
+        assertEquals(Address.AddressType.MUXED_CONTRACT, address.addressType)
+        assertEquals(muxedContractId, address.toString())
+        assertEquals(Address(muxedContractId), address)
+    }
+
+    @Test
+    fun testMuxedContractAddressRoundTripsThroughSCVal() {
+        val scVal = Address(muxedContractId).toSCVal()
+        assertIs<SCAddressXdr.MuxedContract>(assertIs<SCValXdr.Address>(scVal).value)
+        assertEquals(muxedContractId, Address.fromSCVal(scVal).toString())
+    }
+
+    @Test
+    fun testFromMuxedContractBytes() {
+        val address = Address.fromMuxedContract(StrKey.decodeMuxedContract(muxedContractId))
+        assertEquals(muxedContractId, address.toString())
+        assertEquals(Address.AddressType.MUXED_CONTRACT, address.addressType)
+    }
 }

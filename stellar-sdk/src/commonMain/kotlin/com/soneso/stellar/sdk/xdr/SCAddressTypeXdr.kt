@@ -15,7 +15,8 @@ private const val XDR_JSON_TYPE = "SCAddressTypeXdr"
  *     SC_ADDRESS_TYPE_CONTRACT = 1,
  *     SC_ADDRESS_TYPE_MUXED_ACCOUNT = 2,
  *     SC_ADDRESS_TYPE_CLAIMABLE_BALANCE = 3,
- *     SC_ADDRESS_TYPE_LIQUIDITY_POOL = 4
+ *     SC_ADDRESS_TYPE_LIQUIDITY_POOL = 4,
+ *     SC_ADDRESS_TYPE_MUXED_CONTRACT = 5
  * };
  */
 enum class SCAddressTypeXdr(val value: Int, internal val xdrJsonName: String) {
@@ -23,7 +24,8 @@ enum class SCAddressTypeXdr(val value: Int, internal val xdrJsonName: String) {
   SC_ADDRESS_TYPE_CONTRACT(1, "contract"),
   SC_ADDRESS_TYPE_MUXED_ACCOUNT(2, "muxed_account"),
   SC_ADDRESS_TYPE_CLAIMABLE_BALANCE(3, "claimable_balance"),
-  SC_ADDRESS_TYPE_LIQUIDITY_POOL(4, "liquidity_pool");
+  SC_ADDRESS_TYPE_LIQUIDITY_POOL(4, "liquidity_pool"),
+  SC_ADDRESS_TYPE_MUXED_CONTRACT(5, "muxed_contract");
 
   companion object {
 
