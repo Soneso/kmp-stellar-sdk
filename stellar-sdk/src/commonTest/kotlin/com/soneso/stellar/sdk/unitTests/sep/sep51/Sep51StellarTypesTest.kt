@@ -13,6 +13,7 @@ import com.soneso.stellar.sdk.xdr.Int256PartsXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.MuxedAccountMed25519Xdr
 import com.soneso.stellar.sdk.xdr.MuxedAccountXdr
+import com.soneso.stellar.sdk.xdr.MuxedContractXdr
 import com.soneso.stellar.sdk.xdr.MuxedEd25519AccountXdr
 import com.soneso.stellar.sdk.xdr.NodeIDXdr
 import com.soneso.stellar.sdk.xdr.PoolIDXdr
@@ -336,6 +337,22 @@ class Sep51StellarTypesTest {
         val decoded = SCAddressXdr.fromXdrJsonElement(JsonPrimitive(POOL_STRKEY))
         val pool = assertIs<SCAddressXdr.LiquidityPoolId>(decoded)
         assertContentEquals(filled(0x44), pool.value.value.value)
+    }
+
+    @Test
+    fun addressRendersItsMuxedContractArmAsAWStrkey() {
+        val value = SCAddressXdr.MuxedContract(
+            MuxedContractXdr(Uint64Xdr(1uL), ContractIDXdr(HashXdr(filled(0x33))))
+        )
+        assertEquals(MUXED_CONTRACT_STRKEY_ID_ONE, text(value.toXdrJsonElement()))
+    }
+
+    @Test
+    fun addressReadsAWStrkeyBackIntoItsMuxedContractArm() {
+        val decoded = SCAddressXdr.fromXdrJsonElement(JsonPrimitive(MUXED_CONTRACT_STRKEY_ID_ONE))
+        val muxed = assertIs<SCAddressXdr.MuxedContract>(decoded).value
+        assertEquals(1uL, muxed.id.value)
+        assertContentEquals(filled(0x33), muxed.contractId.value.value)
     }
 
     // -------------------------------------------------------------------------------------
@@ -803,6 +820,12 @@ class Sep51StellarTypesTest {
     }
 
     @Test
+    fun aMuxedContractRejectsAContractStrkey() {
+        val error = rejects { MuxedContractXdr.fromXdrJsonElement(JsonPrimitive(CONTRACT_STRKEY)) }
+        assertEquals("MuxedContractXdr: expects a W strkey, got \"$CONTRACT_STRKEY\"", error.message)
+    }
+
+    @Test
     fun aSignedPayloadRejectsAnAccountStrkey() {
         val error = rejects {
             SignerKeyEd25519SignedPayloadXdr.fromXdrJsonElement(JsonPrimitive(ACCOUNT_STRKEY))
@@ -826,10 +849,10 @@ class Sep51StellarTypesTest {
     }
 
     @Test
-    fun anAddressRejectsAPrefixOutsideItsFiveForms() {
+    fun anAddressRejectsAPrefixOutsideItsSixForms() {
         val error = rejects { SCAddressXdr.fromXdrJsonElement(JsonPrimitive(PRE_AUTH_TX_STRKEY)) }
         assertEquals(
-            "SCAddressXdr: expects a G, C, M, B or L strkey, got \"$PRE_AUTH_TX_STRKEY\"",
+            "SCAddressXdr: expects a G, C, M, B, L or W strkey, got \"$PRE_AUTH_TX_STRKEY\"",
             error.message
         )
     }
@@ -837,7 +860,7 @@ class Sep51StellarTypesTest {
     @Test
     fun anAddressRejectsAnEmptyString() {
         val error = rejects { SCAddressXdr.fromXdrJsonElement(JsonPrimitive("")) }
-        assertTrue(error.message!!.contains("expects a G, C, M, B or L strkey"), error.message!!)
+        assertTrue(error.message!!.contains("expects a G, C, M, B, L or W strkey"), error.message!!)
     }
 
     @Test
@@ -968,6 +991,10 @@ class Sep51StellarTypesTest {
         /** The M strkey of the same account key multiplexed by id 0x0102030405060708. */
         const val MUXED_STRKEY_ORDERED_ID: String =
             "MAIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCEIRCAICAMCAKBQHBCZIA"
+
+        /** The W strkey of the contract hash of [CONTRACT_STRKEY] multiplexed by id 1. */
+        const val MUXED_CONTRACT_STRKEY_ID_ONE: String =
+            "WAZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGMZTGAAAAAAAAAAAAFESK"
 
         /** The T strkey of a pre-authorised transaction hash of thirty-two 0x66 bytes. */
         const val PRE_AUTH_TX_STRKEY: String =

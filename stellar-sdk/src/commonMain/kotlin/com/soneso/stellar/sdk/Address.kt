@@ -4,7 +4,7 @@ import com.soneso.stellar.sdk.xdr.*
 
 /**
  * Represents a single address in the Stellar network. An address can represent an account,
- * contract, muxed account, claimable balance, or liquidity pool.
+ * contract, muxed account, claimable balance, liquidity pool, or muxed contract.
  *
  * ## Usage
  *
@@ -23,12 +23,13 @@ import com.soneso.stellar.sdk.xdr.*
  * val scVal = address.toSCVal()
  *
  * // Get encoded string
- * val encoded = address.toString() // G..., C..., M..., B..., or L...
+ * val encoded = address.toString() // G..., C..., M..., B..., L..., or W...
  * ```
  *
  * @property addressType The type of this address
  * @constructor Creates a new [Address] from a Stellar public key (G...), contract ID (C...),
- *              muxed account ID (M...), liquidity pool ID (L...), or claimable balance ID (B...).
+ *              muxed account ID (M...), liquidity pool ID (L...), claimable balance ID (B...),
+ *              or muxed contract ID (W...).
  * @param address the StrKey encoded format of Stellar address
  * @throws IllegalArgumentException if the address is invalid or unsupported
  */
@@ -50,6 +51,10 @@ class Address(address: String) {
             StrKey.isValidMed25519PublicKey(address) -> {
                 addressType = AddressType.MUXED_ACCOUNT
                 key = StrKey.decodeMed25519PublicKey(address)
+            }
+            StrKey.isValidMuxedContract(address) -> {
+                addressType = AddressType.MUXED_CONTRACT
+                key = StrKey.decodeMuxedContract(address)
             }
             StrKey.isValidClaimableBalance(address) -> {
                 addressType = AddressType.CLAIMABLE_BALANCE
@@ -85,6 +90,7 @@ class Address(address: String) {
             AddressType.MUXED_ACCOUNT -> StrKey.encodeMed25519PublicKey(key)
             AddressType.CLAIMABLE_BALANCE -> StrKey.encodeClaimableBalance(key)
             AddressType.LIQUIDITY_POOL -> StrKey.encodeLiquidityPool(key)
+            AddressType.MUXED_CONTRACT -> StrKey.encodeMuxedContract(key)
         }
     }
 
@@ -105,10 +111,9 @@ class Address(address: String) {
                 SCAddressXdr.ContractId(ContractIDXdr(hash))
             }
             AddressType.MUXED_ACCOUNT -> {
-                val parameter = fromRawMuxedAccountStrKey(key)
                 val muxedAccount = MuxedEd25519AccountXdr(
-                    id = parameter.id,
-                    ed25519 = parameter.ed25519
+                    id = Uint64Xdr(XdrJson.muxedId(key)),
+                    ed25519 = Uint256Xdr(key.copyOfRange(0, 32))
                 )
                 SCAddressXdr.MuxedAccount(muxedAccount)
             }
@@ -123,6 +128,13 @@ class Address(address: String) {
             AddressType.LIQUIDITY_POOL -> {
                 val hash = HashXdr(key.copyOf())
                 SCAddressXdr.LiquidityPoolId(PoolIDXdr(hash))
+            }
+            AddressType.MUXED_CONTRACT -> {
+                val muxedContract = MuxedContractXdr(
+                    id = Uint64Xdr(XdrJson.muxedId(key)),
+                    contractId = ContractIDXdr(HashXdr(key.copyOfRange(0, 32)))
+                )
+                SCAddressXdr.MuxedContract(muxedContract)
             }
         }
     }
@@ -169,7 +181,9 @@ class Address(address: String) {
         /** Claimable balance ID (B...) */
         CLAIMABLE_BALANCE,
         /** Liquidity pool ID (L...) */
-        LIQUIDITY_POOL
+        LIQUIDITY_POOL,
+        /** Muxed contract address (W...), protocol 30 and higher */
+        MUXED_CONTRACT
     }
 
     companion object {
@@ -201,6 +215,18 @@ class Address(address: String) {
          */
         fun fromMuxedAccount(muxedAccountId: ByteArray): Address {
             return Address(StrKey.encodeMed25519PublicKey(muxedAccountId))
+        }
+
+        /**
+         * Creates a new [Address] from a Stellar muxed contract ID.
+         *
+         * @param muxedContractId the 40 bytes of the muxed contract ID (W...): the 32-byte
+         * contract id followed by the 8-byte big-endian multiplexing id
+         * @return a new [Address] object from the given Stellar muxed contract ID
+         * @throws IllegalArgumentException if [muxedContractId] is not 40 bytes
+         */
+        fun fromMuxedContract(muxedContractId: ByteArray): Address {
+            return Address(StrKey.encodeMuxedContract(muxedContractId))
         }
 
         /**
@@ -286,13 +312,9 @@ class Address(address: String) {
                     fromContract(scAddress.value.value.value)
                 }
                 is SCAddressXdr.MuxedAccount -> {
-                    val rawBytes = toRawMuxedAccountStrKey(
-                        RawMuxedAccountStrKeyParameter(
-                            ed25519 = scAddress.value.ed25519,
-                            id = scAddress.value.id
-                        )
+                    fromMuxedAccount(
+                        XdrJson.muxedPayload(scAddress.value.ed25519.value, scAddress.value.id.value)
                     )
-                    fromMuxedAccount(rawBytes)
                 }
                 is SCAddressXdr.ClaimableBalanceId -> {
                     when (val cbId = scAddress.value) {
@@ -307,6 +329,11 @@ class Address(address: String) {
                 }
                 is SCAddressXdr.LiquidityPoolId -> {
                     fromLiquidityPool(scAddress.value.value.value)
+                }
+                is SCAddressXdr.MuxedContract -> {
+                    fromMuxedContract(
+                        XdrJson.muxedPayload(scAddress.value.contractId.value.value, scAddress.value.id.value)
+                    )
                 }
             }
         }
@@ -323,65 +350,6 @@ class Address(address: String) {
                 "invalid scVal type, expected SCV_ADDRESS, but got ${scVal.discriminant}"
             }
             return fromSCAddress(scVal.value)
-        }
-
-        /**
-         * Helper class to hold muxed account StrKey parameters.
-         */
-        private data class RawMuxedAccountStrKeyParameter(
-            val ed25519: Uint256Xdr,
-            val id: Uint64Xdr
-        )
-
-        /**
-         * Converts muxed account XDR parameters to raw bytes for StrKey encoding.
-         *
-         * The raw format is 40 bytes: 32 bytes ed25519 public key + 8 bytes big-endian ID.
-         *
-         * @param parameter the muxed account parameters
-         * @return the raw 40-byte representation
-         */
-        private fun toRawMuxedAccountStrKey(parameter: RawMuxedAccountStrKeyParameter): ByteArray {
-            val result = ByteArray(40)
-            // Copy ed25519 (32 bytes)
-            parameter.ed25519.value.copyInto(result, destinationOffset = 0)
-            // Copy ID as big-endian (8 bytes)
-            val id = parameter.id.value.toLong()
-            result[32] = ((id shr 56) and 0xFF).toByte()
-            result[33] = ((id shr 48) and 0xFF).toByte()
-            result[34] = ((id shr 40) and 0xFF).toByte()
-            result[35] = ((id shr 32) and 0xFF).toByte()
-            result[36] = ((id shr 24) and 0xFF).toByte()
-            result[37] = ((id shr 16) and 0xFF).toByte()
-            result[38] = ((id shr 8) and 0xFF).toByte()
-            result[39] = (id and 0xFF).toByte()
-            return result
-        }
-
-        /**
-         * Converts raw muxed account StrKey bytes to XDR parameters.
-         *
-         * The raw format is 40 bytes: 32 bytes ed25519 public key + 8 bytes big-endian ID.
-         *
-         * @param data the raw 40-byte muxed account data
-         * @return the muxed account parameters
-         * @throws IllegalArgumentException if the data is not 40 bytes
-         */
-        private fun fromRawMuxedAccountStrKey(data: ByteArray): RawMuxedAccountStrKeyParameter {
-            require(data.size == 40) {
-                "Muxed account bytes must be 40 bytes long, got ${data.size}"
-            }
-            // Extract ed25519 (first 32 bytes)
-            val ed25519Bytes = data.copyOfRange(0, 32)
-            // Extract ID (last 8 bytes, big-endian)
-            var id = 0L
-            for (i in 32..39) {
-                id = (id shl 8) or (data[i].toLong() and 0xFF)
-            }
-            return RawMuxedAccountStrKeyParameter(
-                ed25519 = Uint256Xdr(ed25519Bytes),
-                id = Uint64Xdr(id.toULong())
-            )
         }
     }
 }

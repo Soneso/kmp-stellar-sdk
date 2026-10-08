@@ -103,6 +103,11 @@ internal fun sampleMuxedEd25519AccountXdr(seed: Int, depth: Int): MuxedEd25519Ac
   sampleUint256Xdr(seed + 3, depth + 1)
 )
 
+internal fun sampleMuxedContractXdr(seed: Int, depth: Int): MuxedContractXdr = MuxedContractXdr(
+  sampleUint64Xdr(seed, depth + 1),
+  sampleContractIDXdr(seed + 3, depth + 1)
+)
+
 internal fun sampleSCAddressXdrAccountIdArm(seed: Int, depth: Int): SCAddressXdr =
   SCAddressXdr.AccountId(sampleAccountIDXdr(seed, depth + 1))
 
@@ -118,13 +123,17 @@ internal fun sampleSCAddressXdrClaimableBalanceIdArm(seed: Int, depth: Int): SCA
 internal fun sampleSCAddressXdrLiquidityPoolIdArm(seed: Int, depth: Int): SCAddressXdr =
   SCAddressXdr.LiquidityPoolId(samplePoolIDXdr(seed, depth + 1))
 
+internal fun sampleSCAddressXdrMuxedContractArm(seed: Int, depth: Int): SCAddressXdr =
+  SCAddressXdr.MuxedContract(sampleMuxedContractXdr(seed, depth + 1))
+
 internal fun sampleSCAddressXdr(seed: Int, depth: Int): SCAddressXdr =
-  when (seed.mod(5)) {
+  when (seed.mod(6)) {
     0 -> sampleSCAddressXdrAccountIdArm(seed, depth)
     1 -> sampleSCAddressXdrContractIdArm(seed + 3, depth)
     2 -> sampleSCAddressXdrMuxedAccountArm(seed + 6, depth)
     3 -> sampleSCAddressXdrClaimableBalanceIdArm(seed + 9, depth)
-    else -> sampleSCAddressXdrLiquidityPoolIdArm(seed + 12, depth)
+    4 -> sampleSCAddressXdrLiquidityPoolIdArm(seed + 12, depth)
+    else -> sampleSCAddressXdrMuxedContractArm(seed + 15, depth)
   }
 
 internal fun sampleContractExecutableExternalRefXdr(seed: Int, depth: Int): ContractExecutableExternalRefXdr = ContractExecutableExternalRefXdr(
@@ -1108,6 +1117,16 @@ class XdrJsonContractTest {
   }
 
   @Test
+  fun sCAddressTypeXdrRendersScAddressTypeMuxedContractAsMuxedContract() {
+    val member = SCAddressTypeXdr.SC_ADDRESS_TYPE_MUXED_CONTRACT
+    assertEquals(5, member.value)
+    assertEquals(JsonPrimitive("muxed_contract"), member.toXdrJsonElement())
+    assertEquals("\"muxed_contract\"", member.toXdrJson())
+    assertEquals(member, SCAddressTypeXdr.fromXdrJson("\"muxed_contract\""))
+    assertEquals(member, SCAddressTypeXdr.fromXdrJsonElement(JsonPrimitive("muxed_contract")))
+  }
+
+  @Test
   fun sCAddressTypeXdrRejectsAMemberItDoesNotDeclare() {
     assertFailsWith<IllegalArgumentException> { SCAddressTypeXdr.fromXdrJsonElement(JsonPrimitive("not_a_name_this_type_declares")) }
     assertFailsWith<IllegalArgumentException> { SCAddressTypeXdr.fromXdrJsonElement(JsonNull) }
@@ -1139,9 +1158,33 @@ class XdrJsonContractTest {
 
 
   @Test
+  fun muxedContractXdrRoundTripsThroughItsJsonTree() {
+    assertRoundTripMuxedContractXdr(sampleMuxedContractXdr(1421, 0))
+    assertRoundTripMuxedContractXdr(sampleMuxedContractXdr(1421, SAMPLE_DEPTH))
+  }
+
+  private fun assertRoundTripMuxedContractXdr(value: MuxedContractXdr) {
+    val tree = value.toXdrJsonElement()
+    val text = MuxedContractXdr.fromXdrJsonElement(tree).toXdrJson()
+    assertEquals(tree, MuxedContractXdr.fromXdrJson(text).toXdrJsonElement())
+    assertEquals(text, MuxedContractXdr.fromXdrJson(text).toXdrJson())
+
+    val writer = XdrWriter()
+    MuxedContractXdr.fromXdrJsonElement(tree).encode(writer)
+    assertEquals(tree, MuxedContractXdr.decode(XdrReader(writer.toByteArray())).toXdrJsonElement())
+  }
+
+  @Test
+  fun muxedContractXdrRejectsInputThatIsNotItsObject() {
+    assertFailsWith<IllegalArgumentException> { MuxedContractXdr.fromXdrJsonElement(JsonNull) }
+    assertFailsWith<IllegalArgumentException> { MuxedContractXdr.fromXdrJsonElement(buildJsonObject { }) }
+  }
+
+
+  @Test
   fun sCAddressXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCAddressXdr(sampleSCAddressXdr(1421, 0))
-    assertRoundTripSCAddressXdr(sampleSCAddressXdr(1421, SAMPLE_DEPTH))
+    assertRoundTripSCAddressXdr(sampleSCAddressXdr(1522, 0))
+    assertRoundTripSCAddressXdr(sampleSCAddressXdr(1522, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCAddressXdr(value: SCAddressXdr) {
@@ -1157,7 +1200,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCAddressXdrRendersAccountIdArmAsAccount() {
-    val value = sampleSCAddressXdrAccountIdArm(1421, 0)
+    val value = sampleSCAddressXdrAccountIdArm(1522, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SCAddressXdr.fromXdrJsonElement(tree)
@@ -1167,7 +1210,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCAddressXdrRendersContractIdArmAsContract() {
-    val value = sampleSCAddressXdrContractIdArm(1426, 0)
+    val value = sampleSCAddressXdrContractIdArm(1527, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SCAddressXdr.fromXdrJsonElement(tree)
@@ -1177,7 +1220,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCAddressXdrRendersMuxedAccountArmAsMuxedAccount() {
-    val value = sampleSCAddressXdrMuxedAccountArm(1431, 0)
+    val value = sampleSCAddressXdrMuxedAccountArm(1532, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SCAddressXdr.fromXdrJsonElement(tree)
@@ -1187,7 +1230,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCAddressXdrRendersClaimableBalanceIdArmAsClaimableBalance() {
-    val value = sampleSCAddressXdrClaimableBalanceIdArm(1436, 0)
+    val value = sampleSCAddressXdrClaimableBalanceIdArm(1537, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SCAddressXdr.fromXdrJsonElement(tree)
@@ -1197,7 +1240,17 @@ class XdrJsonContractTest {
 
   @Test
   fun sCAddressXdrRendersLiquidityPoolIdArmAsLiquidityPool() {
-    val value = sampleSCAddressXdrLiquidityPoolIdArm(1441, 0)
+    val value = sampleSCAddressXdrLiquidityPoolIdArm(1542, 0)
+    val tree = value.toXdrJsonElement()
+    assertEquals(true, isJsonString(tree))
+    val decoded = SCAddressXdr.fromXdrJsonElement(tree)
+    assertEquals(value.discriminant, decoded.discriminant)
+    assertEquals(tree, decoded.toXdrJsonElement())
+  }
+
+  @Test
+  fun sCAddressXdrRendersMuxedContractArmAsMuxedContract() {
+    val value = sampleSCAddressXdrMuxedContractArm(1547, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(true, isJsonString(tree))
     val decoded = SCAddressXdr.fromXdrJsonElement(tree)
@@ -1224,8 +1277,8 @@ class XdrJsonContractTest {
 
   @Test
   fun contractExecutableExternalRefXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractExecutableExternalRefXdr(sampleContractExecutableExternalRefXdr(1522, 0))
-    assertRoundTripContractExecutableExternalRefXdr(sampleContractExecutableExternalRefXdr(1522, SAMPLE_DEPTH))
+    assertRoundTripContractExecutableExternalRefXdr(sampleContractExecutableExternalRefXdr(1623, 0))
+    assertRoundTripContractExecutableExternalRefXdr(sampleContractExecutableExternalRefXdr(1623, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractExecutableExternalRefXdr(value: ContractExecutableExternalRefXdr) {
@@ -1248,8 +1301,8 @@ class XdrJsonContractTest {
 
   @Test
   fun contractExecutableXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripContractExecutableXdr(sampleContractExecutableXdr(1623, 0))
-    assertRoundTripContractExecutableXdr(sampleContractExecutableXdr(1623, SAMPLE_DEPTH))
+    assertRoundTripContractExecutableXdr(sampleContractExecutableXdr(1724, 0))
+    assertRoundTripContractExecutableXdr(sampleContractExecutableXdr(1724, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripContractExecutableXdr(value: ContractExecutableXdr) {
@@ -1265,7 +1318,7 @@ class XdrJsonContractTest {
 
   @Test
   fun contractExecutableXdrRendersWasmHashArmAsWasm() {
-    val value = sampleContractExecutableXdrWasmHashArm(1623, 0)
+    val value = sampleContractExecutableXdrWasmHashArm(1724, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("wasm"), jsonKeys(tree))
     val decoded = ContractExecutableXdr.fromXdrJsonElement(tree)
@@ -1275,7 +1328,7 @@ class XdrJsonContractTest {
 
   @Test
   fun contractExecutableXdrRendersVoidArmAsStellarAsset() {
-    val value = sampleContractExecutableXdrVoidArm(1628, 0)
+    val value = sampleContractExecutableXdrVoidArm(1729, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("stellar_asset"), tree)
     val decoded = ContractExecutableXdr.fromXdrJsonElement(tree)
@@ -1285,7 +1338,7 @@ class XdrJsonContractTest {
 
   @Test
   fun contractExecutableXdrRendersExternalRefArmAsExternalRef() {
-    val value = sampleContractExecutableXdrExternalRefArm(1633, 0)
+    val value = sampleContractExecutableXdrExternalRefArm(1734, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("external_ref"), jsonKeys(tree))
     val decoded = ContractExecutableXdr.fromXdrJsonElement(tree)
@@ -1315,8 +1368,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCVecXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCVecXdr(sampleSCVecXdr(1724, 0))
-    assertRoundTripSCVecXdr(sampleSCVecXdr(1724, SAMPLE_DEPTH))
+    assertRoundTripSCVecXdr(sampleSCVecXdr(1825, 0))
+    assertRoundTripSCVecXdr(sampleSCVecXdr(1825, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCVecXdr(value: SCVecXdr) {
@@ -1338,8 +1391,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCMapXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCMapXdr(sampleSCMapXdr(1825, 0))
-    assertRoundTripSCMapXdr(sampleSCMapXdr(1825, SAMPLE_DEPTH))
+    assertRoundTripSCMapXdr(sampleSCMapXdr(1926, 0))
+    assertRoundTripSCMapXdr(sampleSCMapXdr(1926, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCMapXdr(value: SCMapXdr) {
@@ -1361,8 +1414,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCNonceKeyXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCNonceKeyXdr(sampleSCNonceKeyXdr(1926, 0))
-    assertRoundTripSCNonceKeyXdr(sampleSCNonceKeyXdr(1926, SAMPLE_DEPTH))
+    assertRoundTripSCNonceKeyXdr(sampleSCNonceKeyXdr(2027, 0))
+    assertRoundTripSCNonceKeyXdr(sampleSCNonceKeyXdr(2027, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCNonceKeyXdr(value: SCNonceKeyXdr) {
@@ -1385,8 +1438,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCContractInstanceXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCContractInstanceXdr(sampleSCContractInstanceXdr(2027, 0))
-    assertRoundTripSCContractInstanceXdr(sampleSCContractInstanceXdr(2027, SAMPLE_DEPTH))
+    assertRoundTripSCContractInstanceXdr(sampleSCContractInstanceXdr(2128, 0))
+    assertRoundTripSCContractInstanceXdr(sampleSCContractInstanceXdr(2128, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCContractInstanceXdr(value: SCContractInstanceXdr) {
@@ -1409,8 +1462,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCValXdr(sampleSCValXdr(2128, 0))
-    assertRoundTripSCValXdr(sampleSCValXdr(2128, SAMPLE_DEPTH))
+    assertRoundTripSCValXdr(sampleSCValXdr(2229, 0))
+    assertRoundTripSCValXdr(sampleSCValXdr(2229, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCValXdr(value: SCValXdr) {
@@ -1426,7 +1479,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersBArmAsBool() {
-    val value = sampleSCValXdrBArm(2128, 0)
+    val value = sampleSCValXdrBArm(2229, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("bool"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1436,7 +1489,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersVoidScvVoidArmAsVoid() {
-    val value = sampleSCValXdrVoidScvVoidArm(2133, 0)
+    val value = sampleSCValXdrVoidScvVoidArm(2234, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("void"), tree)
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1446,7 +1499,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersErrorArmAsError() {
-    val value = sampleSCValXdrErrorArm(2138, 0)
+    val value = sampleSCValXdrErrorArm(2239, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("error"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1456,7 +1509,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersU32ArmAsU32() {
-    val value = sampleSCValXdrU32Arm(2143, 0)
+    val value = sampleSCValXdrU32Arm(2244, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("u32"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1466,7 +1519,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersI32ArmAsI32() {
-    val value = sampleSCValXdrI32Arm(2148, 0)
+    val value = sampleSCValXdrI32Arm(2249, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("i32"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1476,7 +1529,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersU64ArmAsU64() {
-    val value = sampleSCValXdrU64Arm(2153, 0)
+    val value = sampleSCValXdrU64Arm(2254, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("u64"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1486,7 +1539,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersI64ArmAsI64() {
-    val value = sampleSCValXdrI64Arm(2158, 0)
+    val value = sampleSCValXdrI64Arm(2259, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("i64"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1496,7 +1549,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersTimepointArmAsTimepoint() {
-    val value = sampleSCValXdrTimepointArm(2163, 0)
+    val value = sampleSCValXdrTimepointArm(2264, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("timepoint"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1506,7 +1559,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersDurationArmAsDuration() {
-    val value = sampleSCValXdrDurationArm(2168, 0)
+    val value = sampleSCValXdrDurationArm(2269, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("duration"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1516,7 +1569,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersU128ArmAsU128() {
-    val value = sampleSCValXdrU128Arm(2173, 0)
+    val value = sampleSCValXdrU128Arm(2274, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("u128"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1526,7 +1579,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersI128ArmAsI128() {
-    val value = sampleSCValXdrI128Arm(2178, 0)
+    val value = sampleSCValXdrI128Arm(2279, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("i128"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1536,7 +1589,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersU256ArmAsU256() {
-    val value = sampleSCValXdrU256Arm(2183, 0)
+    val value = sampleSCValXdrU256Arm(2284, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("u256"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1546,7 +1599,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersI256ArmAsI256() {
-    val value = sampleSCValXdrI256Arm(2188, 0)
+    val value = sampleSCValXdrI256Arm(2289, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("i256"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1556,7 +1609,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersBytesArmAsBytes() {
-    val value = sampleSCValXdrBytesArm(2193, 0)
+    val value = sampleSCValXdrBytesArm(2294, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("bytes"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1566,7 +1619,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersStrArmAsString() {
-    val value = sampleSCValXdrStrArm(2198, 0)
+    val value = sampleSCValXdrStrArm(2299, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("string"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1576,7 +1629,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersSymArmAsSymbol() {
-    val value = sampleSCValXdrSymArm(2203, 0)
+    val value = sampleSCValXdrSymArm(2304, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("symbol"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1586,7 +1639,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersVecArmAsVec() {
-    val value = sampleSCValXdrVecArm(2208, 0)
+    val value = sampleSCValXdrVecArm(2309, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("vec"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1596,7 +1649,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersMapArmAsMap() {
-    val value = sampleSCValXdrMapArm(2213, 0)
+    val value = sampleSCValXdrMapArm(2314, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("map"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1606,7 +1659,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersAddressArmAsAddress() {
-    val value = sampleSCValXdrAddressArm(2218, 0)
+    val value = sampleSCValXdrAddressArm(2319, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("address"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1616,7 +1669,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersInstanceArmAsContractInstance() {
-    val value = sampleSCValXdrInstanceArm(2223, 0)
+    val value = sampleSCValXdrInstanceArm(2324, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("contract_instance"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1626,7 +1679,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersVoidScvLedgerKeyContractInstanceArmAsLedgerKeyContractInstance() {
-    val value = sampleSCValXdrVoidScvLedgerKeyContractInstanceArm(2228, 0)
+    val value = sampleSCValXdrVoidScvLedgerKeyContractInstanceArm(2329, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(JsonPrimitive("ledger_key_contract_instance"), tree)
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1636,7 +1689,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersNonceKeyArmAsLedgerKeyNonce() {
-    val value = sampleSCValXdrNonceKeyArm(2233, 0)
+    val value = sampleSCValXdrNonceKeyArm(2334, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("ledger_key_nonce"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1646,7 +1699,7 @@ class XdrJsonContractTest {
 
   @Test
   fun sCValXdrRendersExecutableTagArmAsExecutableTag() {
-    val value = sampleSCValXdrExecutableTagArm(2238, 0)
+    val value = sampleSCValXdrExecutableTagArm(2339, 0)
     val tree = value.toXdrJsonElement()
     assertEquals(listOf("executable_tag"), jsonKeys(tree))
     val decoded = SCValXdr.fromXdrJsonElement(tree)
@@ -1676,8 +1729,8 @@ class XdrJsonContractTest {
 
   @Test
   fun sCMapEntryXdrRoundTripsThroughItsJsonTree() {
-    assertRoundTripSCMapEntryXdr(sampleSCMapEntryXdr(2229, 0))
-    assertRoundTripSCMapEntryXdr(sampleSCMapEntryXdr(2229, SAMPLE_DEPTH))
+    assertRoundTripSCMapEntryXdr(sampleSCMapEntryXdr(2330, 0))
+    assertRoundTripSCMapEntryXdr(sampleSCMapEntryXdr(2330, SAMPLE_DEPTH))
   }
 
   private fun assertRoundTripSCMapEntryXdr(value: SCMapEntryXdr) {

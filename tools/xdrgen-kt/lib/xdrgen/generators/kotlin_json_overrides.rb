@@ -52,8 +52,9 @@ module Xdrgen
           KOTLIN
         },
 
-        # The strkey lists the account key before the multiplexing id; the XDR structure
-        # lists the id first. XdrJson.muxedPayload and XdrJson.muxedId hold that reordering.
+        # The M and W strkeys list the account key or the contract id before the multiplexing
+        # id; the XDR structures list the id first. XdrJson.muxedPayload and XdrJson.muxedId
+        # hold that reordering.
         'MuxedAccountMed25519Xdr' => {
           imports: [STRKEY_IMPORT],
           to: <<~KOTLIN,
@@ -76,6 +77,19 @@ module Xdrgen
             internal fun fromXdrJsonTree(element: JsonElement): MuxedEd25519AccountXdr {
               val payload = XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "an M strkey") { StrKey.decodeMed25519PublicKey(it) }
               return MuxedEd25519AccountXdr(Uint64Xdr(XdrJson.muxedId(payload)), Uint256Xdr(payload.copyOfRange(0, 32)))
+            }
+          KOTLIN
+        },
+
+        'MuxedContractXdr' => {
+          imports: [STRKEY_IMPORT],
+          to: <<~KOTLIN,
+            fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeMuxedContract(XdrJson.muxedPayload(contractId.value.value, id.value)))
+          KOTLIN
+          from: <<~KOTLIN
+            internal fun fromXdrJsonTree(element: JsonElement): MuxedContractXdr {
+              val payload = XdrJson.strkey(XdrJson.name(element, XDR_JSON_TYPE), XDR_JSON_TYPE, "a W strkey") { StrKey.decodeMuxedContract(it) }
+              return MuxedContractXdr(Uint64Xdr(XdrJson.muxedId(payload)), ContractIDXdr(HashXdr(payload.copyOfRange(0, 32))))
             }
           KOTLIN
         },
@@ -109,6 +123,7 @@ module Xdrgen
               is MuxedAccount -> value.toXdrJsonElement()
               is ClaimableBalanceId -> value.toXdrJsonElement()
               is LiquidityPoolId -> value.toXdrJsonElement()
+              is MuxedContract -> value.toXdrJsonElement()
             }
           KOTLIN
           from: <<~KOTLIN
@@ -119,7 +134,8 @@ module Xdrgen
                 'M' -> MuxedAccount(MuxedEd25519AccountXdr.fromXdrJsonTree(element))
                 'B' -> ClaimableBalanceId(ClaimableBalanceIDXdr.fromXdrJsonTree(element))
                 'L' -> LiquidityPoolId(PoolIDXdr.fromXdrJsonTree(element))
-                else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, C, M, B or L strkey, got ${XdrJson.preview(element)}")
+                'W' -> MuxedContract(MuxedContractXdr.fromXdrJsonTree(element))
+                else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, C, M, B, L or W strkey, got ${XdrJson.preview(element)}")
               }
           KOTLIN
         },

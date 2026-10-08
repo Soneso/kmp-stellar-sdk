@@ -73,17 +73,20 @@ EXCLUDED_SOURCES = %w[
 ].freeze
 
 # Structs that SEP-0051 renders as a single JSON string rather than an object:
-# the integer-parts types become one base-10 decimal, and the account and
-# signed-payload types become strkeys. They carry no JSON field names, so the
-# field-name diff does not apply to them and reports them separately. A struct
-# appearing here unexpectedly means a new type needs a string rendering; one
-# disappearing means a type that used to be a string is now an object.
+# the integer-parts types become one base-10 decimal, and the account, muxed
+# contract and signed-payload types become strkeys. They carry no JSON field
+# names, so the field-name diff does not apply to them and reports them
+# separately. A struct appearing here unexpectedly means a new type needs a
+# string rendering; one disappearing means a type that used to be a string is
+# now an object. A listed struct the reference cannot resolve is skipped by that
+# check and checked once a reference that knows it is pinned.
 STRING_RENDERED_STRUCTS = %w[
   Int128Parts
   Int256Parts
   UInt128Parts
   UInt256Parts
   MuxedEd25519Account
+  MuxedContract
   med25519
   ed25519SignedPayload
 ].freeze

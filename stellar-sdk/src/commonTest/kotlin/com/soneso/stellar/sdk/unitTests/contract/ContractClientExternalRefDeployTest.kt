@@ -693,7 +693,8 @@ class ContractClientExternalRefDeployTest {
             Address(MOCK_RPC_SOURCE_ACCOUNT),
             Address.fromMuxedAccount(ByteArray(40) { 0x22 }),
             Address.fromClaimableBalance(ByteArray(32) { 0x33 }),
-            Address.fromLiquidityPool(ByteArray(32) { 0x44 })
+            Address.fromLiquidityPool(ByteArray(32) { 0x44 }),
+            Address.fromMuxedContract(ByteArray(40) { 0x55 })
         )
         assertEquals(
             Address.AddressType.entries.filter { it != Address.AddressType.CONTRACT },

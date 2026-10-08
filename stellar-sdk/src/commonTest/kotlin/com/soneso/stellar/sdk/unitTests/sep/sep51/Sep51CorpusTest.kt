@@ -437,6 +437,12 @@ class Sep51CorpusTest {
             RevokeSponsorshipOpXdr.Companion::decode,
             RevokeSponsorshipOpXdr::encode
         )
+        "SCAddressTypeXdr" -> Codec(
+            SCAddressTypeXdr.Companion::fromXdrJson,
+            SCAddressTypeXdr::toXdrJson,
+            SCAddressTypeXdr.Companion::decode,
+            SCAddressTypeXdr::encode
+        )
         "SCAddressXdr" -> Codec(
             SCAddressXdr.Companion::fromXdrJson,
             SCAddressXdr::toXdrJson,

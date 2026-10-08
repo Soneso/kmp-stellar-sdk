@@ -1295,6 +1295,96 @@ class XdrJsonContractConfigSettingTest {
   }
 
   @Test
+  fun contractCostTypeXdrRendersMlDsa44DecodeVerifyingKeyAsMlDsa44DecodeVerifyingKey() {
+    val member = ContractCostTypeXdr.MlDsa44DecodeVerifyingKey
+    assertEquals(86, member.value)
+    assertEquals(JsonPrimitive("ml_dsa44_decode_verifying_key"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa44_decode_verifying_key\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa44_decode_verifying_key\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa44_decode_verifying_key")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersMlDsa65DecodeVerifyingKeyAsMlDsa65DecodeVerifyingKey() {
+    val member = ContractCostTypeXdr.MlDsa65DecodeVerifyingKey
+    assertEquals(87, member.value)
+    assertEquals(JsonPrimitive("ml_dsa65_decode_verifying_key"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa65_decode_verifying_key\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa65_decode_verifying_key\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa65_decode_verifying_key")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersMlDsa87DecodeVerifyingKeyAsMlDsa87DecodeVerifyingKey() {
+    val member = ContractCostTypeXdr.MlDsa87DecodeVerifyingKey
+    assertEquals(88, member.value)
+    assertEquals(JsonPrimitive("ml_dsa87_decode_verifying_key"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa87_decode_verifying_key\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa87_decode_verifying_key\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa87_decode_verifying_key")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersMlDsa44DecodeSignatureAsMlDsa44DecodeSignature() {
+    val member = ContractCostTypeXdr.MlDsa44DecodeSignature
+    assertEquals(89, member.value)
+    assertEquals(JsonPrimitive("ml_dsa44_decode_signature"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa44_decode_signature\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa44_decode_signature\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa44_decode_signature")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersMlDsa65DecodeSignatureAsMlDsa65DecodeSignature() {
+    val member = ContractCostTypeXdr.MlDsa65DecodeSignature
+    assertEquals(90, member.value)
+    assertEquals(JsonPrimitive("ml_dsa65_decode_signature"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa65_decode_signature\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa65_decode_signature\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa65_decode_signature")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersMlDsa87DecodeSignatureAsMlDsa87DecodeSignature() {
+    val member = ContractCostTypeXdr.MlDsa87DecodeSignature
+    assertEquals(91, member.value)
+    assertEquals(JsonPrimitive("ml_dsa87_decode_signature"), member.toXdrJsonElement())
+    assertEquals("\"ml_dsa87_decode_signature\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"ml_dsa87_decode_signature\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("ml_dsa87_decode_signature")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersVerifyMlDsa44SigAsVerifyMlDsa44Sig() {
+    val member = ContractCostTypeXdr.VerifyMlDsa44Sig
+    assertEquals(92, member.value)
+    assertEquals(JsonPrimitive("verify_ml_dsa44_sig"), member.toXdrJsonElement())
+    assertEquals("\"verify_ml_dsa44_sig\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"verify_ml_dsa44_sig\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("verify_ml_dsa44_sig")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersVerifyMlDsa65SigAsVerifyMlDsa65Sig() {
+    val member = ContractCostTypeXdr.VerifyMlDsa65Sig
+    assertEquals(93, member.value)
+    assertEquals(JsonPrimitive("verify_ml_dsa65_sig"), member.toXdrJsonElement())
+    assertEquals("\"verify_ml_dsa65_sig\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"verify_ml_dsa65_sig\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("verify_ml_dsa65_sig")))
+  }
+
+  @Test
+  fun contractCostTypeXdrRendersVerifyMlDsa87SigAsVerifyMlDsa87Sig() {
+    val member = ContractCostTypeXdr.VerifyMlDsa87Sig
+    assertEquals(94, member.value)
+    assertEquals(JsonPrimitive("verify_ml_dsa87_sig"), member.toXdrJsonElement())
+    assertEquals("\"verify_ml_dsa87_sig\"", member.toXdrJson())
+    assertEquals(member, ContractCostTypeXdr.fromXdrJson("\"verify_ml_dsa87_sig\""))
+    assertEquals(member, ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("verify_ml_dsa87_sig")))
+  }
+
+  @Test
   fun contractCostTypeXdrRejectsAMemberItDoesNotDeclare() {
     assertFailsWith<IllegalArgumentException> { ContractCostTypeXdr.fromXdrJsonElement(JsonPrimitive("not_a_name_this_type_declares")) }
     assertFailsWith<IllegalArgumentException> { ContractCostTypeXdr.fromXdrJsonElement(JsonNull) }

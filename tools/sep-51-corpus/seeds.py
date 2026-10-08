@@ -1157,6 +1157,8 @@ SEEDS = [
           "Contract cost type enum member."),
     _seed("StellarValueType", "StellarValueTypeXdr", "empty_tx_set",
           "Stellar value type enum member is stripped of its shared prefix."),
+    _seed("ScAddressType", "SCAddressTypeXdr", "muxed_account",
+          "SC address type enum member is stripped of its shared prefix."),
     _seed("ClaimAtom", "ClaimAtomXdr",
           {"v0": {"seller_ed25519": HASH1, "offer_id": "1",
                   "asset_sold": "native", "amount_sold": "1",

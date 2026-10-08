@@ -21,6 +21,8 @@ private const val XDR_JSON_TYPE = "SCAddressXdr"
  *     ClaimableBalanceID claimableBalanceId;
  * case SC_ADDRESS_TYPE_LIQUIDITY_POOL:
  *     PoolID liquidityPoolId;
+ * case SC_ADDRESS_TYPE_MUXED_CONTRACT:
+ *     MuxedContract muxedContract;
  * };
  */
 sealed class SCAddressXdr {
@@ -56,6 +58,12 @@ sealed class SCAddressXdr {
     override val discriminant: SCAddressTypeXdr = SCAddressTypeXdr.SC_ADDRESS_TYPE_LIQUIDITY_POOL
   }
 
+  data class MuxedContract(
+    val value: MuxedContractXdr
+  ) : SCAddressXdr() {
+    override val discriminant: SCAddressTypeXdr = SCAddressTypeXdr.SC_ADDRESS_TYPE_MUXED_CONTRACT
+  }
+
   companion object {
 
     fun decode(reader: XdrReader): SCAddressXdr {
@@ -81,6 +89,10 @@ sealed class SCAddressXdr {
           val value = PoolIDXdr.decode(reader)
           LiquidityPoolId(value)
         }
+        SCAddressTypeXdr.SC_ADDRESS_TYPE_MUXED_CONTRACT -> {
+          val value = MuxedContractXdr.decode(reader)
+          MuxedContract(value)
+        }
         else -> throw IllegalArgumentException("Unknown SCAddressXdr discriminant: $discriminant")
       }
     }
@@ -96,7 +108,8 @@ sealed class SCAddressXdr {
         'M' -> MuxedAccount(MuxedEd25519AccountXdr.fromXdrJsonTree(element))
         'B' -> ClaimableBalanceId(ClaimableBalanceIDXdr.fromXdrJsonTree(element))
         'L' -> LiquidityPoolId(PoolIDXdr.fromXdrJsonTree(element))
-        else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, C, M, B or L strkey, got ${XdrJson.preview(element)}")
+        'W' -> MuxedContract(MuxedContractXdr.fromXdrJsonTree(element))
+        else -> XdrJson.fail(XDR_JSON_TYPE, "expects a G, C, M, B, L or W strkey, got ${XdrJson.preview(element)}")
       }
   }
 
@@ -118,6 +131,9 @@ sealed class SCAddressXdr {
       is LiquidityPoolId -> {
         value.encode(writer)
       }
+      is MuxedContract -> {
+        value.encode(writer)
+      }
     }
   }
 
@@ -127,6 +143,7 @@ sealed class SCAddressXdr {
     is MuxedAccount -> value.toXdrJsonElement()
     is ClaimableBalanceId -> value.toXdrJsonElement()
     is LiquidityPoolId -> value.toXdrJsonElement()
+    is MuxedContract -> value.toXdrJsonElement()
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

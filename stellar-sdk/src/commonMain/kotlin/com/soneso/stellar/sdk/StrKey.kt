@@ -99,7 +99,8 @@ object StrKey {
         SIGNED_PAYLOAD((15 shl 3).toByte(), 40..100),     // P
         CONTRACT((2 shl 3).toByte(), 32..32),             // C
         LIQUIDITY_POOL((11 shl 3).toByte(), 32..32),      // L
-        CLAIMABLE_BALANCE((1 shl 3).toByte(), 33..33);    // B
+        CLAIMABLE_BALANCE((1 shl 3).toByte(), 33..33),    // B
+        MUXED_CONTRACT((22 shl 3).toByte(), 40..40);      // W
 
         /**
          * Character counts an encoded strkey of this type can have.
@@ -479,6 +480,59 @@ object StrKey {
     fun isValidContract(address: String): Boolean {
         return try {
             decodeContract(address)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Encodes raw bytes to strkey muxed contract address (W...)
+     *
+     * A muxed contract address pairs a contract with a 64-bit multiplexing id (CAP-0084), the
+     * way a muxed account address pairs an account with one. SEP-0023 defines its strkey.
+     *
+     * @param data The 40-byte payload: the 32-byte contract id followed by the 8-byte
+     * multiplexing id, most significant byte first
+     * @return The encoded strkey, 69 characters long
+     * @throws IllegalArgumentException if [data] is not 40 bytes
+     */
+    fun encodeMuxedContract(data: ByteArray): String {
+        val dataLengths = VersionByte.MUXED_CONTRACT.dataLengths
+        require(data.size in dataLengths) {
+            "Muxed contract address must be ${expectedLengthText(dataLengths)} bytes, got ${data.size}"
+        }
+        return encodeCheck(VersionByte.MUXED_CONTRACT, data).concatToString()
+    }
+
+    /**
+     * Decodes strkey muxed contract address (W...) to raw bytes
+     *
+     * `WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC`, for example,
+     * decodes to the contract id of `CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA`
+     * followed by the multiplexing id 0.
+     *
+     * @param data The strkey to decode. A muxed contract address strkey is 69 characters long.
+     * @return The 40 raw bytes: the 32-byte contract id followed by the 8-byte big-endian
+     * multiplexing id
+     * @throws IllegalArgumentException if [data] fails a check of the [StrKey] decode contract,
+     * which this type holds to 69 characters and the muxed contract version byte
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md">SEP-0023</a>
+     * @see <a href="https://github.com/stellar/stellar-protocol/blob/master/core/cap-0084.md">CAP-0084</a>
+     */
+    fun decodeMuxedContract(data: String): ByteArray {
+        return decodeCheck(VersionByte.MUXED_CONTRACT, data.toCharArray())
+    }
+
+    /**
+     * Checks validity of muxed contract address (W...)
+     *
+     * @param muxedContractId The strkey to check
+     * @return true if [muxedContractId] is a strkey [decodeMuxedContract] accepts, false otherwise
+     */
+    fun isValidMuxedContract(muxedContractId: String): Boolean {
+        return try {
+            decodeMuxedContract(muxedContractId)
             true
         } catch (e: Exception) {
             false
