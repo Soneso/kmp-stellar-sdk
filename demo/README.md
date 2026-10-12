@@ -1,6 +1,6 @@
 # Stellar SDK Demo App
 
-A comprehensive Kotlin Multiplatform demo application showcasing the Stellar SDK's capabilities across all supported platforms (Android, iOS, macOS, Desktop, and Web).
+A Kotlin Multiplatform demo application showcasing the Stellar SDK's capabilities across all supported platforms (Android, iOS, macOS, Desktop, and Web).
 
 ## Overview
 
@@ -93,7 +93,7 @@ The demo app uses a **Compose Multiplatform** architecture with maximum code sha
 
 ## Features
 
-The demo app includes 11 comprehensive feature demonstrations:
+The demo app includes 11 feature demonstrations:
 
 ### 1. Key Generation
 - Generate random Stellar Ed25519 keypairs
@@ -110,7 +110,7 @@ The demo app includes 11 comprehensive feature demonstrations:
 - Demonstrates: `FriendBot.fundTestnetAccount()`
 
 ### 3. Fetch Account Details
-- Retrieve comprehensive account information from Horizon
+- Retrieve account information from Horizon
 - Display balances, sequence number, and flags
 - Show all account balances (native and issued assets)
 - Real-time account data fetching
@@ -138,7 +138,7 @@ The demo app includes 11 comprehensive feature demonstrations:
 - Supports both Horizon and RPC APIs
 - Demonstrates: `HorizonServer.transactions()`, `SorobanServer.getTransaction()`
 
-### 7. Fetch Smart Contract Details
+### 7. Fetch smart contract details
 - Parse WASM contracts to view metadata
 - Display contract specification (functions, types)
 - View contract code hash and metadata
@@ -154,7 +154,7 @@ The demo app includes 11 comprehensive feature demonstrations:
 - Located in `shared/src/commonMain/resources/wasm/`
 - Demonstrates: `ContractClient.deploy()`
 
-### 9. Invoke Hello World Contract
+### 9. Invoke Hello World contract
 - Invoke deployed smart contracts with the "hello" function
 - Demonstrate spec-based type conversion and automatic result parsing
 - Use ContractClient to load contract specifications from the network
@@ -376,7 +376,7 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
 ./gradlew :demo:webApp:productionDist
 
 # Deploy the dist/ directory to any static hosting
-# - Netlify, Vercel, GitHub Pages, etc.
+# - for example Netlify, Vercel, or GitHub Pages
 # - Bundle size: 28 MB unminified (2.7 MB gzipped)
 ```
 
@@ -415,33 +415,42 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
 
 | Platform | UI Framework | Status | Min Version | Notes |
 |----------|--------------|--------|-------------|-------|
-| Android  | Compose | ✅ Production | API 24 (Android 7.0) | Fully tested |
-| iOS | Compose | ✅ Production | iOS 14.0 | Xcode 15+ required |
-| macOS Native | SwiftUI | ✅ Production | macOS 11.0 | See comparison below |
-| Desktop (JVM) | Compose | ✅ Production | macOS/Windows/Linux | See comparison below |
-| Web (JS) | Compose | ✅ Production | Chrome 90+, Firefox 88+, Safari 15.4+ | Stable, production-ready |
+| Android  | Compose | Production | API 24 (Android 7.0) | Fully tested |
+| iOS | Compose | Production | iOS 14.0 | Xcode 15+ required |
+| macOS Native | SwiftUI | Production | macOS 11.0 | See comparison below |
+| Desktop (JVM) | Compose | Production | macOS/Windows/Linux | See comparison below |
+| Web (JS) | Compose | Production | Chrome 90+, Firefox 88+, Safari 15.4+ | Stable, production-ready |
 
 ## Development Workflow
 
 ### Adding New Features
 
-1. **Add business logic** in `shared/src/commonMain/kotlin/com/stellar/demo/stellar/`:
+1. **Add business logic** in `shared/src/commonMain/kotlin/com/soneso/demo/stellar/`:
    ```kotlin
    // Example: NewFeature.kt
+   /**
+    * Demonstrates [SDK feature]: what the developer learns from this module.
+    */
    suspend fun performNewFeature(param: String): Result<Data> {
-       // Use Stellar SDK here
-       val server = Server("https://horizon-testnet.stellar.org")
-       // ... implementation
+       return try {
+           // Use the Stellar SDK directly
+           val server = HorizonServer("https://horizon-testnet.stellar.org")
+           // ... implementation
+           Result.success(data)
+       } catch (e: Exception) {
+           Result.failure(e) // Keep the full exception for the result display
+       }
    }
    ```
+   The module calls SDK classes and methods directly, returns a `Result`, and carries KDoc that names the SDK features it demonstrates.
 
-2. **Create UI screen** in `shared/src/commonMain/kotlin/com/stellar/demo/ui/screens/`:
+2. **Create UI screen** in `shared/src/commonMain/kotlin/com/soneso/demo/ui/screens/`:
    ```kotlin
    // Example: NewFeatureScreen.kt
    class NewFeatureScreen : Screen {
        @Composable
        override fun Content() {
-           // Compose UI implementation
+           // Compose UI implementation built from the shared components
        }
    }
    ```
@@ -460,7 +469,7 @@ The desktop app runs on macOS, Windows, and Linux with the same Compose UI as An
    ```bash
    ./gradlew :demo:androidApp:installDebug
    ./gradlew :demo:desktopApp:run
-   ./gradlew :demo:webApp:jsBrowserDevelopmentRun
+   ./gradlew :demo:webApp:viteDev
    # iOS/macOS: Build framework and run in Xcode
    ```
 
@@ -471,17 +480,23 @@ The demo minimizes platform-specific code. Only used for:
 - **Entry points**: Minimal code to launch Compose UI
 - **macOS native**: Full SwiftUI implementation with 30 Swift files (Views, Components, Utilities)
 
+### UI Components and Patterns
+
+Screens use Material 3 and the shared components in `shared/src/commonMain/kotlin/com/soneso/demo/ui/components/`; a new screen reuses them before it adds a component:
+
+- **`StellarTopBar`**: the screen header with the title and the back navigation (`onNavigationClick = { navigator.pop() }`).
+- **`AnimatedButton`**: the action button. Pass `isLoading` while the operation runs and `enabled = !isLoading && inputIsValid`; the button shows a progress indicator while loading.
+- **`InfoCard`**: the explanation of the SDK feature the screen demonstrates.
+- **`GoldCard`**: input forms and configuration sections.
+- **`BlueCard`**: details and data such as balances, transactions and contract metadata.
+- **`TealCard`** and **`GreenCard`**: success messages and operation results.
+- **`ErrorCard`**: error messages and failure states, with the message of the exception the business logic returned.
+
+Input fields validate as the user types. `FormValidation` in `ui/FormValidation.kt` returns a short error message or `null` for account IDs, secret seeds, contract IDs, transaction hashes and asset codes. The field shows that message through `isError` and `supportingText`. Operations run in the scope from `rememberCoroutineScope()`, because the SDK's network and crypto calls are `suspend` functions.
+
 ### Testing
 
-```bash
-# Run all shared module tests
-./gradlew :demo:shared:test
-
-# Platform-specific tests
-./gradlew :demo:shared:jvmTest
-./gradlew :demo:shared:jsNodeTest
-./gradlew :demo:shared:macosArm64Test
-```
+The demo has no automated tests. Test a change manually against testnet, with accounts funded through Friendbot and real network calls: on Desktop first, the fastest iteration, then on Android and Web. Test the iOS and the macOS native apps before a release.
 
 ## Troubleshooting
 
@@ -560,22 +575,22 @@ Edit `demo/webApp/build.gradle.kts` and change the port.
 
 You have two options for running on macOS:
 
-### Option 1: Desktop App (Recommended)
-- ✅ Full Compose UI (same as Android/iOS/Web)
-- ✅ Cross-platform (also runs on Windows/Linux)
-- ✅ Easier to maintain (shared code)
-- ❌ Requires JVM (larger bundle size)
+### Option 1: Desktop app (recommended)
+- Pro: Full Compose UI (same as Android/iOS/Web)
+- Pro: Cross-platform (also runs on Windows/Linux)
+- Pro: Easier to maintain (shared code)
+- Con: Requires JVM (larger bundle size)
 
 ```bash
 ./gradlew :demo:desktopApp:run
 ```
 
 ### Option 2: Native macOS App
-- ✅ True native macOS app
-- ✅ Smaller bundle (no JVM)
-- ✅ Native SwiftUI integration
-- ❌ Separate SwiftUI codebase (30 Swift files, see macosApp/README.md)
-- ❌ macOS-only (not cross-platform)
+- Pro: True native macOS app
+- Pro: Smaller bundle (no JVM)
+- Pro: Native SwiftUI integration
+- Con: Separate SwiftUI codebase (30 Swift files, see macosApp/README.md)
+- Con: macOS-only (not cross-platform)
 
 ```bash
 cd demo/macosApp && xcodegen generate && open StellarDemo.xcodeproj
@@ -606,7 +621,7 @@ See `demo/macosApp/README.md` for detailed comparison and rationale.
 
 ### Documentation
 - [Main SDK README](../README.md)
-- [SDK CLAUDE.md](../CLAUDE.md)
+- [Repository rules for contributors and agents (AGENTS.md)](../AGENTS.md)
 - [Android App README](androidApp/README.md)
 - [iOS App README](iosApp/README.md)
 - [macOS App README](macosApp/README.md)
@@ -628,11 +643,17 @@ See `demo/macosApp/README.md` for detailed comparison and rationale.
 
 When contributing to the demo app:
 
-1. **Keep platform-specific code minimal**: Put everything possible in `commonMain`
-2. **Use the SDK**: Don't reimplement SDK functionality in the demo
-3. **Test on multiple platforms**: Android, Desktop, and Web at minimum
-4. **Follow Material 3 guidelines**: Consistent UI across platforms
-5. **Document new features**: Update this README and platform-specific READMEs
+1. **Keep platform-specific code minimal**: Put everything possible in `commonMain`.
+2. **Use the SDK directly**: Call SDK classes and methods as an app developer would; the demo neither reimplements SDK functionality nor wraps SDK classes in simplified helpers.
+3. **Use real network calls**: Features run against testnet; the demo uses no mock data.
+4. **Handle every error**: Catch the failure, keep the full exception in the `Result`, and show it to the user.
+5. **Explain the SDK**: Comments and KDoc explain the SDK concepts a feature demonstrates, so the code teaches the pattern.
+6. **Check every platform for a new dependency**: A dependency of the shared module has to support Android, iOS, macOS, Desktop and Web.
+7. **Test on multiple platforms**: Android, Desktop, and Web at minimum.
+8. **Follow Material 3 guidelines and the shared components**: Consistent UI across platforms.
+9. **Document new features**: Update this README and platform-specific READMEs.
+
+The repository rules for every change, including the demo, are in the root `AGENTS.md`.
 
 ## License
 

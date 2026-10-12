@@ -12,7 +12,7 @@ Integration tests are different from unit tests:
 
 ### AccountIntegrationTest.kt
 
-Comprehensive tests for account-related operations:
+Tests for account-related operations:
 
 | Test | Description | Operations Tested |
 |------|-------------|-------------------|
@@ -28,7 +28,7 @@ Comprehensive tests for account-related operations:
 
 ### ClaimableBalanceIntegrationTest.kt
 
-Comprehensive tests for claimable balance operations:
+Tests for claimable balance operations:
 
 | Test | Description | Operations Tested |
 |------|-------------|-------------------|
@@ -93,7 +93,7 @@ time, so a plain `delay()` is skipped.
 
 ### SorobanIntegrationTest.kt
 
-Comprehensive tests for Soroban RPC server operations against live testnet:
+Tests for Soroban RPC server operations against live testnet:
 
 | Test | Description | RPC Methods Tested |
 |------|-------------|-------------------|
@@ -108,7 +108,7 @@ Comprehensive tests for Soroban RPC server operations against live testnet:
 | `testGetLedgersSequenceOrdering` | Verifies ledgers are returned in ascending order | getLedgers |
 | `testGetLedgersWithoutPagination` | getLedgers with default pagination | getLedgers |
 | `testGetLedgersWithDifferentLimits` | Tests various pagination limits | getLedgers |
-| `testGetLedgersValidatesAllFields` | Comprehensive response field validation | getLedgers |
+| `testGetLedgersValidatesAllFields` | Validation of every response field | getLedgers |
 | `testGetLedgersErrorHandlingInvalidStartLedger` | Error handling for invalid parameters | getLedgers |
 | `testGetLedgersWithRecentLedger` | Retrieves very recent ledger data | getLedgers |
 | `testUploadContract` | Upload Soroban contract WASM | simulateTransaction, sendTransaction |
@@ -120,14 +120,12 @@ Comprehensive tests for Soroban RPC server operations against live testnet:
 
 **GetLedgers Test Suite Details**:
 
-All `getLedgers` tests were ported from the Flutter Stellar SDK to ensure feature parity and validate the getLedgers RPC method:
-
 1. **testBasicGetLedgersWithLimit**: Tests basic ledger retrieval with pagination, validates response structure (cursor, timestamps, ledger info with hash/sequence/XDR)
 2. **testGetLedgersPaginationWithCursor**: Validates cursor-based pagination where startLedger is omitted when using cursor
 3. **testGetLedgersSequenceOrdering**: Ensures ledgers are returned in ascending sequence order for blockchain continuity
 4. **testGetLedgersWithoutPagination**: Tests that pagination is optional and server provides sensible defaults
 5. **testGetLedgersWithDifferentLimits**: Verifies pagination limit parameter works for various values (1, 10)
-6. **testGetLedgersValidatesAllFields**: Comprehensive validation of all response fields (top-level and ledger info)
+6. **testGetLedgersValidatesAllFields**: Validation of all response fields (top-level and ledger info)
 7. **testGetLedgersErrorHandlingInvalidStartLedger**: Tests graceful error handling for invalid start ledger (future ledger)
 8. **testGetLedgersWithRecentLedger**: Validates retrieval of very recent ledger data for real-time applications
 
@@ -153,7 +151,7 @@ The contract tests demonstrate the complete Soroban smart contract lifecycle:
 
 ### SorobanAuthIntegrationTest.kt
 
-Comprehensive tests for Soroban authorization workflows against live testnet:
+Tests for Soroban authorization workflows against live testnet:
 
 | Test | Description | Key Features Tested |
 |------|-------------|---------------------|
@@ -195,7 +193,7 @@ The auth tests demonstrate two critical Soroban authorization patterns:
 
 ### SorobanAtomicSwapIntegrationTest.kt
 
-Comprehensive tests for Soroban atomic swap contract functionality demonstrating multi-party contract interactions:
+Tests for Soroban atomic swap contract functionality demonstrating multi-party contract interactions:
 
 | Test | Description | Key Features Tested |
 |------|-------------|---------------------|
@@ -248,7 +246,7 @@ The atomic swap tests demonstrate a complete multi-party smart contract workflow
 
 ### TradingIntegrationTest.kt
 
-Comprehensive tests for Stellar trading operations including offers and order books:
+Tests for Stellar trading operations including offers and order books:
 
 | Test | Description | Operations Tested |
 |------|-------------|-------------------|
@@ -308,7 +306,7 @@ The trading tests demonstrate complete offer management:
 
 ### TrustIntegrationTest.kt
 
-Comprehensive tests for Stellar trustline operations:
+Tests for Stellar trustline operations:
 
 | Test | Description | Operations Tested |
 |------|-------------|-------------------|
@@ -367,7 +365,7 @@ The trust tests demonstrate complete trustline management:
 
 ### TransactionAsyncIntegrationTest.kt
 
-Comprehensive tests for asynchronous transaction submission:
+Tests for asynchronous transaction submission:
 
 | Test | Description | Status Tested |
 |------|-------------|---------------|
@@ -449,7 +447,7 @@ Integration tests automatically fund accounts via Friendbot and run without manu
 ./gradlew :stellar-sdk:jvmTest --tests "AccountIntegrationTest.testBumpSequence"
 
 # Run all integration tests
-./gradlew :stellar-sdk:jvmTest --tests "com.stellar.sdk.integrationTests.*"
+./gradlew :stellar-sdk:jvmTest --tests "com.soneso.stellar.sdk.integrationTests.*"
 
 # Run on macOS
 ./gradlew :stellar-sdk:macosArm64Test --tests "AccountIntegrationTest"
@@ -457,7 +455,8 @@ Integration tests automatically fund accounts via Friendbot and run without manu
 # Run on iOS Simulator
 ./gradlew :stellar-sdk:iosSimulatorArm64Test --tests "AccountIntegrationTest"
 
-# Note: JS tests may need to be run individually (see CLAUDE.md for JS testing notes)
+# Run on JS Node
+./gradlew :stellar-sdk:jsNodeTest --tests "AccountIntegrationTest"
 ```
 
 ## Test Networks
@@ -507,7 +506,7 @@ private val testOn = "futurenet"  // or "testnet"
 
 3. Check network status: https://status.stellar.org
 
-### FriendBot Not Available
+### FriendBot not available
 
 **Symptom**: `Failed to fund account` error
 
@@ -517,7 +516,7 @@ private val testOn = "futurenet"  // or "testnet"
 3. Fund manually using Stellar Laboratory: https://laboratory.stellar.org
 4. Switch to a different network (testnet ↔ futurenet)
 
-### 404 Account Not Found
+### 404 account not found
 
 **Symptom**: `Account not found` or `404` error immediately after funding
 
@@ -554,7 +553,7 @@ private val testOn = "futurenet"  // or "testnet"
    - Invalid operation parameters
    - Account doesn't exist yet (wait longer after funding)
 
-### Tests Pass on JVM but Fail on JS/Native
+### Tests pass on JVM but fail on JS/Native
 
 **Symptom**: Platform-specific failures
 
@@ -562,7 +561,7 @@ private val testOn = "futurenet"  // or "testnet"
 1. Check platform-specific crypto initialization (especially JS)
 2. Verify HTTP client configuration for platform
 3. Check for platform-specific timing issues (add longer delays)
-4. See `CLAUDE.md` for known JS testing limitations
+4. See the root `AGENTS.md` for the platform limits, such as the iOS simulator rejecting the testnet certificate chain
 
 ### Network Connectivity Issues
 
@@ -633,7 +632,7 @@ fun testSomething() = runTest {
     try {
         // Test code
     } finally {
-        // Cleanup if needed (merge account, etc.)
+        // Clean up if needed, for example by merging the account
     }
 }
 ```
@@ -703,64 +702,9 @@ while (keepPolling) {
 
 **Test Coverage**: The `stream transactions for account` test from Flutter SDK is not included.
 
-## CI/CD Integration
+## CI
 
-### GitHub Actions
-
-Example workflow:
-
-```yaml
-name: Integration Tests
-
-on:
-  schedule:
-    - cron: '0 2 * * *'  # Run daily at 2 AM
-  workflow_dispatch:  # Manual trigger
-
-jobs:
-  integration-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up JDK
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-
-      - name: Run integration tests
-        run: ./gradlew :stellar-sdk:jvmTest --tests "com.stellar.sdk.integrationTests.*"
-        timeout-minutes: 30
-
-      - name: Report results
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Integration tests failed',
-              body: 'Integration tests failed. Check the workflow run for details.'
-            })
-```
-
-### GitLab CI
-
-Example `.gitlab-ci.yml`:
-
-```yaml
-integration-tests:
-  stage: test
-  only:
-    - schedules
-    - web  # Manual trigger
-  script:
-    - ./gradlew :stellar-sdk:jvmTest --tests "com.stellar.sdk.integrationTests.*"
-  timeout: 30m
-  allow_failure: true  # Don't block pipeline on network issues
-```
+CI runs every test suite with `-PexcludeIntegrationTests`, so no workflow runs the integration tests. Run them locally before a change to code that talks to Horizon or Soroban RPC.
 
 ## Contributing
 

@@ -143,14 +143,14 @@ This overview provides a quick introduction. For detailed information:
 - **[Web Setup](../demo/webApp/README.md)** - Vite dev server, production builds, deployment
 
 ### Development
-- **[Demo CLAUDE.md](../demo/CLAUDE.md)** - Implementation patterns, adding new features, best practices
+- **[Development Workflow](../demo/README.md#development-workflow)** - Adding new features, platform-specific code, shared UI components and patterns, manual testing
 - **[Project Structure](../demo/README.md#project-structure)** - Detailed file organization
 - **[Technology Stack](../demo/README.md#technology-stack)** - Dependencies and frameworks
 
 ### Platform Details
 Each platform has specific setup requirements, build commands, and troubleshooting guides in its respective README.
 
-## Why Explore This Demo?
+## Why explore this demo?
 
 1. **Learn by Example**: See production-ready SDK patterns, not toy examples
 2. **Real Network Integration**: All features work against Stellar testnet

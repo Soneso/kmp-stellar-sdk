@@ -24,12 +24,12 @@ A Kotlin Multiplatform SDK for building applications on the Stellar Network. Wri
 - [Demo App](demo/README.md) - Multi-platform sample application
 - [Smart Accounts](docs/smart-accounts/README.md) - OpenZeppelin smart account support (passkeys, multi-signer, policies)
 - [Smart Account Demo](smart-account-demo/README.md) - Smart account demo with passkey authentication
-- [Development Guide](CLAUDE.md) - Architecture and development guidelines
+- [Contributing](CONTRIBUTING.md) - How to report issues and submit changes; the build, test and repository rules are in [AGENTS.md](AGENTS.md)
 - [Horizon API Compatibility](compatibility/horizon/HORIZON_COMPATIBILITY_MATRIX.md) - Supported Horizon endpoints
 - [Soroban RPC Compatibility](compatibility/rpc/RPC_COMPATIBILITY_MATRIX.md) - Supported Soroban RPC methods
 - [SEP Implementations](docs/sep/README.md) - Stellar Ecosystem Proposals support
 
-## What Is This?
+## What is this?
 
 The Stellar SDK for Kotlin Multiplatform enables you to:
 
@@ -50,7 +50,7 @@ With this SDK, you can create:
 - **DEX Interfaces** - Build trading interfaces, liquidity pools, and order book managers
 - **Soroban DApps** - Deploy and interact with smart contracts from any platform
 - **Token Issuance Platforms** - Create and distribute custom assets with trustline management
-- **Cross-Border Payment Systems** - Leverage path payments for currency conversion
+- **Cross-Border Payment Systems** - Use path payments for currency conversion
 - **Account Services** - Multi-signature support, account recovery, and sponsorship flows
 - **Mobile-First Apps** - iOS and Android apps sharing business logic with desktop, web and server
 
@@ -121,7 +121,7 @@ suspend fun example() {
 }
 ```
 
-### Create KeyPair from Secret Seed
+### Create KeyPair from secret seed
 
 ```kotlin
 suspend fun fromSeed() {
@@ -204,7 +204,7 @@ suspend fun fetchTransactionData() {
 }
 ```
 
-### Interact with Soroban Smart Contracts
+### Interact with Soroban smart contracts
 
 The SDK provides a high-level ContractClient API with automatic type conversion:
 
@@ -351,7 +351,7 @@ See [Testing Guide](docs/testing.md) for information on running tests.
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on reporting issues, proposing features, and submitting pull requests.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on reporting issues, proposing features, and submitting pull requests.
 
 ## License
 

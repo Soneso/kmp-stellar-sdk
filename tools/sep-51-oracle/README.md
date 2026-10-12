@@ -42,13 +42,13 @@ with an older build would bake six wrong keys into the SDK.
 ./probe.sh --check
 
 # Render one value: probe.sh <REFERENCE TYPE NAME> <BASE64>
-./probe.sh ScVal AAAAAQAAAAU=
+./probe.sh ScVal AAAAAwAAAAU=
 ./probe.sh --schema AccountEntryExtensionV2
 
 # Rebuild the name table and check it against the reference
 ruby name_map.rb --diff
 
-# Check without writing: are the names right, and are the artefacts current?
+# Check without writing: are the names right, and are the artifacts current?
 ruby name_map.rb --check
 
 # Compare against a build other than the pinned one, writing nothing
@@ -60,7 +60,7 @@ ruby emitted_names.rb
 
 `name_map.rb --diff` exits non-zero if any derived name disagrees with the
 reference, so it can gate a change. `--check` runs the same comparison but
-writes nothing and additionally fails when a committed artefact is out of date,
+writes nothing and additionally fails when a committed artifact is out of date,
 which is the form to run from a build.
 
 ### Exit codes
@@ -69,8 +69,8 @@ which is the form to run from a build.
 
 | Code | Meaning |
 |---|---|
-| 0 | The derived names agree with the reference, and the artefacts are current. |
-| 1 | A name disagrees, or a committed artefact is stale. |
+| 0 | The derived names agree with the reference, and the artifacts are current. |
+| 1 | A name disagrees, or a committed artifact is stale. |
 | 2 | The reference CLI is missing or does not match the pin. |
 
 ### Advisory mode
@@ -86,8 +86,8 @@ Both are driven from the release watcher in
 `.github/workflows/sep-51-corpus-drift.yml`, which runs them only when the reference crate
 publishes a version newer than the pin.
 
-A missing CLI is a separate code because it calls for a different response —
-install the pinned build — and a caller that read every non-zero exit as
+A missing CLI is a separate code because it calls for a different response:
+installing the pinned build. A caller that read every non-zero exit as
 disagreement would report it as a name mismatch.
 
 `emitted_names.rb` needs no reference CLI and exits 0 or 1.
@@ -98,8 +98,8 @@ disagreement would report it as a name mismatch.
 substitutes for the other.
 
 `name_map.rb` answers "are the derivation rules right?" It calls
-`tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_names.rb` — the same module the
-generator calls — and compares the result with the reference, member by member.
+`tools/xdrgen-kt/lib/xdrgen/generators/kotlin_json_names.rb`, the same module the
+generator calls, and compares the result with the reference, member by member.
 But it calls that module *its own way*, over its own walk of the `.x` sources. It
 therefore cannot see how the generator invokes it. By construction it stays green
 when the rules are right and the generator uses them wrongly.
@@ -112,7 +112,7 @@ table. The failure modes it is the only guard against:
   computed from the wrong set and every member of that enum is stripped wrongly;
 - a key emitted under the wrong field, or a field emitted twice, or one dropped;
 - struct keys emitted in an order other than `.x` declaration order, which is a
-  wire-format change even though the key set is unchanged — so struct keys are
+  wire-format change even though the key set is unchanged, so struct keys are
   compared as an ordered list, not a set;
 - a type-level override that stopped being applied, leaving a type that should
   render as a single string emitting an object instead.
@@ -151,10 +151,21 @@ by construction the member's own JSON name, so the enum diff already covers it.
 
 Re-run `ruby name_map.rb --diff` after either pin moves:
 
-- **XDR pin** (`tools/xdrgen-kt/xdr-source.cfg`) — new enum members or types can
+- **XDR pin** (`tools/xdrgen-kt/xdr-source.cfg`): new enum members or types can
   introduce identifier shapes the rules handle differently from the reference.
-- **Reference pin** (`oracle-pin.json`) — a reference release can change key
-  spellings, as the `type_` to `type` fix in 28.0.0 did.
+- **Reference pin** (`oracle-pin.json`): a reference release can change key
+  spellings.
+
+The workflow `.github/workflows/sep-51-corpus-drift.yml` runs every Monday. It
+checks the name table with `name_map.rb --check` and the corpus with
+`tools/sep-51-corpus/refresh_corpus.sh` against the pinned reference build, and
+opens an issue labeled `sep-51-corpus-drift` when either differs. That issue is
+resolved locally with the pinned CLI: `ruby name_map.rb --diff`, then the corpus
+generator. The same run compares a newer `stellar-xdr` release on crates.io
+against the committed name table and corpus in advisory mode, which writes
+nothing, checks the published SEP-51 revision against `sep_spec` in
+`oracle-pin.json`, and reports either change in an issue labeled
+`sep-51-reference-release`.
 
 Two identifier shapes have no agreed JSON name and make `name_map.rb` raise
 rather than guess: a member identifier equal to its enum's shared prefix, which
@@ -162,6 +173,6 @@ leaves an empty name, and a member whose stripped remainder is exactly `Error`,
 which the reference escapes. Neither occurs in the current `.x` set.
 
 The reference CLI vendors a different XDR commit than the SDK generates from, so
-it can lag behind on newly added types. At the current pins it resolves
-everything; when it does not, the affected members and types are reported as
-unresolvable rather than as mismatches.
+it can lag behind on newly added types. The affected members and types are
+reported as unresolvable, not as mismatches; the `verification` section of
+`name-map.json` lists the ones at the current pins.

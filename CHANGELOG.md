@@ -10,39 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Muxed contract addresses (`W...`, CAP-0084, protocol 30 and higher). The SEP-0023 strkey, base
   value `22 << 3`, carries the 32-byte contract id followed by the 8-byte big-endian id. `StrKey`
-  gains `encodeMuxedContract`, `decodeMuxedContract`, and `isValidMuxedContract`. `Address`
-  parses `W...` as `Address.AddressType.MUXED_CONTRACT`, converts to and from
-  `SCAddressXdr.MuxedContract`, and provides `fromMuxedContract(ByteArray)`. `SCValXdr.toNative`
-  and contract results render the arm as its `W...` strkey. `MuxedContract` pairs a contract id
-  (`C...`) with an optional `ULong` id: `contractId`, `id`, `address` (`W...` with an id, `C...`
-  without), `toSCAddress`, `fromSCAddress`, and `toAddress`.
+  gains `encodeMuxedContract`, `decodeMuxedContract`, and `isValidMuxedContract`. `Address` parses
+  `W...` as `Address.AddressType.MUXED_CONTRACT`, converts to and from `SCAddressXdr.MuxedContract`,
+  and provides `fromMuxedContract(ByteArray)`. `SCValXdr.toNative` and contract results render the
+  arm as its `W...` strkey. `MuxedContract` pairs a contract id (`C...`) with an optional `ULong`
+  id: `contractId`, `id`, `address` (`W...` with an id, `C...` without), `toSCAddress`,
+  `fromSCAddress`, and `toAddress`.
+- The [SEP-23](compatibility/sep/SEP-0023_COMPATIBILITY_MATRIX.md) and
+  [SEP-29](compatibility/sep/SEP-0029_COMPATIBILITY_MATRIX.md) compatibility matrices document
+  strkey format support and the memo-required check; `docs/sep/sep-23.md` and `docs/sep/sep-29.md`
+  describe both features.
 
 ### Changed
-- `ContractSpec.nativeToXdrSCVal` and `funcArgsToXdrSCValues` accept for an `Address` parameter a
-  `G...` or `C...` strkey or an `Address` of type `ACCOUNT` or `CONTRACT`, and for a
-  `MuxedAddress` parameter also an `M...` or `W...` strkey or an `Address` of type
-  `MUXED_ACCOUNT` or `MUXED_CONTRACT`. A `B...` or `L...` address, a muxed address for an
-  `Address` parameter, a malformed string, or a value of another type throws
-  `ContractSpecException` naming the parameter type, the kinds it takes, and the value given.
-  These checks apply to `String` and `Address` values; `null` converts to void and a prebuilt
-  `SCValXdr` passes through unchanged. Before this change both parameter types took every strkey
-  kind `Address` parses and refused an `Address` instance.
-- XDR definitions regenerated from stellar/stellar-xdr commit
+- Breaking: `ContractSpec.nativeToXdrSCVal` and `funcArgsToXdrSCValues` accept for an `Address`
+  parameter a `G...` or `C...` strkey or an `Address` of type `ACCOUNT` or `CONTRACT`, and for a
+  `MuxedAddress` parameter also an `M...` or `W...` strkey or an `Address` of type `MUXED_ACCOUNT`
+  or `MUXED_CONTRACT`. A `B...` or `L...` address, a muxed address for an `Address` parameter, a
+  malformed string, or a value of another type throws `ContractSpecException` naming the parameter
+  type, the kinds it takes, and the value given. These checks apply to `String` and `Address`
+  values; `null` converts to void and a prebuilt `SCValXdr` passes through unchanged. Before this
+  change both parameter types took every strkey kind `Address` parses and refused an `Address`
+  instance.
+- Breaking: XDR definitions regenerated from stellar/stellar-xdr commit
   `579a90b2654e3811e8b672e128a5e094c7325b27` (CAP-0084 muxed contract addresses, CAP-0087 ML-DSA
-  cost types). `SCAddressTypeXdr` gains `SC_ADDRESS_TYPE_MUXED_CONTRACT` (5), and `SCAddressXdr`
-  the arm `MuxedContract`, a `MuxedContractXdr` (`id`, `contractId`). `ContractCostTypeXdr` gains
-  nine members, `MlDsa44DecodeVerifyingKey` (86) through `VerifyMlDsa87Sig` (94). XDR-JSON
-  renders a muxed contract as its `W...` strkey; the new keys are `muxed_contract` and
+  cost types). `SCAddressTypeXdr` gains `SC_ADDRESS_TYPE_MUXED_CONTRACT` (5), and `SCAddressXdr` the
+  arm `MuxedContract`, a `MuxedContractXdr` (`id`, `contractId`). `ContractCostTypeXdr` gains nine
+  members, `MlDsa44DecodeVerifyingKey` (86) through `VerifyMlDsa87Sig` (94). XDR-JSON renders a
+  muxed contract as its `W...` strkey; the new keys are `muxed_contract` and
   `ml_dsa44_decode_verifying_key` through `verify_ml_dsa87_sig`. Existing members, arms, and keys
   keep their values. A `when` over `SCAddressXdr`, `SCAddressTypeXdr`, `ContractCostTypeXdr`, or
   `Address.AddressType` without an `else` branch needs the new branch; all other code compiles
-  unchanged.
-- `Auth.authorizeEntry` rejects an entry whose credential address or `forAddress` target is an
-  `M...` or `W...` address, `Auth.authorizeInvocation` such a `publicKey`, and
-  `Auth.attachDelegates` such a delegate, with `IllegalArgumentException`: "Muxed account (M...)
-  and muxed contract (W...) addresses are not valid Soroban auth addresses" (delegate addresses
-  for `attachDelegates`), followed by the address.
-- XDR definitions regenerated from stellar/stellar-xdr commit
+  unchanged. Before this change, decoding address type 5 or a cost type from 86 to 94 threw
+  `IllegalArgumentException` for an unknown value.
+- Breaking: `Auth.authorizeEntry` rejects an entry whose credential address or `forAddress` target
+  is an `M...` or `W...` address, `Auth.authorizeInvocation` such a `publicKey`, and
+  `Auth.attachDelegates` such a delegate, with `IllegalArgumentException`: "Muxed account (M...) and
+  muxed contract (W...) addresses are not valid Soroban auth addresses" (delegate addresses for
+  `attachDelegates`), followed by the address. Before this change, an `M...` target or delegate was
+  rejected with other messages, and a muxed credential address was signed without a check.
+- Breaking: XDR definitions regenerated from stellar/stellar-xdr commit
   `c2612cf534e4448fa263e252afe1bdbac5512d14`. `StellarValueType` gains `STELLAR_VALUE_SIGNED_MS` (3)
   and `STELLAR_VALUE_EMPTY_TX_SET_MS` (4), and `StellarValue.ext` the arms `signedMsValue`
   (`closeTimeMs`, `lcValueSignature`) and `proposedMsValue` (the `proposedValue` fields plus
@@ -51,28 +57,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `StellarValueExtXdr.SignedMsValue` (`StellarValueSignedMsValueXdr`) and
   `StellarValueExtXdr.ProposedMsValue` (`StellarValueProposedMsValueXdr`), and `TimePointMsXdr`.
   XDR-JSON keys: `signed_ms`, `empty_tx_set_ms`, `close_time_ms`; existing members, arms, and
-  renderings keep their values and keys. A `when` over `StellarValueTypeXdr` or
-  `StellarValueExtXdr` without an `else` branch needs the new branches; all other code compiles
-  unchanged.
+  renderings keep their values and keys. A `when` over `StellarValueTypeXdr` or `StellarValueExtXdr`
+  without an `else` branch needs the new branches; all other code compiles unchanged. Before this
+  change, decoding `STELLAR_VALUE_SIGNED_MS` or `STELLAR_VALUE_EMPTY_TX_SET_MS` threw
+  `IllegalArgumentException` for an unknown value.
+- Horizon and Soroban RPC compatibility matrices target v29.0.0 and retain their reported coverage.
+- The repository documents its build, test, generation and contribution rules in `AGENTS.md` and
+  `CONTRIBUTING.md`; CI checks that every path `AGENTS.md` names exists.
+- `TransactionInfo.diagnosticEventsXdr` and `TransactionInfo.parseDiagnosticEventsXdr()` are no
+  longer deprecated, because stellar-rpc supplies a transaction's diagnostic events there. Version
+  1.14.0 had deprecated them in favor of the nested `Events` members, which are deprecated instead.
+
+### Deprecated
+- `Events.diagnosticEventsXdr` and `Events.parseDiagnosticEventsXdr()` are deprecated because
+  stellar-rpc supplies diagnostic events at the transaction's top level. Read
+  `GetTransactionResponse.diagnosticEventsXdr` for a single transaction or
+  `TransactionInfo.diagnosticEventsXdr` for a transaction list, and parse them with the
+  `parseDiagnosticEventsXdr()` of those classes. The deprecated members continue decoding the nested
+  field in older response data.
 
 ### Fixed
-- `AssembledTransaction.signAuthEntries` keeps the signature expiration ledger of an entry that
-  already carries a signature on any node, including a second cosigner on the same node, since
+- Breaking: `AssembledTransaction.signAuthEntries` keeps the signature expiration ledger of an entry
+  that already carries a signature on any node, including a second cosigner on the same node, since
   every signature on the entry commits to that one value. Without `validUntilLedgerSequence` it
-  reuses the stored value; the latest ledger is fetched at most once per call, and only for
-  entries that need the default. An explicit value that differs from the stored one raises
+  reuses the stored value; the latest ledger is fetched at most once per call, and only for entries
+  that need the default. An explicit value that differs from the stored one raises
   `IllegalArgumentException` naming both values, and the transaction keeps its auth entries.
-  `Auth.authorizeEntry` applies the same check to `validUntilLedgerSeq`.
-- `Asset.compareTo` orders credit assets with the same code by the issuer's raw 32-byte public
-  key, as stellar-core does, not by the strkey text. The `LiquidityPool` order check, its decoding
-  from XDR and the pool id follow this order.
-- `Scv.toMap` emits map entries in the Soroban host's key order and raises
+  `Auth.authorizeEntry` applies the same check to `validUntilLedgerSeq`. Before this change,
+  `signAuthEntries` passed a fresh expiration ledger on every call. A second signer whose call
+  computed a later default or passed another explicit value therefore signed a different payload
+  than the first, and the host rejected the entry.
+- Breaking: `Scv.toMap` emits map entries in the Soroban host's key order and raises
   `IllegalArgumentException` for two keys that are equal in that order. The new overload
-  `Scv.toMap(List<SCMapEntryXdr>)` keeps keys that convert to the same value apart so the check
-  sees them. `ContractSpec` builds map and struct values through it and reports a duplicate key
-  as `ContractSpecException`. The comparator is public as `scval.compareScValHostOrder` and
-  compares `I32`, `I64`, `I128`, `I256` and `LedgerKeyNonce` values as signed integers. Decoding
-  keeps the wire order.
+  `Scv.toMap(List<SCMapEntryXdr>)` keeps keys that convert to the same value apart so the check sees
+  them. `ContractSpec` builds map and struct values through it and reports a duplicate key as
+  `ContractSpecException`. The comparator is public as `scval.compareScValHostOrder` and compares
+  `I32`, `I64`, `I128`, `I256` and `LedgerKeyNonce` values as signed integers. Decoding keeps the
+  wire order. Before this change, a map kept its insertion order, and the host rejected a call whose
+  map keys were out of its order.
+- Breaking: `Asset.compareTo` orders credit assets with the same code by the issuer's raw 32-byte
+  public key, as stellar-core does, not by the strkey text. The `LiquidityPool` order check, its
+  decoding from XDR and the pool id follow this order. Before this change, the SDK used that text
+  order, so for such a pair it rejected the order stellar-core accepts and accepted the reversed
+  one.
+- `GetTransactionResponse` reads the top-level `diagnosticEventsXdr` list that stellar-rpc sends and
+  parses it with `parseDiagnosticEventsXdr()`. Before this change, the response exposed only the
+  nested `Events` field, so the events went unread.
+- The footers of the SEP compatibility matrices link to `docs/sep/README.md`; the earlier target
+  `docs/sep-implementations.md` did not exist.
 
 ## [1.14.0] - 2026-09-28
 
