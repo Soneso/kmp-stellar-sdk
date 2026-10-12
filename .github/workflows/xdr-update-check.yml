@@ -327,7 +327,7 @@ jobs:
             printf '10. Build and run unit tests: `./gradlew :stellar-sdk:jvmTest -PexcludeIntegrationTests`\n'
             printf '11. If the XDR changes introduce new types or modify existing ones, evaluate whether the SDK needs updated high-level APIs (operation builders, SEP implementations, etc.)\n'
             printf '12. Update the changelog with any breaking changes or new features. A changed XDR-JSON rendering is a wire-format change and belongs there; `Sep51RollbackRehearsalTest` fails until its frozen constants are updated, which is what makes such a change deliberate\n'
-            printf '\nSteps 5 and 7 need the pinned XDR-JSON reference CLI: `cargo install stellar-xdr --features cli --version 28.0.1 --locked`. See `tools/sep-51-oracle/README.md`.\n'
+            printf '\nSteps 5 and 7 need the pinned XDR-JSON reference CLI: `cargo install stellar-xdr --features cli --version 30.0.0 --locked`. See `tools/sep-51-oracle/README.md`.\n'
           } >> /tmp/issue_body.md
 
           printf '\n---\n*This issue was created automatically by the [XDR update check workflow](.github/workflows/xdr-update-check.yml).*\n' >> /tmp/issue_body.md

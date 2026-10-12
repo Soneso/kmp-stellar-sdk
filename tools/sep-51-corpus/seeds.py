@@ -22,9 +22,10 @@ empty and populated variable-length data, optionals in both states, and the
 name rules that a pin bump could disturb.
 
 A SignerKeyEd25519SignedPayload with a zero-length payload is deliberately
-absent: the reference decodes it to a strkey it then refuses to encode, so it
-cannot round-trip through the generator. That input is pinned by a hand-written
-negative test instead.
+absent: the reference decodes it to an `<INVALID:...:EMPTY_PAYLOAD>` marker in
+place of a strkey and refuses to encode that marker, so it cannot round-trip
+through the generator. That input is pinned by a hand-written negative test
+instead.
 """
 
 # --- Reusable values ---------------------------------------------------------
@@ -152,8 +153,8 @@ SEEDS = [
           "Asset code holding a non-ASCII byte escapes it as \\xNN."),
     _seed("AssetCode4", "AssetCode4Xdr", "a\\\\b",
           "Backslash inside a four-byte asset code doubles."),
-    _seed("AssetCode12", "AssetCode12Xdr", "ABC",
-          "Three-character twelve-byte asset code keeps its short form."),
+    _seed("AssetCode12", "AssetCode12Xdr", "ABC\\0\\0",
+          "Three-character twelve-byte asset code pads to five bytes with escaped NULs."),
     _seed("AssetCode12", "AssetCode12Xdr", "ABCDE",
           "Five-character asset code sits at the twelve-byte floor."),
     _seed("AssetCode12", "AssetCode12Xdr", "ABCDEFGH",

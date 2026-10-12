@@ -12,7 +12,7 @@ reference CLI; these tools are used when the XDR pin or the reference pin moves.
 Install the pinned reference CLI (user-level, no elevated privileges):
 
 ```bash
-cargo install stellar-xdr --features cli --version 28.0.1 --locked
+cargo install stellar-xdr --features cli --version 30.0.0 --locked
 ```
 
 It installs to `~/.cargo/bin/stellar-xdr`. Set `STELLAR_XDR` to use a binary from
@@ -133,16 +133,16 @@ The check is exhaustive over two surfaces:
   about field *names* only and says nothing about emission order. Emission order
   is declaration order, and `decode` output is the authority there.
 
-Seven structs are rendered by SEP-0051 as a single JSON string rather than an
-object: the four integer-parts types, plus `MuxedEd25519Account` and the two
-nested structs `med25519` and `ed25519SignedPayload`, which the SDK generates as
-`MuxedAccountMed25519Xdr` and `SignerKeyEd25519SignedPayloadXdr`. They carry no
-field names, so the field diff does not apply; `name_map.rb` classifies them
-separately and asserts the set is exactly the expected one. A struct entering or
-leaving that set is reported as a mismatch, because it means a type's wire form
-changed. A type the reference cannot resolve is exempt from the leaving check --
-it is reported once, as unresolvable, since an absent type is no evidence about
-its rendering.
+Eight structs are rendered by SEP-0051 as a single JSON string rather than an
+object: the four integer-parts types, plus `MuxedEd25519Account`,
+`MuxedContract` and the two nested structs `med25519` and
+`ed25519SignedPayload`, which the SDK generates as `MuxedAccountMed25519Xdr` and
+`SignerKeyEd25519SignedPayloadXdr`. They carry no field names, so the field diff
+does not apply; `name_map.rb` classifies them separately and asserts the set is
+exactly the expected one. A struct entering or leaving that set is reported as a
+mismatch, because it means a type's wire form changed. A type the reference
+cannot resolve is exempt from the leaving check -- it is reported once, as
+unresolvable, since an absent type is no evidence about its rendering.
 
 Union arm keys are derived rather than probed. An arm keyed by an enum member is
 by construction the member's own JSON name, so the enum diff already covers it.

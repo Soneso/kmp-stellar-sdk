@@ -203,7 +203,9 @@ module Xdrgen
         },
 
         # A four-character code drops all its NUL padding; a twelve-character code keeps
-        # five bytes, which is what tells the two forms apart once trimmed.
+        # five bytes, which is what tells the two forms apart once trimmed. SEP-0051 sets
+        # those five bytes as the floor of a twelve-character code, so its reader refuses a
+        # string that unescapes to fewer; a short code carries escaped NULs up to the floor.
         'AssetCode4Xdr' => {
           imports: [],
           to: <<~KOTLIN,
@@ -222,7 +224,7 @@ module Xdrgen
           KOTLIN
           from: <<~KOTLIN
             internal fun fromXdrJsonTree(element: JsonElement): AssetCode12Xdr =
-              AssetCode12Xdr(XdrJson.padAssetCode(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"), XDR_JSON_TYPE, 12))
+              AssetCode12Xdr(XdrJson.padAssetCode(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"), XDR_JSON_TYPE, 12, minimumLength = 5))
           KOTLIN
         },
 

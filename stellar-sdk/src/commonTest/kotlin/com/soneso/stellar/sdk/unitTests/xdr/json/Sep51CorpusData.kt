@@ -2488,16 +2488,4 @@ internal val SEP51_CORPUS: List<Sep51CorpusEntry> = listOf(
 
 /** Enum members the reference could not resolve when the name table was last built. */
 internal val SEP51_UNRESOLVABLE_ENUM_MEMBERS: List<String> = listOf(
-  "ContractCostType.MlDsa44DecodeSignature",
-  "ContractCostType.MlDsa44DecodeVerifyingKey",
-  "ContractCostType.MlDsa65DecodeSignature",
-  "ContractCostType.MlDsa65DecodeVerifyingKey",
-  "ContractCostType.MlDsa87DecodeSignature",
-  "ContractCostType.MlDsa87DecodeVerifyingKey",
-  "ContractCostType.VerifyMlDsa44Sig",
-  "ContractCostType.VerifyMlDsa65Sig",
-  "ContractCostType.VerifyMlDsa87Sig",
-  "SCAddressType.SC_ADDRESS_TYPE_MUXED_CONTRACT",
-  "StellarValueType.STELLAR_VALUE_EMPTY_TX_SET_MS",
-  "StellarValueType.STELLAR_VALUE_SIGNED_MS",
 )
