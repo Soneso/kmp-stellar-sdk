@@ -1,8 +1,10 @@
 package com.soneso.stellar.sdk.unitTests.sep.sep51
 
+import com.soneso.stellar.sdk.xdr.AlphaNum12Xdr
 import com.soneso.stellar.sdk.xdr.AssetCode12Xdr
 import com.soneso.stellar.sdk.xdr.AssetCode4Xdr
 import com.soneso.stellar.sdk.xdr.AssetXdr
+import com.soneso.stellar.sdk.xdr.ChangeTrustAssetXdr
 import com.soneso.stellar.sdk.xdr.EvictionIteratorXdr
 import com.soneso.stellar.sdk.xdr.Int32Xdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
@@ -16,6 +18,7 @@ import com.soneso.stellar.sdk.xdr.SorobanTransactionMetaExtXdr
 import com.soneso.stellar.sdk.xdr.SponsorshipDescriptorXdr
 import com.soneso.stellar.sdk.xdr.TTLEntryXdr
 import com.soneso.stellar.sdk.xdr.ThresholdsXdr
+import com.soneso.stellar.sdk.xdr.TrustLineAssetXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.Uint64Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
@@ -24,8 +27,11 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Holds the SDK to the renderings SEP-0051 states in its Specification and Stellar-Specific
@@ -383,7 +389,139 @@ class Sep51SpecExampleTest {
         assertEquals(xdr, base64 { AssetCode12Xdr.fromXdrJson(document).encode(it) })
     }
 
+    /**
+     * A twelve-byte asset code is always five encoded characters or more, and the network rejects
+     * a shorter one as invalid. The count is taken after unescaping: `ABC\0` falls short at four
+     * bytes, and a three-character code reaches the floor written as `ABC\0\0`.
+     */
+    @Test
+    fun assetCodeOfTwelveRejectsAStringThatUnescapesToFewerThanFiveBytes() {
+        for ((code, length) in listOf("ABC" to 3, "ABCD" to 4, "ABC\\0" to 4, "" to 0)) {
+            assertBothAssetCodeOfTwelveParsersReject(
+                code,
+                "AssetCode12Xdr: expects an asset code of at least 5 bytes, got $length"
+            )
+        }
+    }
+
+    /**
+     * The bare three-character code is refused wherever a twelve-byte asset code is read from a
+     * JSON tree: standalone, as the `asset_code` of an `AlphaNum12`, and in the
+     * `credit_alphanum12` arm of each union that carries one.
+     */
+    @Test
+    fun assetCodeOfTwelveRejectsTheBareThreeCharacterCodeInEveryEnclosingType() {
+        val alphaNum = buildJsonObject {
+            put("asset_code", "ABC")
+            put("issuer", ZERO_ACCOUNT)
+        }
+        val arm = buildJsonObject { put("credit_alphanum12", alphaNum) }
+        val parsers = mapOf<String, () -> Unit>(
+            "AssetCode12Xdr" to { AssetCode12Xdr.fromXdrJsonElement(JsonPrimitive("ABC")) },
+            "AlphaNum12Xdr" to { AlphaNum12Xdr.fromXdrJsonElement(alphaNum) },
+            "AssetXdr" to { AssetXdr.fromXdrJsonElement(arm) },
+            "ChangeTrustAssetXdr" to { ChangeTrustAssetXdr.fromXdrJsonElement(arm) },
+            "TrustLineAssetXdr" to { TrustLineAssetXdr.fromXdrJsonElement(arm) }
+        )
+        for ((name, parse) in parsers) {
+            val error = assertFailsWith<IllegalArgumentException>(name) { parse() }
+            assertEquals(
+                "AssetCode12Xdr: expects an asset code of at least 5 bytes, got 3",
+                error.message,
+                name
+            )
+        }
+    }
+
+    @Test
+    fun assetCodeOfTwelveRejectsAStringThatUnescapesToMoreThanTwelveBytes() {
+        assertBothAssetCodeOfTwelveParsersReject(
+            "ABCDEFGHIJKLM",
+            "AssetCode12Xdr: expects an asset code of at most 12 bytes, got 13"
+        )
+    }
+
+    @Test
+    fun assetCodeOfTwelveRejectsAnUnrecognisedEscape() {
+        assertBothAssetCodeOfTwelveParsersReject(
+            "ABCDE\\q",
+            "AssetCode12Xdr: key \"value\" contains the unrecognised escape \"\\q\""
+        )
+    }
+
+    /**
+     * The renderings below are the reference XDR-JSON forms of an asset code of five to twelve
+     * bytes, standalone and as the `asset_code` of an `AlphaNum12` with the all-zero issuer.
+     */
+    @Test
+    fun assetCodeOfTwelveAcceptsEveryStringThatUnescapesToFiveToTwelveBytes() {
+        val cases = listOf(
+            Triple(
+                "ABC\\0\\0",
+                "QUJDAAAAAAAAAAAA",
+                "QUJDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            ),
+            Triple(
+                "ABCD\\0",
+                "QUJDRAAAAAAAAAAA",
+                "QUJDRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            ),
+            Triple(
+                "ABCDE",
+                "QUJDREUAAAAAAAAA",
+                "QUJDREUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            ),
+            Triple(
+                "ABCDEFGHIJKL",
+                "QUJDREVGR0hJSktM",
+                "QUJDREVGR0hJSktMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            )
+        )
+        for ((code, assetCodeXdr, alphaNumXdr) in cases) {
+            val document = JsonPrimitive(code).toString()
+            assertEquals(document, AssetCode12Xdr.decode(reader(assetCodeXdr)).toXdrJson(), code)
+            assertEquals(
+                assetCodeXdr,
+                base64 { AssetCode12Xdr.fromXdrJson(document).encode(it) },
+                code
+            )
+
+            val alphaNum = alphaNumOfTwelveDocument(code)
+            assertEquals(alphaNum, AlphaNum12Xdr.decode(reader(alphaNumXdr)).toXdrJson(), code)
+            assertEquals(
+                alphaNumXdr,
+                base64 { AlphaNum12Xdr.fromXdrJson(alphaNum).encode(it) },
+                code
+            )
+        }
+    }
+
+    /** The XDR-JSON text of an `AlphaNum12` carrying [code] and the all-zero issuer. */
+    private fun alphaNumOfTwelveDocument(code: String): String =
+        buildJsonObject {
+            put("asset_code", code)
+            put("issuer", ZERO_ACCOUNT)
+        }.toString()
+
+    /**
+     * Asserts that [code] is refused with [message] both as a standalone twelve-byte asset code
+     * and as the `asset_code` of an `AlphaNum12`.
+     */
+    private fun assertBothAssetCodeOfTwelveParsersReject(code: String, message: String) {
+        val standalone = assertFailsWith<IllegalArgumentException> {
+            AssetCode12Xdr.fromXdrJson(JsonPrimitive(code).toString())
+        }
+        assertEquals(message, standalone.message, code)
+        val nested = assertFailsWith<IllegalArgumentException> {
+            AlphaNum12Xdr.fromXdrJson(alphaNumOfTwelveDocument(code))
+        }
+        assertEquals(message, nested.message, code)
+    }
+
     private companion object {
+
+        /** The strkey of the all-zero ed25519 public key. */
+        const val ZERO_ACCOUNT: String = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
 
         /** The reference XDR-JSON form of a ledger header, whose skip list is a fixed array. */
         const val LEDGER_HEADER_JSON: String =

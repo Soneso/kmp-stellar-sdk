@@ -474,10 +474,17 @@ internal object XdrJson {
         return bytes.copyOf(end)
     }
 
-    /** Restores a trimmed asset code to its fixed width, rejecting one that does not fit. */
-    fun padAssetCode(bytes: ByteArray, type: String, width: Int): ByteArray {
+    /**
+     * Restores a trimmed asset code to its fixed width, rejecting one that does not fit or that
+     * is shorter than [minimumLength] bytes. [bytes] is the code after unescaping, so escaped NUL
+     * padding counts towards the minimum.
+     */
+    fun padAssetCode(bytes: ByteArray, type: String, width: Int, minimumLength: Int = 0): ByteArray {
         if (bytes.size > width) {
             fail(type, "expects an asset code of at most $width bytes, got ${bytes.size}")
+        }
+        if (bytes.size < minimumLength) {
+            fail(type, "expects an asset code of at least $minimumLength bytes, got ${bytes.size}")
         }
         return bytes.copyOf(width)
     }

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   describe both features.
 
 ### Changed
+- Breaking: `AssetCode12Xdr` rejects an XDR-JSON string that unescapes to fewer than five bytes, as
+  the reference implementation does since 30.0.0; a short code is written with escaped NUL bytes,
+  `"ABC\0\0"` for a three-character code. Before this change, `"ABC"` was accepted and produced an
+  asset code that the network rejects as invalid.
 - Breaking: `ContractSpec.nativeToXdrSCVal` and `funcArgsToXdrSCValues` accept for an `Address`
   parameter a `G...` or `C...` strkey or an `Address` of type `ACCOUNT` or `CONTRACT`, and for a
   `MuxedAddress` parameter also an `M...` or `W...` strkey or an `Address` of type `MUXED_ACCOUNT`

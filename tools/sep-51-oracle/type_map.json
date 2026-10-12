@@ -1,8 +1,8 @@
 {
   "oracle": {
     "tool": "stellar-xdr",
-    "version": "28.0.1",
-    "xdr_commit": "9c9c145953e80990d6ff1ae3a6a973a0ce6d0694"
+    "version": "30.0.0",
+    "xdr_commit": "4f524bbac80c781c06e4fb5fc93a2d0d331d6705"
   },
   "sdk_xdr_commit": "579a90b2654e3811e8b672e128a5e094c7325b27",
   "description": "Maps this SDK's generated XDR type names to the reference CLI's spelling. unknown_to_oracle lists every type the reference build does not resolve, whatever the cause; the expected cause is a type added after the XDR commit that build vendors, and the list is empty while the two pins agree closely enough.",
@@ -224,6 +224,7 @@
     "MemoXdr": "Memo",
     "MuxedAccountMed25519Xdr": "MuxedAccountMed25519",
     "MuxedAccountXdr": "MuxedAccount",
+    "MuxedContractXdr": "MuxedContract",
     "MuxedEd25519AccountXdr": "MuxedEd25519Account",
     "OfferEntryExtXdr": "OfferEntryExt",
     "OfferEntryFlagsXdr": "OfferEntryFlags",
@@ -350,7 +351,9 @@
     "SorobanTransactionMetaXdr": "SorobanTransactionMeta",
     "StateArchivalSettingsXdr": "StateArchivalSettings",
     "StellarValueExtXdr": "StellarValueExt",
+    "StellarValueProposedMsValueXdr": "StellarValueProposedMsValue",
     "StellarValueProposedValueXdr": "StellarValueProposedValue",
+    "StellarValueSignedMsValueXdr": "StellarValueSignedMsValue",
     "StellarValueTypeXdr": "StellarValueType",
     "StellarValueXdr": "StellarValue",
     "TTLEntryXdr": "TtlEntry",
@@ -402,9 +405,5 @@
     "UInt256PartsXdr": "UInt256Parts",
     "UpgradeEntryMetaXdr": "UpgradeEntryMeta"
   },
-  "unknown_to_oracle": [
-    "MuxedContractXdr",
-    "StellarValueProposedMsValueXdr",
-    "StellarValueSignedMsValueXdr"
-  ]
+  "unknown_to_oracle": []
 }

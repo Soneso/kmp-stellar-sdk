@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -1474,6 +1475,16 @@ class XdrJsonHelperTest {
     fun padAssetCodeRejectsACodeThatDoesNotFit() {
         val error = rejects { XdrJson.padAssetCode(ByteArray(5), type, 4) }
         assertTrue(error.message!!.contains("at most 4 bytes"))
+    }
+
+    @Test
+    fun padAssetCodeRejectsACodeShorterThanTheMinimum() {
+        val error = rejects { XdrJson.padAssetCode(ByteArray(4), type, 12, minimumLength = 5) }
+        assertEquals("$type: expects an asset code of at least 5 bytes, got 4", error.message)
+        assertContentEquals(
+            byteArrayOf(65, 66, 67, 0, 0) + ByteArray(7),
+            XdrJson.padAssetCode(byteArrayOf(65, 66, 67, 0, 0), type, 12, minimumLength = 5)
+        )
     }
 
     // -------------------------------------------------------------------------------------

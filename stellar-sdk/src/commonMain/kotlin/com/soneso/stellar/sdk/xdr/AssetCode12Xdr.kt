@@ -25,7 +25,7 @@ value class AssetCode12Xdr(val value: ByteArray) {
     fun fromXdrJsonElement(element: JsonElement): AssetCode12Xdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
     internal fun fromXdrJsonTree(element: JsonElement): AssetCode12Xdr =
-      AssetCode12Xdr(XdrJson.padAssetCode(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"), XDR_JSON_TYPE, 12))
+      AssetCode12Xdr(XdrJson.padAssetCode(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"), XDR_JSON_TYPE, 12, minimumLength = 5))
   }
 
   fun encode(writer: XdrWriter) {

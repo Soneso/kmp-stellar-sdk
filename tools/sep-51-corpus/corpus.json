@@ -2,29 +2,12 @@
   "metadata": {
     "description": "SEP-0051 (XDR-JSON) conformance corpus. Each entry pins the exact JSON text the SDK must emit for one XDR value and the base64 XDR that value encodes to.",
     "reference_tool": "stellar-xdr",
-    "reference_version": "28.0.1",
-    "reference_xdr_commit": "9c9c145953e80990d6ff1ae3a6a973a0ce6d0694",
+    "reference_version": "30.0.0",
+    "reference_xdr_commit": "4f524bbac80c781c06e4fb5fc93a2d0d331d6705",
     "sdk_xdr_commit": "579a90b2654e3811e8b672e128a5e094c7325b27",
     "entry_count": 352,
-    "unresolvable_enum_members": [
-      "ContractCostType.MlDsa44DecodeSignature",
-      "ContractCostType.MlDsa44DecodeVerifyingKey",
-      "ContractCostType.MlDsa65DecodeSignature",
-      "ContractCostType.MlDsa65DecodeVerifyingKey",
-      "ContractCostType.MlDsa87DecodeSignature",
-      "ContractCostType.MlDsa87DecodeVerifyingKey",
-      "ContractCostType.VerifyMlDsa44Sig",
-      "ContractCostType.VerifyMlDsa65Sig",
-      "ContractCostType.VerifyMlDsa87Sig",
-      "SCAddressType.SC_ADDRESS_TYPE_MUXED_CONTRACT",
-      "StellarValueType.STELLAR_VALUE_EMPTY_TX_SET_MS",
-      "StellarValueType.STELLAR_VALUE_SIGNED_MS"
-    ],
-    "unresolvable_struct_types": [
-      "MuxedContract",
-      "proposedMsValue",
-      "signedMsValue"
-    ]
+    "unresolvable_enum_members": [],
+    "unresolvable_struct_types": []
   },
   "entries": [
     {
