@@ -25,7 +25,7 @@ All documentation is written for **Group 1: SDK Users** - developers who want to
 
 ## Release Policy for Docs
 
-Main's user-facing documentation and skill content describe the released SDK, because users read them on GitHub against the SDK they can install. Documentation and skill content for unreleased behavior goes to the `release-docs` branch, not to the feature branch that implements the behavior; `release-docs` is merged as the first step of release preparation. Feature branches carry only code, tests, the CHANGELOG's `[Unreleased]` section, CLAUDE.md updates, and version-independent process documents. Skill archives are rebuilt only during release preparation, never on feature branches.
+Main's user-facing documentation and skill content describe the released SDK, because users read them on GitHub against the SDK they can install. Documentation and skill content for unreleased behavior goes to the `release-docs` branch, not to the feature branch that implements the behavior; `release-docs` is merged as the first step of release preparation. Feature branches carry only code, tests, the CHANGELOG's `[Unreleased]` section, AGENTS.md updates, and version-independent process documents. Skill archives are rebuilt only during release preparation, never on feature branches.
 
 ## Core Principles
 
@@ -49,7 +49,7 @@ Documentation focuses exclusively on SDK usage. Avoid:
 
 **Test**: Can a developer copy-paste this code and have it work with just the SDK dependency?
 
-### 3. Examples Over Theory
+### 3. Examples over theory
 
 Every section must have working code examples:
 - Complete, runnable examples (no undefined variables)
@@ -57,7 +57,7 @@ Every section must have working code examples:
 - Comments explain WHY, not WHAT
 - Show the happy path first, edge cases in Advanced docs
 
-### 4. Accuracy Is Critical
+### 4. Accuracy is critical
 
 All code must:
 - Use actual SDK classes, methods, and properties
@@ -67,7 +67,7 @@ All code must:
 
 **Verification process**: Cross-reference examples with actual SDK source files before publishing.
 
-### 5. Conciseness Over Completeness
+### 5. Conciseness over completeness
 
 - Remove filler words and marketing language
 - One clear example beats three redundant ones
@@ -80,9 +80,9 @@ Examples must work across all KMP targets:
 - Avoid `File` I/O (not available on JavaScript/iOS)
 - Use `suspend` functions appropriately
 - Show coroutine usage patterns
-- Note platform-specific requirements clearly
+- Note platform-specific requirements
 
-### 7. One Framework Per Platform
+### 7. One framework per platform
 
 Platform guides show **one primary framework** to avoid decision paralysis:
 - **Android**: Compose with Kotlin
@@ -95,7 +95,7 @@ Platform guides show **one primary framework** to avoid decision paralysis:
 
 ### 8. No Changelog Residue
 
-Documentation states the current contract, never the story of how the code got there — and never the counterfactual of what the code would do without one of its checks. Sentences shaped like "X happens rather than Y" or "X instead of Y", where Y is a former defect or a hypothetical failure, leak the author's editing context into the reader's head: the reader never imagined Y, learns nothing about the API from it, and is left wondering why it is mentioned.
+Documentation states the current contract. It never tells the story of how the code got there, and never the counterfactual of what the code would do without one of its checks. Sentences shaped like "X happens rather than Y" or "X instead of Y", where Y is a former defect or a hypothetical failure, leak the author's editing context into the reader's head. The reader never imagined Y, learns nothing about the API from it, and is left wondering why it is mentioned.
 
 Keep a "rather than"/"instead of" contrast only when both branches are real choices or plausible expectations for the reader ("returns null rather than throwing"). Delete it when the second branch exists only in the author's memory of the code.
 
@@ -110,7 +110,7 @@ The justification for a check ("this guards against X") belongs in the commit me
 
 ### 9. Error Handling in Examples
 
-Call the API directly when the input is fixed and known good (hardcoded literals, freshly generated values) — a failure there is a programming error. Wrap the call in `try`/`catch` where a value arrives at runtime (user input, network data). Never show runtime input handled without a catch. Explain the convention to readers once in the entry-level guide; other pages follow it without restating it.
+Call the API directly when the input is fixed and known good (hardcoded literals, freshly generated values). A failure there is a programming error. Wrap the call in `try`/`catch` where a value arrives at runtime (user input, network data). Never show runtime input handled without a catch. Explain the convention to readers once in the entry-level guide; other pages follow it without restating it.
 
 ## Content Guidelines
 
@@ -126,7 +126,7 @@ Call the API directly when the input is fixed and known good (hardcoded literals
 - KeyPair generation, import, signing
 - Transaction building and submission
 - All 27 Stellar operations with real use cases
-- Horizon queries (accounts, transactions, etc.)
+- Horizon queries, such as accounts and transactions
 - Soroban contract interaction
 - Multi-signature workflows
 - Error handling patterns
@@ -182,7 +182,7 @@ Before publishing or updating documentation, verify:
 - [ ] All class names match actual SDK
 - [ ] All method names match actual SDK
 - [ ] All property names match actual SDK
-- [ ] All types are correct (e.g., `AssetTypeNative` not `Asset.native`)
+- [ ] All types are correct (for example, `AssetTypeNative`, not `Asset.native`)
 - [ ] All examples verified against SDK source code
 
 ### Completeness
@@ -323,7 +323,7 @@ val keypair = KeyPair.random()
 ### For Existing Documentation
 
 1. **Audit** against quality checklist
-2. **Identify** violations (hypothetical code, app architecture, etc.)
+2. **Identify** violations, such as hypothetical code and app architecture
 3. **Fix** issues systematically
 4. **Verify** improvements maintain value
 5. **Update** cross-references

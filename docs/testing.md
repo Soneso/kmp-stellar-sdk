@@ -6,8 +6,8 @@ The SDK includes test coverage across all supported platforms: JVM, JavaScript (
 
 Tests are organized into two categories under `commonTest`:
 
-- **`unitTests/`** — Pure unit tests with no network dependencies.
-- **`integrationTests/`** — Tests that validate against the live Stellar Testnet. These require network access and take longer to run.
+- **`unitTests/`**: Pure unit tests with no network dependencies.
+- **`integrationTests/`**: Tests that validate against the live Stellar Testnet. These require network access and take longer to run.
 
 Both categories run by default in local and IDE environments. In CI, integration tests are excluded via the `-PexcludeIntegrationTests` Gradle property.
 
@@ -99,21 +99,21 @@ The `realDelay()` function (in `integrationTests/TestUtils.kt`) delegates to `pl
 
 ## Code Coverage
 
-Coverage is collected via [Kover](https://github.com/Kotlin/kotlinx-kover) on JVM tests:
+[Kover](https://github.com/Kotlin/kotlinx-kover) collects the coverage of the JVM tests. The `jvmOnly` report variant instruments the JVM target only, so the Android test targets are not compiled:
 
 ```bash
 # Generate HTML and XML coverage reports
-./gradlew :stellar-sdk:koverHtmlReport :stellar-sdk:koverXmlReport
+./gradlew :stellar-sdk:koverHtmlReportJvmOnly :stellar-sdk:koverXmlReportJvmOnly -PexcludeIntegrationTests
 ```
 
 Reports are generated at:
-- HTML: `stellar-sdk/build/reports/kover/html/index.html`
-- XML: `stellar-sdk/build/reports/kover/report.xml`
+- HTML: `stellar-sdk/build/reports/kover/htmlJvmOnly/index.html`
+- XML: `stellar-sdk/build/reports/kover/reportJvmOnly.xml`
 
-Coverage is uploaded to [Codecov](https://codecov.io) automatically in CI (requires `CODECOV_TOKEN` secret in GitHub repository settings).
+CI uploads the XML report to [Codecov](https://codecov.io) with OpenID Connect; the workflow references no Codecov token.
 
 ## CI Workflow
 
 The GitHub Actions workflow (`.github/workflows/tests.yml`) runs JVM unit tests across JDK 17, 21, and 25 (integration tests excluded via `-PexcludeIntegrationTests`). Coverage is collected on JDK 25 and uploaded to Codecov.
 
-JS, macOS native, and iOS simulator tests are run locally. They share the same `commonTest` sources and the same exclusion flag works across all platforms.
+The same workflow runs the JS Node tests on every run and the macOS native tests on pull requests. JS browser and iOS simulator tests run locally. All platforms share the same `commonTest` sources, and the same exclusion flag works on each of them.

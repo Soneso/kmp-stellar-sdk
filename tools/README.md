@@ -1,101 +1,83 @@
-# KMP Stellar SDK - Development Tools
+# KMP Stellar SDK development tools
 
-This directory contains development tools for the KMP Stellar SDK.
+This directory holds the development tools of the KMP Stellar SDK, one tool per subdirectory. Every tool except `coverage/` has a README with its details. Run every command in this file from the repository root.
 
-## Available Tools
+| Tool | Purpose | Requirements |
+|---|---|---|
+| `xdrgen-kt/` | Generates the Kotlin XDR types and the XDR-JSON (SEP-51) test suite from the pinned `.x` definition files. | Ruby 3 with Bundler, curl |
+| `sep-51-oracle/` | Derives the XDR-JSON name of every enum member, struct field and union arm and checks the names against the pinned reference CLI. | Ruby; the pinned `stellar-xdr` CLI for the reference checks |
+| `sep-51-corpus/` | Generates the SEP-51 conformance corpus from hand-written seeds through the reference CLI. | Python 3, the pinned `stellar-xdr` CLI |
+| `matrix-generator/` | Generates the compatibility matrices under `compatibility/`. | Python 3, network access |
+| `skill-generator/` | Generates the API reference of the agent skill. | Python 3 |
+| `coverage/` | Computes the line coverage metric from the Kover report and enforces a minimum. | Python 3 |
+| `p28-owner-fixture/` | Source of the protocol 28 owner contract whose wasm the integration tests deploy. | Rust with the `wasm32v1-none` target, stellar-cli |
 
-### xdrgen-kt - XDR Code Generation
+## xdrgen-kt
 
-**Location:** `tools/xdrgen-kt/`
-
-**Description:** Ruby-based tool for generating Kotlin XDR types from Stellar XDR specification files.
-
-**Prerequisites:**
-- Ruby (bundled dependencies included)
-
-**Usage:**
 ```bash
-cd tools/xdrgen-kt
-./generate.rb /path/to/stellar-xdr/Stellar-*.x
+make -C tools/xdrgen-kt generate          # install the gems, download the pinned .x files, generate the XDR types
+make -C tools/xdrgen-kt emit-json-tests   # emit the XDR-JSON test suite into the SDK test sources
+make -C tools/xdrgen-kt test              # run the generator tests
+make -C tools/xdrgen-kt update            # after a pin change in xdr-source.cfg: download again and regenerate everything
+make -C tools/xdrgen-kt                   # list all targets
 ```
 
-**Output:** Generates Kotlin XDR types in `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr/`
+The Makefile runs `generate.rb` through Bundler. Without arguments, `generate.rb` reads the `.x` files that `download-xdr.sh` places under `tools/xdrgen-kt/xdr/`. The types land in `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr/`, the emitted tests in `stellar-sdk/src/commonTest/kotlin/com/soneso/stellar/sdk/unitTests/xdr/json/`. Details: `tools/xdrgen-kt/README.md`.
 
-**Features:**
-- Generates type-safe Kotlin classes from XDR specifications
-- Automatically excludes internal/overlay protocol files
-- Maintains compatibility with Stellar protocol updates
+## sep-51-oracle
 
-For detailed documentation, see the README.md in each tool's subdirectory.
-
-### matrix-generator - Compatibility Matrix Generator
-
-**Location:** `tools/matrix-generator/`
-
-**Description:** Python-based tools for generating compatibility matrices that compare the KMP Stellar SDK against official Stellar API specifications. Covers Horizon REST API, Soroban RPC, and SEP (Stellar Ecosystem Proposals).
-
-**Prerequisites:**
-- Python 3.8+ (standard library only, no external dependencies)
-- Optional: `GITHUB_TOKEN` for higher API rate limits
-
-**Usage:**
 ```bash
-# Generate all matrices (Horizon + RPC + SEPs)
-python3 tools/matrix-generator/run_analysis.py
+ruby tools/sep-51-oracle/emitted_names.rb     # check the names the generated Kotlin emits against name-map.json
+ruby tools/sep-51-oracle/name_map.rb --diff   # rebuild the name table and check it against the reference CLI
+tools/sep-51-oracle/probe.sh --check          # verify that the installed reference CLI matches the pin
 ```
 
-**Output:** Generates compatibility matrices in `compatibility/horizon/`, `compatibility/rpc/`, and `compatibility/sep/`.
+Details, including the pins and the exit codes: `tools/sep-51-oracle/README.md`.
 
-For detailed documentation, see `tools/matrix-generator/README.md`.
+## sep-51-corpus
 
-### skill-generator - Agent Skill API Reference Generator
+```bash
+python3 tools/sep-51-corpus/generate_corpus.py   # regenerate corpus.json from seeds.py
+bash tools/sep-51-corpus/refresh_corpus.sh       # regenerate into a scratch directory and diff against the committed corpus
+```
 
-**Location:** `tools/skill-generator/`
+`make -C tools/xdrgen-kt emit-json-tests` embeds the corpus into the generated tests. Details: `tools/sep-51-corpus/README.md`.
 
-**Description:** Python-based tool that regenerates the agent skill's compact API reference file from the SDK's Kotlin source. The output (`skills/kmp-stellar-sdk/references/api_reference.md`) lists every public class, method, and property signature, so AI coding agents consuming the skill can look up the SDK surface without reading raw source.
+## matrix-generator
 
-**Prerequisites:**
-- Python 3.8+ (standard library only, no external dependencies)
+```bash
+GITHUB_TOKEN="$(gh auth token)" python3 tools/matrix-generator/run_analysis.py
+```
 
-**Usage:**
+The run writes the matrices under `compatibility/horizon/`, `compatibility/rpc/` and `compatibility/sep/`. `GITHUB_TOKEN` raises the GitHub API rate limit from 60 to 5,000 requests per hour. `AGENTS.md` lists the cases in which regenerated matrices go into a commit. Details: `tools/matrix-generator/README.md`.
+
+## skill-generator
+
 ```bash
 python3 tools/skill-generator/generate_api_reference.py
 ```
 
-**Output:** Writes to `skills/kmp-stellar-sdk/references/api_reference.md`. After regenerating, rebuild the skill zip so the bundled archive matches.
+The script writes `skills/kmp-stellar-sdk/references/api_reference.md`. The maintainer regenerates the reference and the skill zip at release preparation. Details: `tools/skill-generator/README.md`.
 
-For detailed documentation, see `tools/skill-generator/README.md`.
+## coverage
 
-## Directory Structure
-
-```
-tools/
-├── README.md                  # This file
-├── xdrgen-kt/                 # XDR code generation tool
-│   ├── generate.rb            # Main generator script
-│   ├── Gemfile                # Ruby dependencies
-│   └── lib/                   # Custom Kotlin generator
-├── matrix-generator/          # Compatibility matrix generator
-│   ├── run_analysis.py        # Master orchestrator (all pipelines)
-│   ├── common.py              # Shared utilities
-│   ├── github_fetcher.py      # GitHub API client
-│   ├── sdk_analyzer.py        # Kotlin source analyzer
-│   ├── horizon/               # Horizon API pipeline
-│   ├── rpc/                   # Soroban RPC pipeline
-│   └── sep/                   # SEP pipeline
-└── skill-generator/           # Agent skill API reference generator
-    ├── README.md              # Tool documentation
-    └── generate_api_reference.py
+```bash
+python3 tools/coverage/coverage_summary.py --min 90
 ```
 
-## Contributing
+The script reads `stellar-sdk/build/reports/kover/reportJvmOnly.xml`, which `./gradlew :stellar-sdk:koverXmlReportJvmOnly -PexcludeIntegrationTests` writes. It counts a line as covered only when all of its branches are covered, the metric Codecov reports. `--packages` prints the metric per package, and `--min` exits with status 1 when the overall metric is below the given percentage.
 
-When adding new tools to this directory:
+## p28-owner-fixture
 
-1. Create a subdirectory for the tool (e.g., `tools/my-tool/`)
-2. Include a README.md in the tool's directory with detailed usage instructions
-3. Update this file to list the new tool
-4. Follow existing patterns for script organization and documentation
+```bash
+cd tools/p28-owner-fixture && stellar contract build
+```
+
+The build writes `target/wasm32v1-none/release/p28_owner_fixture.wasm`, which is committed as `stellar-sdk/src/commonTest/resources/wasm/p28_owner_fixture.wasm`. Each of the four Soneso Stellar SDK repositories holds a copy of the directory and the wasm, and a rebuild updates all four. Details: `tools/p28-owner-fixture/README.md`.
+
+## Adding a tool
+
+A new tool gets its own subdirectory with a README that states its requirements and usage, and a row and a section in this file.
 
 ## License
 

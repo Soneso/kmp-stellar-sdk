@@ -5,8 +5,6 @@ on:
     branches:
       - main
   pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -233,3 +231,18 @@ jobs:
             exit 1
           fi
           echo "Committed generated output matches a fresh generation."
+
+  # Every repository path AGENTS.md names exists, is gitignored, or matches its glob.
+  agents-md-paths:
+    name: agents-md-paths
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run the path checker's tests
+        run: python3 .github/scripts/test_check_agents_md_paths.py
+
+      - name: Check the paths AGENTS.md names
+        run: python3 .github/scripts/check_agents_md_paths.py

@@ -39,7 +39,9 @@ cd kmp-stellar-sdk && zip -r ../kmp-stellar-sdk.zip . -x "*.DS_Store"
 
 ## When to regenerate
 
-Regenerate whenever the SDK's public API surface changes:
+The reference describes the released SDK. The maintainer regenerates it at
+release preparation on the `release-docs` branch, together with the skill
+version fields and the zip, when the release changes the public API surface:
 
 - New SEP implementation added
 - New public class, method, or property in any non-XDR / non-crypto package
@@ -47,8 +49,9 @@ Regenerate whenever the SDK's public API surface changes:
 - Field renamed, type changed, or signature otherwise modified
 - Class deprecated or removed
 
-Stale generation will not break the SDK build, but the agent skill will offer
-out-of-date guidance to consumers.
+A pull request that changes the API leaves the reference and the zip
+unchanged. On `main`, a fresh generation therefore differs from the committed
+file by the API added since the last release.
 
 ## What gets included
 
@@ -87,5 +90,5 @@ This is a regex-based parser, not a Kotlin compiler frontend. It correctly
 handles every pattern present in the current SDK source but is not a general
 Kotlin parser. If a future SDK change uses a declaration shape that the script
 doesn't yet recognize, the affected classes silently drop from the output.
-After any large API change, sanity-check the regenerated `api_reference.md`
+After any large API change, check the regenerated `api_reference.md`
 against the actual source (counts and a few spot-checked sections).
