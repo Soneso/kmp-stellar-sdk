@@ -664,43 +664,7 @@ A timeout below the worst-case funding wait hides the diagnostic: the test dies 
 `runTest` timeout instead of the helper's message naming the endpoint that never served the
 account.
 
-## Missing Features
-
-The following features from the Flutter SDK tests are not yet implemented in KMP SDK:
-
-### Streaming API
-
-**Status**: Not implemented
-
-**Flutter Test**:
-```dart
-sdk.transactions
-    .forAccount(accountId)
-    .cursor("now")
-    .stream()
-    .listen((response) { ... })
-```
-
-**Workaround**: Poll for new transactions instead of streaming:
-```kotlin
-var lastCursor = "now"
-while (keepPolling) {
-    val page = horizonServer.transactions()
-        .forAccount(accountId)
-        .cursor(lastCursor)
-        .limit(10)
-        .execute()
-
-    for (tx in page.records) {
-        // Process transaction
-    }
-
-    lastCursor = page.records.lastOrNull()?.pagingToken ?: lastCursor
-    delay(5000)  // Poll every 5 seconds
-}
-```
-
-**Test Coverage**: The `stream transactions for account` test from Flutter SDK is not included.
+Set the timeout only through `runTest(timeout = ...)` and never nest `withTimeout()` inside the test body: `runTest` runs the body on virtual time, so an inner timeout does not measure the real wait.
 
 ## CI
 
