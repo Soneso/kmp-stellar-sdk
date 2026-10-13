@@ -25,7 +25,34 @@ All documentation is written for **Group 1: SDK Users** - developers who want to
 
 ## Release Policy for Docs
 
-Main's user-facing documentation and skill content describe the released SDK, because users read them on GitHub against the SDK they can install. Documentation and skill content for unreleased behavior goes to the `release-docs` branch, not to the feature branch that implements the behavior; `release-docs` is merged as the first step of release preparation. Feature branches carry only code, tests, the CHANGELOG's `[Unreleased]` section, AGENTS.md updates, and version-independent process documents. Skill archives are rebuilt only during release preparation, never on feature branches.
+`main`'s user documentation in `docs/` and the skill in `skills/` describe the released SDK, because users read them on GitHub against the SDK they can install. Documentation and skill content for unreleased behavior goes to the `release-docs` branch, not to the feature or fix branch that implements the behavior. Before a release, `main` is merged into `release-docs`, and `release-docs` is merged into the release preparation branch; `release-docs` is never the head of a pull request and is never merged directly into `main`. After the release it is fast-forwarded to `main`. Feature and fix branches carry code, tests, the CHANGELOG entry under `[Unreleased]`, and the version-independent process documents (`AGENTS.md`, `CONTRIBUTING.md`, this strategy) when a fact in them changes. Skill archives and the skill's generated API reference change only during release preparation; a run that regenerates them to check a change restores the committed files.
+
+## Migration Guides
+
+A release gets a migration guide when it changes behavior that existing code can observe. The test: code that compiled, ran, or passed its tests on the previous release fails to compile, behaves differently, or needs a change to keep its result. This covers changed defaults, removed or retyped API, stricter validation, and a new error type or message from an existing call. It also covers changed output spelling, new network requests, changes to the wire form, and fixes that end an error a caller may have worked around. A generated XDR addition gets a note when an exhaustive match over the type stops compiling or skips the new value silently. A deprecation gets a note only when the API also changes behavior; a removal always does. Additions, refactors, performance work, documentation, and CI changes get none.
+
+The guide is `docs/migration/X.Y.Z.md`, titled `# Migrating to X.Y.Z`, and is written during release preparation from the final CHANGELOG section of the version. Its introduction reads (the clause on earlier guides is omitted when none exists):
+
+```markdown
+This guide covers the observable changes between P.Q.R and X.Y.Z. If you upgrade from an older version, also review the CHANGELOG between your version and P.Q.R and the earlier migration guides, newest first: [A.B.C](A.B.C.md). Each note describes one situation: whether you are affected, how it shows, and what to do.
+```
+
+When a guide covers more than one area, its notes are grouped under `## <area>` headings in the order of the CHANGELOG section; a guide with one area stays a flat list. Each note is one bullet for one situation:
+
+1. "If you <what the affected code does>:", naming the API.
+2. What happens in X.Y.Z, with the exact type, message, or value.
+3. "In P.Q.R <what happened>.", naming the version.
+4. The action in the imperative, with the opt-out if one exists, and what stays unaffected.
+
+The previous-version sentence is the only history a note carries. A note stays under 120 words; a note over 150 words is split by situation.
+
+A note carries a fenced before-and-after pair, labeled with both versions, when the action rewrites a call, a type, an override signature, or a multi-step recipe; the after block compiles against X.Y.Z. A one-token action (add `try`, catch a type, pass a flag) stays inline.
+
+Every CHANGELOG `Breaking:` entry and every change of a kind this section names has a note, and every note traces to a CHANGELOG entry. The CHANGELOG states what the API does; the note says who is affected and what to do.
+
+The CHANGELOG section of the version opens with `Migration guide: [docs/migration/X.Y.Z.md](docs/migration/X.Y.Z.md)`. The release notes end with a "Migrating to X.Y.Z" line that links the guide at the tag `vX.Y.Z`. `docs/README.md` lists all guides, newest first. A correction of a published guide also updates the release notes of the version.
+
+Review: a reviewer who did not write the guide starts from code that worked on P.Q.R and, note by note, decides whether they are affected, recognizes the symptom, and applies the action without the CHANGELOG or the source. A step that needs either fails the note.
 
 ## Core Principles
 
@@ -73,6 +100,7 @@ All code must:
 - One clear example beats three redundant ones
 - Link to Dokka for complete API reference (don't duplicate method signatures)
 - Professional technical tone without unnecessary superlatives
+- Don't use em dashes; use a comma, a period, or a colon
 
 ### 6. Platform Compatibility
 
@@ -95,7 +123,7 @@ Platform guides show **one primary framework** to avoid decision paralysis:
 
 ### 8. No Changelog Residue
 
-Documentation states the current contract. It never tells the story of how the code got there, and never the counterfactual of what the code would do without one of its checks. Sentences shaped like "X happens rather than Y" or "X instead of Y", where Y is a former defect or a hypothetical failure, leak the author's editing context into the reader's head. The reader never imagined Y, learns nothing about the API from it, and is left wondering why it is mentioned.
+Documentation states the current contract. It never tells the story of how the code got there, and never the counterfactual of what the code would do without one of its checks. Sentences shaped like "X happens rather than Y" or "X instead of Y", where Y is a former defect or a hypothetical failure, leak the author's editing context into the reader's head. The reader never imagined Y, learns nothing about the API from it, and is left wondering why it is mentioned. Migration guides are the one exception: each note names the previous version once (see Migration Guides).
 
 Keep a "rather than"/"instead of" contrast only when both branches are real choices or plausible expectations for the reader ("returns null rather than throwing"). Delete it when the second branch exists only in the author's memory of the code.
 
@@ -359,23 +387,56 @@ Good documentation achieves:
 
 ```text
 docs/
-├── README.md                    # Documentation hub with learning paths
-├── quick-start.md              # 30-minute fast path
-├── getting-started.md          # Full fundamentals guide
-├── demo-app.md                 # Demo app guide
-├── architecture.md             # SDK design and internals
-├── sdk-usage-examples.md       # Practical code patterns
-├── advanced.md                 # Complex scenarios
-├── soroban-rpc-usage.md       # Smart contract development
-├── testing.md                  # SDK testing (contributor doc)
-├── platforms/
-│   ├── README.md              # Platform overview
-│   ├── jvm.md                 # Android + Server JVM
-│   ├── javascript.md          # Browser + Node.js
-│   ├── ios.md                 # iOS + iPadOS
-│   └── macos.md               # macOS Desktop
-└── documentation-strategy.md   # This file
+├── README.md                      # Documentation hub with learning paths
+├── quick-start.md                 # 30-minute fast path
+├── getting-started.md             # Full fundamentals guide
+├── demo-app.md                    # Demo app guide
+├── architecture.md                # SDK design and internals
+├── sdk-usage-examples.md          # Practical code patterns
+├── addresses.md                   # Addresses and StrKey
+├── advanced.md                    # Complex scenarios
+├── sep/                           # SEP guides
+│   ├── README.md                  # SEP overview
+│   ├── sep-01.md                  # Stellar TOML
+│   ├── sep-02.md                  # Federation protocol
+│   ├── sep-05.md                  # Key derivation methods for Stellar keys
+│   ├── sep-06.md                  # Programmatic deposit and withdrawal
+│   ├── sep-08.md                  # Regulated assets
+│   ├── sep-09.md                  # Standard KYC fields
+│   ├── sep-10.md                  # Stellar web authentication
+│   ├── sep-12.md                  # KYC API
+│   ├── sep-23.md                  # StrKey encoding
+│   ├── sep-24.md                  # Interactive anchor/wallet asset transfer
+│   ├── sep-29.md                  # Account memo requirements
+│   ├── sep-30.md                  # Account recovery
+│   ├── sep-31.md                  # Cross-border payments
+│   ├── sep-38.md                  # Anchor RFQ API
+│   ├── sep-45.md                  # Web authentication for contract accounts
+│   ├── sep-51.md                  # XDR-JSON
+│   └── sep-53.md                  # Sign and verify messages
+├── smart-accounts/                # Smart account kit
+│   ├── README.md                  # Smart account overview
+│   ├── api-reference.md           # Smart accounts API reference
+│   ├── onboarding.md              # Smart accounts: developer onboarding
+│   ├── scf/                       # Smart account architecture
+│   │   └── oz-sm-architecture.md  # Smart account support for the KMP Stellar SDK
+│   ├── webauthn-android.md        # WebAuthn setup: Android
+│   ├── webauthn-ios.md            # WebAuthn setup: iOS
+│   ├── webauthn-macos.md          # WebAuthn setup: macOS
+│   └── webauthn-web.md            # WebAuthn setup: web (browser)
+├── platforms/                     # Platform guides
+│   ├── README.md                  # Platform overview
+│   ├── ios.md                     # iOS + iPadOS
+│   ├── javascript.md              # Browser + Node.js
+│   ├── jvm.md                     # Android + server JVM
+│   └── macos.md                   # macOS desktop
+├── migration/                     # Migration guides, one per release
+│   └── 1.12.0.md                  # Migrating to 1.12.0
+├── testing.md                     # SDK testing (contributor doc)
+└── documentation-strategy.md      # This file
 ```
+
+`index.html` redirects to the generated API reference under `api/latest/`. `api/index.html` redirects to the same reference. `.nojekyll` is the GitHub Pages marker.
 
 ## Related Documents
 
@@ -386,6 +447,6 @@ docs/
 
 ---
 
-**Last Updated**: 2025-11-11
+**Last Updated**: 2026-10-13
 
-**Next Review**: 2026-02-11 (Quarterly maintenance)
+**Next Review**: 2027-01-13 (Quarterly maintenance)
