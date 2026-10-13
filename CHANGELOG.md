@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TransactionInfo.diagnosticEventsXdr` and `TransactionInfo.parseDiagnosticEventsXdr()` are no
   longer deprecated, because stellar-rpc supplies a transaction's diagnostic events there. Version
   1.14.0 had deprecated them in favor of the nested `Events` members, which are deprecated instead.
+- The integration-test README states the timeout rule: `runTest(timeout = ...)` only, no nested
+  `withTimeout()`. It no longer lists transaction streaming as missing; the SDK streams Horizon
+  responses with `stream(serializer, listener)`, and `AccountIntegrationTest` covers it. The nested
+  agent guide under `integrationTests/` is gone; `AGENTS.md` holds the rules.
 
 ### Deprecated
 - `Events.diagnosticEventsXdr` and `Events.parseDiagnosticEventsXdr()` are deprecated because
