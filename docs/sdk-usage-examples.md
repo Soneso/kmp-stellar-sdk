@@ -457,9 +457,10 @@ val server = HorizonServer("https://horizon-testnet.stellar.org")
 val usdcAsset = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
 val eurocAsset = Asset.createNonNativeAsset("EUROC", "GBAW5XGWORWVFE2XTJYDTLDHXTY2Q2MO73HYCGB3XMFMQ562Q2W2GJQX")
 
-// Create liquidity pool object (assets must be in lexicographic order)
+// Create the pool object. assetA < assetB in stellar-core's order: native first, then
+// type (alphanum4 before alphanum12), then code bytes, then the issuer's raw key bytes
 val liquidityPool = LiquidityPool(
-    assetA = usdcAsset,  // Assets are automatically validated for correct order
+    assetA = usdcAsset,  // LiquidityPool rejects a reversed pair
     assetB = eurocAsset,
     fee = LiquidityPool.FEE  // 30 basis points (0.3%)
 )
@@ -1278,22 +1279,25 @@ The SDK automatically converts between XDR and native Kotlin types:
 | `SCV_I32` | `Int` | `42` |
 | `SCV_U64` | `ULong` | `1000000UL` |
 | `SCV_I64` | `Long` | `1000000L` |
-| `SCV_U128` | `BigInteger` | `BigInteger("123456789")` |
-| `SCV_I128` | `BigInteger` | `BigInteger("123456789")` |
-| `SCV_U256` | `BigInteger` | `BigInteger("999...")` |
-| `SCV_I256` | `BigInteger` | `BigInteger("999...")` |
+| `SCV_U128` | `BigInteger` | `BigInteger.parseString("123456789")` |
+| `SCV_I128` | `BigInteger` | `BigInteger.parseString("123456789")` |
+| `SCV_U256` | `BigInteger` | `BigInteger.parseString("340282366920938463463374607431768211456")` |
+| `SCV_I256` | `BigInteger` | `BigInteger.parseString("340282366920938463463374607431768211456")` |
 | `SCV_BYTES` | `ByteArray` | `byteArrayOf(1, 2, 3)` |
 | `SCV_STRING` | `String` | `"hello"` |
 | `SCV_SYMBOL` | `String` | `"symbol"` |
 | `SCV_VEC` | `List<Any?>` | `listOf(1, 2, 3)` |
 | `SCV_MAP` | `Map<*, *>` | `mapOf("key" to "value")` |
-| `SCV_ADDRESS` | `String` | `"GABC..."` |
+| `SCV_ADDRESS` | `String` (`G...`, `C...`) or `Address`; a `MuxedAddress` parameter also takes `M...` and `W...` | `"GABC..."` |
 | `SCV_VOID` | `null` | `null` |
 
 **Manual conversion examples:**
 
 ```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
 // Convert native arguments to XDR (useful for low-level operations or when bypassing convenience layer)
+// Address parameters take G... or C... strkeys or an Address; MuxedAddress parameters also M... and W...
 val xdrArgs = client.funcArgsToXdrSCValues(
     functionName = "transfer",
     arguments = mapOf(
@@ -1307,7 +1311,7 @@ val xdrArgs = client.funcArgsToXdrSCValues(
 val resultXdr = client.invoke<SCValXdr>(
     functionName = "balance",
     arguments = mapOf("id" to "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"),
-    source = sourceAccount,
+    source = sourceAccount.getAccountId(),
     signer = null
 )
 val balance = client.funcResToNative("balance", resultXdr) as BigInteger
@@ -1318,40 +1322,40 @@ val balance = client.funcResToNative("balance", resultXdr) as BigInteger
 val addressScVal = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toSCVal()  // Convert string address to SCValXdr
 val params = listOf(
     addressScVal,                            // Account address
-    Scv.toUint128(BigInteger("1000000")),   // Amount
+    Scv.toUint128(BigInteger.parseString("1000000")),   // Amount
     Scv.toSymbol("transfer"),               // Method name
     Scv.toBoolean(true),                    // Flag
     Scv.toVec(listOf(                       // Array
         Scv.toUint32(1u),
         Scv.toUint32(2u)
     )),
-    Scv.toMap(linkedMapOf(                  // Map (use LinkedHashMap for insertion order)
+    Scv.toMap(linkedMapOf(                  // Map, emitted in the Soroban host's key order
         Scv.toSymbol("key") to Scv.toString("value")
     ))
 )
 
 // Parse complex results with type-safe discriminated unions
 // This pattern prevents runtime errors by ensuring you handle the correct SCValXdr type
-val resultXdr = client.invoke<SCValXdr>(
+val dataXdr = client.invoke<SCValXdr>(
     functionName = "get_data",
     arguments = mapOf("key" to "user_123"),
-    source = sourceAccount,
+    source = sourceAccount.getAccountId(),
     signer = null
 )
-when (resultXdr.discriminant) {
+when (dataXdr.discriminant) {
     SCValTypeXdr.SCV_U128 -> {
-        val num = Scv.fromUint128(resultXdr)
+        val num = Scv.fromUint128(dataXdr)
         println("Number: $num")
     }
     SCValTypeXdr.SCV_STRING -> {
-        val str = Scv.fromString(resultXdr)
+        val str = Scv.fromString(dataXdr)
         println("String: $str")
     }
     SCValTypeXdr.SCV_VEC -> {
-        val vec = Scv.fromVec(resultXdr)
+        val vec = Scv.fromVec(dataXdr)
         println("Array size: ${vec.size}")
     }
-    else -> println("Unexpected type: ${resultXdr.discriminant}")
+    else -> println("Unexpected type: ${dataXdr.discriminant}")
 }
 ```
 
@@ -1373,7 +1377,7 @@ Reach for `toNative()` when no spec is at hand: contract event values, ledger en
 | `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` | `BigInteger` (`com.ionspin.kotlin.bignum.integer`) |
 | `SCV_BYTES` | `ByteArray` (the stored payload array, so writes to it go through to the value) |
 | `SCV_STRING`, `SCV_SYMBOL` | `String` |
-| `SCV_ADDRESS` | strkey `String` (`G...`, `C...`, `M...`, `B...` or `L...`); the `SCValXdr` itself when the address has no strkey form |
+| `SCV_ADDRESS` | strkey `String` (`G...`, `C...`, `M...`, `W...`, `B...` or `L...`); the `SCValXdr` itself when the address has no strkey form |
 | `SCV_VEC` | `List<Any?>`, each element converted in order; an absent payload gives an empty list |
 | `SCV_MAP` | `Map<Any?, Any?>` under the key rules below, or the `SCValXdr` itself; an absent payload gives an empty map |
 | `SCV_ERROR`, `SCV_CONTRACT_INSTANCE`, `SCV_LEDGER_KEY_CONTRACT_INSTANCE`, `SCV_LEDGER_KEY_NONCE`, `SCV_EXECUTABLE_TAG` | the `SCValXdr` itself; `Scv.fromError`, `Scv.fromExecutableTagBytes` and the other `Scv.from*` accessors read the payload on request |
@@ -1421,7 +1425,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 // A u64 above Long.MAX_VALUE converts to a ULong and keeps its exact value
 val count = Scv.toUint64(18446744073709551615uL).toNative()  // ULong 18446744073709551615
 
-// A map with symbol keys converts to a Map keyed by String, in entry order
+// A map with symbol keys converts to a Map keyed by String, in the host's key order
 val owner = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 val record = Scv.toMap(
     linkedMapOf(
@@ -1436,7 +1440,7 @@ val name = fields["name"] as String  // "Alice"
 val age = fields["age"] as UInt  // 30u
 val balance = fields["balance"] as BigInteger  // 1000000000
 val ownerAddress = fields["owner"] as String  // the strkey held in owner
-// fields.keys.toList() is ["name", "age", "balance", "owner"]
+// fields.keys.toList() is ["age", "balance", "name", "owner"]
 
 // A vec converts to a List with each element converted in turn
 val items = Scv.toVec(
@@ -1459,6 +1463,8 @@ For complete authorization workflows (multi-signature, atomic swaps), see the [A
 
 > Authorization credentials have three address arms: `ADDRESS_V2` (the default, Protocol 27+, CAP-71), the legacy `ADDRESS` (valid on every network), and `ADDRESS_WITH_DELEGATES` (Protocol 27+, CAP-71). `Auth.authorizeInvocation` builds `ADDRESS_V2` by default and simulation requests it. On a network below Protocol 27, V2 entries invalidate the transaction, so request the legacy arm with `simulateTransaction(tx, useUpgradedAuth = false)` or `ClientOptions(useUpgradedAuth = false)` and build it with `Auth.authorizeInvocation(..., authV2 = false)`. Signing is the same whatever the arm; build delegate trees with `Auth.attachDelegates` + `DelegateDescriptor`. See [Advanced SDK Usage](advanced.md) for the delegate and multi-party signing flows.
 
+The credential address, the `forAddress` target, the `authorizeInvocation` public key and every delegate are account (`G...`) or contract (`C...`) addresses. A muxed address throws `IllegalArgumentException` with the message `Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban auth addresses: ` followed by the address, and `attachDelegates` names `delegate addresses` in place of `auth addresses`.
+
 ```kotlin
 // Example 1: Sign a single authorization entry
 // Use case: You have an auth entry from simulation and need to sign it manually
@@ -1471,6 +1477,8 @@ val entry: SorobanAuthorizationEntryXdr = TODO("take this from your simulation r
 
 val userKeypair = KeyPair.fromSecretSeed("SCZANGBA5YHTNYVVV4C3U252E2B6P6F5T3U6MM63WBSBZATAQI3EBTQ4")
 
+// The first signature fixes the entry's expiration: a later signer passes the stored
+// signatureExpirationLedger, and a different value throws IllegalArgumentException
 val signedEntry = Auth.authorizeEntry(
     entry = entry,
     signer = userKeypair,
@@ -1541,15 +1549,23 @@ val client = ContractClient.forContract(
 
 val assembled = client.buildInvoke<Unit>(
     functionName = "transfer",
-    parameters = mapOf("from" to "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR", "to" to "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U", "amount" to 1000L),
-    source = "GDFJHLAXAUMHA4OWPOB4P7YO72AQR2HMIUYFOXLXE2DZGM633K7HZDQP"
+    arguments = mapOf("from" to "GCFIRY65OQE7DFP5KLNS2PF2LVZMUZYJX4OZIEQ36N2IQANUB5XVYOJR", "to" to "GCATS5YOVB6ROX2WUNKGNQ2MP3GMXDMKSG2O4N5CLX3A6W4PZGZZI55U", "amount" to 1000L),
+    source = "GDFJHLAXAUMHA4OWPOB4P7YO72AQR2HMIUYFOXLXE2DZGM633K7HZDQP",
+    signer = null
 )
 
 // Sign with custom hardware wallet signer
 assembled.signAuthEntries(
     authEntriesSigner = KeyPair.fromAccountId("GBXHUHG5FGYLPD6RHL2MKWMP572O6KUXCZXDZJXS4T57ZTMAKBN7DWXN"),  // Public key only
     authorizeEntryDelegate = { entry, network ->
-        Auth.authorizeEntry(entry, LedgerSigner(), currentLedger + 100, network)
+        // signAuthEntries stamped the entry's expiration before calling this delegate
+        val expiration = when (val credentials = entry.credentials) {
+            is SorobanCredentialsXdr.Address -> credentials.value.signatureExpirationLedger
+            is SorobanCredentialsXdr.AddressV2 -> credentials.value.signatureExpirationLedger
+            is SorobanCredentialsXdr.AddressWithDelegates -> credentials.value.addressCredentials.signatureExpirationLedger
+            SorobanCredentialsXdr.Void -> return@signAuthEntries entry
+        }
+        Auth.authorizeEntry(entry, LedgerSigner(), expiration.value.toLong(), network)
     }
 )
 

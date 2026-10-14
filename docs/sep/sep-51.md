@@ -356,13 +356,14 @@ Types that already have a text form use it, rather than rendering their internal
 | `MuxedAccount` | `G…` or `M…` strkey, by arm |
 | `MuxedAccountMed25519`, `MuxedEd25519Account` | `M…` strkey |
 | `ContractID` | `C…` strkey |
+| `MuxedContract` | `W…` strkey |
 | `PoolID` | `L…` strkey |
 | `ClaimableBalanceID` | `B…` strkey |
-| `SCAddress` | `G…`, `C…`, `M…`, `B…` or `L…`, by arm |
+| `SCAddress` | `G…`, `C…`, `M…`, `W…`, `B…` or `L…`, by arm |
 | `SignerKey` | `G…`, `T…`, `X…` or `P…`, by arm |
 | `SignerKeyEd25519SignedPayload` | `P…` strkey |
 | `AssetCode4` | trailing NUL bytes trimmed, then escaped |
-| `AssetCode12` | trailing NUL bytes trimmed to no fewer than five, then escaped |
+| `AssetCode12` | trailing NUL bytes trimmed to no fewer than five, then escaped; a string read must unescape to five to twelve bytes |
 | `AssetCode` | rendered as its `AssetCode4` or `AssetCode12` arm |
 | `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string |
 
@@ -382,6 +383,14 @@ fun stellarTypes() {
     // An asset code of twelve keeps five characters, which is what distinguishes
     // it on the wire from an asset code of four
     println(AssetCode12Xdr.fromXdrJson("\"ABCDE\"").toXdrJson()) // "ABCDE"
+
+    // A string read must unescape to at least five bytes, so the document "ABC" is
+    // rejected; a three-character code is the document "ABC\\0\\0"
+    try {
+        AssetCode12Xdr.fromXdrJson("\"ABC\"")
+    } catch (e: IllegalArgumentException) {
+        println(e.message) // AssetCode12Xdr: expects an asset code of at least 5 bytes, got 3
+    }
 
     // A 128-bit integer is one decimal string, not a pair of limbs
     println(SCValXdr.fromXdrJson("{\"i128\":\"-42\"}").toXdrJson()) // {"i128":"-42"}

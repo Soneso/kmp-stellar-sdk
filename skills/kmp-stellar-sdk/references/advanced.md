@@ -435,8 +435,8 @@ val accountId = keyPair.getAccountId()
 val assetA: Asset = AssetTypeNative
 val assetB: Asset = Asset.createNonNativeAsset("USDC", issuerAccountId)
 
-// Assets must be in lexicographic order (assetA < assetB)
-// AssetTypeNative is always first in sort order
+// assetA < assetB in stellar-core's order: native first, then type (alphanum4 before
+// alphanum12), then code bytes, then the issuer's raw key bytes; LiquidityPool rejects a reversed pair
 val pool = LiquidityPool(assetA = assetA, assetB = assetB)
 
 // Step 1: Establish trustline to the pool share asset

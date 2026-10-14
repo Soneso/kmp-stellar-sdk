@@ -165,14 +165,16 @@ These types render as strkeys rather than as their structural XDR shape:
 | `MuxedAccount` | `G...` on the ed25519 arm, `M...` on the med25519 arm | `"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE"` |
 | `MuxedEd25519Account`, `MuxedAccountMed25519` | `M...` | as above |
 | `ContractID` | `C...` | `"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"` |
+| `MuxedContract` | `W...` | `"WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"` |
 | `PoolID` | `L...` | `"LCAIDAUDQSCYNB4IRGFIXDENR2HZBEMSSOKJLFUXTCMZVG44TWPJ744M"` |
 | `ClaimableBalanceID` | `B...` | `"BAAACAQDAQCQMBYIBEFAWDANBYHRAEISCMKBKFQXDAMRUGY4DUPB6IHRSE"` |
 | `SignerKey` | `G...` / `T...` / `X...` / `P...` by arm | `"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ"` |
-| `SCAddress` | `G...`, `C...`, `M...`, `B...` or `L...` by arm | `"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"` |
+| `SCAddress` | `G...`, `C...`, `M...`, `W...`, `B...` or `L...` by arm | `"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"` |
 | `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string | `"340282366920938463463374607431768211455"` |
-| `AssetCode4`, `AssetCode12` | the code with its trailing NUL padding trimmed | `"ABC"` |
+| `AssetCode4` | the code with its trailing NUL padding trimmed | `"ABC"` |
+| `AssetCode12` | the code with its trailing NUL padding trimmed to no fewer than five bytes; a string read must unescape to five to twelve bytes | `"ABC\\0\\0"` |
 
-An `AssetCode12` is never trimmed below five bytes, which is what keeps it distinguishable from an `AssetCode4`: the code `ABC` padded to twelve bytes renders as `"ABC\\0\\0"` in the document, and an all-NUL code renders as five escaped NUL bytes.
+An `AssetCode12` is never trimmed below five bytes, which keeps it distinguishable from an `AssetCode4`. The code `ABC` padded to twelve bytes renders as `"ABC\\0\\0"` in the document, whose string `ABC\0\0` unescapes to five bytes, and an all-NUL code renders as five escaped NUL bytes. Reading applies the same floor, so the document `"ABC"` throws `IllegalArgumentException` with the message `AssetCode12Xdr: expects an asset code of at least 5 bytes, got 3`.
 
 A strkey that fails its checksum, or one whose prefix does not match the arm being read, is rejected — a `C...` where an account key is expected raises rather than silently decoding. The canonical-form rules are in security.md.
 

@@ -386,7 +386,8 @@ val removeTrustOp = ChangeTrustOperation(usd, "0")
 // Liquidity pool share trustline
 val assetA = AssetTypeNative
 val assetB = AssetTypeCreditAlphaNum4("USD", issuerAccountId)
-// Assets must be in lexicographic order (assetA < assetB)
+// assetA < assetB in stellar-core's order: native first, then type (alphanum4 before
+// alphanum12), then code bytes, then the issuer's raw key bytes; LiquidityPool rejects a reversed pair
 val pool = LiquidityPool(assetA, assetB)
 val poolTrustOp = ChangeTrustOperation(pool)
 ```

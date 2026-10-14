@@ -467,7 +467,7 @@ val balanceNative = client.funcResToNative("balance", balanceXdr) as BigInteger
 ```
 
 **Helper Methods:**
-- `funcArgsToXdrSCValues()` - Convert native arguments to XDR
+- `funcArgsToXdrSCValues()` - Convert native arguments to XDR; an `Address` parameter takes a `G...` or `C...` strkey or an `Address`, and a `MuxedAddress` parameter also takes `M...` and `W...`
 - `funcResToNative()` - Convert XDR results back to native types (inverse of nativeToXdrSCVal)
 
 #### Low-Level RPC Server

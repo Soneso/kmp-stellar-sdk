@@ -408,6 +408,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
 val symVal  = Scv.toSymbol("transfer")
 val addrVal = Scv.toAddress(Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54").toSCAddress())
 val vecVal  = Scv.toVec(listOf(Scv.toUint32(1u), Scv.toUint32(2u)))
+// toMap emits the entries in the Soroban host's key order and throws for two keys equal in it
 val mapVal  = Scv.toMap(linkedMapOf(symVal to Scv.toUint32(42u)))
 
 // WRONG: Scv.toU32() / Scv.fromU32() — those method names do NOT exist
