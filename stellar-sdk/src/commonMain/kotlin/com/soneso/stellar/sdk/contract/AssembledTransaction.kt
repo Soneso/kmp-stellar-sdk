@@ -547,10 +547,11 @@ class AssembledTransaction<T> internal constructor(
      * All three address credential arms are considered. For ADDRESS_WITH_DELEGATES
      * entries the delegate tree is walked depth-first, and every delegate node is
      * reported on the same terms as the top-level address. A node is reported when
-     * its signature is void (no signature yet) or, when [includeAlreadySigned] is
-     * true, regardless of its signature. A delegates-only entry whose top-level
-     * signature stays void but whose delegate nodes are all signed does not report
-     * the top-level address. Source-account (Void) credentials contribute nothing.
+     * its signature is void or an empty vector (see [Auth.carriesSignature]) or,
+     * when [includeAlreadySigned] is true, regardless of its signature. An unsigned
+     * top-level address is reported even when all its delegates are signed. [sign]
+     * blocks only on account (G...) addresses. Source-account (Void) credentials
+     * contribute nothing.
      *
      * @param includeAlreadySigned Whether to include already-signed entries (default false)
      * @return Set of addresses that need to sign
@@ -577,9 +578,9 @@ class AssembledTransaction<T> internal constructor(
      * Adds the addresses that still require a signature in [credentials] to [out].
      *
      * Exhaustive over the credential arms. The top-level address is reported when
-     * its signature is void (or unconditionally when [includeAlreadySigned]); for
-     * ADDRESS_WITH_DELEGATES the delegate tree is walked and each node reported on
-     * the same terms.
+     * its signature is void or an empty vector (or unconditionally when
+     * [includeAlreadySigned]); for ADDRESS_WITH_DELEGATES the delegate tree is
+     * walked and each node reported on the same terms.
      */
     private fun collectSignersNeeded(
         credentials: SorobanCredentialsXdr,
@@ -602,7 +603,7 @@ class AssembledTransaction<T> internal constructor(
 
     /**
      * Walks the delegate tree depth-first and reports every node whose signature is
-     * void (or every node when [includeAlreadySigned]).
+     * void or an empty vector (or every node when [includeAlreadySigned]).
      *
      * @throws IllegalArgumentException if the tree exceeds [DELEGATE_TRAVERSAL_CAP]
      */
@@ -624,8 +625,8 @@ class AssembledTransaction<T> internal constructor(
     }
 
     /**
-     * Adds the StrKey form of [address] to [out] when [signature] is void or when
-     * [includeAlreadySigned] is set.
+     * Adds the StrKey form of [address] to [out] when [signature] is void or an
+     * empty vector, or when [includeAlreadySigned] is set.
      */
     private fun addIfUnsigned(
         address: SCAddressXdr,
@@ -633,7 +634,7 @@ class AssembledTransaction<T> internal constructor(
         includeAlreadySigned: Boolean,
         out: MutableSet<String>
     ) {
-        if (includeAlreadySigned || signature.discriminant == SCValTypeXdr.SCV_VOID) {
+        if (includeAlreadySigned || !Auth.carriesSignature(signature)) {
             out.add(Address.fromSCAddress(address).toString())
         }
     }

@@ -94,7 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Auth.authorizeEntry` applies the same check to `validUntilLedgerSeq`. Before this change,
   `signAuthEntries` passed a fresh expiration ledger on every call. A second signer whose call
   computed a later default or passed another explicit value therefore signed a different payload
-  than the first, and the host rejected the entry.
+  than the first, and the host rejected the entry. A signature value of void or an empty vector
+  counts as unsigned, which matches the placeholder js-stellar-sdk writes; `Auth.carriesSignature`
+  exposes the check.
 - Breaking: `Scv.toMap` emits map entries in the Soroban host's key order and raises
   `IllegalArgumentException` for two keys that are equal in that order. The new overload
   `Scv.toMap(List<SCMapEntryXdr>)` keeps keys that convert to the same value apart so the check sees

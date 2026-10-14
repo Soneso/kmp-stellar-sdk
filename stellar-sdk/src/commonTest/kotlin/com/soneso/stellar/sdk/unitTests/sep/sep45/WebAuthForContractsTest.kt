@@ -10,10 +10,12 @@ import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
+import com.soneso.stellar.sdk.requireAddressCredentials
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.sep.sep45.exceptions.*
+import com.soneso.stellar.sdk.unitTests.assertSingleSignatureVerifies
 import com.soneso.stellar.sdk.unitTests.assertSdkClientIdentification
 import com.soneso.stellar.sdk.unitTests.captureFirstRequest
 import com.soneso.stellar.sdk.xdr.*
@@ -137,8 +139,7 @@ class WebAuthForContractsTest {
     }
 
     /**
-     * Builds a single unsigned authorization entry, with the void signature a server's
-     * recording-mode simulation returns.
+     * Builds an authorization entry, defaulting to the void placeholder from recording-mode simulation.
      */
     private fun buildAuthEntry(
         credentialsAddress: String,
@@ -147,7 +148,8 @@ class WebAuthForContractsTest {
         argsMap: SCValXdr,
         nonce: Long,
         expirationLedger: Long,
-        subInvocations: List<SorobanAuthorizedInvocationXdr> = emptyList()
+        subInvocations: List<SorobanAuthorizedInvocationXdr> = emptyList(),
+        signature: SCValXdr = Scv.toVoid()
     ): SorobanAuthorizationEntryXdr {
         val address = addressToScAddress(credentialsAddress)
 
@@ -156,7 +158,7 @@ class WebAuthForContractsTest {
                 address = address,
                 nonce = Int64Xdr(nonce),
                 signatureExpirationLedger = Uint32Xdr(expirationLedger.toUInt()),
-                signature = Scv.toVoid()
+                signature = signature
             )
         )
 
@@ -222,7 +224,9 @@ class WebAuthForContractsTest {
         nonce: String,
         clientDomain: String? = null,
         clientDomainAccount: String? = null,
-        signServerEntry: Boolean = true
+        signServerEntry: Boolean = true,
+        clientSignature: SCValXdr = Scv.toVoid(),
+        clientExpirationLedger: Long = 1000000L
     ): String {
         val serverKeyPair = KeyPair.fromSecretSeed(SERVER_SECRET_SEED)
         val entries = mutableListOf<SorobanAuthorizationEntryXdr>()
@@ -258,7 +262,8 @@ class WebAuthForContractsTest {
             functionName = "web_auth_verify",
             argsMap = argsMap,
             nonce = 12346L,
-            expirationLedger = 1000000L
+            expirationLedger = clientExpirationLedger,
+            signature = clientSignature
         )
         entries.add(clientEntry)
 
@@ -270,7 +275,8 @@ class WebAuthForContractsTest {
                 functionName = "web_auth_verify",
                 argsMap = argsMap,
                 nonce = 12347L,
-                expirationLedger = 1000000L
+                expirationLedger = clientExpirationLedger,
+                signature = clientSignature
             )
             entries.add(clientDomainEntry)
         }
@@ -505,6 +511,94 @@ class WebAuthForContractsTest {
                 (latestLedgerSequence + 10).toUInt(),
                 clientCredentials.value.signatureExpirationLedger.value
             )
+        } finally {
+            sorobanServer.close()
+        }
+    }
+
+    @Test
+    fun testJwtToken_emptyVectorExpirationDerivedFromLatestLedger() = runTest {
+        val clientSigner = KeyPair.random()
+        val domainSigner = KeyPair.random()
+        val clientDomain = "client.example.com"
+        val nonce = "test_nonce_${nonceCounter++}"
+        val challengeXdr = buildValidChallenge(
+            clientAccountId = CLIENT_CONTRACT_ID,
+            homeDomain = DOMAIN,
+            webAuthDomain = "auth.example.stellar.org",
+            webAuthDomainAccount = SERVER_ACCOUNT_ID,
+            nonce = nonce,
+            clientDomain = clientDomain,
+            clientDomainAccount = domainSigner.getAccountId(),
+            clientSignature = SCValXdr.Vec(SCVecXdr(emptyList())),
+            clientExpirationLedger = 0
+        )
+
+        var submittedBody: String? = null
+        val mockEngine = MockEngine { request ->
+            when (request.method) {
+                HttpMethod.Get -> respond(
+                    content = """{"authorization_entries": "$challengeXdr", "network_passphrase": "Test SDF Network ; September 2015"}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+                else -> {
+                    submittedBody = (request.body as TextContent).text
+                    respond(
+                        content = """{"token": "$SUCCESS_JWT_TOKEN"}""",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json")
+                    )
+                }
+            }
+        }
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(this@WebAuthForContractsTest.json)
+            }
+        }
+
+        val latestLedgerSequence = 500_000L
+        val sorobanServer = createMockSorobanServer(latestLedgerSequence = latestLedgerSequence)
+        val webAuth = WebAuthForContracts.createWithServer(
+            authEndpoint = AUTH_SERVER,
+            webAuthContractId = WEB_AUTH_CONTRACT_ID,
+            serverSigningKey = SERVER_ACCOUNT_ID,
+            serverHomeDomain = DOMAIN,
+            network = Network.TESTNET,
+            sorobanServer = sorobanServer,
+            httpClient = mockClient
+        )
+        webAuth.useFormUrlEncoded = false
+
+        try {
+            val token = webAuth.jwtToken(
+                clientAccountId = CLIENT_CONTRACT_ID,
+                signers = listOf(clientSigner),
+                homeDomain = DOMAIN,
+                clientDomain = clientDomain,
+                clientDomainAccountKeyPair = domainSigner
+            )
+
+            assertEquals(SUCCESS_JWT_TOKEN, token.token)
+
+            val body = submittedBody
+            assertNotNull(body, "Token request was never submitted")
+            val entries = decodeAuthEntries(submittedEntriesFromJsonBody(body))
+            val signersByAddress = listOf(
+                CLIENT_CONTRACT_ID to clientSigner,
+                domainSigner.getAccountId() to domainSigner
+            )
+            for ((address, signer) in signersByAddress) {
+                val entry = entries.single {
+                    Address.fromSCAddress(it.credentials.requireAddressCredentials().address).toString() == address
+                }
+                assertEquals(
+                    (latestLedgerSequence + 10).toUInt(),
+                    entry.credentials.requireAddressCredentials().signatureExpirationLedger.value
+                )
+                assertSingleSignatureVerifies(entry, signer)
+            }
         } finally {
             sorobanServer.close()
         }

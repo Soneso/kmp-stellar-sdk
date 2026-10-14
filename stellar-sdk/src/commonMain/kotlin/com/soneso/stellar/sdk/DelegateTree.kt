@@ -88,9 +88,9 @@ internal fun SorobanCredentialsXdr.withUpdatedAddressCredentials(
  * signature, or null when none does.
  *
  * Every signature on an entry, top-level and delegate, commits to the one expiration stored in
- * the top-level address credentials. A node carries a signature when its value is anything
- * other than the `SCV_VOID` placeholder. Signing appends to a node's signature vector, so a
- * signature on the node about to be signed counts as well.
+ * the top-level address credentials. A node carries a signature when its value is neither
+ * void nor an empty vector, as defined by [Auth.carriesSignature]. Signing appends to a node's
+ * signature vector, so a signature on the node about to be signed counts as well.
  *
  * @throws IllegalArgumentException if the credentials are source-account (Void) credentials or
  *   the delegate tree exceeds [DELEGATE_TRAVERSAL_CAP]
@@ -98,7 +98,7 @@ internal fun SorobanCredentialsXdr.withUpdatedAddressCredentials(
 internal fun SorobanCredentialsXdr.committedExpiration(): Long? {
     val top = requireAddressCredentials()
     val delegates = (this as? SorobanCredentialsXdr.AddressWithDelegates)?.value?.delegates.orEmpty()
-    val signed = top.signature.discriminant != SCValTypeXdr.SCV_VOID || delegates.anySigned()
+    val signed = Auth.carriesSignature(top.signature) || delegates.anySigned()
     return if (signed) top.signatureExpirationLedger.value.toLong() else null
 }
 
@@ -121,7 +121,7 @@ private fun List<SorobanDelegateSignatureXdr>.anySigned(depth: Int = 0): Boolean
         )
     }
     return any { node ->
-        node.signature.discriminant != SCValTypeXdr.SCV_VOID || node.nestedDelegates.anySigned(depth + 1)
+        Auth.carriesSignature(node.signature) || node.nestedDelegates.anySigned(depth + 1)
     }
 }
 
