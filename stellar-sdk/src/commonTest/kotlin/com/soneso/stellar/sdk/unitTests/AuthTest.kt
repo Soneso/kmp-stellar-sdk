@@ -477,9 +477,9 @@ class AuthTest {
     fun testAuthorizeEntryAppendsToVecWithNullInnerValue() = runTest {
         val signer = KeyPair.fromSecretSeed(SECRET_SEED)
         val baseEntry = createUnsignedEntry(signer.getAccountId())
-        // A non-void signature fixes the stored expiration, so the entry stores the requested one.
+        // A vector with a null inner value is unsigned, so its stored expiration can change.
         val degenerateCredentials = (baseEntry.credentials as SorobanCredentialsXdr.Address).value
-            .copy(signatureExpirationLedger = Uint32Xdr(VALID_UNTIL_LEDGER_SEQ.toUInt()), signature = SCValXdr.Vec(null))
+            .copy(signatureExpirationLedger = Uint32Xdr(0u), signature = SCValXdr.Vec(null))
         val entryWithDegenerateVec = baseEntry.copy(
             credentials = SorobanCredentialsXdr.Address(degenerateCredentials)
         )
@@ -491,8 +491,8 @@ class AuthTest {
             network = NETWORK
         )
 
-        // A void-like Vec(null) is treated the same as no prior signatures: exactly one
-        // element is appended, never an NPE from dereferencing the null inner vector.
+        // The unsigned Vec(null) receives the requested expiration and exactly one signature.
         verifySignedEntry(signedEntry, signer, NONCE, VALID_UNTIL_LEDGER_SEQ)
+        assertSingleSignatureVerifies(signedEntry, signer)
     }
 }

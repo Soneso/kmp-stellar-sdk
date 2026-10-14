@@ -35,8 +35,8 @@ import com.soneso.stellar.sdk.xdr.*
  *
  * An entry stores one signature expiration ledger, and every signature on it, top-level and
  * delegate, commits to that value. [authorizeEntry] stamps `validUntilLedgerSeq` before
- * hashing. When any node already carries a signature (anything other than the `SCV_VOID`
- * placeholder), including the node being signed, `validUntilLedgerSeq` must equal the
+ * hashing. When any node already carries a signature (neither void nor an empty vector;
+ * see [carriesSignature]), including the node being signed, `validUntilLedgerSeq` must equal the
  * stored expiration; otherwise [authorizeEntry] throws.
  *
  * ## Protocol gating
@@ -48,6 +48,23 @@ import com.soneso.stellar.sdk.xdr.*
  * `ADDRESS_WITH_DELEGATES` credentials are built via [attachDelegates].
  */
 object Auth {
+
+    /**
+     * Returns whether [signature] carries a signature payload rather than an unsigned placeholder.
+     *
+     * [SCValTypeXdr.SCV_VOID] and [SCValXdr.Vec] values with a null or empty inner vector are
+     * unsigned; every other value carries a signature. This follows js-stellar-sdk v17.2.1:
+     * [auth.ts lines 482 to 487](https://github.com/stellar/js-stellar-sdk/blob/v17.2.1/src/base/auth.ts#L482-L487)
+     * writes an empty-vector placeholder, and
+     * [signaturePresent, lines 1108 to 1121](https://github.com/stellar/js-stellar-sdk/blob/v17.2.1/src/base/auth.ts#L1108-L1121)
+     * treats it like void.
+     *
+     * This classifies placeholders; it does not judge whether an empty vector authorizes a custom
+     * account contract. Such a payload is reported as unsigned even when that contract accepts it.
+     */
+    fun carriesSignature(signature: SCValXdr): Boolean =
+        signature.discriminant != SCValTypeXdr.SCV_VOID &&
+            !(signature is SCValXdr.Vec && signature.value?.value.isNullOrEmpty())
 
     // ============================================================================
     // Public API — authorizeEntry overloads
