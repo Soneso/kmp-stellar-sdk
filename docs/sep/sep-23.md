@@ -329,7 +329,7 @@ fun unknownDiscriminant() {
 
 ## Muxed Contracts (W...)
 
-A muxed contract pairs a contract with a 64-bit multiplexing id, the way a muxed account pairs an account with one. The Soroban host accepts a `W...` address from protocol 30 as a `MuxedAddress` contract parameter, never as an authorization address.
+A muxed contract pairs a contract with a 64-bit multiplexing id, the way a muxed account pairs an account with one. The Soroban host accepts a `W...` address from the protocol version CAP-0084 sets as a `MuxedAddress` contract parameter, never as an authorization address.
 
 A muxed contract combines:
 - a contract id (`C...`), the contract on the ledger

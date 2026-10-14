@@ -140,7 +140,7 @@ fun muxedContracts() {
 }
 ```
 
-The Soroban host accepts a `W...` address from protocol 30 as a `MuxedAddress` contract parameter, never as an authorization address.
+The Soroban host accepts a `W...` address from the protocol version CAP-0084 sets as a `MuxedAddress` contract parameter, never as an authorization address.
 
 ### SignerKey
 
