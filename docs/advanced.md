@@ -83,6 +83,8 @@ val signedEntry = Auth.authorizeEntry(
 )
 ```
 
+The first signer chooses the expiration. An entry that already carries a signature must receive its stored `signatureExpirationLedger`, and a different value throws `IllegalArgumentException`.
+
 ### Protocol 27 Authorization Arms (CAP-71)
 
 A Soroban authorization entry carries one of three address credential arms:
@@ -112,6 +114,8 @@ val signed = Auth.authorizeEntry(
     network = Network.PUBLIC
 )
 ```
+
+`Auth.authorizeEntry` stamps `validUntilLedgerSeq` on the entry before it hashes, and on an entry that already carries a signature the value must equal the stored expiration. The credential address, the `forAddress` target, the `authorizeInvocation` public key and every delegate are account (`G...`) or contract (`C...`) addresses. A muxed address throws `IllegalArgumentException` with the message `Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban auth addresses: ` followed by the address, and `attachDelegates` names `delegate addresses` in place of `auth addresses`.
 
 **V2 via simulation** is the default. The `useUpgradedAuth` key is sent on
 every simulate request with the current value (default `true`); a Protocol 27+
@@ -180,8 +184,10 @@ val withDelegateSig = Auth.authorizeEntry(
     options = Auth.AuthOptions(forAddress = delegateKeyPair.getAccountId())
 )
 
-// Optionally also sign the top-level address (forAddress = null, the default).
-// A delegates-only entry whose top-level signature stays void is legitimate.
+// Optionally also sign the top-level address (forAddress = null, the default) with the
+// stored expiration, currentLedger + 100L here, or through signAuthEntries without a value.
+// A custom account contract (C...) may keep a void top-level signature if its __check_auth accepts delegate signatures alone.
+// A top-level account (G...) needs its own signature: needsNonInvokerSigningBy lists it, and sign throws until it has one.
 ```
 
 **Submitting delegated or hand-built entries.** The delegate arm built above —
@@ -298,6 +304,8 @@ if (delegateKeyPair.getAccountId() in pending) assembled.signAuthEntries(delegat
 
 val swapResult = assembled.signAndSubmit(invokerKeyPair)
 ```
+
+The first `signAuthEntries` call stamps the latest ledger plus 100 and signs. An entry that already carries a signature keeps its stored expiration, so the second call signs such an entry with the value the first call stamped.
 
 ### Custom Result Parsing with funcResToNative
 
@@ -759,15 +767,15 @@ fun parseTransactionMeta(metaXdr: String): TransactionMetaXdr {
 
 ### SCVal Type Conversions
 
-Convert between native types and Soroban contract values:
+Convert native types to Soroban contract values:
 
 ```kotlin
-// toInt, toLong: from the previous steps of this flow
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.Address
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Convert native types to SCVal
+// Scv.toMap emits the entries in host key order: admin, decimals, name
 val scMap = Scv.toMap(linkedMapOf(
     Scv.toSymbol("name") to Scv.toString("MyToken"),
     Scv.toSymbol("decimals") to Scv.toUint32(7U),
@@ -780,29 +788,6 @@ val scVec = Scv.toVec(listOf(
     Scv.toInt128(BigInteger.fromLong(1000000)),
     Scv.toBytes(byteArrayOf(1, 2, 3, 4))
 ))
-
-// Convert SCVal to native types
-fun parseContractResult(scVal: SCValXdr): Any? {
-    return when (scVal) {
-        is SCValXdr.B -> scVal.value
-        is SCValXdr.I32 -> scVal.value
-        is SCValXdr.I64 -> scVal.value
-        is SCValXdr.U32 -> scVal.value.toInt()
-        is SCValXdr.U64 -> scVal.value.toLong()
-        is SCValXdr.Str -> Scv.fromString(scVal)
-        is SCValXdr.Vec -> scVal.value?.value?.map { parseContractResult(it) }
-        is SCValXdr.Map -> {
-            val map = mutableMapOf<String, Any?>()
-            scVal.value?.value?.forEach { entry ->
-                val key = Scv.fromSymbol(entry.key)
-                val value = parseContractResult(entry.`val`)
-                map[key] = value
-            }
-            map
-        }
-        else -> null
-    }
-}
 ```
 
 ## Production Error Handling

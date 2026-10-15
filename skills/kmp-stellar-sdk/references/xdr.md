@@ -134,7 +134,7 @@ val vec: SCValXdr = Scv.toVec(listOf(
     Scv.toBoolean(true),
 ))
 
-// Map: key-value pairs using LinkedHashMap (order preserved)
+// Map: key-value pairs in a LinkedHashMap, emitted in the Soroban host's key order
 val map: SCValXdr = Scv.toMap(linkedMapOf(
     Scv.toSymbol("name") to Scv.toString("Alice"),
     Scv.toSymbol("balance") to Scv.toInt128(BigInteger.fromLong(1000000)),
@@ -142,9 +142,13 @@ val map: SCValXdr = Scv.toMap(linkedMapOf(
 ```
 
 ```kotlin
-// WRONG: Scv.toMap(mapOf(...)) — requires LinkedHashMap, not Map
-// CORRECT: Scv.toMap(linkedMapOf(...)) — use linkedMapOf for deterministic ordering
+// WRONG: Scv.toMap(mapOf(...))
+//   requires LinkedHashMap, not Map
+// CORRECT: Scv.toMap(linkedMapOf(...))
+//   the entries are emitted in the Soroban host's key order, not in the map's order
 ```
+
+Use `Scv.toMap(List<SCMapEntryXdr>)` for keys that convert to the same value; both overloads sort with `compareScValHostOrder` and throw `IllegalArgumentException` for two keys equal in host order.
 
 ## Reading Values from SCValXdr
 
@@ -231,6 +235,7 @@ The `Address` class provides a high-level way to work with Stellar addresses and
 val accountAddr = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")     // G... account
 val contractAddr = Address("CC4DZNN2TPLUOAIRBI3CY7TGRFFCCW6GNVVRRQ3QIIBY6TM6M2RVMBMC")    // C... contract
 val muxedAddr = Address("MAAAAAAAAAAAAAB7BQ2L7E5NBWMXDUCMZSIPOBKRDSBYVLMXGSSKF6YNPIB7Y77ITLVL6")       // M... muxed account
+val muxedContractAddr = Address("WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG") // W... muxed contract
 
 // Convert to SCAddressXdr (for low-level XDR construction)
 val scAddress: SCAddressXdr = accountAddr.toSCAddress()
@@ -240,7 +245,7 @@ val addressArg: SCValXdr = contractAddr.toSCVal()
 
 // Convert back from SCAddressXdr
 val restored = Address.fromSCAddress(scAddress)
-val strKey: String = restored.getEncodedAddress() // G... or C... format
+val strKey: String = restored.getEncodedAddress() // the strkey of the address kind
 
 // Convert back from SCValXdr
 val fromVal = Address.fromSCVal(addressArg)
@@ -416,6 +421,8 @@ val signedBase64: String = signedEntry.toXdrBase64()
 // Return signedBase64 to invoker...
 ```
 
+The first signer chooses the expiration. An entry that already carries a signature must receive its stored `signatureExpirationLedger`, and a different value throws `IllegalArgumentException`.
+
 ```kotlin
 // WRONG: authEntry.toBase64EncodedXdrString() — no such method
 // CORRECT: authEntry.toXdrBase64() — extension function
@@ -545,7 +552,7 @@ The JSON form is for inspection, logging, storage and interchange. The wire form
 | `MuxedAccount` | `G...` or `M...` strkey by arm | `"MAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPSAAAAAAAAAAAE2LAOE"` |
 | `ContractID` / `PoolID` / `ClaimableBalanceID` | `C...` / `L...` / `B...` strkey | `"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"` |
 | `SignerKey` | `G...` / `T...` / `X...` / `P...` strkey by arm | `"TBAECQSDIRCUMR2IJFFEWTCNJZHVAUKSKNKFKVSXLBMVUW24LVPF7EOJ"` |
-| `SCAddress` | `G...`, `C...`, `M...`, `B...` or `L...` strkey by arm | `{"address":"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"}` |
+| `SCAddress` | `G...`, `C...`, `M...`, `W...`, `B...` or `L...` strkey by arm | `{"address":"CAQCCIRDEQSSMJZIFEVCWLBNFYXTAMJSGM2DKNRXHA4TUOZ4HU7D7V6Z"}` |
 | `Int128Parts`, `UInt128Parts`, `Int256Parts`, `UInt256Parts` | one base-10 decimal string | `{"i128":"-1"}` |
 
 Output is deterministic: compact, keys in declaration order, hexadecimal lowercase. Use your own

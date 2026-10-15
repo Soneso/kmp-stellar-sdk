@@ -1,10 +1,10 @@
 # Addresses and StrKey
 
-Stellar writes keys and identifiers as strkeys: base32 strings whose first letter names their type, defined in [SEP-0023](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md). Account ids, secret seeds, contract ids, muxed accounts, claimable balance ids, liquidity pool ids and signer keys all travel in this form. This page states the rules the SDK codec applies: which strings it accepts, in what order it checks them, and how the higher-level address types build on it.
+Stellar writes keys and identifiers as strkeys, defined in [SEP-0023](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md): base32 strings whose first letter names their type. Muxed contracts follow [CAP-0084](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0084.md); the SDK encodes them with the `W` prefix. Account ids, secret seeds, contract ids, muxed accounts, muxed contracts, claimable balance ids, liquidity pool ids and signer keys all travel in this form. This page states the rules the SDK codec applies: which strings it accepts, in what order it checks them, and how the higher-level address types build on it.
 
-The codec is the `StrKey` object. It is the single gate: every SDK type that reads or writes a strkey — `KeyPair`, `Address`, `MuxedAccount`, `SignerKey`, `ClaimableBalanceId`, the XDR-JSON layer — goes through it, so one string is accepted or rejected identically everywhere, on every platform.
+The codec is the `StrKey` object. It is the single gate: `KeyPair`, `Address`, `MuxedAccount`, `MuxedContract`, `SignerKey`, `ClaimableBalanceId` and the XDR-JSON layer all read and write strkeys through it. A string is therefore accepted or rejected identically on every platform.
 
-## The Nine Types
+## The Ten Types
 
 | Prefix | Names | Payload bytes | Characters | `StrKey` functions |
 |---|---|---|---|---|
@@ -12,6 +12,7 @@ The codec is the `StrKey` object. It is the single gate: every SDK type that rea
 | `S` | ed25519 secret seed | 32 | 56 | `encodeEd25519SecretSeed` / `decodeEd25519SecretSeed` |
 | `M` | muxed ed25519 public key | 40 | 69 | `encodeMed25519PublicKey` / `decodeMed25519PublicKey` |
 | `C` | contract id | 32 | 56 | `encodeContract` / `decodeContract` |
+| `W` | muxed contract | 40 | 69 | `encodeMuxedContract` / `decodeMuxedContract` |
 | `L` | liquidity pool id | 32 | 56 | `encodeLiquidityPool` / `decodeLiquidityPool` |
 | `B` | claimable balance id | 33 | 58 | `encodeClaimableBalance` / `decodeClaimableBalance` |
 | `T` | pre-authorized transaction hash | 32 | 56 | `encodePreAuthTx` / `decodePreAuthTx` |
@@ -43,9 +44,10 @@ Every `decodeX` runs the same checks in the same order and reports the first one
 9. the version byte names the type the caller asked for;
 10. the checksum matches the payload it covers.
 
-Checks 2 and 4 answer one question — whether the string is written in the characters a strkey is written in — and report it in the same words. Check 8 has nothing to read for a type whose payload is an opaque key of a fixed size; only the muxed key, the claimable balance id and the signed payload frame structure inside their payloads:
+Checks 2 and 4 answer one question, whether the string is written in the characters a strkey is written in, and report it in the same words. Check 8 has nothing to read for a type whose payload is an opaque key of a fixed size; only the muxed key, the muxed contract, the claimable balance id and the signed payload frame structure inside their payloads:
 
 - **Muxed key (`M...`)** — 40 bytes: the 32-byte ed25519 public key followed by the multiplexing id as an eight-byte big-endian value.
+- **Muxed contract (`W...`)**, 40 bytes: the 32-byte contract id followed by the multiplexing id as an eight-byte big-endian value.
 - **Claimable balance id (`B...`)** — 33 bytes: a one-byte type discriminant followed by the 32-byte balance hash. The XDR union declares a single case, `V0` with discriminant `0`, so that is the one value the decode accepts. `encodeClaimableBalance` also takes the 32-byte hash alone or the 36-byte XDR wire form (the four-byte big-endian union discriminant followed by the hash) and writes all three as the same strkey.
 - **Signed payload (`P...`)** — 40 to 100 bytes: the 32-byte ed25519 public key, the declared payload length as a four-byte big-endian value, and the payload padded with zeros to a four-byte boundary. The declared length must be 1 to 64, the total size must fit it exactly, and every padding byte must be zero. `encodeSignedPayload` checks the same framing, so every string it returns is one the decode accepts.
 
@@ -67,19 +69,20 @@ Secret seeds move as `CharArray`, not `String`: `decodeEd25519SecretSeed` takes 
 
 ## The Address Types
 
-The codec hands back raw bytes. Five types sit on top of it and are the usual way to work with addresses:
+The codec hands back raw bytes. Six types sit on top of it and are the usual way to work with addresses:
 
 | Type | Reads | Purpose |
 |---|---|---|
 | `KeyPair` | `G...`, `S...` | Signing and verification; `fromAccountId`, `fromSecretSeed`, `getAccountId` |
-| `Address` | `G...`, `C...`, `M...`, `B...`, `L...` | The five kinds an `SCAddress` names, for Soroban |
+| `Address` | `G...`, `C...`, `M...`, `W...`, `B...`, `L...` | The six kinds an `SCAddress` names, for Soroban |
 | `MuxedAccount` | `G...`, `M...` | A payment destination with an optional multiplexing id |
+| `MuxedContract` | `C...`, `W...` | A contract id with an optional multiplexing id |
 | `SignerKey` | `G...`, `T...`, `X...`, `P...` | The four signer forms account options accept |
 | `ClaimableBalanceId` | `B...` and hex spellings | One balance across every spelling it is written in |
 
 ### Address
 
-`Address` accepts any of the five strkey kinds an `SCAddress` can name and reports which one it got. It converts to and from the XDR forms Soroban contracts consume:
+`Address` accepts any of the six strkey kinds an `SCAddress` can name and reports which one it got. It converts to and from the XDR forms Soroban contracts consume:
 
 ```kotlin
 import com.soneso.stellar.sdk.Address
@@ -97,7 +100,7 @@ fun addresses() {
 }
 ```
 
-`getBytes()` returns the decoded payload as the table above defines it — for a claimable balance address that is the 33-byte body, discriminant included. The byte factories `fromAccount`, `fromContract`, `fromMuxedAccount`, `fromClaimableBalance` and `fromLiquidityPool` take the same widths the codec's encode functions take, so `fromClaimableBalance` also reads the bare 32-byte hash and the 36-byte XDR wire form.
+`getBytes()` returns the decoded payload as the table above defines it. For a claimable balance address that is the 33-byte body, discriminant included. The byte factories `fromAccount`, `fromContract`, `fromMuxedAccount`, `fromMuxedContract`, `fromClaimableBalance` and `fromLiquidityPool` take the same widths the codec's encode functions take, so `fromClaimableBalance` also reads the bare 32-byte hash and the 36-byte XDR wire form.
 
 ### MuxedAccount
 
@@ -118,6 +121,26 @@ fun muxedAccounts() {
 ```
 
 Zero is a multiplexing id like any other: an account carrying the id `0` is written as an `M...` address, and only an account with no id at all is written as the `G...` address.
+
+### MuxedContract
+
+A muxed contract is a contract with an optional 64-bit multiplexing id. The `C...` address and the id are the two halves; the `W...` address is the pair written as one string:
+
+```kotlin
+import com.soneso.stellar.sdk.MuxedContract
+
+fun muxedContracts() {
+    val muxed = MuxedContract("WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG")
+    println(muxed.contractId) // CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE
+    println(muxed.id)         // 123456
+
+    // The address writes the id back when one is set
+    println(MuxedContract(muxed.contractId, 123456UL).address.first()) // W
+    println(MuxedContract(muxed.contractId).address.first())           // C
+}
+```
+
+The Soroban host accepts a `W...` address from the protocol version CAP-0084 sets as a `MuxedAddress` contract parameter, never as an authorization address.
 
 ### SignerKey
 

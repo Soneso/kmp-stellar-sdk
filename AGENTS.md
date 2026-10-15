@@ -18,7 +18,7 @@ python3 tools/coverage/coverage_summary.py --min 90
 ```
 
 - Pass `-PexcludeIntegrationTests` to every test task; without it the integration tests run against testnet. `check`, `build` and `test` without it run them too, and `check` also runs the browser, iOS simulator, macOS x64, and Android tasks and Android Lint, more than 160 tasks.
-- The JVM unit suite (about 10,500 tests) takes about 70 seconds; the JS suite about 60 seconds, the macOS suite about 50 seconds with a warm Kotlin/Native cache, the Android suite about four minutes. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
+- The JVM unit suite (about 10,600 tests) takes 35 to 70 seconds, the JS suite 60 to 90 seconds, and the Android suite two to four minutes. The macOS suite takes about 30 seconds with a warm Kotlin/Native cache and about three minutes when a source change recompiles and links the test binary. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
 - The build cache can answer a test task from cache without running a test. `--rerun` forces execution when you need the evidence.
 - The Android tasks, `check` and the documentation build need the Android SDK location: `ANDROID_HOME` or `sdk.dir` in the gitignored `local.properties`. The iOS simulator tests need `-PexcludeIntegrationTests` because the simulator rejects the testnet certificate chain.
 - `verifyTestNamespaces` fails a test outside the `unitTests` or `integrationTests` packages; CI does not run it.
@@ -38,7 +38,7 @@ Before reporting a change as done:
 4. `CHANGELOG.md` has an entry under `[Unreleased]` in the Keep a Changelog section the change belongs to (Added, Changed, Deprecated, Removed, Fixed, Security), in present tense, one entry per user-visible change.
 5. No generated file was edited by hand. The user documentation under `docs/` and the skill under `skills/` describe the released SDK; they change on the `release-docs` branch with the release. `docs/documentation-strategy.md` is a process document and changes in the pull request that changes a fact it states.
 
-Every pull request runs `.github/workflows/tests.yml`: the JVM tests on every JDK of the matrix with the coverage gate on the newest, the JS Node tests, the macOS tests, the XDR generator job, and the `agents-md-paths` job. That job runs `.github/scripts/check_agents_md_paths.py`, which fails when a path this file names does not exist, so a change that moves a file also changes the line here. The XDR generator job runs the generator tests, checks the emitted names and regenerates both output trees; a difference in the two generated directories fails it. The branch rules require the JVM test job of the newest JDK and the Codecov project status; `codecov.yml` holds the targets and thresholds.
+Every pull request runs `.github/workflows/tests.yml`: the JVM tests on every JDK of the matrix with the coverage gate on the newest, the JS Node tests, the macOS tests, the XDR generator job, and the `agents-md-paths` job. That job runs `.github/scripts/check_agents_md_paths.py`, which fails when a path this file names outside a fenced block is missing and not gitignored, or is a glob that matches no path. A change that moves a file therefore also changes the line here. The XDR generator job runs the generator tests, checks the emitted names and regenerates both output trees; a difference in the two generated directories fails it. The branch rules require the JVM test job of the newest JDK and the Codecov project status; `codecov.yml` holds the targets and thresholds.
 
 ## Generated code and data
 
@@ -63,9 +63,9 @@ Generated files are never edited by hand. Change the generator or its override f
 
 ## Boundaries
 
-- Releases are the maintainer's. An agent never changes a version place: `version` and `demo.version` in `gradle.properties`, the root `build.gradle.kts`, `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/Util.kt`, the dependency snippets in `README.md`, `docs/getting-started.md`, `docs/quick-start.md`, `docs/platforms/`, `demo/README.md` and `demo/shared/build.gradle.kts`. The same holds for the skill version fields in `skills/kmp-stellar-sdk/SKILL.md`, `skills/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, the zip, a tag, or a GitHub release.
-- Never run a publish task (`publishToSonatype` and its siblings): a partial upload burns the version number against the Maven Central namespace quota. `releases/RELEASE_INSTRUCTIONS.md` and `releases/RELEASE_NOTES_*.md` are the maintainer's files.
-- No credential lives in the repository, and the workflows reference none. Ask before adding a dependency, a workflow, a Gradle module, or a new generated artifact; each is a maintenance commitment the maintainer carries after the pull request.
+- Releases are the maintainer's. Outside a release preparation the maintainer directs, an agent never changes a version place: `version` and `demo.version` in `gradle.properties`, the root `build.gradle.kts`, `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/Util.kt`, the dependency snippets in `README.md`, `docs/getting-started.md`, `docs/quick-start.md`, `docs/platforms/`, `demo/README.md`, `demo/shared/build.gradle.kts` and `skills/kmp-stellar-sdk/references/smart_accounts.md`. The same holds for the skill version fields in `skills/kmp-stellar-sdk/SKILL.md`, `skills/.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, the zip, a tag, or a GitHub release.
+- Never run a publish task (`publishToSonatype` and its siblings) outside a release the maintainer directs; a partial upload cannot be retracted. `releases/RELEASE_NOTES_*.md` are the maintainer's files.
+- No credential lives in the repository, and the workflows use no credential of the maintainer (`secrets.GITHUB_TOKEN` is the run's own token). Ask before adding a dependency, a workflow, a Gradle module, or a new generated artifact; each is a maintenance commitment the maintainer carries after the pull request.
 
 ## Changes
 

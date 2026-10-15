@@ -1,10 +1,10 @@
 # SEP-0023 (Strkeys) Compatibility Matrix
 
-**Generated:** 2026-09-30 13:56:47
+**Generated:** 2026-10-14 15:09:49
 
 **SEP Version:** 1.3.0  
 **SEP Status:** Active  
-**SDK Version:** 1.14.0  
+**SDK Version:** 1.15.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md
 
 ## SEP Summary

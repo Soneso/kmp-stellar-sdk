@@ -60,7 +60,7 @@ android {
 }
 
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.14.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.15.0")
 
     // Android-specific
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
@@ -113,7 +113,7 @@ dependencies {
 ```kotlin
 // build.gradle.kts
 plugins {
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.2.21"
     application
 }
 
@@ -122,7 +122,7 @@ kotlin {
 }
 
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.14.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.15.0")
 
     // Server frameworks (optional)
     implementation("io.ktor:ktor-server-netty:2.3.8")

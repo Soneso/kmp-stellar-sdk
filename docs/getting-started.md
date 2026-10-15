@@ -39,7 +39,7 @@ Add the SDK as a Maven dependency (recommended for most projects):
 ```kotlin
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.14.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.15.0")
 }
 ```
 
@@ -51,7 +51,7 @@ includeBuild("/path/to/kmp-stellar-sdk")
 
 // In your module's build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.14.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.15.0")
 }
 ```
 
@@ -125,7 +125,7 @@ targets: [
 
 ```kotlin
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.14.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.15.0")
 }
 ```
 
@@ -467,7 +467,7 @@ val balanceNative = client.funcResToNative("balance", balanceXdr) as BigInteger
 ```
 
 **Helper Methods:**
-- `funcArgsToXdrSCValues()` - Convert native arguments to XDR
+- `funcArgsToXdrSCValues()` - Convert native arguments to XDR; an `Address` parameter takes a `G...` or `C...` strkey or an `Address`, and a `MuxedAddress` parameter also takes `M...` and `W...`
 - `funcResToNative()` - Convert XDR results back to native types (inverse of nativeToXdrSCVal)
 
 #### Low-Level RPC Server

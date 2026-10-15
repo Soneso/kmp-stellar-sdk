@@ -300,7 +300,7 @@ Type mapping (Soroban -> Kotlin via funcResToNative):
 | u128, i128, u256, i256 | BigInteger (com.ionspin.kotlin.bignum.integer) |
 | bool | Boolean |
 | symbol, string | String |
-| address | String (G.../C.../M...) |
+| address | String (G.../C.../M.../W...) |
 | bytes | ByteArray |
 | vec\<T\> | List\<T\> |
 | map\<K, V\> | List\<Pair\<K, V\>\> |
@@ -344,14 +344,18 @@ swapTx.signAuthEntries(bobKeyPair)
 val response: SCValXdr = swapTx.signAndSubmit(aliceKeyPair)
 ```
 
+**Signature expiration.** Every signature on an entry commits to the one `signatureExpirationLedger` the entry stores. Once any node of an entry carries a signature, `signAuthEntries` keeps the stored value, and an explicit `validUntilLedgerSequence` that differs throws `IllegalArgumentException` naming both values. Without a value, it fetches the latest ledger at most once per call, and only for entries that need the default of the latest ledger plus 100. `Auth.authorizeEntry` applies the same check to `validUntilLedgerSeq`. `signAuthEntries` stamps the expiration on the entry before it calls `authorizeEntryDelegate`, so a delegate that calls `Auth.authorizeEntry` passes the expiration the entry carries. A void signature or an empty vector, the placeholder js-stellar-sdk writes, counts as unsigned; `Auth.carriesSignature` exposes that check.
+
 **Remote signing with delegate:**
 
 ```kotlin
+// bobAccountId, remoteSignService: the signer's account id and your own signing service
 val bobPublicOnly = KeyPair.fromAccountId(bobAccountId)
 swapTx.signAuthEntries(
     authEntriesSigner = bobPublicOnly,
     authorizeEntryDelegate = { entry, network ->
-        // Send to remote server for signing
+        // Send to remote server for signing. The entry carries its expiration;
+        // the remote signer signs with that stored value.
         val entryXdr = entry.toXdrBase64()
         val signedXdr = remoteSignService.sign(entryXdr)
         SorobanAuthorizationEntryXdr.fromXdrBase64(signedXdr)
@@ -373,12 +377,20 @@ Protocol 27 opt out to the legacy arm: `simulateTransaction(tx, useUpgradedAuth 
 Delegate entries are always built client-side with the low-level `Auth` helpers
 and submitted via `SorobanServer`. Build a delegate tree with
 `Auth.attachDelegates(entry, validUntilLedgerSeq, listOf(DelegateDescriptor(addr)))`,
-then sign each node via `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`
-(a delegates-only entry keeps a void top-level signature). `needsNonInvokerSigningBy()`
-and `signAuthEntries(keyPair)` walk and sign an existing delegate tree by address
-but do not create one. When the authorizing address is a contract account (its
-`__check_auth` reads storage or consumes delegates), re-simulate in enforcing mode
-after signing to capture the footprint before submitting.
+then sign each node via `Auth.authorizeEntry(..., options = Auth.AuthOptions(forAddress = nodeAddress))`.
+A custom account contract (`C...`) at the top level may keep a void top-level
+signature when its `__check_auth` accepts delegate signatures alone. An account
+(`G...`) at the top level needs its own signature: `needsNonInvokerSigningBy()`
+lists it, and `sign` throws `NeedsMoreSignaturesException` until it has one.
+`needsNonInvokerSigningBy()` and `signAuthEntries(keyPair)` walk and sign an
+existing delegate tree by address but do not create one. When the authorizing
+address is a contract account (its `__check_auth` reads storage or consumes
+delegates), re-simulate in enforcing mode after signing to capture the footprint
+before submitting. The credential address, the `forAddress` target, the
+`authorizeInvocation` public key and every delegate are account (`G...`) or
+contract (`C...`) addresses. A muxed address throws `IllegalArgumentException`
+with the message `Muxed account (M...) and muxed contract (W...) addresses are not valid Soroban auth addresses: ` followed by the address,
+and `attachDelegates` names `delegate addresses` in place of `auth addresses`.
 
 **Adding memos or custom preconditions via buildInvoke:**
 
@@ -608,7 +620,7 @@ val amount256 = Scv.toUint256(BigInteger.fromLong(999999))
 val value = Scv.fromInt128(resultScVal)  // returns BigInteger
 ```
 
-**Map uses LinkedHashMap** (preserves order for deterministic XDR):
+**Map uses LinkedHashMap**, and `Scv.toMap` emits the entries in the Soroban host's key order:
 
 ```kotlin
 val mapVal = Scv.toMap(linkedMapOf(
@@ -621,7 +633,7 @@ val mapVal = Scv.toMap(linkedMapOf(
 
 ## Automatic Type Conversion
 
-When using `ContractClient.invoke()` or `ContractClient.deploy()`, arguments are passed as `Map<String, Any?>` and auto-converted based on the contract spec:
+When using `ContractClient.invoke()` or `ContractClient.deploy()`, arguments are passed as `Map<String, Any?>` and auto-converted based on the contract spec. An address parameter takes an `Address` instance as well as a strkey string:
 
 ```kotlin
 // Native Kotlin types -> XDR (automatic via ContractSpec)
@@ -642,9 +654,11 @@ val args = mapOf(
 // BigInteger is ONLY for manual Scv.toInt128(BigInteger.fromLong(...)) calls (low-level API)
 ```
 
-Address auto-detection rules:
-- Strings starting with `G` or `M` -> account address
-- Strings starting with `C` -> contract address
+Address rules, by the parameter's spec type:
+- `Address` parameters take a `G...` or `C...` strkey, or an `Address` of type `ACCOUNT` or `CONTRACT`
+- `MuxedAddress` parameters also take an `M...` or `W...` strkey, or an `Address` of type `MUXED_ACCOUNT` or `MUXED_CONTRACT`
+
+A `B...` or `L...` address, a muxed address for an `Address` parameter, a malformed string, or a value of another type throws `ContractSpecException` naming the parameter type, the kinds it takes, and the value or its type. `null` converts to void, and a prebuilt `SCValXdr` passes through.
 
 You can also use `funcArgsToXdrSCValues` directly for manual conversion:
 
@@ -658,6 +672,8 @@ val xdrArgs: List<SCValXdr> = client.funcArgsToXdrSCValues("transfer", mapOf(
 ))
 ```
 
+The same rules apply here: an `Address` parameter takes `G...` or `C...`, and a `MuxedAddress` parameter also takes `M...` and `W...`.
+
 ---
 
 ## Reading Contract Return Values
@@ -668,7 +684,8 @@ When using the low-level API, extract typed results from `SCValXdr` sealed class
 // txResponse: from the previous steps of this flow
 val result: SCValXdr? = txResponse.getResultValue()
 
-// Use Scv.from* helpers to extract values
+// A result has one type. Each helper below throws IllegalArgumentException for any other type;
+// call the one that matches the result.
 val strVal: String = Scv.fromString(result!!)      // SCV_STRING
 val symVal: String = Scv.fromSymbol(result!!)      // SCV_SYMBOL
 val boolVal: Boolean = Scv.fromBoolean(result!!)   // SCV_BOOL
@@ -682,7 +699,7 @@ val bigIntVal: com.ionspin.kotlin.bignum.integer.BigInteger = Scv.fromInt128(res
 
 // Address extraction
 val address = Address.fromSCVal(result!!)
-val strKey: String = address.toString()  // G... or C... format
+val strKey: String = address.toString()  // the strkey of the address kind
 
 // Vec extraction
 val vec: List<SCValXdr> = Scv.fromVec(result!!)
@@ -746,7 +763,7 @@ Type mapping (XDR -> Kotlin via toNative):
 | SCV_U128, SCV_I128, SCV_U256, SCV_I256 | BigInteger (com.ionspin.kotlin.bignum.integer) |
 | SCV_BYTES | ByteArray (the stored payload array) |
 | SCV_STRING, SCV_SYMBOL | String |
-| SCV_ADDRESS | String (G.../C.../M.../B.../L...); the SCValXdr itself when the address has no strkey form |
+| SCV_ADDRESS | String (G.../C.../M.../W.../B.../L...); the SCValXdr itself when the address has no strkey form |
 | SCV_VEC | List\<Any?\>, elements converted in order; absent payload -> empty list |
 | SCV_MAP | Map\<Any?, Any?\> under the key rules below, or the SCValXdr itself; absent payload -> empty map |
 | SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG | the SCValXdr itself (read the payload with Scv.fromError, Scv.fromExecutableTagBytes, ...) |
@@ -785,7 +802,7 @@ val accountId = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 val owner = Scv.toAddress(Address(accountId).toSCAddress()).toNative()
 println(owner)  // GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ (String)
 
-// A symbol-keyed map becomes a Map<String, Any?> in entry order
+// A symbol-keyed map becomes a Map<String, Any?> in host key order
 val record = Scv.toMap(
     linkedMapOf(
         Scv.toSymbol("name") to Scv.toString("Alice"),
@@ -794,7 +811,7 @@ val record = Scv.toMap(
 ).toNative() as Map<*, *>
 println(record["name"])       // Alice
 println(record["age"])        // 30 (UInt)
-println(record.keys.toList()) // [name, age]
+println(record.keys.toList()) // [age, name]
 ```
 
 **WRONG/CORRECT map fallback detection:**

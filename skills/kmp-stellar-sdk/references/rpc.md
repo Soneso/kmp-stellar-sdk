@@ -378,7 +378,7 @@ when (txResponse.status) {
 }
 ```
 
-**Response fields:** `status` (GetTransactionStatus), `txHash` (String?), `latestLedger` (Long?), `envelopeXdr` (String?), `resultXdr` (String?), `resultMetaXdr` (String?), `ledger` (Long?), `createdAt` (Long?), `applicationOrder` (Int?), `feeBump` (Boolean?).
+**Response fields:** `status` (GetTransactionStatus), `txHash` (String?), `latestLedger` (Long?), `latestLedgerCloseTime` (Long?), `oldestLedger` (Long?), `oldestLedgerCloseTime` (Long?), `envelopeXdr` (String?), `resultXdr` (String?), `resultMetaXdr` (String?), `ledger` (Long?), `createdAt` (Long?), `applicationOrder` (Int?), `feeBump` (Boolean?), `events` (Events?), `diagnosticEventsXdr` (List\<String\>?).
 
 **Status values (GetTransactionStatus enum):** `SUCCESS`, `NOT_FOUND`, `FAILED`.
 
@@ -389,6 +389,7 @@ when (txResponse.status) {
 - `parseEnvelopeXdr()` -- returns `TransactionEnvelopeXdr?`
 - `parseResultXdr()` -- returns `TransactionResultXdr?`
 - `parseResultMetaXdr()` -- returns `TransactionMetaXdr?`
+- `parseDiagnosticEventsXdr()` -- returns `List<DiagnosticEventXdr>?`
 
 ```kotlin
 // WRONG: txResponse.status == GetTransactionResponse.STATUS_SUCCESS — no string constants
@@ -604,7 +605,7 @@ val nextPage = GetTransactionsRequest(
 
 **Response type:** `GetTransactionsResponse` with `transactions` (List\<TransactionInfo\>), `latestLedger`, `oldestLedger`, `cursor` (String).
 
-Each `TransactionInfo` has: `status` (TransactionStatus -- SUCCESS or FAILED), `txHash`, `applicationOrder`, `feeBump`, `envelopeXdr`, `resultXdr`, `resultMetaXdr`, `ledger`, `createdAt`, `events` (Events?). Parse methods: `parseEnvelopeXdr()`, `parseResultXdr()`, `parseResultMetaXdr()`.
+Each `TransactionInfo` has: `status` (TransactionStatus -- SUCCESS or FAILED), `txHash`, `applicationOrder`, `feeBump`, `envelopeXdr`, `resultXdr`, `resultMetaXdr`, `ledger`, `createdAt`, `diagnosticEventsXdr` (List\<String\>?), `events` (Events?). Parse methods: `parseEnvelopeXdr()`, `parseResultXdr()`, `parseResultMetaXdr()`, `parseDiagnosticEventsXdr()`.
 
 ```kotlin
 // WRONG: GetTransactionsRequest(startLedger = 1000, paginationOptions = ...)

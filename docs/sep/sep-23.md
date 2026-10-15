@@ -1,6 +1,6 @@
 # SEP-23: Strkey Encoding
 
-SEP-23 defines how Stellar writes keys and identifiers as strkeys: base32 strings whose first letter names their type. Account ids start with `G`, secret seeds with `S`, muxed accounts with `M`, contracts with `C`, and so on. The SDK codec is the `StrKey` object, and every SDK type that reads or writes a strkey (`KeyPair`, `Address`, `MuxedAccount`, `SignerKey`, `ClaimableBalanceId`) goes through it, so one string is accepted or rejected identically on JVM, Android, iOS, macOS and JavaScript.
+SEP-23 defines how Stellar writes keys and identifiers as strkeys: base32 strings whose first letter names their type. Account ids start with `G`, secret seeds with `S`, muxed accounts with `M` and contracts with `C`; the [version bytes reference](#version-bytes-reference) lists every prefix. Muxed contracts follow [CAP-0084](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0084.md); the SDK encodes them with the `W` prefix. The SDK codec is the `StrKey` object, and every SDK type that reads or writes a strkey goes through it: `KeyPair`, `Address`, `MuxedAccount`, `MuxedContract`, `SignerKey` and `ClaimableBalanceId`. One string is therefore accepted or rejected identically on JVM, Android, iOS, macOS and JavaScript.
 
 **Use Cases**:
 - Validate addresses entered by users or received from other services
@@ -15,7 +15,7 @@ Code examples assume a `suspend` calling context and these imports:
 import com.soneso.stellar.sdk.*
 ```
 
-The decode contract, check by check, is described in [Addresses and StrKey](../addresses.md). This page walks through each strkey type and the validation rules SEP-23 requires.
+The decode contract, check by check, is described in [Addresses and StrKey](../addresses.md). This page walks through each strkey type and the validation rules that SEP-23, or CAP-0084 for muxed contracts, requires.
 
 ## Quick Start
 
@@ -327,9 +327,76 @@ fun unknownDiscriminant() {
 }
 ```
 
+## Muxed Contracts (W...)
+
+A muxed contract pairs a contract with a 64-bit multiplexing id, the way a muxed account pairs an account with one. The Soroban host accepts a `W...` address from the protocol version CAP-0084 sets as a `MuxedAddress` contract parameter, never as an authorization address.
+
+A muxed contract combines:
+- a contract id (`C...`), the contract on the ledger
+- a 64-bit unsigned integer id
+
+Written as one string, the pair starts with `W`.
+
+### Creating muxed contracts
+
+`MuxedContract` takes a `C...` address with a `ULong` id, or parses a `C...` or `W...` address:
+
+```kotlin
+fun createMuxedContracts() {
+    val contractId = "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE"
+
+    // From a C... address and an id
+    val muxed = MuxedContract(contractId, 123456UL)
+    println(muxed.address) // WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG
+
+    // From a W... address
+    val parsed = MuxedContract("WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG")
+    println(parsed == muxed) // true
+}
+```
+
+### Extracting muxed contract components
+
+```kotlin
+fun extractContractComponents() {
+    val muxed = MuxedContract("WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG")
+
+    // The underlying C... address, the contract on the ledger
+    println(muxed.contractId) // CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE
+
+    // The 64-bit id, as an unsigned value
+    println(muxed.id) // 123456
+
+    // The same address as an Address, for Soroban calls
+    println(muxed.toAddress().addressType) // MUXED_CONTRACT
+}
+```
+
+Zero is an id like any other: a contract carrying the id `0` is written as a `W...` address, and only a contract with no id (`id == null`) is written as its `C...` address.
+
+### Low-level muxed contract encoding
+
+The raw form of a muxed contract is 40 bytes: the 32-byte contract id followed by the id as an eight-byte big-endian value.
+
+```kotlin
+fun lowLevelMuxedContract() {
+    val muxedContractId = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+
+    println(StrKey.isValidMuxedContract(muxedContractId)) // true
+
+    val raw = StrKey.decodeMuxedContract(muxedContractId)
+    println(raw.size) // 40
+
+    val contractId = raw.copyOfRange(0, 32)
+    println(StrKey.encodeContract(contractId)) // CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE
+
+    println(StrKey.encodeMuxedContract(raw) == muxedContractId) // true
+}
+```
+
 ## Parsing Any Address
 
-`Address` reads the five strkey kinds a Soroban `SCAddress` can name (`G`, `M`, `C`, `B`, `L`) and reports which one it got. Anything else, including a valid `S`, `T`, `X` or `P` strkey, throws `IllegalArgumentException` with the message `Unsupported address type`.
+`Address` reads the six strkey kinds a Soroban `SCAddress` can name (`G`, `M`, `C`, `W`, `B`, `L`) and reports which one it got. Anything else, including a valid `S`, `T`, `X` or `P` strkey, throws `IllegalArgumentException` with the message `Unsupported address type`.
 
 ```kotlin
 fun classify(input: String) {
@@ -344,6 +411,7 @@ fun classify(input: String) {
         Address.AddressType.ACCOUNT -> println("Account")
         Address.AddressType.MUXED_ACCOUNT -> println("Muxed account over ${MuxedAccount(input).accountId}")
         Address.AddressType.CONTRACT -> println("Contract")
+        Address.AddressType.MUXED_CONTRACT -> println("Muxed contract over ${MuxedContract(input).contractId}")
         Address.AddressType.CLAIMABLE_BALANCE -> println("Claimable balance")
         Address.AddressType.LIQUIDITY_POOL -> println("Liquidity pool")
     }
@@ -363,6 +431,7 @@ The version byte is the first decoded byte. Its top five bits select the first l
 | X | SHA-256 hash | `23 << 3` (184) | 32 | 56 | `encodeSha256Hash`, `decodeSha256Hash`, `isValidSha256Hash` |
 | P | Signed payload | `15 << 3` (120) | 40 to 100 | 69 to 165 | `encodeSignedPayload`, `decodeSignedPayload`, `isValidSignedPayload` |
 | C | Contract id | `2 << 3` (16) | 32 | 56 | `encodeContract`, `decodeContract`, `isValidContract` |
+| W | Muxed contract | `22 << 3` (176) | 40 | 69 | `encodeMuxedContract`, `decodeMuxedContract`, `isValidMuxedContract` |
 | L | Liquidity pool id | `11 << 3` (88) | 32 | 56 | `encodeLiquidityPool`, `decodeLiquidityPool`, `isValidLiquidityPool` |
 | B | Claimable balance id | `1 << 3` (8) | 33 | 58 | `encodeClaimableBalance`, `decodeClaimableBalance`, `isValidClaimableBalance` |
 
@@ -437,6 +506,6 @@ Because the character count is checked first, an empty string or a single charac
 
 **Specification**: [SEP-23: Strkeys](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md)
 
-**Implementation**: `com.soneso.stellar.sdk.StrKey`, `com.soneso.stellar.sdk.MuxedAccount`, `com.soneso.stellar.sdk.SignerKey`, `com.soneso.stellar.sdk.Address`, `com.soneso.stellar.sdk.ClaimableBalanceId`
+**Implementation**: `com.soneso.stellar.sdk.StrKey`, `com.soneso.stellar.sdk.MuxedAccount`, `com.soneso.stellar.sdk.MuxedContract`, `com.soneso.stellar.sdk.SignerKey`, `com.soneso.stellar.sdk.Address`, `com.soneso.stellar.sdk.ClaimableBalanceId`
 
 **Last Updated**: 2026-09-28

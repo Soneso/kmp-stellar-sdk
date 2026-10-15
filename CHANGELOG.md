@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-15
+
+Migration guide: [docs/migration/1.15.0.md](docs/migration/1.15.0.md)
+
 ### Added
-- Muxed contract addresses (`W...`, CAP-0084, protocol 30 and higher). The SEP-0023 strkey, base
+- Muxed contract addresses (`W...`, CAP-0084). The SEP-0023 strkey, base
   value `22 << 3`, carries the 32-byte contract id followed by the 8-byte big-endian id. `StrKey`
   gains `encodeMuxedContract`, `decodeMuxedContract`, and `isValidMuxedContract`. `Address` parses
   `W...` as `Address.AddressType.MUXED_CONTRACT`, converts to and from `SCAddressXdr.MuxedContract`,
@@ -65,7 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without an `else` branch needs the new branches; all other code compiles unchanged. Before this
   change, decoding `STELLAR_VALUE_SIGNED_MS` or `STELLAR_VALUE_EMPTY_TX_SET_MS` threw
   `IllegalArgumentException` for an unknown value.
-- Horizon and Soroban RPC compatibility matrices target v29.0.0 and retain their reported coverage.
+- The Horizon compatibility matrix targets Horizon v29.0.0 and the Soroban RPC matrix targets
+  stellar-rpc v29.0.1; both retain their reported coverage.
 - The repository documents its build, test, generation and contribution rules in `AGENTS.md` and
   `CONTRIBUTING.md`; CI checks that every path `AGENTS.md` names exists.
 - `TransactionInfo.diagnosticEventsXdr` and `TransactionInfo.parseDiagnosticEventsXdr()` are no
@@ -75,6 +80,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `withTimeout()`. It no longer lists transaction streaming as missing; the SDK streams Horizon
   responses with `stream(serializer, listener)`, and `AccountIntegrationTest` covers it. The nested
   agent guide under `integrationTests/` is gone; `AGENTS.md` holds the rules.
+- The user documentation and the agent skill describe this release: muxed contract addresses in
+  every strkey list, table, and section; the `ContractSpec` address rules; the checks that reject
+  muxed addresses in the authorization functions; the expiration rule of `signAuthEntries` with the
+  unsigned placeholder rule; the host key order of map arguments; the asset order; the input floor
+  of `AssetCode12` in XDR-JSON; and the top-level diagnostic events. The JVM example declares Kotlin
+  2.2.21, the version the SDK builds with. The documentation index lists the migration guides.
 
 ### Deprecated
 - `Events.diagnosticEventsXdr` and `Events.parseDiagnosticEventsXdr()` are deprecated because

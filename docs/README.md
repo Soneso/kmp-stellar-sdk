@@ -29,6 +29,10 @@ Welcome to the documentation for the Stellar SDK for Kotlin Multiplatform. This 
 ### Protocols & Standards
 - **[SEP Implementations](sep/)** - Stellar Ecosystem Proposal support
 
+### Migration guides
+- **[Migrating to 1.15.0](migration/1.15.0.md)** - Observable changes between 1.14.0 and 1.15.0
+- **[Migrating to 1.12.0](migration/1.12.0.md)** - Observable changes between 1.11.0 and 1.12.0
+
 ## Key Features
 
 This SDK provides an implementation of the Stellar protocol with:
@@ -44,7 +48,7 @@ This SDK provides an implementation of the Stellar protocol with:
 
 ### Core Features
 - Ed25519 keypair generation and management
-- StrKey encoding/decoding for all nine key types (G, S, M, C, L, B, T, X, P) - see [Addresses and StrKey](addresses.md)
+- StrKey encoding/decoding for all ten key types (G, S, M, C, W, L, B, T, X, P) - see [Addresses and StrKey](addresses.md)
 - Transaction building and signing
 - Fee bump transactions
 - Multi-signature support
