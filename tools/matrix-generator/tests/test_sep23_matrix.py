@@ -37,6 +37,7 @@ KEY_TYPES = [
     ("STRKEY_HASH_X", "23 << 3", 184, "X"), ("STRKEY_SIGNED_PAYLOAD", "15 << 3", 120, "P"),
     ("STRKEY_CONTRACT", "2 << 3", 16, "C"), ("STRKEY_LIQUIDITY_POOL", "11 << 3", 88, "L"),
     ("STRKEY_CLAIMABLE_BALANCE", "1 << 3", 8, "B"),
+    ("STRKEY_MUXED_CONTRACT", "22 << 3", 176, "W"),
 ]
 
 G = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJ"
@@ -56,6 +57,9 @@ VALID = [
     ("Valid contract", "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"),
     ("Valid liquidity pool address", "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"),
     ("Valid claimable balance address", B + "R4TU"),
+    ("Valid muxed contract address", "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC"),
+    ("Valid muxed contract address in which unsigned id exceeds maximum signed 64-bit integer",
+     "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAACWJY"),
 ]
 INVALID = [
     ("Invalid length (Ed25519 should be 32 bytes, not 5)", "GAAAAAAAACGC6"),
@@ -76,14 +80,23 @@ INVALID = [
     ("The unused trailing 2-bits must be zero in the encoding of the last symbol.", B + "R4TV"),
     ("Invalid claimable balance type (first byte of binary key is not 0)",
      "BAAT6DBUX6J22DMZOHIEZTEQ64CVCHEDRKWZONFEUL5Q26QD7R76RGXACA"),
+    ("The unused trailing bit must be zero in the encoding of the last three bytes (24 bits) as five base-32 "
+     "symbols (25 bits) of a muxed contract", "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWD"),
+    ("Invalid length (congruent to 6 mod 8) of a muxed contract",
+     "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWCA"),
+    ("Invalid length (base-32 decoding should yield 43 bytes, not 44) of a muxed contract",
+     "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAAIOUI"),
+    ("Invalid algorithm (low 3 bits of version byte are 7) of a muxed contract",
+     "W47QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAADXHW"),
+    ("Invalid checksum of a muxed contract", "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWA"),
 ]
-NAMES = [f"valid_{n:02d}" for n in range(1, 9)] + [f"invalid_{n:02d}" for n in range(1, 16)]
+NAMES = [f"valid_{n:02d}" for n in range(1, 11)] + [f"invalid_{n:02d}" for n in range(1, 21)]
 VECTOR = dict(zip(NAMES, [vector for _, vector in VALID + INVALID]))
 
 # StrKey.kt as the SDK lays it out: a private VersionByte enum written with `shl` and an encode
 # and a decode function per key type.
 FUNCTIONS = ["Ed25519PublicKey", "Med25519PublicKey", "Ed25519SecretSeed", "PreAuthTx", "Sha256Hash",
-             "SignedPayload", "Contract", "LiquidityPool", "ClaimableBalance"]
+             "SignedPayload", "Contract", "LiquidityPool", "ClaimableBalance", "MuxedContract"]
 ACCOUNT_ID_ENTRY = "        ACCOUNT_ID((6 shl 3).toByte(), 32..32),           // G\n"
 STRKEY_KT = (
     "package com.soneso.stellar.sdk\n\nobject StrKey {\n\n"
@@ -91,7 +104,8 @@ STRKEY_KT = (
     + "".join(f"        {name}(({shift} shl 3).toByte(), 32..32),\n" for name, shift in (
         ("MED25519_PUBLIC_KEY", 12), ("SEED", 18), ("PRE_AUTH_TX", 19), ("SHA256_HASH", 23),
         ("SIGNED_PAYLOAD", 15), ("CONTRACT", 2), ("LIQUIDITY_POOL", 11)))
-    + "        CLAIMABLE_BALANCE((1 shl 3).toByte(), 33..33);\n\n"
+    + "        CLAIMABLE_BALANCE((1 shl 3).toByte(), 33..33),\n"
+    "        MUXED_CONTRACT((22 shl 3).toByte(), 40..40);\n\n"
     "        val encodedLength: Int get() = dataLengths.first\n    }\n\n"
     + "".join(f"    fun encode{f}(data: ByteArray): String = TODO()\n    fun decode{f}(data: String): ByteArray = TODO()\n"
               for f in FUNCTIONS)
@@ -102,7 +116,7 @@ STRKEY_KT = (
 # plain literals, one vector split into two literals joined with `+`, and a list.
 EXACT_STRKEY_TEST_KT = (
     "package com.soneso.stellar.sdk.unitTests\n\nclass StrKeyTest {\n"
-    + "".join(f'    private val valid{n} = "{VALID[n][1]}"\n' for n in (0, 1, 2, 4, 5, 6))
+    + "".join(f'    private val valid{n} = "{VALID[n][1]}"\n' for n in (0, 1, 2, 4, 5, 6, 8, 9))
     + f'    private val signedPayload =\n        "{VALID[3][1][:40]}" +\n            "{VALID[3][1][40:]}"\n'
     + "    private val claimableBalanceId = ClaimableBalanceVectors.strKey\n"
     + "    private val invalidVectors = listOf(\n" + "".join(f'        "{v}",\n' for _, v in INVALID) + "    )\n}\n"
@@ -161,8 +175,8 @@ class Sep23ParserTest(unittest.TestCase):
         self.assertEqual([(s["title"], s["key"]) for s in definition["sections"]],
                          [("Key types", KEY_TYPES_KEY), (VECTORS_TITLE, VECTORS_KEY)])
         self.assertEqual((definition["preamble"]["title"], definition["preamble"]["version"],
-                          definition["preamble"]["status"]), ("Strkeys", "1.3.0", "Active"))
-        self.assertEqual(definition["metadata"]["total_fields"], 32)
+                          definition["preamble"]["status"]), ("Strkeys", "1.4.0", "Active"))
+        self.assertEqual(definition["metadata"]["total_fields"], 40)
 
     def test_key_types_carry_the_evaluated_base_value_and_first_character(self) -> None:
         self.assertEqual(section(spec_definition(), KEY_TYPES_KEY)["fields"], [
@@ -180,7 +194,7 @@ class Sep23ParserTest(unittest.TestCase):
 
     def test_items_follow_an_edited_document(self) -> None:
         edited = replace_once(SPEC, "| STRKEY_PUBKEY            | 6 << 3     |", "| STRKEY_PUBKEY            | 7 << 3     |")
-        edited = replace_once(edited, VALID[5][1], VALID[5][1][:-1] + "B")
+        edited = replace_once(edited, f"   - Strkey `{VALID[5][1]}`\n", f"   - Strkey `{VALID[5][1][:-1]}B`\n")
         edited = replace_once(edited, "| STRKEY_CONTRACT          | 2 << 3     | C          | no    | Hash |\n", "")
         edited = replace_once(edited, f"1. Invalid checksum\n\n   - Strkey:\n     `{VECTOR['invalid_10']}`\n\n", "")
         definition = parse(edited)
@@ -189,7 +203,7 @@ class Sep23ParserTest(unittest.TestCase):
         self.assertNotIn("STRKEY_CONTRACT", key_type_values(definition))
         self.assertEqual(vectors["valid_06"], VALID[5][1][:-1] + "B")
         self.assertEqual(vectors["invalid_10"], VECTOR["invalid_11"])
-        self.assertEqual(definition["metadata"]["total_fields"], 8 + 8 + 14)
+        self.assertEqual(definition["metadata"]["total_fields"], 9 + 10 + 19)
 
     def test_a_plain_integer_base_value_is_read(self) -> None:
         field = section(parse(replace_once(SPEC, "| 6 << 3     |", "| 48         |")), KEY_TYPES_KEY)["fields"][0]
@@ -322,7 +336,7 @@ class Sep23KeyTypeCheckTest(Sep23AnalyzerCase):
         with mock.patch.dict(sep_analyzer.SEPAnalyzer.SEP23_KEY_TYPES, {"STRKEY_CONTRACT": None}):
             mapped = self.mappings()
         self.assertIsNone(mapped["STRKEY_CONTRACT"])
-        self.assertEqual(sum(symbol is not None for symbol in mapped.values()), 8)
+        self.assertEqual(sum(symbol is not None for symbol in mapped.values()), 9)
 
     def test_every_value_form_evaluates(self) -> None:
         entries = STRKEY_KT[STRKEY_KT.index(ACCOUNT_ID_ENTRY):STRKEY_KT.index(";\n") + 2]
@@ -332,7 +346,8 @@ class Sep23KeyTypeCheckTest(Sep23AnalyzerCase):
             "        PRE_AUTH_TX(1__52.toByte(), 32..32), SHA256_HASH((23 shl 3), 32..32),\n"
             "        SIGNED_PAYLOAD((0xF shl 0b11).toByte(), 40..100),\n"
             "        CONTRACT(( 2 shl 3 ).toByte(), 32..32) { override fun toString() = \"C\" },\n"
-            "        LIQUIDITY_POOL(0X58, 32..32), CLAIMABLE_BALANCE(0B1000, 33..33);\n"))
+            "        LIQUIDITY_POOL(0X58, 32..32), CLAIMABLE_BALANCE(0B1000, 33..33),\n"
+            "        MUXED_CONTRACT((0xB0).toByte(), 40..40);\n"))
         self.write_sdk(strkey=rewritten)
         self.assertTrue(all(self.mappings().values()))
 
@@ -451,10 +466,10 @@ class Sep23RunTest(Sep23AnalyzerCase):
         self.write_sdk(strkey_test=COLLISION_STRKEY_TEST_KT, claimable_balance_vectors="object ClaimableBalanceVectors\n")
         matrix = self.render()
         self.assertTrue(matrix.startswith("# SEP-0023 (Strkeys) Compatibility Matrix\n\n**Generated:** "))
-        self.assertIn("## Overall Coverage\n\n**Total Coverage:** 34.38% (11/32 fields)\n\n"
-                      "- ✅ **Implemented:** 11/32\n- ❌ **Not Implemented:** 21/32\n\n"
-                      "**Required Fields:** 34.38% (11/32)\n\n**Optional Fields:** 100% (0/0)\n\n", matrix)
-        self.assertIn(f"| {VECTORS_TITLE} | 8.7% | 2/23 | 2 | 23 |\n", matrix)
+        self.assertIn("## Overall Coverage\n\n**Total Coverage:** 30.0% (12/40 fields)\n\n"
+                      "- ✅ **Implemented:** 12/40\n- ❌ **Not Implemented:** 28/40\n\n"
+                      "**Required Fields:** 30.0% (12/40)\n\n**Optional Fields:** 100% (0/0)\n\n", matrix)
+        self.assertIn(f"| {VECTORS_TITLE} | 6.67% | 2/30 | 2 | 30 |\n", matrix)
 
     def test_a_missing_definition_file_raises(self) -> None:
         self.write_sdk()
