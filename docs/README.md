@@ -30,6 +30,7 @@ Welcome to the documentation for the Stellar SDK for Kotlin Multiplatform. This 
 - **[SEP Implementations](sep/)** - Stellar Ecosystem Proposal support
 
 ### Migration guides
+- **[Migrating to 1.15.0](migration/1.15.0.md)** - Observable changes between 1.14.0 and 1.15.0
 - **[Migrating to 1.12.0](migration/1.12.0.md)** - Observable changes between 1.11.0 and 1.12.0
 
 ## Key Features
