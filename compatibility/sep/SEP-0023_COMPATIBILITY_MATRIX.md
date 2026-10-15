@@ -1,8 +1,8 @@
 # SEP-0023 (Strkeys) Compatibility Matrix
 
-**Generated:** 2026-10-14 15:09:49
+**Generated:** 2026-10-15 14:47:59
 
-**SEP Version:** 1.3.0  
+**SEP Version:** 1.4.0  
 **SEP Status:** Active  
 **SDK Version:** 1.15.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md
@@ -13,12 +13,12 @@ Strkey is an ASCII format for representing Stellar account IDs and addresses.
 
 ## Overall Coverage
 
-**Total Coverage:** 100.0% (32/32 fields)
+**Total Coverage:** 100.0% (40/40 fields)
 
-- ✅ **Implemented:** 32/32
-- ❌ **Not Implemented:** 0/32
+- ✅ **Implemented:** 40/40
+- ❌ **Not Implemented:** 0/40
 
-**Required Fields:** 100.0% (32/32)
+**Required Fields:** 100.0% (40/40)
 
 **Optional Fields:** 100% (0/0)
 
@@ -30,8 +30,8 @@ Strkey is an ASCII format for representing Stellar account IDs and addresses.
 
 | Section | Coverage | Required | Implemented | Total |
 |---------|----------|----------|-------------|-------|
-| Key types | 100.0% | 9/9 | 9 | 9 |
-| Test vectors quoted in the StrKey unit test files | 100.0% | 23/23 | 23 | 23 |
+| Key types | 100.0% | 10/10 | 10 | 10 |
+| Test vectors quoted in the StrKey unit test files | 100.0% | 30/30 | 30 | 30 |
 
 ## Detailed Field Comparison
 
@@ -48,6 +48,7 @@ Strkey is an ASCII format for representing Stellar account IDs and addresses.
 | `STRKEY_CONTRACT` | ✓ | ✅ | `StrKey.encodeContract / decodeContract` | Version byte base value 2 << 3 = 16, first character C |
 | `STRKEY_LIQUIDITY_POOL` | ✓ | ✅ | `StrKey.encodeLiquidityPool / decodeLiquidityPool` | Version byte base value 11 << 3 = 88, first character L |
 | `STRKEY_CLAIMABLE_BALANCE` | ✓ | ✅ | `StrKey.encodeClaimableBalance / decodeClaimableBalance` | Version byte base value 1 << 3 = 8, first character B |
+| `STRKEY_MUXED_CONTRACT` | ✓ | ✅ | `StrKey.encodeMuxedContract / decodeMuxedContract` | Version byte base value 22 << 3 = 176, first character W |
 
 ### Test vectors quoted in the StrKey unit test files
 
@@ -61,6 +62,8 @@ Strkey is an ASCII format for representing Stellar account IDs and addresses.
 | `valid_06` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Valid contract |
 | `valid_07` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Valid liquidity pool address |
 | `valid_08` | ✓ | ✅ | `unitTests/ClaimableBalanceVectors.kt` | quoted in `unitTests/ClaimableBalanceVectors.kt`: Valid claimable balance address |
+| `valid_09` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Valid muxed contract address |
+| `valid_10` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Valid muxed contract address in which unsigned id exceeds ma... |
 | `invalid_01` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid length (Ed25519 should be 32 bytes, not 5) |
 | `invalid_02` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: The unused trailing bit must be zero in the encoding of the ... |
 | `invalid_03` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid length (congruent to 1 mod 8) |
@@ -76,6 +79,11 @@ Strkey is an ASCII format for representing Stellar account IDs and addresses.
 | `invalid_13` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: No zero padding in signed payload |
 | `invalid_14` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: The unused trailing 2-bits must be zero in the encoding of t... |
 | `invalid_15` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid claimable balance type (first byte of binary key is ... |
+| `invalid_16` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: The unused trailing bit must be zero in the encoding of the ... |
+| `invalid_17` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid length (congruent to 6 mod 8) of a muxed contract |
+| `invalid_18` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid length (base-32 decoding should yield 43 bytes, not ... |
+| `invalid_19` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid algorithm (low 3 bits of version byte are 7) of a mu... |
+| `invalid_20` | ✓ | ✅ | `unitTests/StrKeyTest.kt` | quoted in `unitTests/StrKeyTest.kt`: Invalid checksum of a muxed contract |
 
 ## Implementation Gaps
 

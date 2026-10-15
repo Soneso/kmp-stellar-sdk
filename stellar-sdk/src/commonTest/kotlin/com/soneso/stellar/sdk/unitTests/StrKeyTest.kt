@@ -992,16 +992,20 @@ class StrKeyTest {
     fun testMuxedContractInvalidVectorsAreRejected() {
         val base = "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAA"
         val invalid = listOf(
-            base + "WWD" to "Unused bits should be set to 0",
-            base + "WWCA" to "Invalid encoded length, expected 69 characters, got 70",
-            base + "AIOUI" to "Invalid encoded length, expected 69 characters, got 71",
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWD" to
+                "Unused bits should be set to 0",
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWCA" to
+                "Invalid encoded length, expected 69 characters, got 70",
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAAIOUI" to
+                "Invalid encoded length, expected 69 characters, got 71",
             // The algorithm bits of the version byte set to 7, with and without the checksum
             // recomputed.
             "W47QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAADXHW" to
                 "Version byte is invalid",
             "W47QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWC" to
                 "Version byte is invalid",
-            base + "WWA" to "Checksum invalid",
+            "WA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAAAWWA" to
+                "Checksum invalid",
             base + "WWC===" to "Invalid encoded length, expected 69 characters, got 72"
         )
         for ((strKey, rejection) in invalid) {

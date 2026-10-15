@@ -88,6 +88,7 @@ class SEPAnalyzer:
         'STRKEY_CONTRACT': ('CONTRACT', 'encodeContract', 'decodeContract'),
         'STRKEY_LIQUIDITY_POOL': ('LIQUIDITY_POOL', 'encodeLiquidityPool', 'decodeLiquidityPool'),
         'STRKEY_CLAIMABLE_BALANCE': ('CLAIMABLE_BALANCE', 'encodeClaimableBalance', 'decodeClaimableBalance'),
+        'STRKEY_MUXED_CONTRACT': ('MUXED_CONTRACT', 'encodeMuxedContract', 'decodeMuxedContract'),
     }
 
     # Shared runtime behind the XDR-JSON conversion methods (SEP-51)
