@@ -1417,10 +1417,7 @@ A nested map that falls back is contained: the enclosing vec or map still conver
 
 ```kotlin
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.scval.toNative
-import com.soneso.stellar.sdk.xdr.SCValXdr
 
 // A u64 above Long.MAX_VALUE converts to a ULong and keeps its exact value
 val count = Scv.toUint64(18446744073709551615uL).toNative()  // ULong 18446744073709551615

@@ -50,10 +50,7 @@ import com.soneso.stellar.sdk.Claimant
 The SDK provides the `Auth.Signer` interface for custom signing logic:
 
 ```kotlin
-import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
-import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
-import com.soneso.stellar.sdk.xdr.XdrWriter
 
 // Implement custom signer for hardware wallet integration
 class HardwareWalletSigner(
@@ -125,8 +122,6 @@ a network below Protocol 27, where V2 entries invalidate the transaction:
 
 ```kotlin
 // transaction: from the previous steps of this flow
-import com.soneso.stellar.sdk.rpc.SorobanServer
-
 val server = SorobanServer("https://soroban-testnet.stellar.org")
 val simulation = server.simulateTransaction(transaction) // requests AddressV2
 // Legacy opt-out, e.g. for a network below Protocol 27:
@@ -162,9 +157,6 @@ assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and
 
 ```kotlin
 // authEntryFromSimulation, currentLedger, delegateKeyPair: from the previous steps of this flow
-import com.soneso.stellar.sdk.Auth
-import com.soneso.stellar.sdk.DelegateDescriptor
-
 // Attach a sorted, validated delegate tree to a base entry (top-level signature
 // stays void). Delegates may nest further via DelegateDescriptor.nestedDelegates.
 val delegated = Auth.attachDelegates(
@@ -312,9 +304,6 @@ The first `signAuthEntries` call stamps the latest ledger plus 100 and signs. An
 Parse complex contract results using the SDK's type conversion system:
 
 ```kotlin
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.xdr.SCValXdr
-
 // Example: Parse custom struct from contract
 data class TokenMetadata(
     val name: String,
@@ -353,8 +342,6 @@ suspend fun getTokenMetadata(contractClient: ContractClient): TokenMetadata {
 Handle expired contract state gracefully:
 
 ```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.exception.ExpiredStateException
 import kotlinx.coroutines.delay
 
@@ -398,10 +385,6 @@ Parse contract Wasm bytecode to extract specifications, metadata, and environmen
 #### Parse from Bytecode
 
 ```kotlin
-import com.soneso.stellar.sdk.contract.SorobanContractParser
-import com.soneso.stellar.sdk.contract.SorobanContractInfo
-import com.soneso.stellar.sdk.contract.SorobanContractParserException
-
 val bytecode: ByteArray = java.io.File("contract.wasm").readBytes() // JVM; use your platform's file APIs elsewhere
 
 try {
@@ -452,9 +435,6 @@ val events: List<SCSpecEventV0Xdr> = contractInfo.events
 `SorobanServer` can fetch and parse contract info directly from a deployed contract, by contract ID or WASM ID:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.contract.SorobanContractInfo
-
 // Both methods are suspend functions — call from a coroutine scope
 suspend fun loadContractInfo() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -489,12 +469,6 @@ instance or its code was not found, or the contract is a Stellar Asset Contract,
 no WASM on-chain. To resolve a reference directly, use `getExternalRefWasmHash`:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
-import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
-import com.soneso.stellar.sdk.xdr.SCValXdr
-
 suspend fun resolveExternalRef() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
 
@@ -533,10 +507,6 @@ submission and the returned client is ready to invoke, the same flow `deployFrom
 uses.
 
 ```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.contract.ContractClient
-
 suspend fun deployFromExternalRef(keyPair: KeyPair) {
     val client = ContractClient.deployFromExternalRef(
         executableOwner = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
@@ -574,10 +544,6 @@ or Stellar asset) does not enter the derivation. Use it when the address is need
 before the deployment, for example in constructor arguments of another contract.
 
 ```kotlin
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.secureRandomBytes
-
 suspend fun predictContractId() {
     val deployer = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     val salt = secureRandomBytes(32)
@@ -596,10 +562,6 @@ suspend fun predictContractId() {
 Use `TransactionPreconditions` for advanced transaction control:
 
 ```kotlin
-import com.soneso.stellar.sdk.TransactionPreconditions
-import com.soneso.stellar.sdk.TimeBounds
-import com.soneso.stellar.sdk.LedgerBounds
-import com.soneso.stellar.sdk.SignerKey
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -644,9 +606,6 @@ Increase fees for stuck transactions:
 
 ```kotlin
 // feePayerAccount, feePayerKeypair, horizonServer, loadTransactionFromDb: from the previous steps of this flow
-import com.soneso.stellar.sdk.FeeBumpTransactionBuilder
-import com.soneso.stellar.sdk.FeeBumpTransaction
-
 // Original transaction stuck with low fee
 // Application-specific: Load transaction from your storage
 // This function represents your database/storage retrieval logic
@@ -734,8 +693,6 @@ val atomicSwap = TransactionBuilder(account, network)
 The SDK provides 424 XDR types for advanced protocol operations:
 
 ```kotlin
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.xdr.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -770,8 +727,6 @@ fun parseTransactionMeta(metaXdr: String): TransactionMetaXdr {
 Convert native types to Soroban contract values:
 
 ```kotlin
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.Address
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Convert native types to SCVal
@@ -1149,14 +1104,6 @@ class MultiSigCoordinator(
 Use the SDK's Auth class for secure authorization:
 
 ```kotlin
-import com.soneso.stellar.sdk.Auth
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.*
-import com.soneso.stellar.sdk.rpc.SorobanServer
-
 // Build authorization from scratch
 suspend fun authorizeCustomInvocation(
     signer: KeyPair,
@@ -1477,7 +1424,6 @@ suspend fun advancedEventQuerying() {
 Build Soroban transaction data for advanced resource configuration:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanDataBuilder
 val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 val network = Network.TESTNET
 
