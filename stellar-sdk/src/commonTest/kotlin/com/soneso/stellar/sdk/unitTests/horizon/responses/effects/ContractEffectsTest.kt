@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.unitTests.horizon.responses.effects
 
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.horizon.responses.effects.*
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.LINKS_JSON
 import com.soneso.stellar.sdk.unitTests.horizon.responses.effects.EffectTestHelpers.assertStandardLinks
@@ -71,10 +72,44 @@ class ContractEffectsTest {
         assertIs<ContractCreditedEffectResponse>(effect)
         assertEquals("USDC", effect.assetCode)
         assertEquals(testContractId, effect.contract)
+        assertNull(effect.contractMuxed)
+        assertNull(effect.contractMuxedId)
         assertEquals("500.0000000", effect.amount)
         assertEquals(TEST_CREATED_AT, effect.createdAt)
         assertEquals(TEST_PAGING_TOKEN, effect.pagingToken)
         assertStandardLinks(effect.links)
+    }
+
+    @Test
+    fun testContractCreditedMuxedJsonDeserialization() {
+        val contract = "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE"
+        val muxed = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+        val jsonStr = """
+        {
+            "id": "80",
+            "account": "$TEST_ACCOUNT",
+            "type": "contract_credited",
+            "created_at": "$TEST_CREATED_AT",
+            "paging_token": "$TEST_PAGING_TOKEN",
+            $LINKS_JSON,
+            "asset_type": "native",
+            "contract": "$contract",
+            "amount": "500.0000000",
+            "contract_muxed": "$muxed",
+            "contract_muxed_id": "123456"
+        }
+        """
+        val effect = json.decodeFromString<EffectResponse>(jsonStr)
+        assertIs<ContractCreditedEffectResponse>(effect)
+        assertEquals(contract, effect.contract)
+        assertEquals(muxed, effect.contractMuxed)
+        assertEquals("123456", effect.contractMuxedId)
+        val bytes = StrKey.decodeMuxedContract(assertNotNull(effect.contractMuxed))
+        assertContentEquals(StrKey.decodeContract(effect.contract), bytes.copyOfRange(0, 32))
+        val muxedId = bytes.copyOfRange(32, 40).fold(0UL) { id, byte ->
+            (id shl 8) or byte.toUByte().toULong()
+        }
+        assertEquals(123456UL, muxedId)
     }
 
     @Test
