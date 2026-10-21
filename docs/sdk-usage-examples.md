@@ -766,12 +766,12 @@ val operations = server.operations()
 operations.records.forEach { op ->
     when (op) {
         is PaymentOperationResponse -> {
-            println("Payment: ${op.amount} ${op.asset.code} to ${op.to}")
+            println("Payment: ${op.amount} ${op.assetCode ?: "XLM"} to ${op.to}")
         }
         is CreateAccountOperationResponse -> {
             println("Account created: ${op.account} with ${op.startingBalance} XLM")
         }
-        // Handle other operation types as needed
+        else -> {}
     }
 }
 

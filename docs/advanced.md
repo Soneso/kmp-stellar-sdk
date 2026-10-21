@@ -1382,9 +1382,7 @@ suspend fun customPolling() {
 Query Soroban contract events with sophisticated filtering for monitoring and debugging:
 
 ```kotlin
-// sym, u32: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.requests.GetEventsRequest
-import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun advancedEventQuerying() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -1440,10 +1438,10 @@ suspend fun advancedEventQuerying() {
         val parsedTopics = event.parseTopic()
         parsedTopics.forEach { topic ->
             // Convert SCVal back to native types
-            when {
-                topic.sym != null -> println("Topic (symbol): ${Scv.fromSymbol(topic)}")
-                topic.u32 != null -> println("Topic (u32): ${Scv.fromUint32(topic)}")
-                // ... handle other types as needed
+            when (topic) {
+                is SCValXdr.Sym -> println("Topic (symbol): ${Scv.fromSymbol(topic)}")
+                is SCValXdr.U32 -> println("Topic (u32): ${Scv.fromUint32(topic)}")
+                else -> {}
             }
         }
 
