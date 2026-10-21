@@ -8,6 +8,11 @@ import kotlinx.serialization.Serializable
  *
  * This effect occurs when a contract is credited with an asset.
  *
+ * @property contractMuxed The muxed address of [contract] as a W... strkey, set by Horizon
+ * for a transfer or mint to a muxed contract address. Null when no muxed destination is reported.
+ * @property contractMuxedId The muxed id as the decimal string Horizon sends for a transfer or
+ * mint to a muxed contract address. Null when no muxed destination is reported.
+ *
  * @see [Effect Documentation](https://developers.stellar.org/docs/data/horizon/api-reference/resources/effects)
  */
 @Serializable
@@ -53,5 +58,10 @@ data class ContractCreditedEffectResponse(
     /**
      * The amount credited
      */
-    val amount: String
+    val amount: String,
+
+    @SerialName("contract_muxed")
+    val contractMuxed: String? = null,
+    @SerialName("contract_muxed_id")
+    val contractMuxedId: String? = null
 ) : EffectResponse()
