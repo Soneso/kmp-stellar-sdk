@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `AssembledTransaction.signAuthEntries` keeps the memo and fee of the simulated transaction.
+- `AssembledTransaction.submit` keeps polling when a `getTransaction` request fails after the send; at the timeout it throws `TransactionStillPendingException` or the last failure.
 
 ## [1.15.0] - 2026-10-15
 

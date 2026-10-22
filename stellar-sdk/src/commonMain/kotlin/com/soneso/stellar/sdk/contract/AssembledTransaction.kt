@@ -280,6 +280,7 @@ class AssembledTransaction<T> internal constructor(
      * @throws NeedsMoreSignaturesException if more auth signatures required
      * @throws SendTransactionFailedException if submission failed
      * @throws TransactionStillPendingException if still pending after timeout
+     * @throws Exception the last getTransaction failure when every status request failed until [submitTimeout]
      * @throws ExpiredStateException if contract state needs restoration
      * @throws TransactionFailedException if transaction failed
      */
@@ -696,6 +697,7 @@ class AssembledTransaction<T> internal constructor(
      * @throws NotYetSimulatedException if not yet simulated
      * @throws SendTransactionFailedException if submission failed
      * @throws TransactionStillPendingException if still pending after timeout
+     * @throws Exception the last getTransaction failure when every status request failed until [submitTimeout]
      * @throws TransactionFailedException if transaction failed
      */
     suspend fun submit(): T {
@@ -821,13 +823,24 @@ class AssembledTransaction<T> internal constructor(
 
         // Poll for result with exponential backoff
         val txHash = sendTransactionResponse!!.hash!!
-        val attempts = withExponentialBackoff(
+        var lastResponse: GetTransactionResponse? = null
+        var lastFailure: Throwable? = null
+        withExponentialBackoff(
             timeout = submitTimeout,
-            fn = { server.getTransaction(txHash) },
-            keepWaitingIf = { it.status == GetTransactionStatus.NOT_FOUND }
+            fn = {
+                try {
+                    server.getTransaction(txHash).also { lastResponse = it }
+                } catch (e: Throwable) {
+                    // A failed status request does not determine the submitted transaction's outcome.
+                    if (isFatal(e)) throw e
+                    lastFailure = e
+                    null
+                }
+            },
+            keepWaitingIf = { it == null || it.status == GetTransactionStatus.NOT_FOUND }
         )
 
-        getTransactionResponse = attempts.last()
+        getTransactionResponse = lastResponse ?: throw lastFailure!!
 
         return when (getTransactionResponse!!.status) {
             GetTransactionStatus.SUCCESS -> getTransactionResponse!!

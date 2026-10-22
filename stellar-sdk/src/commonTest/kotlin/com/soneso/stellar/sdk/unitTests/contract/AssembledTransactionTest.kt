@@ -1,25 +1,29 @@
 package com.soneso.stellar.sdk.unitTests.contract
 
-import com.soneso.stellar.sdk.contract.*
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.*
 import com.soneso.stellar.sdk.contract.exception.*
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpResponseData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import kotlin.test.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.IOException
+import kotlinx.serialization.json.Json
 
 /**
  * Unit tests for AssembledTransaction.
@@ -783,10 +787,12 @@ class AssembledTransactionTest {
         sourceAccount: String = MOCK_RPC_SOURCE_ACCOUNT,
         simulateResultJson: String,
         sendTransactionResultJson: String? = null,
-        getTransactionResultJson: String? = null
+        getTransactionResultJson: String? = null,
+        poll: (suspend MockRequestHandleScope.() -> HttpResponseData)? = null
     ): SorobanServer {
         val engine = MockEngine { request ->
             val body = request.body.toByteArray().decodeToString()
+            if (poll != null && "\"getTransaction\"" in body) return@MockEngine poll()
             val resultJson = when {
                 "\"getLedgerEntries\"" in body -> ledgerEntriesResultJson(sourceAccount)
                 "\"simulateTransaction\"" in body -> simulateResultJson
@@ -1828,41 +1834,120 @@ class AssembledTransactionTest {
 
     // ==================== submitInternal(): getTransaction terminal statuses ====================
 
-    @Test
-    fun testSubmitThrowsTransactionStillPendingExceptionWhenPollingTimesOut() = runTest {
+    private fun MockRequestHandleScope.pollResponse(status: String): HttpResponseData = respond(
+        """{"jsonrpc":"2.0","id":"1","result":{"status":"$status","latestLedger":14246,
+        "resultMetaXdr":"${successResultMetaBase64(Scv.toUint32(42u))}"}}""",
+        headers = headersOf(HttpHeaders.ContentType, "application/json")
+    )
+
+    private fun MockRequestHandleScope.pollUnavailable(calls: Int): HttpResponseData = respond(
+        "unavailable on poll $calls", HttpStatusCode.ServiceUnavailable,
+        headersOf(HttpHeaders.ContentType, "application/json")
+    )
+
+    private suspend fun withPollingTransaction(
+        timeout: Int = 1,
+        poll: suspend MockRequestHandleScope.() -> HttpResponseData,
+        check: suspend (AssembledTransaction<UInt>) -> Unit
+    ) {
         val signer = KeyPair.random()
-        val source = signer.getAccountId()
-        val txHash = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304"
         rawJsonMockServer(
-            sourceAccount = source,
             simulateResultJson = simulateResultJson(Scv.toVoid(), listOf(writeAuthEntry())),
-            sendTransactionResultJson = """{ "status": "PENDING", "hash": "$txHash", "latestLedger": 14245 }""",
-            getTransactionResultJson = """{ "status": "NOT_FOUND", "latestLedger": 14245 }"""
+            sendTransactionResultJson = """{"status":"PENDING","hash":"${"ab".repeat(32)}","latestLedger":14245}""",
+            poll = poll
         ).use { server ->
-            val builder = TransactionBuilder(sourceAccount = Account(source, MOCK_RPC_SOURCE_SEQ), network = NETWORK)
-                .addOperation(
-                    InvokeHostFunctionOperation.invokeContractFunction(
-                        contractAddress = MOCK_RPC_CONTRACT_ID,
-                        functionName = "hello",
-                        parameters = emptyList()
-                    )
-                )
-                .setTimeout(300L)
-                .setBaseFee(100L)
-            // submitTimeout=0 means the poll loop's time budget is exhausted immediately
-            // after the first getTransaction call, so it stays NOT_FOUND deterministically.
-            val assembled = AssembledTransaction<SCValXdr>(
-                server = server,
-                submitTimeout = 0,
-                transactionSigner = signer,
-                parseResultXdrFn = null,
-                transactionBuilder = builder
+            val assembled = AssembledTransaction(
+                server = server, submitTimeout = timeout, transactionSigner = signer,
+                parseResultXdrFn = { Scv.fromUint32(it) }, transactionBuilder = mockBuilder()
             )
             assembled.simulate()
             assembled.sign()
-            val ex = assertFailsWith<TransactionStillPendingException> { assembled.submit() }
-            assertTrue(ex.message!!.contains("Waited 0 seconds"))
-            assertSame(assembled, ex.assembledTransaction)
+            check(assembled)
+        }
+    }
+
+    @Test
+    fun testSubmitRecoversAfterHttpAndIoPollingFailures() = runTest {
+        var calls = 0
+        withPollingTransaction(timeout = 10, poll = {
+            when (++calls) {
+                1 -> pollUnavailable(calls)
+                2 -> throw IOException("connection reset on poll $calls")
+                else -> pollResponse("SUCCESS")
+            }
+        }) { assembled ->
+            assertEquals(42u, assembled.submit())
+            assertEquals(3, calls)
+        }
+    }
+
+    @Test
+    fun testSubmitTimeoutRethrowsLastPollingFailure() = runTest {
+        for (httpFailure in listOf(false, true)) {
+            var calls = 0
+            withPollingTransaction(poll = {
+                if (++calls == 1 || httpFailure) pollUnavailable(calls)
+                else throw IOException("connection reset on poll $calls")
+            }) { assembled ->
+                withContext(Dispatchers.Default) {
+                    if (httpFailure) {
+                        val error = assertFailsWith<IllegalArgumentException> { assembled.submit() }
+                        assertTrue(error.message!!.startsWith("Failed to parse response for method getTransaction:"))
+                        assertTrue(error.message!!.contains("unavailable on poll $calls"))
+                    } else {
+                        val error = assertFailsWith<IOException> { assembled.submit() }
+                        assertEquals("connection reset on poll $calls", error.message)
+                    }
+                }
+                assertTrue(calls >= 2)
+            }
+        }
+    }
+
+    @Test
+    fun testSubmitTimeoutKeepsNotFoundBeforePollingFailure() = runTest {
+        var calls = 0
+        withPollingTransaction(poll = {
+            if (++calls == 1) pollResponse("NOT_FOUND") else throw IOException("poll $calls failed")
+        }) { assembled ->
+            withContext(Dispatchers.Default) {
+                val error = assertFailsWith<TransactionStillPendingException> { assembled.submit() }
+                assertSame(assembled, error.assembledTransaction)
+            }
+            assertTrue(calls >= 2)
+        }
+    }
+
+    @Test
+    fun testSubmitPollingCancelsWithCoroutine() = runTest {
+        val polling = CompletableDeferred<Unit>()
+        var calls = 0
+        withPollingTransaction(timeout = 30, poll = {
+            calls++
+            polling.complete(Unit)
+            awaitCancellation()
+        }) { assembled ->
+            val job = async { assembled.submit() }
+            polling.await()
+            job.cancel()
+            assertFailsWith<CancellationException> { job.await() }
+            assertEquals(1, calls)
+        }
+    }
+
+    @Test
+    fun testSubmitThrowsTransactionStillPendingExceptionWhenPollingTimesOut() = runTest {
+        var calls = 0
+        withPollingTransaction(poll = {
+            calls++
+            pollResponse("NOT_FOUND")
+        }) { assembled ->
+            val error = withContext(Dispatchers.Default) {
+                assertFailsWith<TransactionStillPendingException> { assembled.submit() }
+            }
+            assertTrue(error.message!!.contains("Waited 1 seconds"))
+            assertSame(assembled, error.assembledTransaction)
+            assertTrue(calls >= 2)
         }
     }
 
