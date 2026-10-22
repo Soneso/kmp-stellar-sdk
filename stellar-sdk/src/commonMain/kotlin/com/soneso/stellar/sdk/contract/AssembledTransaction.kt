@@ -494,6 +494,22 @@ class AssembledTransaction<T> internal constructor(
             updatedAuthEntries.add(signedEntry)
         }
 
+        builtTransaction = rebuildWithAuthEntries(builtTransaction!!, operation, updatedAuthEntries)
+        signed = null
+        return this
+    }
+
+    /**
+     * Returns [currentTx] with [updatedAuthEntries] as the auth entries of its operation.
+     * Copies the source account, sequence number, fee, memo, preconditions, Soroban data,
+     * envelope type and network of [currentTx] and the host function and source account
+     * of [operation]. The result carries no signatures.
+     */
+    private fun rebuildWithAuthEntries(
+        currentTx: Transaction,
+        operation: InvokeHostFunctionOperation,
+        updatedAuthEntries: List<SorobanAuthorizationEntryXdr>
+    ): Transaction {
         // Rebuild the operation with updated auth entries
         val updatedOperation = InvokeHostFunctionOperation(
             hostFunction = operation.hostFunction,
@@ -501,12 +517,7 @@ class AssembledTransaction<T> internal constructor(
         )
         updatedOperation.sourceAccount = operation.sourceAccount
 
-        // Rebuild the transaction with the updated operation
-        val currentTx = builtTransaction!!
-
-        // IMPORTANT: Use the source account from the BUILT transaction, not the builder
-        // The built transaction has the correct (updated) sequence number from simulate()
-        // Note: We use sequenceNumber - 1 because TransactionBuilder increments it when building
+        // TransactionBuilder increments the supplied source sequence number.
         val sourceAccountWithCorrectSeq = Account(
             currentTx.sourceAccount,
             currentTx.sequenceNumber - 1
@@ -515,10 +526,12 @@ class AssembledTransaction<T> internal constructor(
         // Create new transaction builder with correct sequence number
         val newBuilder = TransactionBuilder(
             sourceAccount = sourceAccountWithCorrectSeq,
-            network = transactionBuilder.network
+            network = currentTx.network
         )
             .addOperation(updatedOperation)
-            .setBaseFee(currentTx.fee)
+            // TransactionBuilder adds the resource fee of the Soroban data to the base fee of the one operation.
+            .setBaseFee(currentTx.fee - (currentTx.sorobanData?.resourceFee?.value ?: 0L))
+            .addMemo(currentTx.memo)
 
         // Copy preconditions
         newBuilder.addPreconditions(currentTx.preconditions)
@@ -529,13 +542,7 @@ class AssembledTransaction<T> internal constructor(
         }
 
         // Build the new transaction
-        builtTransaction = newBuilder.build()
-
-        // Important: Clear signed transaction since we modified builtTransaction
-        // The transaction will need to be signed again (with sign() or signAndSubmit())
-        signed = null
-
-        return this
+        return newBuilder.build().also { it.envelopeType = currentTx.envelopeType }
     }
 
     /**
