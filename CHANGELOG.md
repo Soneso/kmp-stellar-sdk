@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `AssembledTransaction.signAuthEntries` keeps the memo and fee of the simulated transaction.
 - `AssembledTransaction.submit` keeps polling when a `getTransaction` request fails after the send; at the timeout it throws `TransactionStillPendingException` or the last failure.
+- `StellarToml.fromDomain` rejects a domain that is not a host name with an optional port before it sends a request.
+- `StellarToml.fromDomain` and `StellarToml.currencyFromUrl` give the client they create a connect timeout of 10 seconds and a request timeout of 30 seconds, the values of the federation client.
+- `StellarToml.fromDomain` and `StellarToml.currencyFromUrl` reject a file larger than 100 KB (102,400 bytes), the SEP-1 limit.
 
 ## [1.15.0] - 2026-10-15
 
