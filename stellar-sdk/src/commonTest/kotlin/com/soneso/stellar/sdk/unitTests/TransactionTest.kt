@@ -118,6 +118,29 @@ class TransactionTest {
     }
 
     @Test
+    fun testMuxedContractInvokeTargetEnvelopeRoundTrips() = runTest {
+        // The invoke guard sits at the construction entries, not in the codec: an envelope whose
+        // invoke target is a muxed contract (W...) decodes, re-encodes and hashes unchanged.
+        val muxedContract = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+        val args = InvokeContractArgsXdr(
+            contractAddress = Address(muxedContract).toSCAddress(),
+            functionName = SCSymbolXdr("test"),
+            args = emptyList()
+        )
+        val tx = buildSimpleTransaction(
+            operations = listOf(InvokeHostFunctionOperation(HostFunctionXdr.InvokeContract(args)))
+        )
+        val envelope = tx.toEnvelopeXdrBase64()
+        val restored = Transaction.fromEnvelopeXdr(envelope, NETWORK)
+
+        assertEquals(envelope, restored.toEnvelopeXdrBase64())
+        assertContentEquals(tx.hash(), restored.hash())
+        val target = (restored.operations[0] as InvokeHostFunctionOperation).hostFunction
+            as HostFunctionXdr.InvokeContract
+        assertEquals(muxedContract, Address.fromSCAddress(target.value.contractAddress).toString())
+    }
+
+    @Test
     fun testIsSorobanTransactionExtendTTL() {
         val op = ExtendFootprintTTLOperation(10000)
         val tx = buildSimpleTransaction(operations = listOf(op))

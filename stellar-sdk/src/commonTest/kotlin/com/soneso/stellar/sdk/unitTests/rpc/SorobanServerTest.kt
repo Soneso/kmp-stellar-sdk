@@ -284,6 +284,12 @@ class SorobanServerTest {
         /** A valid account strkey used as the subject of account-scoped calls. */
         private const val TEST_ACCOUNT_ID = "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ"
 
+        /** SEP-0023 vectors: a muxed contract with id 123456 and a muxed account with id 0. */
+        private const val TEST_MUXED_CONTRACT_ID =
+            "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+        private const val TEST_MUXED_ACCOUNT_ID =
+            "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ"
+
         /** A valid asset issuer distinct from [TEST_ACCOUNT_ID]. */
         private const val TEST_ISSUER_ID = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
 
@@ -1254,6 +1260,67 @@ class SorobanServerTest {
     }
 
     @Test
+    fun testGetContractData_nonContractOwnerOrMuxedKey_rejectsBeforeRequest() = runTest {
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            suspend fun messageFor(owner: String, key: SCValXdr) =
+                assertFailsWith<IllegalArgumentException> {
+                    server.getContractData(owner, key, SorobanServer.Durability.PERSISTENT)
+                }.message
+            val expected = "The contract data owner must be a contract (C...) address, got"
+            val keyMessage = "Contract data keys cannot contain muxed account (M...) or " +
+                "muxed contract (W...) addresses"
+            val muxedContract = Address(TEST_MUXED_CONTRACT_ID).toSCVal()
+            val muxedAccount = Address(TEST_MUXED_ACCOUNT_ID).toSCVal()
+
+            // An owner that is not a contract is refused
+            assertEquals(
+                "$expected a muxed contract (W...) address: $TEST_MUXED_CONTRACT_ID; " +
+                    "use its base contract (C...) address",
+                messageFor(TEST_MUXED_CONTRACT_ID, Scv.toSymbol("balance"))
+            )
+            assertEquals(
+                "$expected a muxed account (M...) address: $TEST_MUXED_ACCOUNT_ID",
+                messageFor(TEST_MUXED_ACCOUNT_ID, Scv.toSymbol("balance"))
+            )
+            val seed = "SAEZSI6DY7AXJFIYA4PM6SIBNEYYXIEM2MSOTHFGKHDW32MBQ7KVO6EN"
+            val seedMessage = messageFor(seed, Scv.toSymbol("balance"))!!
+            assertEquals("$expected a secret seed (S...) instead of an address", seedMessage)
+            assertFalse(seedMessage.contains(seed), "The seed must not be echoed")
+
+            // A muxed address in a vector element, a map value or a map key is refused
+            val vecKey = Scv.toVec(listOf(Scv.toSymbol("Balance"), muxedContract))
+            assertEquals(keyMessage, messageFor(TEST_CONTRACT_ID, vecKey))
+            val mapValueKey = Scv.toMap(linkedMapOf(Scv.toSymbol("holder") to muxedAccount))
+            assertEquals(keyMessage, messageFor(TEST_CONTRACT_ID, mapValueKey))
+            val mapKeyKey = Scv.toMap(linkedMapOf(muxedContract to Scv.toUint32(1u)))
+            assertEquals(keyMessage, messageFor(TEST_CONTRACT_ID, mapKeyKey))
+            val nestedMapKey = Scv.toMap(linkedMapOf(Scv.toVec(listOf(muxedContract)) to Scv.toUint32(1u)))
+            assertEquals(keyMessage, messageFor(TEST_CONTRACT_ID, nestedMapKey))
+            assertTrue(requests.isEmpty(), "No request should be issued for a rejected owner or key")
+
+            // A key holding plain addresses in a vector and a map reaches the engine
+            val allowance = linkedMapOf(
+                Scv.toSymbol("from") to Address(TEST_ACCOUNT_ID).toSCVal(),
+                Scv.toSymbol("spender") to Address(TEST_CONTRACT_ID).toSCVal()
+            )
+            val plainKey = Scv.toVec(listOf(Scv.toSymbol("Allowance"), Scv.toMap(allowance)))
+            assertNull(server.getContractData(TEST_CONTRACT_ID, plainKey, SorobanServer.Durability.PERSISTENT))
+            val expectedKey = LedgerKeyXdr.ContractData(
+                LedgerKeyContractDataXdr(Address(TEST_CONTRACT_ID).toSCAddress(), plainKey, ContractDataDurabilityXdr.PERSISTENT)
+            ).toXdrBase64()
+            assertEquals(1, requests.size)
+            assertTrue(requests[0].contains(expectedKey), "Request should carry the key. Body: ${requests[0]}")
+
+            // An absent vector or map holds no address and reaches the engine as well
+            for (absent in listOf(SCValXdr.Vec(null), SCValXdr.Map(null))) {
+                assertNull(server.getContractData(TEST_CONTRACT_ID, absent, SorobanServer.Durability.PERSISTENT))
+            }
+            assertEquals(3, requests.size)
+        }
+    }
+
+    @Test
     fun testGetTransactions_returnsPaginatedTransactions() = runTest {
         // Given: A getTransactions response with a single transaction
         val response = """{
@@ -1376,14 +1443,24 @@ class SorobanServerTest {
 
     @Test
     fun testGetSACBalance_invalidContractId_throwsIllegalArgumentException() = runTest {
-        createMockServer(GET_LEDGER_ENTRIES_RESPONSE).use { server ->
-            val exception = assertFailsWith<IllegalArgumentException> {
-                server.getSACBalance(TEST_ACCOUNT_ID, Asset.createNativeAsset(), Network.TESTNET)
-            }
-            assertTrue(
-                exception.message?.contains("Invalid contract ID") ?: false,
-                "Unexpected message: ${exception.message}"
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            suspend fun messageFor(holder: String) = assertFailsWith<IllegalArgumentException> {
+                server.getSACBalance(holder, Asset.createNativeAsset(), Network.TESTNET)
+            }.message
+            val expected = "The balance holder must be a contract (C...) address, got"
+
+            assertEquals(
+                "$expected a muxed contract (W...) address: $TEST_MUXED_CONTRACT_ID; " +
+                    "use its base contract (C...) address",
+                messageFor(TEST_MUXED_CONTRACT_ID)
             )
+            assertEquals(
+                "$expected a muxed account (M...) address: $TEST_MUXED_ACCOUNT_ID",
+                messageFor(TEST_MUXED_ACCOUNT_ID)
+            )
+            assertEquals("$expected an account (G...) address: $TEST_ACCOUNT_ID", messageFor(TEST_ACCOUNT_ID))
+            assertTrue(requests.isEmpty(), "No request should be issued for a rejected holder")
         }
     }
 
@@ -1630,6 +1707,31 @@ class SorobanServerTest {
                 requests[1].contains(expectedCodeKey),
                 "Second request should key on the WASM hash. Body: ${requests[1]}"
             )
+        }
+    }
+
+    @Test
+    fun testLoadContractForContractId_nonContractAddress_rejectsBeforeRequest() = runTest {
+        // The info loader delegates to the code loader, so both refuse before any request.
+        val requests = mutableListOf<String>()
+        createSequencedMockServer(GET_LEDGER_ENTRIES_RESPONSE, capturedRequests = requests).use { server ->
+            val loaders: List<suspend (String) -> Any?> = listOf(
+                { server.loadContractCodeForContractId(it) },
+                { server.loadContractInfoForContractId(it) }
+            )
+            val expected = "The contract to load must be a contract (C...) address, got"
+            for (load in loaders) {
+                assertEquals(
+                    "$expected a muxed contract (W...) address: $TEST_MUXED_CONTRACT_ID; " +
+                        "use its base contract (C...) address",
+                    assertFailsWith<IllegalArgumentException> { load(TEST_MUXED_CONTRACT_ID) }.message
+                )
+                assertEquals(
+                    "$expected a muxed account (M...) address: $TEST_MUXED_ACCOUNT_ID",
+                    assertFailsWith<IllegalArgumentException> { load(TEST_MUXED_ACCOUNT_ID) }.message
+                )
+            }
+            assertTrue(requests.isEmpty(), "No request should be issued for a rejected contract")
         }
     }
 

@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk
 
 import com.soneso.stellar.sdk.xdr.*
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Represents a single address in the Stellar network. An address can represent an account,
@@ -352,4 +353,32 @@ class Address(address: String) {
             return fromSCAddress(scVal.value)
         }
     }
+}
+
+/**
+ * Throws [IllegalArgumentException] unless [address] is a contract (C...) strkey; the message
+ * starts with [subject], the role of the address at the calling entry, and names its kind.
+ * Input of no address kind is echoed through [XdrJson.preview], escaped and truncated; a secret
+ * seed (S...) is named but never echoed.
+ */
+internal fun requireContractStrKey(address: String, subject: String) {
+    if (StrKey.isValidContract(address)) return
+    val muxedContract = StrKey.isValidMuxedContract(address)
+    val kind = when {
+        StrKey.isValidEd25519PublicKey(address) -> "an account (G...)"
+        StrKey.isValidMed25519PublicKey(address) -> "a muxed account (M...)"
+        muxedContract -> "a muxed contract (W...)"
+        StrKey.isValidClaimableBalance(address) -> "a claimable balance (B...)"
+        StrKey.isValidLiquidityPool(address) -> "a liquidity pool (L...)"
+        StrKey.isValidEd25519SecretSeed(address.toCharArray()) -> throw IllegalArgumentException(
+            "$subject must be a contract (C...) address, got a secret seed (S...) instead of an address"
+        )
+        else -> throw IllegalArgumentException(
+            "$subject must be a contract (C...) address: ${XdrJson.preview(JsonPrimitive(address))}"
+        )
+    }
+    val hint = if (muxedContract) "; use its base contract (C...) address" else ""
+    throw IllegalArgumentException(
+        "$subject must be a contract (C...) address, got $kind address: $address$hint"
+    )
 }

@@ -1584,6 +1584,7 @@ data class InvokeHostFunctionOperation(
          * @param functionName The name of the contract function to invoke
          * @param parameters The function parameters as SCVal XDR values
          * @return An InvokeHostFunctionOperation ready to be added to a transaction
+         * @throws IllegalArgumentException If contractAddress is not a contract (C...) address
          *
          * ## Example
          * ```kotlin
@@ -1603,6 +1604,7 @@ data class InvokeHostFunctionOperation(
             functionName: String,
             parameters: List<SCValXdr>
         ): InvokeHostFunctionOperation {
+            requireContractStrKey(contractAddress, "The contract to invoke")
             val address = Address(contractAddress)
             val invokeArgs = InvokeContractArgsXdr(
                 contractAddress = address.toSCAddress(),

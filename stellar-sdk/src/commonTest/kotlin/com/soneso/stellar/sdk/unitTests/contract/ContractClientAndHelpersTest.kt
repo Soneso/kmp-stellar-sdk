@@ -242,6 +242,54 @@ class ContractClientAndHelpersTest {
         client.close()
     }
 
+    // ==================== forContract address guard ====================
+
+    @Test
+    fun testForContractRejectsNonContractAddressBeforeSpecLoad() = runTest {
+        // The guard runs before the spec load, so the error is not wrapped as a load failure.
+        suspend fun messageFor(contractId: String) = assertFailsWith<IllegalArgumentException> {
+            ContractClient.forContract(contractId, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        }.message
+        val expected = "The contract to load must be a contract (C...) address, got"
+
+        assertEquals(
+            "$expected a muxed contract (W...) address: $MOCK_RPC_MUXED_CONTRACT_ID; " +
+                "use its base contract (C...) address",
+            messageFor(MOCK_RPC_MUXED_CONTRACT_ID)
+        )
+        assertEquals(
+            "$expected a muxed account (M...) address: $MOCK_RPC_MUXED_ACCOUNT_ID",
+            messageFor(MOCK_RPC_MUXED_ACCOUNT_ID)
+        )
+    }
+
+    @Test
+    fun testInvokeEntriesRejectMuxedContractBeforeFirstRequest() = runTest {
+        // Every public build entry encodes the invoke target before the source account lookup.
+        val requests = mutableListOf<String>()
+        mockRpcServer(simulateReturnValue = Scv.toSymbol("hi"), requestLog = requests).use { server ->
+            val client = ContractClient.forServer(
+                MOCK_RPC_MUXED_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, helloSpec()
+            )
+            val named = mapOf("to" to "Alice")
+            val positional = listOf(Scv.toSymbol("Alice"))
+            val entries: List<suspend () -> Any?> = listOf(
+                { client.invoke<SCValXdr>("hello", named, MOCK_RPC_SOURCE_ACCOUNT, null) },
+                { client.invoke<SCValXdr>("hello", positional, MOCK_RPC_SOURCE_ACCOUNT, null) },
+                { client.buildInvoke<SCValXdr>("hello", named, MOCK_RPC_SOURCE_ACCOUNT, null) },
+                { client.buildInvoke<SCValXdr>("hello", positional, MOCK_RPC_SOURCE_ACCOUNT, null) }
+            )
+            for (entry in entries) {
+                assertEquals(
+                    "The contract to invoke must be a contract (C...) address, got a muxed contract " +
+                        "(W...) address: $MOCK_RPC_MUXED_CONTRACT_ID; use its base contract (C...) address",
+                    assertFailsWith<IllegalArgumentException> { entry() }.message
+                )
+            }
+            assertTrue(requests.isEmpty(), "No request should be issued for a muxed invoke target")
+        }
+    }
+
     // ==================== Spec-Required Methods: spec loaded ====================
     //
     // Companions to the "without spec" guard tests above: these exercise the same
