@@ -1424,6 +1424,77 @@ class AssembledTransactionTest {
         }
     }
 
+    @Test
+    fun testSignAuthEntriesPreservesFeeAndMemoWithKey() = runTest {
+        val (before, after) = signAuthAndCheckEnvelopeFields(useDelegate = false)
+        assertEquals(before.fee, after.fee)
+        assertEquals(before.memo, after.memo)
+    }
+
+    @Test
+    fun testSignAuthEntriesPreservesFeeAndMemoWithDelegate() = runTest {
+        val (before, after) = signAuthAndCheckEnvelopeFields(useDelegate = true)
+        assertEquals(before.fee, after.fee)
+        assertEquals(before.memo, after.memo)
+    }
+
+    private suspend fun signAuthAndCheckEnvelopeFields(useDelegate: Boolean): Pair<Transaction, Transaction> {
+        val signer = KeyPair.random()
+        val entry = addressAuthEntry(signer.getAccountId())
+        val data = minimalSorobanData().copy(resourceFee = Int64Xdr(700L))
+        val simulationJson = """
+            {"transactionData":"${data.toXdrBase64()}","minResourceFee":"700","latestLedger":14245,
+            "results":[{"auth":["${entry.toXdrBase64()}"],"xdr":"${Scv.toVoid().toXdrBase64()}"}]}
+        """.trimIndent()
+        val memo = MemoText("authorization memo")
+        val operation = InvokeHostFunctionOperation.invokeContractFunction(
+            contractAddress = MOCK_RPC_CONTRACT_ID, functionName = "hello", parameters = emptyList()
+        ).apply { sourceAccount = MOCK_RPC_SOURCE_ACCOUNT }
+        val builder = TransactionBuilder(Account(MOCK_RPC_SOURCE_ACCOUNT, MOCK_RPC_SOURCE_SEQ), NETWORK)
+            .addOperation(operation).setBaseFee(100L).setTimeout(300L).addMemo(memo)
+            .addPreconditions(TransactionPreconditions(
+                ledgerBounds = LedgerBounds(14000, 15000), minSequenceNumber = 99L,
+                minSequenceAge = 5L, minSequenceLedgerGap = 2
+            ))
+        return rawJsonMockServer(simulateResultJson = simulationJson).use { server ->
+            val assembled = AssembledTransaction<SCValXdr>(
+                server = server, submitTimeout = 30, transactionSigner = signer,
+                parseResultXdrFn = null, transactionBuilder = builder
+            )
+            assembled.simulate()
+            val before = assembled.builtTransaction!!
+            assertEquals(700L, before.sorobanData!!.resourceFee.value)
+            assertEquals(800L, before.fee)
+            assertEquals(memo, before.memo)
+            var delegateCalls = 0
+            assembled.signAuthEntries(
+                authEntriesSigner = if (useDelegate) KeyPair.fromAccountId(signer.getAccountId()) else signer,
+                validUntilLedgerSequence = 20_000L,
+                authorizeEntryDelegate = if (useDelegate) {
+                    { auth, network ->
+                        delegateCalls++
+                        Auth.authorizeEntry(auth, signer, 20_000L, network)
+                    }
+                } else null
+            )
+            val after = assembled.builtTransaction!!
+            assertEquals(if (useDelegate) 1 else 0, delegateCalls)
+            assertEquals(before.preconditions, after.preconditions)
+            assertEquals(before.sequenceNumber, after.sequenceNumber)
+            assertEquals(before.sourceAccount, after.sourceAccount)
+            assertEquals(before.network, after.network)
+            assertEquals(before.envelopeType, after.envelopeType)
+            assertEquals(before.sorobanData!!.toXdrBase64(), after.sorobanData!!.toXdrBase64())
+            val oldOperation = before.operations.single() as InvokeHostFunctionOperation
+            val newOperation = after.operations.single() as InvokeHostFunctionOperation
+            assertEquals(oldOperation.hostFunction, newOperation.hostFunction)
+            assertEquals(oldOperation.sourceAccount, newOperation.sourceAccount)
+            assertNotEquals(oldOperation.auth.first().toXdrBase64(), newOperation.auth.first().toXdrBase64())
+            assertTrue(assembled.needsNonInvokerSigningBy().isEmpty())
+            before to after
+        }
+    }
+
     // ==================== needsNonInvokerSigningBy: delegate traversal cap ====================
 
     @Test

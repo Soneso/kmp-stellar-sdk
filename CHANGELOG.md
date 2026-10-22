@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Breaking: `SorobanServer.getContractData` rejects an owner that is not a contract (`C...`) address before any request, the message starting "The contract data owner must be a contract (C...) address". A key that holds a muxed account (`M...`) or muxed contract (`W...`) address at any depth of its vectors and maps fails with "Contract data keys cannot contain muxed account (M...) or muxed contract (W...) addresses".
 - `SorobanServer.getSACBalance` names the kind given when it rejects a holder that is not a contract (`C...`) address, the message starting "The balance holder must be a contract (C...) address".
 
+### Fixed
+- `AssembledTransaction.signAuthEntries` keeps the memo and fee of the simulated transaction.
+
 ## [1.15.0] - 2026-10-15
 
 Migration guide: [docs/migration/1.15.0.md](docs/migration/1.15.0.md)
