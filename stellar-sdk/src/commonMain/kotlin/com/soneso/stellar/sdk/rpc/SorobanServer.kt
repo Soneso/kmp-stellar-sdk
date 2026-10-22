@@ -7,13 +7,13 @@ import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MuxedAccount
 import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.TransactionBuilderAccount
 import com.soneso.stellar.sdk.contract.SorobanContractInfo
 import com.soneso.stellar.sdk.contract.SorobanContractParser
 import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
 import com.soneso.stellar.sdk.isFatal
+import com.soneso.stellar.sdk.requireContractStrKey
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
@@ -490,6 +490,8 @@ class SorobanServer(
      * @param key The contract data key
      * @param durability Storage durability (TEMPORARY or PERSISTENT)
      * @return Ledger entry result if found, null otherwise
+     * @throws IllegalArgumentException If contractId is not a contract (C...) address, or if key
+     * contains a muxed account (M...) or muxed contract (W...) address
      * @throws SorobanRpcException If the RPC request fails
      */
     suspend fun getContractData(
@@ -497,6 +499,10 @@ class SorobanServer(
         key: SCValXdr,
         durability: Durability
     ): GetLedgerEntriesResponse.LedgerEntryResult? {
+        requireContractStrKey(contractId, "The contract data owner")
+        require(!containsMuxedAddress(key)) {
+            "Contract data keys cannot contain muxed account (M...) or muxed contract (W...) addresses"
+        }
         // Convert durability enum to XDR
         val contractDataDurability = when (durability) {
             Durability.TEMPORARY -> ContractDataDurabilityXdr.TEMPORARY
@@ -523,6 +529,20 @@ class SorobanServer(
         }
 
         return entries[0]
+    }
+
+    /**
+     * Whether [value] holds a muxed account (M...) or muxed contract (W...) address, directly or
+     * in a vector element or map entry at any depth; the host rejects such a contract data key.
+     */
+    private fun containsMuxedAddress(value: SCValXdr): Boolean = when (value) {
+        is SCValXdr.Address ->
+            value.value is SCAddressXdr.MuxedAccount || value.value is SCAddressXdr.MuxedContract
+        is SCValXdr.Vec -> value.value?.value.orEmpty().any(::containsMuxedAddress)
+        is SCValXdr.Map -> value.value?.value.orEmpty().any {
+            containsMuxedAddress(it.key) || containsMuxedAddress(it.`val`)
+        }
+        else -> false
     }
 
     /**
@@ -872,7 +892,7 @@ class SorobanServer(
      * ## Example
      *
      * ```kotlin
-     * val contractId = "GABC..."
+     * val contractId = "CABC..."
      * val asset = Asset.native()
      * val response = server.getSACBalance(contractId, asset, Network.TESTNET)
      * response.balanceEntry?.let {
@@ -885,7 +905,7 @@ class SorobanServer(
      * @param asset The Stellar asset to check balance for
      * @param network The network (needed for asset contract ID calculation)
      * @return Balance information if the contract holds the asset
-     * @throws IllegalArgumentException If contractId is not a valid contract address
+     * @throws IllegalArgumentException If contractId is not a contract (C...) address
      * @throws SorobanRpcException If the RPC request fails
      *
      * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract documentation</a>
@@ -895,9 +915,7 @@ class SorobanServer(
         asset: Asset,
         network: Network
     ): GetSACBalanceResponse {
-        require(StrKey.isValidContract(contractId)) {
-            "Invalid contract ID: $contractId"
-        }
+        requireContractStrKey(contractId, "The balance holder")
 
         // Build the ledger key for the balance entry
         val assetContractAddress = Address(asset.getContractId(network))
@@ -1113,6 +1131,7 @@ class SorobanServer(
      * @see loadContractInfoForContractId
      */
     suspend fun loadContractCodeForContractId(contractId: String): ContractCodeEntryXdr? {
+        requireContractStrKey(contractId, "The contract to load")
         // Create ledger key for contract instance
         val ledgerKey = LedgerKeyXdr.ContractData(
             LedgerKeyContractDataXdr(

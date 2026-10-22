@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `ContractCreditedEffectResponse` carries `contractMuxed` and `contractMuxedId` when Horizon reports a transfer or mint to a muxed contract address.
 
+### Changed
+- Breaking: `InvokeHostFunctionOperation.invokeContractFunction` and `ContractClient.forContractWithoutSpec` accept a contract (`C...`) address only. Any other input, a muxed contract (`W...`) included, throws `IllegalArgumentException` with a message that starts "The contract to invoke must be a contract (C...) address" and names the kind given.
+- Breaking: `ContractClient.forContract`, `SorobanServer.loadContractCodeForContractId` and `SorobanServer.loadContractInfoForContractId` reject the same inputs before any request with `IllegalArgumentException`, the message starting "The contract to load must be a contract (C...) address".
+- Breaking: `SorobanServer.getContractData` rejects an owner that is not a contract (`C...`) address before any request, the message starting "The contract data owner must be a contract (C...) address". A key that holds a muxed account (`M...`) or muxed contract (`W...`) address at any depth of its vectors and maps fails with "Contract data keys cannot contain muxed account (M...) or muxed contract (W...) addresses".
+- `SorobanServer.getSACBalance` names the kind given when it rejects a holder that is not a contract (`C...`) address, the message starting "The balance holder must be a contract (C...) address".
+
 ## [1.15.0] - 2026-10-15
 
 Migration guide: [docs/migration/1.15.0.md](docs/migration/1.15.0.md)

@@ -198,6 +198,28 @@ class ContractClientPositionalInvokeTest {
     }
 
     @Test
+    fun testForContractWithoutSpecRejectsNonContractAddress() {
+        fun messageFor(contractId: String) = assertFailsWith<IllegalArgumentException> {
+            ContractClient.forContractWithoutSpec(contractId, MOCK_RPC_SERVER_URL, Network.TESTNET)
+        }.message
+        val expected = "The contract to invoke must be a contract (C...) address, got"
+
+        assertEquals(
+            "$expected a muxed contract (W...) address: $MOCK_RPC_MUXED_CONTRACT_ID; " +
+                "use its base contract (C...) address",
+            messageFor(MOCK_RPC_MUXED_CONTRACT_ID)
+        )
+        assertEquals(
+            "$expected a muxed account (M...) address: $MOCK_RPC_MUXED_ACCOUNT_ID",
+            messageFor(MOCK_RPC_MUXED_ACCOUNT_ID)
+        )
+        assertEquals(
+            "$expected an account (G...) address: $MOCK_RPC_SOURCE_ACCOUNT",
+            messageFor(MOCK_RPC_SOURCE_ACCOUNT)
+        )
+    }
+
+    @Test
     fun testSpecFreeClientMapInvokeThrowsIllegalState() = runTest {
         // The Map-based overload requires a spec; it must throw before any RPC is attempted.
         val client = ContractClient.forContractWithoutSpec(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET)

@@ -676,6 +676,7 @@ class ContractClient private constructor(
          * @param rpcUrl The RPC server URL
          * @param network The network (TESTNET/PUBLIC)
          * @return ContractClient with contract spec
+         * @throws IllegalArgumentException if contractId is not a contract (C...) address
          * @throws IllegalStateException if contract spec not found or cannot be loaded
          */
         suspend fun forContract(
@@ -683,6 +684,7 @@ class ContractClient private constructor(
             rpcUrl: String,
             network: Network
         ): ContractClient {
+            requireContractStrKey(contractId, "The contract to load")
             val server = SorobanServer(rpcUrl)
 
             val contractSpec = try {
@@ -726,12 +728,14 @@ class ContractClient private constructor(
          * @param rpcUrl The RPC server URL
          * @param network The network (TESTNET/PUBLIC)
          * @return ContractClient without a contract spec
+         * @throws IllegalArgumentException if contractId is not a contract (C...) address
          */
         fun forContractWithoutSpec(
             contractId: String,
             rpcUrl: String,
             network: Network
         ): ContractClient {
+            requireContractStrKey(contractId, "The contract to invoke")
             return ContractClient(contractId, rpcUrl, network, null)
         }
 

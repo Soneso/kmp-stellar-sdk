@@ -59,6 +59,10 @@ import kotlinx.serialization.json.Json
 
 internal const val MOCK_RPC_SERVER_URL = "https://soroban-testnet.stellar.org:443"
 internal const val MOCK_RPC_CONTRACT_ID = "CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE"
+/** The SEP-0023 muxed contract vector over [MOCK_RPC_CONTRACT_ID] with id 123456. */
+internal const val MOCK_RPC_MUXED_CONTRACT_ID = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+/** The SEP-0023 muxed account vector whose id is 0. */
+internal const val MOCK_RPC_MUXED_ACCOUNT_ID = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ"
 internal const val MOCK_RPC_SOURCE_ACCOUNT = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H"
 internal const val MOCK_RPC_SOURCE_SEQ = 100L
 
@@ -176,10 +180,12 @@ internal fun mockRpcServer(
     authEntries: List<SorobanAuthorizationEntryXdr> = emptyList(),
     sourceAccount: String = MOCK_RPC_SOURCE_ACCOUNT,
     submittedReturnValue: SCValXdr? = null,
-    txHash: String = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304"
+    txHash: String = "3389e9f0f1a7c19f0e9b8a1e9d2b3c4d5e6f70819293a4b5c6d7e8f901020304",
+    requestLog: MutableList<String>? = null
 ): SorobanServer {
     val engine = MockEngine { request ->
         val body = request.body.toByteArray().decodeToString()
+        requestLog?.add(body)
         val resultJson = when {
             "\"getLedgerEntries\"" in body -> ledgerEntriesResultJson(sourceAccount)
             "\"simulateTransaction\"" in body -> simulateResultJson(simulateReturnValue, authEntries)

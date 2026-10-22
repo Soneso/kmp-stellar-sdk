@@ -17,6 +17,12 @@ class InvokeHostFunctionOperationTest {
         const val CONTRACT_ID = "CDCYWK73YTYFJZZSJ5V7EDFNHYBG4QN3VUNG2IGD27KJDDPNCZKBCBXK"
         const val CONTRACT_ID_2 = "CA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUWDA"
         const val ACCOUNT_ID = "GADBBY4WFXKKFJ7CMTG3J5YAUXMQDBILRQ6W3U5IWN5TQFZU4MWZ5T4K"
+
+        /** SEP-0023 vectors: muxed contract id 123456, muxed account id 0, liquidity pool. */
+        const val MUXED_CONTRACT_ID = "WA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAAAAAAAAAPCIA6IG"
+        const val MUXED_ACCOUNT_ID = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ"
+        const val LIQUIDITY_POOL_ID = "LA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUPJN"
+        const val SECRET_SEED = "SAEZSI6DY7AXJFIYA4PM6SIBNEYYXIEM2MSOTHFGKHDW32MBQ7KVO6EN"
     }
 
     // ============================================================================
@@ -398,24 +404,58 @@ class InvokeHostFunctionOperationTest {
             )
         }
 
-        assertEquals("Unsupported address type", exception.message)
+        assertEquals(
+            "The contract to invoke must be a contract (C...) address: \"INVALID_ADDRESS\"",
+            exception.message
+        )
+
+        // Arbitrary input is quoted, its control bytes escaped and its length capped
+        val hostile = assertFailsWith<IllegalArgumentException> {
+            InvokeHostFunctionOperation.invokeContractFunction("C\n" + "A".repeat(100), "test", emptyList())
+        }
+        assertEquals(
+            "The contract to invoke must be a contract (C...) address: \"C\\n${"A".repeat(76)}...",
+            hostile.message
+        )
+
+        // A secret seed is named but never echoed
+        val seed = assertFailsWith<IllegalArgumentException> {
+            InvokeHostFunctionOperation.invokeContractFunction(SECRET_SEED, "test", emptyList())
+        }.message!!
+        assertEquals(
+            "The contract to invoke must be a contract (C...) address, got a secret seed (S...) instead of an address",
+            seed
+        )
+        assertFalse(seed.contains(SECRET_SEED))
     }
 
     @Test
-    fun testAccountAddressAcceptedButDifferentType() {
-        // Account addresses (G...) can be used, but they create AccountId SCAddress type
-        // This is technically allowed by the XDR but semantically you'd normally use contract addresses
-        val operation = InvokeHostFunctionOperation.invokeContractFunction(
-            contractAddress = ACCOUNT_ID,
-            functionName = "test",
-            parameters = emptyList()
+    fun testNonContractAddressRejectedAsInvokeTarget() {
+        // The host invokes only a contract (C...) address; every other strkey kind is refused
+        // here with a message naming the kind given.
+        fun messageFor(address: String) = assertFailsWith<IllegalArgumentException> {
+            InvokeHostFunctionOperation.invokeContractFunction(address, "test", emptyList())
+        }.message
+        val expected = "The contract to invoke must be a contract (C...) address, got"
+
+        assertEquals(
+            "$expected a muxed contract (W...) address: $MUXED_CONTRACT_ID; " +
+                "use its base contract (C...) address",
+            messageFor(MUXED_CONTRACT_ID)
         )
-
-        val hostFunction = operation.hostFunction as HostFunctionXdr.InvokeContract
-        val invokeArgs = hostFunction.value
-
-        // The Address constructor accepts account IDs and converts to SCAddress.AccountId
-        assertTrue(invokeArgs.contractAddress is SCAddressXdr.AccountId)
+        assertEquals(
+            "$expected a muxed account (M...) address: $MUXED_ACCOUNT_ID",
+            messageFor(MUXED_ACCOUNT_ID)
+        )
+        assertEquals("$expected an account (G...) address: $ACCOUNT_ID", messageFor(ACCOUNT_ID))
+        assertEquals(
+            "$expected a claimable balance (B...) address: ${ClaimableBalanceVectors.strKey}",
+            messageFor(ClaimableBalanceVectors.strKey)
+        )
+        assertEquals(
+            "$expected a liquidity pool (L...) address: $LIQUIDITY_POOL_ID",
+            messageFor(LIQUIDITY_POOL_ID)
+        )
     }
 
     // ============================================================================
