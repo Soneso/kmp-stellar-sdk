@@ -4,10 +4,13 @@
 
 package com.soneso.stellar.sdk.sep.sep01
 
+import com.soneso.stellar.sdk.sep.common.createSepDiscoveryClient
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.utils.io.charsets.*
+import io.ktor.utils.io.readBuffer
 
 /**
  * Parses and provides access to stellar.toml files as defined in SEP-0001.
@@ -100,6 +103,38 @@ class StellarToml(
     val validators: List<Validator>? = null
 ) {
     companion object {
+        // SEP-1: "stellar.toml can have a maximum file size of 100KB."
+        // https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0001.md
+        // js-stellar-sdk src/stellartoml/index.ts: STELLAR_TOML_MAX_SIZE = 100 * 1024.
+        private const val MAX_TOML_BYTES = 100 * 1024
+        private val DOMAIN_AUTHORITY = Regex("""(?:[^:/?#@\\\[\]\s]+|\[[0-9a-fA-F:.]+\])(?::([0-9]+))?""")
+
+        private fun validateDomain(domain: String) {
+            val message = "Invalid stellar.toml domain '$domain': expected a host with an optional port"
+            val authority = requireNotNull(DOMAIN_AUTHORITY.matchEntire(domain)) { message }
+            val port = authority.groups[1]?.value
+            require(port == null || port.toIntOrNull() in 1..65535) { message }
+            require(domain.none { it.isWhitespace() || it.isISOControl() }) { message }
+        }
+
+        private suspend fun fetchToml(
+            client: HttpClient,
+            url: String,
+            httpRequestHeaders: Map<String, String>?,
+            notFoundMessage: String
+        ): String = client.prepareGet(url) {
+            httpRequestHeaders?.forEach { (key, value) -> header(key, value) }
+        }.execute { response ->
+            check(response.status == HttpStatusCode.OK) {
+                "$notFoundMessage, response status code ${response.status.value}"
+            }
+            val channel = response.bodyAsChannel()
+            val body = channel.readBuffer(MAX_TOML_BYTES + 1)
+            channel.closedCause?.let { throw it }
+            check(body.size <= MAX_TOML_BYTES) { "TOML file exceeds $MAX_TOML_BYTES bytes" }
+            (response.charset() ?: Charsets.UTF_8).newDecoder().decode(body)
+        }
+
         /**
          * Fetches and parses stellar.toml from a domain's well-known location.
          *
@@ -121,7 +156,8 @@ class StellarToml(
          * @param httpClient Optional custom HTTP client for testing or proxy configuration
          * @param httpRequestHeaders Optional custom HTTP headers to include in the request
          * @return StellarToml containing the parsed stellar.toml data
-         * @throws IllegalStateException If the stellar.toml file is not found (non-200 status code)
+         * @throws IllegalArgumentException If [domain] is not a host with an optional port
+         * @throws IllegalStateException If the file is not found (non-200) or exceeds 102400 bytes
          * @throws Exception If the TOML content is invalid and cannot be parsed
          *
          * Example:
@@ -163,25 +199,13 @@ class StellarToml(
             httpClient: HttpClient? = null,
             httpRequestHeaders: Map<String, String>? = null
         ): StellarToml {
-            val client = httpClient ?: HttpClient()
+            validateDomain(domain)
+            val client = httpClient ?: createSepDiscoveryClient()
             val scheme = if (isLoopbackDomain(domain)) "http" else "https"
             val url = "$scheme://$domain/.well-known/stellar.toml"
 
             try {
-                val response: HttpResponse = client.get(url) {
-                    httpRequestHeaders?.forEach { (key, value) ->
-                        header(key, value)
-                    }
-                }
-
-                if (response.status != HttpStatusCode.OK) {
-                    throw IllegalStateException(
-                        "Stellar toml not found, response status code ${response.status.value}"
-                    )
-                }
-
-                val body = response.bodyAsText()
-                return parse(body)
+                return parse(fetchToml(client, url, httpRequestHeaders, "Stellar toml not found"))
             } finally {
                 if (httpClient == null) {
                     client.close()
@@ -218,7 +242,7 @@ class StellarToml(
          * @param httpClient Optional custom HTTP client for testing or proxy configuration
          * @param httpRequestHeaders Optional custom HTTP headers to include in the request
          * @return Currency containing the complete currency information
-         * @throws IllegalStateException If the currency TOML file is not found (non-200 status code)
+         * @throws IllegalStateException If the file is not found (non-200) or exceeds 102400 bytes
          * @throws Exception If the TOML content is invalid and cannot be parsed
          *
          * Example:
@@ -244,24 +268,11 @@ class StellarToml(
             httpClient: HttpClient? = null,
             httpRequestHeaders: Map<String, String>? = null
         ): Currency {
-            val client = httpClient ?: HttpClient()
+            val client = httpClient ?: createSepDiscoveryClient()
 
             try {
-                val response: HttpResponse = client.get(toml) {
-                    httpRequestHeaders?.forEach { (key, value) ->
-                        header(key, value)
-                    }
-                }
-
-                if (response.status != HttpStatusCode.OK) {
-                    throw IllegalStateException(
-                        "Currency toml not found, response status code ${response.status.value}"
-                    )
-                }
-
-                val body = response.bodyAsText()
-                val parsedToml = parseTomlTree(body)
-                return parseCurrency(parsedToml)
+                val body = fetchToml(client, toml, httpRequestHeaders, "Currency toml not found")
+                return parseCurrency(parseTomlTree(body))
             } finally {
                 if (httpClient == null) {
                     client.close()

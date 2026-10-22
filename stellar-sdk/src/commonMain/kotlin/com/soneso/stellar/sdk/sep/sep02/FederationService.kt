@@ -4,12 +4,12 @@
 
 package com.soneso.stellar.sdk.sep.sep02
 
+import com.soneso.stellar.sdk.sep.common.createSepDiscoveryClient
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02FederationNotFoundException
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02InvalidAddressException
 import com.soneso.stellar.sdk.sep.sep02.exceptions.Sep02InvalidResponseException
 import io.ktor.client.*
-import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -362,13 +362,9 @@ class FederationService(
      * after the block completes.
      */
     private suspend fun <T> withHttpClient(block: suspend (HttpClient) -> T): T {
-        val client = httpClient ?: HttpClient {
+        val client = httpClient ?: createSepDiscoveryClient {
             install(ContentNegotiation) {
                 json(json)
-            }
-            install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
             }
         }
 

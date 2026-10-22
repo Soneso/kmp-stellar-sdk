@@ -4,16 +4,28 @@
 
 package com.soneso.stellar.sdk.unitTests.sep.sep01
 
+import com.soneso.stellar.sdk.sep.common.createSepDiscoveryClient
 import com.soneso.stellar.sdk.sep.sep01.*
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.HttpTimeoutCapability
 import io.ktor.client.request.HttpRequestData
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLProtocol
 import io.ktor.http.headersOf
+import io.ktor.utils.io.ByteChannel
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.close
+import io.ktor.utils.io.writeFully
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.io.IOException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -812,9 +824,145 @@ class StellarTomlTest {
         assertEquals("GBBHQ7H4V6RRORKYLHTCAWP6MOHNORRFJSDPXDFYDGJB2LPZUFPXUEW3", stellarToml.generalInformation.signingKey)
     }
 
-    // ==================== fromDomain (loopback carve-out) ====================
+    // ==================== Domain validation, size cap and timeouts ====================
+
+    @Test
+    fun fromDomain_rejectsUserInfoWithoutRequest() = runTest {
+        assertInvalidDomain("stellar.org@attacker.com")
+    }
+
+    @Test
+    fun fromDomain_rejectsPathWithoutRequest() = runTest {
+        assertInvalidDomain("stellar.org/path")
+    }
+
+    @Test
+    fun fromDomain_rejectsOtherMalformedAuthorities() = runTest {
+        for (domain in listOf("", "stellar.org?x=1", "stellar.org#x", "stellar.org ",
+            "stellar.org\t", "stellar.org\\path", "stellar.org:bad", "stellar.org:65536", "stellar.org:0",
+            "stellar.org:999999999999", "stellar.org\u0000", "stellar.org\u00a0")) {
+            assertInvalidDomain(domain)
+        }
+    }
+
+    private suspend fun assertInvalidDomain(domain: String) {
+        var requests = 0
+        currencyTomlClient(body = minimalToml, onRequest = { requests++ }).use { client ->
+            val error = assertFailsWith<IllegalArgumentException> { StellarToml.fromDomain(domain, client) }
+            assertTrue(error.message.orEmpty().contains(domain))
+            assertEquals(0, requests, "No request for domain '$domain'")
+        }
+    }
+
+    @Test
+    fun fromDomain_preservesPortAndIdnHosts() = runTest {
+        for (host in listOf("anchor.example.org", "bücher.example", "xn--bcher-kva.example")) {
+            var requests = 0
+            currencyTomlClient(body = minimalToml, onRequest = {
+                requests++
+                assertEquals(URLProtocol.HTTPS, it.url.protocol)
+                assertEquals(8443, it.url.port)
+                assertEquals("/.well-known/stellar.toml", it.url.encodedPath)
+                assertNull(it.getCapabilityOrNull(HttpTimeoutCapability))
+            }).use { client ->
+                assertEquals("2.0.0", StellarToml.fromDomain("$host:8443", client).generalInformation.version)
+                assertEquals(1, requests)
+            }
+        }
+    }
+
+    @Test
+    fun fromDomain_rejectsOversizedBody() = runTest {
+        assertOversizedToml { StellarToml.fromDomain("anchor.example.org", it) }
+    }
+
+    @Test
+    fun currencyFromUrl_rejectsOversizedBody() = runTest {
+        assertOversizedToml { StellarToml.currencyFromUrl("https://anchor.example.org/USD.toml", it) }
+    }
+
+    private suspend fun assertOversizedToml(fetch: suspend (HttpClient) -> Unit) {
+        val body = "#" + "é".repeat(51_200)
+        assertEquals(102_401, body.encodeToByteArray().size)
+        currencyTomlClient(body = body).use { client ->
+            val error = assertFailsWith<IllegalStateException> { fetch(client) }
+            assertTrue(error.message.orEmpty().contains("102400"))
+        }
+    }
+
+    @Test
+    fun tomlFetchesAcceptExactSizeLimitAndReuseInjectedClient() = runTest {
+        val prefix = minimalToml + "code=\"USD\"\n#"
+        val body = prefix + "x".repeat(102_400 - prefix.length)
+        assertEquals(102_400, body.encodeToByteArray().size)
+        currencyTomlClient(body = body).use { client ->
+            assertEquals("2.0.0", StellarToml.fromDomain("anchor.example.org", client).generalInformation.version)
+            assertEquals("USD", StellarToml.currencyFromUrl("https://anchor.example.org/USD.toml", client).code)
+        }
+    }
+
+    @Test
+    fun discoveryClientUsesFederationTimeouts() = runTest {
+        createSepDiscoveryClient(engine = MockEngine { request ->
+            val timeout = assertNotNull(request.getCapabilityOrNull(HttpTimeoutCapability))
+            assertEquals(10_000L, timeout.connectTimeoutMillis)
+            assertEquals(30_000L, timeout.requestTimeoutMillis)
+            respond(minimalToml)
+        }).use { client ->
+            assertEquals("2.0.0", StellarToml.fromDomain("anchor.example.org", client).generalInformation.version)
+        }
+    }
+
+    @Test
+    fun fromDomain_rejectsOversizedStreamBeforeEof() = runTest {
+        val channel = ByteChannel(autoFlush = true)
+        val writer = launch { channel.writeFully(("#" + "x".repeat(102_400)).encodeToByteArray()) }
+        try {
+            HttpClient(MockEngine { respond(channel) }).use { client ->
+                val error = assertFailsWith<IllegalStateException> {
+                    withContext(Dispatchers.Default) {
+                        withTimeout(5_000) { StellarToml.fromDomain("anchor.example.org", client) }
+                    }
+                }
+                assertTrue(error.message.orEmpty().contains("102400"))
+                assertTrue(channel.isClosedForRead)
+            }
+        } finally {
+            writer.cancelAndJoin()
+            channel.cancel(null)
+        }
+    }
+
+    @Test
+    fun fromDomain_propagatesBodyChannelFailure() = runTest {
+        val channel = ByteChannel(autoFlush = true)
+        val failure = IOException("TOML body interrupted")
+        channel.writeFully("VERSION=\"2.".encodeToByteArray())
+        channel.close(failure)
+        HttpClient(MockEngine { respond(channel) }) {
+            // The bounded reader receives the failed channel directly.
+            useDefaultTransformers = false
+        }.use { client ->
+            val error = assertFailsWith<IOException> {
+                StellarToml.fromDomain("anchor.example.org", client)
+            }
+            assertEquals(failure.message, error.message)
+        }
+    }
+
+    @Test
+    fun fromDomain_preservesResponseCharset() = runTest {
+        val bytes = "VERSION=\"café\"\n".map { it.code.toByte() }.toByteArray()
+        HttpClient(MockEngine {
+            respond(ByteReadChannel(bytes), headers = headersOf(HttpHeaders.ContentType, "text/plain; charset=ISO-8859-1"))
+        }).use { client ->
+            assertEquals("café", StellarToml.fromDomain("anchor.example.org", client).generalInformation.version)
+        }
+    }
 
     private val minimalToml = "VERSION=\"2.0.0\"\n"
+
+    // ==================== fromDomain (loopback carve-out) ====================
 
     /** Captures the protocol+host+port of the request the mock receives, so tests can
      *  assert which scheme [StellarToml.fromDomain] actually selected. */
