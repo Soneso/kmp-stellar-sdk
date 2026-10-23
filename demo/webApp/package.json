@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "vite": "^8.1.5"
+    "vite": "^8.1.6"
   },
   "dependencies": {
     "libsodium-wrappers-sumo": "0.7.13"
