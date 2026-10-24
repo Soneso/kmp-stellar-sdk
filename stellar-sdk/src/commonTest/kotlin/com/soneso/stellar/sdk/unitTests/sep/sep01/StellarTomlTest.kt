@@ -1239,4 +1239,10 @@ class StellarTomlTest {
         val stellarToml = StellarToml.parse("VERSION=\"2.0.0")
         assertEquals("\"2.0.0", stellarToml.generalInformation.version)
     }
+
+    @Test
+    fun testLoneQuoteValueStaysRaw() {
+        val stellarToml = StellarToml.parse("VERSION = \"")
+        assertEquals("\"", stellarToml.generalInformation.version)
+    }
 }

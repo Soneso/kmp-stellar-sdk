@@ -26,6 +26,31 @@ class TomlParserTest {
     }
 
     @Test
+    fun testLoneDelimiterValuesStayRaw() {
+        for (delimiter in listOf("[", "'", "\"")) {
+            assertEquals(mapOf<String, Any?>("A" to delimiter), TomlParser.parse("A = $delimiter"))
+        }
+        for (delimiter in listOf("'", "\"")) {
+            assertEquals(
+                mapOf<String, Any?>("A" to delimiter, "B" to 1L),
+                TomlParser.parse("A = $delimiter\nB = 1")
+            )
+        }
+        assertEquals(mapOf<String, Any?>("A" to listOf("\"")), TomlParser.parse("A = [\"]"))
+    }
+
+    @Test
+    fun testUnterminatedArrayRunsToEndOfContent() {
+        assertEquals(mapOf<String, Any?>("A" to "[\nB = 1"), TomlParser.parse("A = [\nB = 1"))
+    }
+
+    @Test
+    fun testEmptyStringAndArray() {
+        assertEquals(mapOf<String, Any?>("A" to ""), TomlParser.parse("A = \"\""))
+        assertEquals(mapOf<String, Any?>("A" to emptyList<Any?>()), TomlParser.parse("A = []"))
+    }
+
+    @Test
     fun testSingleLineStringsEndAtLineBreaks() {
         for (lineEnding in listOf("\n", "\r\n", "\r")) {
             for (prefix in listOf("'text", "\"text", "\"text\\")) {
