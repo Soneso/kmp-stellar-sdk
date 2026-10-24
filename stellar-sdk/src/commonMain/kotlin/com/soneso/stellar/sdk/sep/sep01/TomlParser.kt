@@ -11,7 +11,7 @@ package com.soneso.stellar.sdk.sep.sep01
 internal object TomlParser {
 
     fun parse(content: String): Map<String, Any?> {
-        val lines = content.lines()
+        val lines = splitOutsideStrings(content)
         val result = mutableMapOf<String, Any?>()
         var currentTable: String? = null
         var currentArrayTable: String? = null
@@ -58,20 +58,15 @@ internal object TomlParser {
                         val key = parts[0].trim()
                         var valueStr = parts[1].trim()
 
-                        // Handle multi-line arrays
-                        if (valueStr.startsWith("[") && !valueStr.endsWith("]")) {
-                            // Multi-line array - collect all lines until ]
+                        var depth = bracketBalance(valueStr)
+                        if (valueStr.startsWith("[") && depth > 0) {
                             val arrayLines = mutableListOf(valueStr)
-                            i++
-                            while (i < lines.size) {
-                                val nextLine = lines[i].trim()
+                            while (depth > 0 && i + 1 < lines.size) {
+                                val nextLine = lines[++i]
                                 arrayLines.add(nextLine)
-                                if (nextLine.endsWith("]")) {
-                                    break
-                                }
-                                i++
+                                depth += bracketBalance(nextLine)
                             }
-                            valueStr = arrayLines.joinToString(" ")
+                            valueStr = arrayLines.joinToString("\n").trim()
                         }
 
                         val value = parseValue(valueStr)
@@ -111,9 +106,16 @@ internal object TomlParser {
 
     private fun parseValue(value: String): Any? {
         return when {
-            // String
-            value.startsWith("\"") && value.endsWith("\"") -> {
-                value.substring(1, value.length - 1)
+            // Strings
+            (value.startsWith("\"") || value.length >= 2 && value.startsWith("'")) &&
+                value.last() == value.first() -> {
+                val quote = value.first()
+                val multiline = value.length >= 6 && value.startsWith(quote.toString().repeat(3)) &&
+                    value.endsWith(quote.toString().repeat(3))
+                val width = if (multiline) 3 else 1
+                var text = value.substring(width, value.length - width)
+                if (multiline) text = text.removePrefix("\n")
+                if (quote == '\"') decodeBasicString(text, multiline) else text
             }
             // Array
             value.startsWith("[") && value.endsWith("]") -> {
@@ -131,50 +133,134 @@ internal object TomlParser {
         }
     }
 
-    private fun parseArray(arrayStr: String): List<Any?> {
-        val content = arrayStr.substring(1, arrayStr.length - 1).trim()
-        if (content.isEmpty()) {
-            return emptyList()
-        }
+    private fun parseArray(arrayStr: String): List<Any?> =
+        splitOutsideStrings(arrayStr.substring(1, arrayStr.length - 1), ',', arrays = true)
+            .map { it.trim() }.filter { it.isNotEmpty() }.map { parseValue(it) }
 
-        val elements = mutableListOf<Any?>()
-        var current = StringBuilder()
-        var inString = false
+    /**
+     * Splits [content] at [separator] outside strings, and outside nested brackets when [arrays] is set;
+     * [stripComments] drops comments outside strings.
+     */
+    internal fun splitOutsideStrings(
+        content: String,
+        separator: Char = '\n',
+        arrays: Boolean = false,
+        stripComments: Boolean = true
+    ): List<String> {
+        val input = if (separator == '\n') content.replace("\r\n", "\n").replace('\r', '\n') else content
+        val parts = mutableListOf<String>()
+        val current = StringBuilder()
         var depth = 0
-
-        for (char in content) {
+        var i = 0
+        while (i < input.length) {
+            val char = input[i]
             when {
-                char == '"' -> {
-                    inString = !inString
-                    current.append(char)
+                char == '"' || char == '\'' -> {
+                    val end = stringEnd(input, i)
+                    current.append(input.substring(i, end))
+                    i = end
                 }
-                char == '[' && !inString -> {
-                    depth++
-                    current.append(char)
+                char == '#' -> {
+                    val end = input.indexOf('\n', i).let { if (it < 0) input.length else it }
+                    if (!stripComments) current.append(input.substring(i, end))
+                    i = end
                 }
-                char == ']' && !inString -> {
-                    depth--
-                    current.append(char)
-                }
-                char == ',' && !inString && depth == 0 -> {
-                    val element = current.toString().trim()
-                    if (element.isNotEmpty()) {
-                        elements.add(parseValue(element))
-                    }
-                    current = StringBuilder()
+                char == separator && depth == 0 -> {
+                    parts.add(current.toString())
+                    current.clear()
+                    i++
                 }
                 else -> {
+                    if (arrays && char == '[') depth++
+                    if (arrays && char == ']') depth--
                     current.append(char)
+                    i++
                 }
             }
         }
+        parts.add(current.toString())
+        return parts
+    }
 
-        // Add the last element
-        val element = current.toString().trim()
-        if (element.isNotEmpty()) {
-            elements.add(parseValue(element))
+    private fun stringEnd(content: String, start: Int): Int {
+        val quote = content[start]
+        val delimiter = quote.toString().repeat(if (content.startsWith(quote.toString().repeat(3), start)) 3 else 1)
+        var i = start + delimiter.length
+        while (i < content.length) {
+            when {
+                quote == '"' && content[i] == '\\' -> i = minOf(
+                    i + if (delimiter.length == 1 && content.getOrNull(i + 1) == '\n') 1 else 2,
+                    content.length
+                )
+                content.startsWith(delimiter, i) -> {
+                    i += delimiter.length
+                    if (delimiter.length == 3) while (i < content.length && content[i] == quote) i++
+                    return i
+                }
+                delimiter.length == 1 && content[i] == '\n' -> return i
+                else -> i++
+            }
         }
+        return i
+    }
 
-        return elements
+    private fun bracketBalance(content: String): Int {
+        var balance = 0
+        var i = 0
+        while (i < content.length) {
+            when (content[i]) {
+                '"', '\'' -> {
+                    i = stringEnd(content, i)
+                    continue
+                }
+                '[' -> balance++
+                ']' -> balance--
+            }
+            i++
+        }
+        return balance
+    }
+
+    private fun decodeBasicString(value: String, multiline: Boolean): String = buildString {
+        var i = 0
+        while (i < value.length) {
+            if (value[i] != '\\') {
+                append(value[i++])
+                continue
+            }
+            val escaped = value.getOrNull(i + 1)
+            if (multiline && escaped != null && escaped in " \t\r\n") {
+                var end = i + 1
+                while (end < value.length && value[end] in " \t\r\n") end++
+                if ('\n' in value.substring(i + 1, end)) {
+                    i = end
+                    continue
+                }
+            }
+            if (escaped == 'u' || escaped == 'U') {
+                val end = i + 2 + if (escaped == 'u') 4 else 8
+                val code = if (end <= value.length) value.substring(i + 2, end).toIntOrNull(16) else null
+                if (code != null && code in 0..0x10FFFF && code !in 0xD800..0xDFFF) {
+                    if (code <= 0xFFFF) append(code.toChar()) else {
+                        append((0xD800 + ((code - 0x10000) shr 10)).toChar())
+                        append((0xDC00 + ((code - 0x10000) and 0x3FF)).toChar())
+                    }
+                    i = end
+                    continue
+                }
+            }
+            val decoded = when (escaped) {
+                'b' -> '\b'
+                't' -> '\t'
+                'n' -> '\n'
+                'f' -> '\u000C'
+                'r' -> '\r'
+                '"' -> '"'
+                '\\' -> '\\'
+                else -> null
+            }
+            append(decoded ?: '\\')
+            i += if (decoded == null) 1 else 2
+        }
     }
 }

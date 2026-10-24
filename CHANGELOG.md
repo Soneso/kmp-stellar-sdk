@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SorobanServer.getSACBalance` names the kind given when it rejects a holder that is not a contract (`C...`) address, the message starting "The balance holder must be a contract (C...) address".
 
 ### Fixed
+- SEP-1 parsing decodes escaped strings, preserves literal and multiline string content, ignores inline comments outside strings, and reads nested multiline arrays without truncation.
 - `ContractSpec` accepts `BigInteger`, full-range `ULong` and decimal strings beyond the `Long` range for u64, timepoint, duration and 128/256-bit integers, and reports values outside each type's range as `ContractSpecException`.
 - `ContractSpec` rejects a `ULong` above `Long.MAX_VALUE` for u32, i32 and i64 with `ContractSpecException` and names the unsigned value and the type.
 - `ContractSpec` converts whole-number `Double` and `Float` inputs exactly within each integer type's range and rejects fractional, NaN and infinite inputs with `ContractSpecException`.
