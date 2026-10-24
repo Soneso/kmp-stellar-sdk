@@ -4,6 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep30
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.sep.sep30.exceptions.Sep30BadRequestException
 import com.soneso.stellar.sdk.sep.sep30.exceptions.Sep30ConflictException
 import com.soneso.stellar.sdk.sep.sep30.exceptions.Sep30InvalidResponseException
@@ -535,8 +536,8 @@ class Sep30Service(
                 json(json)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
             }
         }
 

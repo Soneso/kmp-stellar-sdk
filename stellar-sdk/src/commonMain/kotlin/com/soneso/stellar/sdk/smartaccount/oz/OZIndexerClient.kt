@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.isFatal
@@ -316,7 +317,7 @@ class OZIndexerClient(
         }
         install(HttpTimeout) {
             requestTimeoutMillis = timeoutMs
-            connectTimeoutMillis = minOf(timeoutMs, 10_000)
+            connectTimeoutMillis = minOf(timeoutMs, HttpTimeouts.CONNECT_TIMEOUT_MS)
         }
     }
 

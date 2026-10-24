@@ -4,16 +4,11 @@
 
 package com.soneso.stellar.sdk.sep.common
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpTimeout
-
-/** Connect timeout of the client that stellar.toml discovery and federation queries create. */
-private const val SEP_DISCOVERY_CONNECT_TIMEOUT_MS = 10_000L
-
-/** Request timeout of the client that stellar.toml discovery and federation queries create. */
-private const val SEP_DISCOVERY_REQUEST_TIMEOUT_MS = 30_000L
 
 // Shared by stellar.toml discovery and federation queries.
 internal fun createSepDiscoveryClient(
@@ -22,8 +17,8 @@ internal fun createSepDiscoveryClient(
 ): HttpClient {
     val config: HttpClientConfig<*>.() -> Unit = {
         install(HttpTimeout) {
-            connectTimeoutMillis = SEP_DISCOVERY_CONNECT_TIMEOUT_MS
-            requestTimeoutMillis = SEP_DISCOVERY_REQUEST_TIMEOUT_MS
+            connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+            requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
         }
         configure()
     }

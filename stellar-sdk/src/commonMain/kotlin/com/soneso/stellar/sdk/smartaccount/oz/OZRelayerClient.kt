@@ -8,6 +8,7 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
@@ -274,7 +275,7 @@ class OZRelayerClient(
                 if (perRequestTimeoutMs != null) {
                     timeout {
                         requestTimeoutMillis = perRequestTimeoutMs
-                        connectTimeoutMillis = minOf(perRequestTimeoutMs, 30_000)
+                        connectTimeoutMillis = minOf(perRequestTimeoutMs, HttpTimeouts.RELAYER_CONNECT_TIMEOUT_MS)
                         socketTimeoutMillis = perRequestTimeoutMs
                     }
                 }
@@ -390,7 +391,7 @@ class OZRelayerClient(
         }
         install(HttpTimeout) {
             requestTimeoutMillis = timeoutMs
-            connectTimeoutMillis = minOf(timeoutMs, 30_000)
+            connectTimeoutMillis = minOf(timeoutMs, HttpTimeouts.RELAYER_CONNECT_TIMEOUT_MS)
         }
     }
 

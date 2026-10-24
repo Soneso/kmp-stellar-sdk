@@ -100,8 +100,8 @@ object FriendBot {
             })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 10_000
+            requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
+            connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
         }
         install(HttpRequestRetry) {
             retryOnServerErrors(maxRetries = 3)

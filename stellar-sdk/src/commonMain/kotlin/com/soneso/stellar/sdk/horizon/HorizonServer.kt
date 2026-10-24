@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.horizon
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.*
@@ -35,6 +36,9 @@ class HorizonServer(
          */
         const val HORIZON_SUBMIT_TIMEOUT = 60
 
+        /** Request and socket timeout for Horizon submission, including its response grace period. */
+        private const val SUBMIT_TIMEOUT_MS = (HORIZON_SUBMIT_TIMEOUT + 5) * 1_000L
+
         /**
          * Default JSON configuration for serialization/deserialization
          */
@@ -62,9 +66,9 @@ class HorizonServer(
                 json(defaultJson)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
-                socketTimeoutMillis = 30_000
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeouts.SOCKET_TIMEOUT_MS
             }
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 3)
@@ -93,9 +97,9 @@ class HorizonServer(
                 json(defaultJson)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = (HORIZON_SUBMIT_TIMEOUT + 5) * 1_000L
-                socketTimeoutMillis = (HORIZON_SUBMIT_TIMEOUT + 5) * 1_000L
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = SUBMIT_TIMEOUT_MS
+                socketTimeoutMillis = SUBMIT_TIMEOUT_MS
             }
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 3)

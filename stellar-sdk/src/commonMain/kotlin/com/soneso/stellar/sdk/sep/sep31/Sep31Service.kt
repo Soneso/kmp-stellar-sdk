@@ -4,6 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep31
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.sep.common.jsonElementToAny
 import com.soneso.stellar.sdk.sep.common.mapToJsonString
@@ -351,12 +352,6 @@ public class Sep31Service(
 
         /** Maximum body size for transaction-shaped responses. */
         private const val TRANSACTION_RESPONSE_CAP_BYTES: Long = 256L * 1024
-
-        /** Connection timeout for SDK-built clients (milliseconds). */
-        private const val CONNECT_TIMEOUT_MS: Long = 10_000
-
-        /** Request timeout for SDK-built clients (milliseconds). */
-        private const val REQUEST_TIMEOUT_MS: Long = 30_000
 
         /**
          * Default message used when an authentication-failure response carries no JSON
@@ -1168,8 +1163,8 @@ public class Sep31Service(
                 json(json)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = CONNECT_TIMEOUT_MS
-                requestTimeoutMillis = REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
             }
         }
         return try {

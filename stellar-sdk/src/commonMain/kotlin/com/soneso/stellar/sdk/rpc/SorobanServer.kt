@@ -3,6 +3,7 @@ package com.soneso.stellar.sdk.rpc
 import com.soneso.stellar.sdk.Account
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Asset
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.InvokeHostFunctionOperation
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.MuxedAccount
@@ -141,11 +142,6 @@ class SorobanServer(
         private const val SUBMIT_TRANSACTION_TIMEOUT = 60_000L
 
         /**
-         * Default connection timeout in milliseconds.
-         */
-        private const val CONNECT_TIMEOUT = 10_000L
-
-        /**
          * Creates a default HTTP client configured for Soroban RPC.
          *
          * The client is configured with:
@@ -171,7 +167,7 @@ class SorobanServer(
                 }
                 install(HttpTimeout) {
                     requestTimeoutMillis = SUBMIT_TRANSACTION_TIMEOUT
-                    connectTimeoutMillis = CONNECT_TIMEOUT
+                    connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
                 }
                 install(DefaultRequest) {
                     header("X-Client-Name", com.soneso.stellar.sdk.Util.CLIENT_NAME)
