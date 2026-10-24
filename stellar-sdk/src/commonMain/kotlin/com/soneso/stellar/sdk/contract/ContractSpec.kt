@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.contract
 
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.contract.exception.ContractSpecException
@@ -46,6 +47,10 @@ import com.soneso.stellar.sdk.xdr.*
  * @property entries The list of contract specification entries
  */
 class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
+
+    private companion object {
+        private val DECIMAL_INTEGER = Regex("[+-]?[0-9]+")
+    }
 
     /**
      * Returns all function specifications from the contract spec.
@@ -667,29 +672,20 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 SCValXdr.I32(Int32Xdr(intVal.toInt()))
             }
             SCSpecTypeXdr.SC_SPEC_TYPE_U64 -> {
-                val intVal = parseInteger(value, "u64")
-                if (intVal < 0) {
-                    throw ContractSpecException.invalidType("Value $intVal out of range for u64")
-                }
-                SCValXdr.U64(Uint64Xdr(intVal.toULong()))
+                val intVal = parseWideInteger(value, "u64", 64)
+                SCValXdr.U64(Uint64Xdr(intVal.ulongValue(true)))
             }
             SCSpecTypeXdr.SC_SPEC_TYPE_I64 -> {
                 val intVal = parseInteger(value, "i64")
                 SCValXdr.I64(Int64Xdr(intVal))
             }
             SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT -> {
-                val intVal = parseInteger(value, "timepoint")
-                if (intVal < 0) {
-                    throw ContractSpecException.invalidType("Value $intVal out of range for timepoint")
-                }
-                SCValXdr.Timepoint(TimePointXdr(Uint64Xdr(intVal.toULong())))
+                val intVal = parseWideInteger(value, "timepoint", 64)
+                SCValXdr.Timepoint(TimePointXdr(Uint64Xdr(intVal.ulongValue(true))))
             }
             SCSpecTypeXdr.SC_SPEC_TYPE_DURATION -> {
-                val intVal = parseInteger(value, "duration")
-                if (intVal < 0) {
-                    throw ContractSpecException.invalidType("Value $intVal out of range for duration")
-                }
-                SCValXdr.Duration(DurationXdr(Uint64Xdr(intVal.toULong())))
+                val intVal = parseWideInteger(value, "duration", 64)
+                SCValXdr.Duration(DurationXdr(Uint64Xdr(intVal.ulongValue(true))))
             }
             SCSpecTypeXdr.SC_SPEC_TYPE_U128 -> handleU128Type(value)
             SCSpecTypeXdr.SC_SPEC_TYPE_I128 -> handleI128Type(value)
@@ -721,70 +717,111 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      */
     private fun parseInteger(value: Any?, typeName: String): Long {
         return when (value) {
+            // Before `is Int`: on Kotlin/JS every number also passes `is Int`.
+            is Double, is Float -> {
+                val number = parseFloatingInteger(value as Number, typeName)
+                // Long.MAX_VALUE.toDouble() is 2^63, so the upper bound is exclusive.
+                if (number < Long.MIN_VALUE.toDouble() || number >= Long.MAX_VALUE.toDouble()) {
+                    throw ContractSpecException.invalidType("Value $value out of range for $typeName")
+                }
+                number.toLong()
+            }
             is Int -> value.toLong()
             is Long -> value
             is UInt -> value.toLong()
-            is ULong -> value.toLong()
-            is Double -> value.toLong()
-            is Float -> value.toLong()
+            is ULong -> {
+                if (value > Long.MAX_VALUE.toULong()) {
+                    throw ContractSpecException.invalidType("Value $value out of range for $typeName")
+                }
+                value.toLong()
+            }
             is String -> value.toLongOrNull()
                 ?: throw ContractSpecException.invalidType("Cannot parse \"$value\" as integer for $typeName")
             else -> throw ContractSpecException.invalidType("Expected integer type, got ${value?.let { it::class.simpleName } ?: "null"} for $typeName")
         }
     }
 
+    private fun parseFloatingInteger(value: Number, typeName: String): Double {
+        val number = value.toDouble()
+        if (!number.isFinite() || number % 1.0 != 0.0) {
+            throw ContractSpecException.invalidType("Value $value is not an integer for $typeName")
+        }
+        return number
+    }
+
+    /**
+     * Parses [value] as an integer for [typeName] and throws [ContractSpecException]
+     * when it lies outside the [bits]-bit range, signed when [signed] is set.
+     */
+    private fun parseWideInteger(value: Any?, typeName: String, bits: Int, signed: Boolean = false): BigInteger {
+        val integer = when (value) {
+            is BigInteger -> value
+            is ULong -> BigInteger.fromULong(value)
+            is Double, is Float -> {
+                val number = parseFloatingInteger(value as Number, typeName)
+                if (number >= Long.MIN_VALUE.toDouble() && number < Long.MAX_VALUE.toDouble()) {
+                    BigInteger.fromLong(number.toLong())
+                } else {
+                    val rawBits = number.toRawBits()
+                    val significand = (rawBits and 0x000FFFFFFFFFFFFFL) or (1L shl 52)
+                    val exponent = ((rawBits ushr 52) and 0x7FFL).toInt()
+                    // Outside the Long range, significand * 2^(exponent - 1023 - 52) needs only a left shift.
+                    val magnitude = BigInteger.fromLong(significand) shl (exponent - 1075)
+                    if (number < 0) -magnitude else magnitude
+                }
+            }
+            is String -> {
+                val long = value.toLongOrNull()
+                when {
+                    long != null -> BigInteger.fromLong(long)
+                    value.matches(DECIMAL_INTEGER) -> BigInteger.parseString(value, 10)
+                    else -> throw ContractSpecException.invalidType("Cannot parse \"$value\" as integer for $typeName")
+                }
+            }
+            else -> BigInteger.fromLong(parseInteger(value, typeName))
+        }
+        val limit = BigInteger.ONE shl (if (signed) bits - 1 else bits)
+        val minimum = if (signed) -limit else BigInteger.ZERO
+        if (integer < minimum || integer >= limit) {
+            throw ContractSpecException.invalidType("Value $value out of range for $typeName")
+        }
+        return integer
+    }
+
     /**
      * Handle 128-bit unsigned integer conversion
      */
     private fun handleU128Type(value: Any?): SCValXdr {
-        val intVal = parseInteger(value, "u128")
-        if (intVal < 0) {
-            throw ContractSpecException.invalidType("Value $intVal out of range for u128")
-        }
+        val intVal = parseWideInteger(value, "u128", 128)
 
-        // Use Scv.toUint128 for proper conversion
-        return Scv.toUint128(
-            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
-        )
+        return Scv.toUint128(intVal)
     }
 
     /**
      * Handle 128-bit signed integer conversion
      */
     private fun handleI128Type(value: Any?): SCValXdr {
-        val intVal = parseInteger(value, "i128")
+        val intVal = parseWideInteger(value, "i128", 128, signed = true)
 
-        // Use Scv.toInt128 for proper conversion
-        return Scv.toInt128(
-            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
-        )
+        return Scv.toInt128(intVal)
     }
 
     /**
      * Handle 256-bit unsigned integer conversion
      */
     private fun handleU256Type(value: Any?): SCValXdr {
-        val intVal = parseInteger(value, "u256")
-        if (intVal < 0) {
-            throw ContractSpecException.invalidType("Value $intVal out of range for u256")
-        }
+        val intVal = parseWideInteger(value, "u256", 256)
 
-        // Use Scv.toUint256 for proper conversion
-        return Scv.toUint256(
-            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
-        )
+        return Scv.toUint256(intVal)
     }
 
     /**
      * Handle 256-bit signed integer conversion
      */
     private fun handleI256Type(value: Any?): SCValXdr {
-        val intVal = parseInteger(value, "i256")
+        val intVal = parseWideInteger(value, "i256", 256, signed = true)
 
-        // Use Scv.toInt256 for proper conversion
-        return Scv.toInt256(
-            com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(intVal)
-        )
+        return Scv.toInt256(intVal)
     }
 
     /**

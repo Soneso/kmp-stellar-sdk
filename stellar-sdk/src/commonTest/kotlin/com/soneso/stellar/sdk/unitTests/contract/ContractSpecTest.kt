@@ -84,7 +84,8 @@ class ContractSpecTest {
             createFunctionEntryWithTypes("test", listOf(
                 "name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL,
                 "age" to SCSpecTypeXdr.SC_SPEC_TYPE_U32,
-                "active" to SCSpecTypeXdr.SC_SPEC_TYPE_BOOL
+                "active" to SCSpecTypeXdr.SC_SPEC_TYPE_BOOL,
+                "amount" to SCSpecTypeXdr.SC_SPEC_TYPE_I128
             ))
         )
         val spec = ContractSpec(entries)
@@ -92,13 +93,33 @@ class ContractSpecTest {
         val args = spec.funcArgsToXdrSCValues("test", mapOf(
             "name" to "Alice",
             "age" to 30,
-            "active" to true
+            "active" to true,
+            "amount" to BigInteger.parseString("10000000000000000000")
         ))
 
-        assertEquals(3, args.size)
+        assertEquals(4, args.size)
         assertTrue(args[0] is SCValXdr.Sym)
         assertTrue(args[1] is SCValXdr.U32)
         assertTrue(args[2] is SCValXdr.B)
+        assertIs<SCValXdr.I128>(args[3])
+        assertEquals(BigInteger.parseString("10000000000000000000"), spec.scValToNative(args[3], null))
+        val floatingArgs = spec.funcArgsToXdrSCValues("test", mapOf(
+            "name" to "Alice", "age" to 30, "active" to true, "amount" to 1e19
+        ))
+        assertEquals(BigInteger.parseString("10000000000000000000"), spec.scValToNative(floatingArgs[3], null))
+        val error = assertFailsWith<ContractSpecException> {
+            spec.funcArgsToXdrSCValues("test", mapOf(
+                "name" to "Alice", "age" to 30, "active" to true, "amount" to 3.75
+            ))
+        }
+        assertTrue(error.message!!.contains("3.75"), error.message)
+        assertTrue(error.message!!.contains("i128"), error.message)
+        val unsignedError = assertFailsWith<ContractSpecException> {
+            spec.funcArgsToXdrSCValues("test", mapOf(
+                "name" to "Alice", "age" to ULong.MAX_VALUE, "active" to true, "amount" to 1
+            ))
+        }
+        assertEquals("Invalid type: Value 18446744073709551615 out of range for u32", unsignedError.message)
     }
 
     @Test
@@ -384,6 +405,8 @@ class ContractSpecTest {
     fun testU32Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U32)
+        assertFloatingIntegerInputs(typeDef, "u32")
+        assertULongInputs(typeDef, "u32")
 
         val result = spec.nativeToXdrSCVal(42, typeDef)
         assertTrue(result is SCValXdr.U32)
@@ -403,6 +426,8 @@ class ContractSpecTest {
     fun testI32Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I32)
+        assertFloatingIntegerInputs(typeDef, "i32")
+        assertULongInputs(typeDef, "i32")
 
         val positive = spec.nativeToXdrSCVal(42, typeDef)
         assertTrue(positive is SCValXdr.I32)
@@ -417,6 +442,7 @@ class ContractSpecTest {
     fun testU64Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U64)
+        assertFloatingIntegerInputs(typeDef, "u64")
 
         val result = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(result is SCValXdr.U64)
@@ -425,12 +451,22 @@ class ContractSpecTest {
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
         }
+        val large = spec.nativeToXdrSCVal(BigInteger.parseString("10000000000000000000"), typeDef)
+        assertEquals(10000000000000000000UL, assertIs<SCValXdr.U64>(large).value.value)
+
+        assertWideIntegerBounds(typeDef, "u64",
+            "0",
+            "18446744073709551615")
     }
 
     @Test
     fun testI64Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I64)
+        assertFloatingIntegerInputs(typeDef, "i64")
+        assertULongInputs(typeDef, "i64")
+        val unsignedMaximum = spec.nativeToXdrSCVal(9223372036854775807UL, typeDef)
+        assertEquals(Long.MAX_VALUE, assertIs<SCValXdr.I64>(unsignedMaximum).value.value)
 
         val positive = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(positive is SCValXdr.I64)
@@ -439,12 +475,21 @@ class ContractSpecTest {
         val negative = spec.nativeToXdrSCVal(-1234567890L, typeDef)
         assertTrue(negative is SCValXdr.I64)
         assertEquals(-1234567890L, negative.value.value)
+        for ((input, expected) in listOf<Pair<Any, Long>>(
+            Long.MIN_VALUE.toDouble() to Long.MIN_VALUE,
+            Long.MIN_VALUE.toFloat() to Long.MIN_VALUE,
+            9223372036854774784.0 to 9223372036854774784L,
+            Float.fromBits(0x5EFFFFFF) to 9223371487098961920L
+        )) {
+            assertEquals(expected, spec.scValToNative(spec.nativeToXdrSCVal(input, typeDef), typeDef))
+        }
     }
 
     @Test
     fun testU128Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U128)
+        assertFloatingIntegerInputs(typeDef, "u128")
 
         val result = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(result is SCValXdr.U128)
@@ -455,12 +500,17 @@ class ContractSpecTest {
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
         }
+
+        assertWideIntegerBounds(typeDef, "u128",
+            "0",
+            "340282366920938463463374607431768211455")
     }
 
     @Test
     fun testI128Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I128)
+        assertFloatingIntegerInputs(typeDef, "i128")
 
         val positive = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(positive is SCValXdr.I128)
@@ -472,12 +522,16 @@ class ContractSpecTest {
         assertTrue(negative is SCValXdr.I128)
         parts = negative.value
         assertEquals(-1L, parts.hi.value) // Sign extension
+        assertWideIntegerBounds(typeDef, "i128",
+            "-170141183460469231731687303715884105728",
+            "170141183460469231731687303715884105727")
     }
 
     @Test
     fun testU256Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_U256)
+        assertFloatingIntegerInputs(typeDef, "u256")
 
         val result = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(result is SCValXdr.U256)
@@ -490,12 +544,16 @@ class ContractSpecTest {
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
         }
+        assertWideIntegerBounds(typeDef, "u256",
+            "0",
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935")
     }
 
     @Test
     fun testI256Conversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_I256)
+        assertFloatingIntegerInputs(typeDef, "i256")
 
         val positive = spec.nativeToXdrSCVal(1000, typeDef)
         assertTrue(positive is SCValXdr.I256)
@@ -509,6 +567,9 @@ class ContractSpecTest {
         assertEquals(-1L, parts.hiHi.value) // Sign extension
         assertEquals(-1L, parts.hiLo.value.toLong())
         assertEquals(-1L, parts.loHi.value.toLong())
+        assertWideIntegerBounds(typeDef, "i256",
+            "-57896044618658097711785492504343953926634992332820282019728792003956564819968",
+            "57896044618658097711785492504343953926634992332820282019728792003956564819967")
     }
 
     @Test
@@ -566,6 +627,7 @@ class ContractSpecTest {
     fun testTimepointConversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT)
+        assertFloatingIntegerInputs(typeDef, "timepoint")
 
         val result = spec.nativeToXdrSCVal(1234567890L, typeDef)
         assertTrue(result is SCValXdr.Timepoint)
@@ -574,12 +636,16 @@ class ContractSpecTest {
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
         }
+        assertWideIntegerBounds(typeDef, "timepoint",
+            "0",
+            "18446744073709551615")
     }
 
     @Test
     fun testDurationConversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_DURATION)
+        assertFloatingIntegerInputs(typeDef, "duration")
 
         val result = spec.nativeToXdrSCVal(3600L, typeDef)
         assertTrue(result is SCValXdr.Duration)
@@ -588,6 +654,9 @@ class ContractSpecTest {
         assertFailsWith<ContractSpecException> {
             spec.nativeToXdrSCVal(-1, typeDef)
         }
+        assertWideIntegerBounds(typeDef, "duration",
+            "0",
+            "18446744073709551615")
     }
 
     // ========== Address Auto-Detection Tests ==========
@@ -3059,6 +3128,92 @@ class ContractSpecTest {
 
     private fun createUdtTypeDef(name: String): SCSpecTypeDefXdr {
         return SCSpecTypeDefXdr.Udt(SCSpecTypeUDTXdr(name))
+    }
+
+    private fun assertULongInputs(typeDef: SCSpecTypeDefXdr, typeName: String) {
+        val spec = ContractSpec(emptyList())
+        val encoded = spec.nativeToXdrSCVal(42UL, typeDef)
+        assertEquals(SCValTypeXdr.valueOf("SCV_" + typeName.uppercase()), encoded.discriminant)
+        assertEquals("42", spec.scValToNative(encoded, typeDef).toString())
+        for (input in listOf(ULong.MAX_VALUE, 9223372036854775808UL)) {
+            val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+            assertEquals("Invalid type: Value $input out of range for $typeName", error.message)
+        }
+    }
+
+    private fun assertFloatingIntegerInputs(typeDef: SCSpecTypeDefXdr, typeName: String) {
+        val spec = ContractSpec(emptyList())
+        for ((input, expected) in listOf<Pair<Any, String>>(
+            3.0 to "3", 4.0f to "4", 0.0 to "0", -0.0f to "0"
+        )) {
+            val encoded = spec.nativeToXdrSCVal(input, typeDef)
+            assertEquals(SCValTypeXdr.valueOf("SCV_" + typeName.uppercase()), encoded.discriminant)
+            assertEquals(expected, spec.scValToNative(encoded, typeDef).toString(), "$typeName: $input")
+        }
+        for (input in listOf<Any>(
+            3.75, 4.75f, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
+            Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY
+        )) {
+            val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+            assertEquals("Invalid type: Value $input is not an integer for $typeName", error.message)
+        }
+        if (typeName in listOf("u32", "i32", "i64")) {
+            for (input in listOf<Any>(
+                Long.MAX_VALUE.toDouble(), Long.MAX_VALUE.toFloat(), 1e19, Float.fromBits(0x5F0AC723), -1e19, -Float.fromBits(0x5F0AC723)
+            )) {
+                val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+                assertEquals("Invalid type: Value $input out of range for $typeName", error.message)
+            }
+        }
+    }
+
+    private fun assertWideIntegerBounds(typeDef: SCSpecTypeDefXdr, typeName: String, min: String, max: String) {
+        val spec = ContractSpec(emptyList())
+        val minimum = BigInteger.parseString(min)
+        val maximum = BigInteger.parseString(max)
+        fun assertValue(input: Any, expected: BigInteger) {
+            val encoded = spec.nativeToXdrSCVal(input, typeDef)
+            assertEquals(SCValTypeXdr.valueOf("SCV_" + typeName.uppercase()), encoded.discriminant)
+            assertEquals(expected.toString(), spec.scValToNative(encoded, typeDef).toString(), "$typeName: $input")
+        }
+        for (expected in listOf(minimum, BigInteger.ZERO, maximum).distinct()) {
+            for (input in listOf<Any>(expected, expected.toString())) assertValue(input, expected)
+        }
+        assertValue(ULong.MAX_VALUE, BigInteger.parseString("18446744073709551615"))
+        assertValue(BigInteger.parseString("10000000000000000000"), BigInteger.parseString("10000000000000000000"))
+        for (input in listOf<Any>(42, 42L, 42u, "+00042")) assertValue(input, BigInteger.fromInt(42))
+        for ((input, expectedText) in listOf<Pair<Any, String>>(
+            Long.MAX_VALUE.toDouble() to "9223372036854775808",
+            Long.MAX_VALUE.toFloat() to "9223372036854775808",
+            1e19 to "10000000000000000000", Float.fromBits(0x5F0AC723) to "9999999980506447872",
+            18446744073709549568.0 to "18446744073709549568",
+            18446744073709551616.0 to "18446744073709551616",
+            1e30 to "1000000000000000019884624838656",
+            -1e19 to "-10000000000000000000", -Float.fromBits(0x5F0AC723) to "-9999999980506447872",
+            Long.MIN_VALUE.toDouble() to "-9223372036854775808",
+            Long.MIN_VALUE.toFloat() to "-9223372036854775808"
+        )) {
+            val expected = BigInteger.parseString(expectedText)
+            if (expected < minimum || expected > maximum) {
+                val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+                assertEquals("Invalid type: Value $input out of range for $typeName", error.message)
+            } else {
+                assertValue(input, expected)
+            }
+        }
+        for (outside in listOf(minimum - BigInteger.ONE, maximum + BigInteger.ONE)) {
+            for (input in listOf<Any>(outside, outside.toString())) {
+                val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+                assertTrue(error.message!!.startsWith("Invalid type:"))
+                assertTrue(error.message!!.contains(input.toString()), error.message)
+                assertTrue(error.message!!.contains(typeName), error.message)
+            }
+        }
+        for (input in listOf("", "1.0", "1e3", "not-a-number", " 1")) {
+            val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(input, typeDef) }
+            assertTrue(error.message!!.contains("\"$input\""), error.message)
+            assertTrue(error.message!!.contains(typeName), error.message)
+        }
     }
 
 }
