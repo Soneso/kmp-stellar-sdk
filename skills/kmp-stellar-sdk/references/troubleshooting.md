@@ -88,7 +88,7 @@ All extend `ContractException`:
 | `SimulationFailedException` | Simulation error | `assembledTransaction` |
 | `SendTransactionFailedException` | Network rejected tx | `assembledTransaction` |
 | `TransactionFailedException` | Tx executed but failed | `assembledTransaction` |
-| `TransactionStillPendingException` | Polling timed out | `assembledTransaction` |
+| `TransactionStillPendingException` | Polling timed out after a status response; if every status request failed, the last request failure is thrown | `assembledTransaction` |
 | `ExpiredStateException` | Ledger entries archived | `assembledTransaction` |
 | `RestorationFailureException` | Auto-restore failed | `assembledTransaction` |
 | `NeedsMoreSignaturesException` | Auth entries need signing | `assembledTransaction` |

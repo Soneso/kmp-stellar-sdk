@@ -72,7 +72,7 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-9 (Standard KYC Fields) - Standardized customer data fields
 - SEP-10 (Web Authentication) - Secure challenge-response authentication
 - SEP-12 (KYC API) - Customer information management
-- SEP-23 (Strkey Encoding) - Encoding, decoding and strict validation of G, S, M, T, X, P, C, L and B strkeys
+- SEP-23 (Strkey Encoding) - Encoding, decoding and strict validation of G, S, M, T, X, P, C, W, L and B strkeys
 - SEP-24 (Hosted Deposit/Withdrawal) - Interactive anchor transfers
 - SEP-29 (Account Memo Requirements) - Memo required check before transaction submission
 - SEP-30 (Account Recovery) - Multi-party account recovery

@@ -110,7 +110,7 @@ val service = Sep31Service(
 )
 ```
 
-A caller-supplied `HttpClient` is used verbatim and never closed by the service; close it yourself when done. When `httpClient` is null the service constructs an internal Ktor client with `followRedirects = false`, content negotiation, and a 30 s request timeout.
+A caller-supplied `HttpClient` is used verbatim and never closed by the service; close it yourself when done. When `httpClient` is null the service constructs an internal Ktor client with `followRedirects = false`, content negotiation, a 10 s connect timeout, and a 30 s request timeout.
 
 ---
 

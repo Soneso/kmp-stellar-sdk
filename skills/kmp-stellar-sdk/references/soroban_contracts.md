@@ -633,7 +633,7 @@ val mapVal = Scv.toMap(linkedMapOf(
 
 ## Automatic Type Conversion
 
-When using `ContractClient.invoke()` or `ContractClient.deploy()`, arguments are passed as `Map<String, Any?>` and auto-converted based on the contract spec. An address parameter takes an `Address` instance as well as a strkey string:
+When using `ContractClient.invoke()` or `ContractClient.deploy()`, arguments are passed as `Map<String, Any?>` and auto-converted based on the contract spec. A u64, timepoint, duration, 128-bit, or 256-bit parameter takes an `Int`, a `Long`, a `BigInteger`, a `ULong`, a decimal `String`, or a whole `Double` or `Float`. An address parameter takes an `Address` instance as well as a strkey string:
 
 ```kotlin
 // Native Kotlin types -> XDR (automatic via ContractSpec)
@@ -646,12 +646,14 @@ val args = mapOf(
     "data" to byteArrayOf(1, 2, 3)  // ByteArray -> Bytes
 )
 
-// WRONG: BigInteger in auto-conversion maps for i128/u128 -- throws ContractSpecException at runtime
-//   "amount" to BigInteger.fromLong(1000000)  // WRONG: BigInteger not accepted
-// CORRECT: use Long or Int for i128/u128 in map args (auto-conversion handles range internally)
+// CORRECT: u64, timepoint, duration, i128, u128, i256, and u256 take Int, Long, BigInteger, ULong,
+//   a decimal String, or a whole Double or Float, up to the full range of the type
+//   "amount" to BigInteger.parseString("10000000000000000000")  // CORRECT: BigInteger -> i128
+//   "amount" to "10000000000000000000"   // CORRECT: decimal String -> i128
 //   "amount" to 1000000L   // CORRECT: Long -> i128
-//   "amount" to 1000000    // CORRECT: Int -> i128
-// BigInteger is ONLY for manual Scv.toInt128(BigInteger.fromLong(...)) calls (low-level API)
+// WRONG: a fractional, NaN, infinite, or out-of-range value throws ContractSpecException naming the value
+//   and the type; ContractClient.invoke() wraps it in IllegalArgumentException
+//   "amount" to 2.5   // WRONG: not an integer
 ```
 
 Address rules, by the parameter's spec type:
@@ -1198,7 +1200,7 @@ if (result.isTupleCase) {
 | `SimulationFailedException` | Transaction simulation failed |
 | `SendTransactionFailedException` | Sending transaction to network failed |
 | `TransactionFailedException` | Transaction included in ledger but failed |
-| `TransactionStillPendingException` | Polling timeout reached |
+| `TransactionStillPendingException` | Polling timeout reached after a status response; if every status request failed, the last request failure is thrown |
 | `ExpiredStateException` | Contract state needs restoration |
 | `RestorationFailureException` | Auto-restore failed |
 | `NotYetSimulatedException` | Calling result/sign before simulate |

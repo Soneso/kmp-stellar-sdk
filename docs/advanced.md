@@ -50,10 +50,7 @@ import com.soneso.stellar.sdk.Claimant
 The SDK provides the `Auth.Signer` interface for custom signing logic:
 
 ```kotlin
-import com.soneso.stellar.sdk.Auth
 import com.soneso.stellar.sdk.crypto.getSha256Crypto
-import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
-import com.soneso.stellar.sdk.xdr.XdrWriter
 
 // Implement custom signer for hardware wallet integration
 class HardwareWalletSigner(
@@ -125,8 +122,6 @@ a network below Protocol 27, where V2 entries invalidate the transaction:
 
 ```kotlin
 // transaction: from the previous steps of this flow
-import com.soneso.stellar.sdk.rpc.SorobanServer
-
 val server = SorobanServer("https://soroban-testnet.stellar.org")
 val simulation = server.simulateTransaction(transaction) // requests AddressV2
 // Legacy opt-out, e.g. for a network below Protocol 27:
@@ -162,9 +157,6 @@ assemble it from an `Address` or `AddressV2` entry with `attachDelegates` and
 
 ```kotlin
 // authEntryFromSimulation, currentLedger, delegateKeyPair: from the previous steps of this flow
-import com.soneso.stellar.sdk.Auth
-import com.soneso.stellar.sdk.DelegateDescriptor
-
 // Attach a sorted, validated delegate tree to a base entry (top-level signature
 // stays void). Delegates may nest further via DelegateDescriptor.nestedDelegates.
 val delegated = Auth.attachDelegates(
@@ -228,6 +220,7 @@ above.
 Use `buildInvoke` for complex multi-signature scenarios:
 
 ```kotlin
+// contractClient, coordinateSignature, getKeypairForAddress, recipientAddress, senderAddress: from the previous steps of this flow
 import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.xdr.*
 val sourceKeypair = KeyPair.fromSecretSeed("SDJHRQF4GCMIIKAAAQ6IHY42X73FQFLHUULAPSKKD4DFDM7UXWWCRHBE")
@@ -248,7 +241,7 @@ val assembled = contractClient.buildInvoke<Map<String, Any>>(
 assembled.simulate()
 
 // Step 3: Collect signatures from multiple parties
-val authEntries = assembled.simulation?.results?.firstOrNull()?.auth ?: emptyList()
+val authEntries = assembled.simulation?.results?.firstOrNull()?.parseAuth() ?: emptyList()
 val signedEntries = mutableListOf<SorobanAuthorizationEntryXdr>()
 
 for (entry in authEntries) {
@@ -312,9 +305,6 @@ The first `signAuthEntries` call stamps the latest ledger plus 100 and signs. An
 Parse complex contract results using the SDK's type conversion system:
 
 ```kotlin
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.xdr.SCValXdr
-
 // Example: Parse custom struct from contract
 data class TokenMetadata(
     val name: String,
@@ -353,8 +343,6 @@ suspend fun getTokenMetadata(contractClient: ContractClient): TokenMetadata {
 Handle expired contract state gracefully:
 
 ```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.exception.ExpiredStateException
 import kotlinx.coroutines.delay
 
@@ -398,10 +386,6 @@ Parse contract Wasm bytecode to extract specifications, metadata, and environmen
 #### Parse from Bytecode
 
 ```kotlin
-import com.soneso.stellar.sdk.contract.SorobanContractParser
-import com.soneso.stellar.sdk.contract.SorobanContractInfo
-import com.soneso.stellar.sdk.contract.SorobanContractParserException
-
 val bytecode: ByteArray = java.io.File("contract.wasm").readBytes() // JVM; use your platform's file APIs elsewhere
 
 try {
@@ -452,9 +436,6 @@ val events: List<SCSpecEventV0Xdr> = contractInfo.events
 `SorobanServer` can fetch and parse contract info directly from a deployed contract, by contract ID or WASM ID:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.contract.SorobanContractInfo
-
 // Both methods are suspend functions — call from a coroutine scope
 suspend fun loadContractInfo() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -489,12 +470,6 @@ instance or its code was not found, or the contract is a Stellar Asset Contract,
 no WASM on-chain. To resolve a reference directly, use `getExternalRefWasmHash`:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanServer
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
-import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
-import com.soneso.stellar.sdk.xdr.SCValXdr
-
 suspend fun resolveExternalRef() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
 
@@ -533,10 +508,6 @@ submission and the returned client is ready to invoke, the same flow `deployFrom
 uses.
 
 ```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.contract.ContractClient
-
 suspend fun deployFromExternalRef(keyPair: KeyPair) {
     val client = ContractClient.deployFromExternalRef(
         executableOwner = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5",
@@ -574,10 +545,6 @@ or Stellar asset) does not enter the derivation. Use it when the address is need
 before the deployment, for example in constructor arguments of another contract.
 
 ```kotlin
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.secureRandomBytes
-
 suspend fun predictContractId() {
     val deployer = Address("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54")
     val salt = secureRandomBytes(32)
@@ -596,10 +563,6 @@ suspend fun predictContractId() {
 Use `TransactionPreconditions` for advanced transaction control:
 
 ```kotlin
-import com.soneso.stellar.sdk.TransactionPreconditions
-import com.soneso.stellar.sdk.TimeBounds
-import com.soneso.stellar.sdk.LedgerBounds
-import com.soneso.stellar.sdk.SignerKey
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -644,9 +607,6 @@ Increase fees for stuck transactions:
 
 ```kotlin
 // feePayerAccount, feePayerKeypair, horizonServer, loadTransactionFromDb: from the previous steps of this flow
-import com.soneso.stellar.sdk.FeeBumpTransactionBuilder
-import com.soneso.stellar.sdk.FeeBumpTransaction
-
 // Original transaction stuck with low fee
 // Application-specific: Load transaction from your storage
 // This function represents your database/storage retrieval logic
@@ -734,8 +694,6 @@ val atomicSwap = TransactionBuilder(account, network)
 The SDK provides 424 XDR types for advanced protocol operations:
 
 ```kotlin
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.xdr.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -770,8 +728,6 @@ fun parseTransactionMeta(metaXdr: String): TransactionMetaXdr {
 Convert native types to Soroban contract values:
 
 ```kotlin
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.Address
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Convert native types to SCVal
@@ -797,6 +753,7 @@ val scVec = Scv.toVec(listOf(
 The SDK provides 11 specialized exception types for contract operations:
 
 ```kotlin
+// getKeypairForAddress, keypair, logger, recipientAccountId, refreshAccountSequence, signer: from the previous steps of this flow
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.exception.*
@@ -813,8 +770,8 @@ suspend fun robustContractInvocation(
         try {
             return contractClient.invoke(
                 functionName = "transfer",
-                arguments = mapOf("to" to "G...", "amount" to 100L),
-                source = "G...",
+                arguments = mapOf("to" to recipientAccountId, "amount" to 100L),
+                source = keypair.getAccountId(),
                 signer = keypair
             )
         } catch (e: SimulationFailedException) {
@@ -849,7 +806,8 @@ suspend fun robustContractInvocation(
 
         } catch (e: TransactionStillPendingException) {
             // Transaction still pending - polling is handled internally by AssembledTransaction
-            // This exception means timeout was reached, but transaction may still complete
+            // This exception means the timeout was reached after a status response; the transaction may still complete
+            // If every status request failed until the timeout, submit throws the last request failure
             // For manual polling later, access the transaction hash from the exception
             throw e
 
@@ -866,7 +824,7 @@ suspend fun robustContractInvocation(
                 assembled.signAuthEntries(keypair)
             }
             // After all signatures collected, retry submission
-            assembled.signAndSubmit(signer)
+            return assembled.signAndSubmit(signer)
 
         } catch (e: RestorationFailureException) {
             // Restoration failed - may need different approach
@@ -884,12 +842,12 @@ suspend fun robustContractInvocation(
         } catch (e: NoSignatureNeededException) {
             // Read-only call doesn't need signatures - get result from assembledTransaction
             val assembled = e.assembledTransaction ?: throw e
-            return assembled.result
+            return assembled.result()
 
-        } catch (e: ContractSpecException) {
-            // Contract spec parsing error
+        } catch (e: IllegalArgumentException) {
+            // Argument conversion failed or an input was invalid; a conversion failure preserves the original exception as its cause
             // Application-specific: Use your logging framework (Logback, SLF4J, etc.)
-            logger.error("Invalid contract spec: ${e.message}")
+            logger.error("Invalid arguments: ${e.message}")
             throw e
         }
     }
@@ -905,10 +863,11 @@ Implement sophisticated retry patterns using Kotlin coroutines:
 ```kotlin
 import com.soneso.stellar.sdk.Transaction
 import com.soneso.stellar.sdk.horizon.HorizonServer
-import com.soneso.stellar.sdk.responses.SubmitTransactionResponse
-import com.soneso.stellar.sdk.requests.BadRequestException
+import com.soneso.stellar.sdk.horizon.exceptions.BadRequestException
+import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.*
 
 class TransactionRetryManager(
     private val horizonServer: HorizonServer,
@@ -918,7 +877,7 @@ class TransactionRetryManager(
         transaction: Transaction,
         maxAttempts: Int = 3,
         backoffMultiplier: Double = 2.0
-    ): SubmitTransactionResponse = coroutineScope {
+    ): TransactionResponse = coroutineScope {
         var delay = 1000L
         var lastException: Exception? = null
 
@@ -926,7 +885,11 @@ class TransactionRetryManager(
             try {
                 return@coroutineScope horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
             } catch (e: BadRequestException) {
-                when (e.problem?.extras?.resultCodes?.transaction) {
+                // Horizon reports the transaction result code in extras.result_codes of the response body
+                val resultCode = e.body?.let { Json.parseToJsonElement(it) }?.jsonObject
+                    ?.get("extras")?.jsonObject?.get("result_codes")?.jsonObject
+                    ?.get("transaction")?.jsonPrimitive?.content
+                when (resultCode) {
                     "tx_bad_seq" -> {
                         // Bad sequence error - transaction used wrong sequence number
                         // Cannot retry with same transaction - must rebuild from scratch
@@ -1149,14 +1112,6 @@ class MultiSigCoordinator(
 Use the SDK's Auth class for secure authorization:
 
 ```kotlin
-import com.soneso.stellar.sdk.Auth
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.Network
-import com.soneso.stellar.sdk.scval.Scv
-import com.soneso.stellar.sdk.xdr.*
-import com.soneso.stellar.sdk.rpc.SorobanServer
-
 // Build authorization from scratch
 suspend fun authorizeCustomInvocation(
     signer: KeyPair,
@@ -1382,9 +1337,7 @@ suspend fun customPolling() {
 Query Soroban contract events with sophisticated filtering for monitoring and debugging:
 
 ```kotlin
-// sym, u32: from the previous steps of this flow
 import com.soneso.stellar.sdk.rpc.requests.GetEventsRequest
-import com.soneso.stellar.sdk.scval.Scv
 
 suspend fun advancedEventQuerying() {
     val server = SorobanServer("https://soroban-testnet.stellar.org")
@@ -1440,10 +1393,10 @@ suspend fun advancedEventQuerying() {
         val parsedTopics = event.parseTopic()
         parsedTopics.forEach { topic ->
             // Convert SCVal back to native types
-            when {
-                topic.sym != null -> println("Topic (symbol): ${Scv.fromSymbol(topic)}")
-                topic.u32 != null -> println("Topic (u32): ${Scv.fromUint32(topic)}")
-                // ... handle other types as needed
+            when (topic) {
+                is SCValXdr.Sym -> println("Topic (symbol): ${Scv.fromSymbol(topic)}")
+                is SCValXdr.U32 -> println("Topic (u32): ${Scv.fromUint32(topic)}")
+                else -> {}
             }
         }
 
@@ -1479,7 +1432,6 @@ suspend fun advancedEventQuerying() {
 Build Soroban transaction data for advanced resource configuration:
 
 ```kotlin
-import com.soneso.stellar.sdk.rpc.SorobanDataBuilder
 val account = Account("GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54", 1L)
 val network = Network.TESTNET
 
@@ -1573,13 +1525,14 @@ class SorobanNetworkExample {
 
 ### Integration Test Patterns
 
-Test complex contract interactions:
+Test complex contract interactions. This test needs a contract with an `initialize(admin: Address)` function and a read-only `get_state()` function that returns a struct with an `admin: Address` field; the spec-based parser turns that struct into a `Map`.
 
 ```kotlin
+// contractId: the C... address of the contract deployed on testnet for this test
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.util.FriendBot
+import com.soneso.stellar.sdk.FriendBot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -1596,12 +1549,12 @@ class ContractIntegrationTest {
         val destination = KeyPair.random()
 
         // Fund accounts
-        FriendBot.fundTestnetAccount(source.accountId)
-        FriendBot.fundTestnetAccount(destination.accountId)
+        FriendBot.fundTestnetAccount(source.getAccountId())
+        FriendBot.fundTestnetAccount(destination.getAccountId())
 
         // Deploy test contract
         val contractClient = ContractClient.forContract(
-            contractId = "C...",
+            contractId = contractId,
             rpcUrl = rpcUrl,
             network = testnet
         )
@@ -1609,7 +1562,9 @@ class ContractIntegrationTest {
         // Test multi-step workflow
         val assembled = contractClient.buildInvoke<Unit>(
             functionName = "initialize",
-            arguments = mapOf("admin" to source.accountId)
+            arguments = mapOf("admin" to source.getAccountId()),
+            source = source.getAccountId(),
+            signer = source
         )
 
         assembled.simulate()
@@ -1621,52 +1576,13 @@ class ContractIntegrationTest {
         val state = contractClient.invoke<Map<String, Any>>(
             functionName = "get_state",
             arguments = emptyMap(),
-            source = source.accountId,
-            signer = null
+            source = source.getAccountId(),
+            signer = null,
+            parseResultXdrFn = { xdr -> contractClient.funcResToNative("get_state", xdr) as Map<String, Any> }
         )
 
-        assertEquals(source.accountId, state["admin"])
+        assertEquals(source.getAccountId(), state["admin"])
     }
-}
-```
-
-### Testing Error Scenarios
-
-Test error handling and recovery:
-
-```kotlin
-import com.soneso.stellar.sdk.KeyPair
-import com.soneso.stellar.sdk.contract.ContractClient
-import com.soneso.stellar.sdk.contract.exception.ExpiredStateException
-import io.mockk.*
-import kotlin.test.Test
-import kotlinx.coroutines.test.runTest
-
-@Test
-fun testErrorRecovery() = runTest {
-    val assembled = mockk<AssembledTransaction<Any>>()
-    val contractClient = mockk<ContractClient>()
-
-    // Simulate expired state with assembledTransaction
-    coEvery {
-        contractClient.invoke(any(), any(), any(), any())
-    } throws ExpiredStateException("State expired", assembled)
-
-    coEvery {
-        assembled.restoreFootprint()
-    } returns mockk()
-
-    // Test recovery logic
-    val recovered: Any? = invokeWithAutoRestore(
-        contractClient,
-        "test_function",
-        emptyMap(),
-        "G...",
-        KeyPair.random()
-    )
-
-    // Verify restoration was called
-    coVerify { assembled.restoreFootprint() }
 }
 ```
 

@@ -31,7 +31,11 @@ import com.soneso.stellar.sdk.sep.sep10.*
 
 `StellarToml.fromDomain()` is a static suspend factory. It constructs
 `https://DOMAIN/.well-known/stellar.toml`, fetches it, and returns a parsed
-`StellarToml` instance. Pass only the bare domain -- no protocol prefix.
+`StellarToml` instance. The domain is a host with an optional port from 1 to
+65535, such as `anchor.example.com` or `localhost:8000`. A scheme, a path, user
+info, whitespace, or a control character in it throws `IllegalArgumentException`
+before any request. The loopback hosts `localhost`, `127.0.0.1`, and `[::1]`
+are fetched over `http://`.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
@@ -48,10 +52,15 @@ try {
 }
 ```
 
-Throws `IllegalStateException` if the HTTP response is not 200. Throws
-`Exception` if the TOML content is invalid and cannot be parsed.
+Throws `IllegalArgumentException` if the domain is not a host with an optional
+port. Throws `IllegalStateException` if the HTTP response is not 200 or the file
+exceeds 102,400 bytes. Throws `Exception` if the TOML content is invalid and
+cannot be parsed, or if the request fails or exceeds a timeout.
 
 ### With a custom HTTP client or headers
+
+Without `httpClient`, the SDK creates a client with a connect timeout of 10
+seconds and a request timeout of 30 seconds.
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
@@ -378,11 +387,13 @@ what auto-correction can fix. Network failures propagate as standard exceptions.
 
 | Method | Throws | Condition |
 |--------|--------|-----------|
+| `StellarToml.fromDomain()` | `IllegalArgumentException` | Domain is not a host with an optional port (`"Invalid stellar.toml domain '{domain}': expected a host with an optional port"`) |
 | `StellarToml.fromDomain()` | `IllegalStateException` | Non-200 HTTP status (`"Stellar toml not found, response status code {code}"`) |
-| `StellarToml.fromDomain()` | `Exception` | Network failure (connection refused, DNS error, timeout) |
-| `StellarToml.parse()` | `Exception` | TOML content is malformed beyond what auto-correction can fix |
+| `StellarToml.fromDomain()` | `IllegalStateException` | File larger than 102,400 bytes (`"TOML file exceeds 102400 bytes"`) |
+| `StellarToml.fromDomain()` | `Exception` | Network failure (connection refused, DNS error, timeout); a client the SDK creates times out after 10 s to connect or 30 s per request; an injected client is used as given |
 | `StellarToml.currencyFromUrl()` | `IllegalStateException` | Non-200 HTTP status (`"Currency toml not found, response status code {code}"`) |
-| `StellarToml.currencyFromUrl()` | `Exception` | Network failure |
+| `StellarToml.currencyFromUrl()` | `IllegalStateException` | File larger than 102,400 bytes (`"TOML file exceeds 102400 bytes"`) |
+| `StellarToml.currencyFromUrl()` | `Exception` | Network failure, with the timeouts of `fromDomain()` |
 
 ```kotlin
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
@@ -498,7 +509,7 @@ suspend fun loadToml() {
 
 **Malformed TOML syntax -- the SDK auto-corrects these:**
 
-The SDK's `safeguardTomlContent()` method silently fixes common real-world
+The SDK's `safeguardTomlContent()` method fixes common real-world header
 errors before parsing. You do not need to call it manually -- `parse()` and
 `fromDomain()` call it automatically. Corrections made:
 
@@ -510,7 +521,11 @@ errors before parsing. You do not need to call it manually -- `parse()` and
 | `[CURRENCIES]` | `[[CURRENCIES]]` |
 | `[VALIDATORS]` | `[[VALIDATORS]]` |
 
-This means even stellar.toml files with incorrect syntax parse successfully.
+Each of these five repairs prints a warning and changes a header line outside
+strings only. Strings follow TOML 1.0. Basic strings decode their escapes.
+Literal and multi-line strings keep their content. Comments outside strings are
+dropped. Arrays may span lines and nest. Parsing is lenient, not a validator:
+malformed TOML may parse or may throw.
 
 ---
 

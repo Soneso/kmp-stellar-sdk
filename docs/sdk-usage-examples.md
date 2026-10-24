@@ -766,12 +766,12 @@ val operations = server.operations()
 operations.records.forEach { op ->
     when (op) {
         is PaymentOperationResponse -> {
-            println("Payment: ${op.amount} ${op.asset.code} to ${op.to}")
+            println("Payment: ${op.amount} ${op.assetCode ?: "XLM"} to ${op.to}")
         }
         is CreateAccountOperationResponse -> {
             println("Account created: ${op.account} with ${op.startingBalance} XLM")
         }
-        // Handle other operation types as needed
+        else -> {}
     }
 }
 
@@ -1279,6 +1279,8 @@ The SDK automatically converts between XDR and native Kotlin types:
 | `SCV_I32` | `Int` | `42` |
 | `SCV_U64` | `ULong` | `1000000UL` |
 | `SCV_I64` | `Long` | `1000000L` |
+| `SCV_TIMEPOINT` | `ULong` | `1700000000UL` |
+| `SCV_DURATION` | `ULong` | `3600UL` |
 | `SCV_U128` | `BigInteger` | `BigInteger.parseString("123456789")` |
 | `SCV_I128` | `BigInteger` | `BigInteger.parseString("123456789")` |
 | `SCV_U256` | `BigInteger` | `BigInteger.parseString("340282366920938463463374607431768211456")` |
@@ -1290,6 +1292,8 @@ The SDK automatically converts between XDR and native Kotlin types:
 | `SCV_MAP` | `Map<*, *>` | `mapOf("key" to "value")` |
 | `SCV_ADDRESS` | `String` (`G...`, `C...`) or `Address`; a `MuxedAddress` parameter also takes `M...` and `W...` | `"GABC..."` |
 | `SCV_VOID` | `null` | `null` |
+
+As arguments, the 64-bit unsigned, timepoint, duration, 128-bit, and 256-bit types also take an `Int`, a `Long`, a `BigInteger`, a `ULong`, a decimal `String`, or a whole `Double` or `Float`. A fractional, NaN, infinite, or out-of-range value throws `ContractSpecException`, which `invoke` wraps in `IllegalArgumentException`.
 
 **Manual conversion examples:**
 
@@ -1417,10 +1421,7 @@ A nested map that falls back is contained: the enclosing vec or map still conver
 
 ```kotlin
 import com.ionspin.kotlin.bignum.integer.BigInteger
-import com.soneso.stellar.sdk.Address
-import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.scval.toNative
-import com.soneso.stellar.sdk.xdr.SCValXdr
 
 // A u64 above Long.MAX_VALUE converts to a ULong and keeps its exact value
 val count = Scv.toUint64(18446744073709551615uL).toNative()  // ULong 18446744073709551615

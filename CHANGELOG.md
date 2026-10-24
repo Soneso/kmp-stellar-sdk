@@ -7,14 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-10-24
+
 ### Added
 - `ContractCreditedEffectResponse` carries `contractMuxed` and `contractMuxedId` when Horizon reports a transfer or mint to a muxed contract address.
 
 ### Changed
-- Breaking: `InvokeHostFunctionOperation.invokeContractFunction` and `ContractClient.forContractWithoutSpec` accept a contract (`C...`) address only. Any other input, a muxed contract (`W...`) included, throws `IllegalArgumentException` with a message that starts "The contract to invoke must be a contract (C...) address" and names the kind given.
-- Breaking: `ContractClient.forContract`, `SorobanServer.loadContractCodeForContractId` and `SorobanServer.loadContractInfoForContractId` reject the same inputs before any request with `IllegalArgumentException`, the message starting "The contract to load must be a contract (C...) address".
-- Breaking: `SorobanServer.getContractData` rejects an owner that is not a contract (`C...`) address before any request, the message starting "The contract data owner must be a contract (C...) address". A key that holds a muxed account (`M...`) or muxed contract (`W...`) address at any depth of its vectors and maps fails with "Contract data keys cannot contain muxed account (M...) or muxed contract (W...) addresses".
+- `InvokeHostFunctionOperation.invokeContractFunction` and `ContractClient.forContractWithoutSpec` accept a contract (`C...`) address only. Any other input, a muxed contract (`W...`) included, throws `IllegalArgumentException` with a message that starts "The contract to invoke must be a contract (C...) address" and names the kind given.
+- `ContractClient.forContract`, `SorobanServer.loadContractCodeForContractId` and `SorobanServer.loadContractInfoForContractId` reject the same inputs before any request with `IllegalArgumentException`, the message starting "The contract to load must be a contract (C...) address".
+- `SorobanServer.getContractData` rejects an owner that is not a contract (`C...`) address before any request, the message starting "The contract data owner must be a contract (C...) address". A key that holds a muxed account (`M...`) or muxed contract (`W...`) address at any depth of its vectors and maps fails with "Contract data keys cannot contain muxed account (M...) or muxed contract (W...) addresses".
 - `SorobanServer.getSACBalance` names the kind given when it rejects a holder that is not a contract (`C...`) address, the message starting "The balance holder must be a contract (C...) address".
+- The documentation and the agent skill describe the muxed contract strkey as part of SEP-23 revision 1.4.0 and the integer input forms of `ContractSpec`. They describe the lenient stellar.toml parser with its domain rule, size limit, and client timeouts, and both outcomes of a timed-out `AssembledTransaction.submit`. The smart account and SEP-31 pages state the transaction time bounds and the connect timeout, and the examples of the advanced guide compile as printed.
 
 ### Fixed
 - SEP-1 parsing decodes escaped strings, preserves literal and multiline string content, ignores inline comments outside strings, and reads nested multiline arrays without truncation.
