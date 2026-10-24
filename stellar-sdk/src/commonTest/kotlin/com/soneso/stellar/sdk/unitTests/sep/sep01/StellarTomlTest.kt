@@ -260,6 +260,50 @@ class StellarTomlTest {
     }
 
     @Test
+    fun testMultilineBasicHeaderPreserved() {
+        val input = listOf(
+            "[DOCUMENTATION]",
+            "ORG_DESCRIPTION = \"\"\"",
+            "  preserved",
+            "[CURRENCIES]",
+            "[ACCOUNTS]",
+            "[[DOCUMENTATION]]",
+            "[PRINCIPALS]",
+            "[VALIDATORS]",
+            "\"\"\"",
+            "ORG_NAME = \"kept\"",
+        ).joinToString("\n")
+        val parsed = StellarToml.parse(input)
+        assertEquals(
+            "  preserved\n[CURRENCIES]\n[ACCOUNTS]\n[[DOCUMENTATION]]\n[PRINCIPALS]\n[VALIDATORS]\n",
+            parsed.documentation?.orgDescription
+        )
+        assertEquals("kept", parsed.documentation?.orgName)
+    }
+
+    @Test
+    fun testMultilineLiteralHeaderPreserved() {
+        val input = listOf(
+            "[DOCUMENTATION]",
+            "ORG_DESCRIPTION = '''",
+            "  preserved",
+            "[CURRENCIES]",
+            "[ACCOUNTS]",
+            "[[DOCUMENTATION]]",
+            "[PRINCIPALS]",
+            "[VALIDATORS]",
+            "'''",
+            "ORG_NAME = \"kept\"",
+        ).joinToString("\n")
+        val parsed = StellarToml.parse(input)
+        assertEquals(
+            "  preserved\n[CURRENCIES]\n[ACCOUNTS]\n[[DOCUMENTATION]]\n[PRINCIPALS]\n[VALIDATORS]\n",
+            parsed.documentation?.orgDescription
+        )
+        assertEquals("kept", parsed.documentation?.orgName)
+    }
+
+    @Test
     fun testFromTomlStringWithIncorrectHeaders() {
         val toml = """
             # Sample stellar.toml with incorrect headers

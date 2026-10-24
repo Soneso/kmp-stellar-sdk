@@ -322,7 +322,7 @@ class StellarToml(
          * @return Corrected TOML content string
          */
         private fun safeguardTomlContent(input: String): String {
-            val lines = input.split('\n').toMutableList()
+            val lines = TomlParser.splitOutsideStrings(input, stripComments = false).toMutableList()
             for (i in lines.indices) {
                 val trimmedLine = lines[i].trimStart()
 
