@@ -106,8 +106,8 @@ internal object TomlParser {
 
     private fun parseValue(value: String): Any? {
         return when {
-            // Strings
-            (value.startsWith("\"") || value.length >= 2 && value.startsWith("'")) &&
+            // Strings: the closing quote is a separate character from the opening one.
+            value.length >= 2 && (value.startsWith("\"") || value.startsWith("'")) &&
                 value.last() == value.first() -> {
                 val quote = value.first()
                 val multiline = value.length >= 6 && value.startsWith(quote.toString().repeat(3)) &&
