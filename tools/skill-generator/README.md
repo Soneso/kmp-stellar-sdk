@@ -40,8 +40,9 @@ cd kmp-stellar-sdk && zip -r ../kmp-stellar-sdk.zip . -x "*.DS_Store"
 ## When to regenerate
 
 The reference describes the released SDK. The maintainer regenerates it at
-release preparation on the `release-docs` branch, together with the skill
-version fields and the zip, when the release changes the public API surface:
+every release preparation on the `release-prep` branch, together with the
+skill version fields and the zip. The regenerated file changes when the
+release changes the public API surface:
 
 - New SEP implementation added
 - New public class, method, or property in any non-XDR / non-crypto package

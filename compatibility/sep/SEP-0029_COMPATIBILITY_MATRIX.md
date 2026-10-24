@@ -1,10 +1,10 @@
 # SEP-0029 (Account Memo Requirements) Compatibility Matrix
 
-**Generated:** 2026-10-14 15:09:50
+**Generated:** 2026-10-24 16:58:05
 
 **SEP Version:** 0.5.0  
 **SEP Status:** Active  
-**SDK Version:** 1.15.0  
+**SDK Version:** 1.16.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0029.md
 
 ## SEP Summary
