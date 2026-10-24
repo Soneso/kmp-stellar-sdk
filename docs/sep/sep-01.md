@@ -125,7 +125,9 @@ val stellarToml = StellarToml.parse(tomlContent)
 **Main Methods**:
 - `StellarToml.fromDomain(domain: String): StellarToml` - Fetch stellar.toml from domain
 - `StellarToml.parse(toml: String): StellarToml` - Parse stellar.toml from string
-- `StellarToml.currencyFromUrl(url: String): Currency` - Load external currency TOML
+- `StellarToml.currencyFromUrl(toml: String): Currency` - Load external currency TOML
+
+`fromDomain` takes a host with an optional port and rejects any other domain before the request. Both fetching methods reject a file over 100 KB (102,400 bytes). The client they create without an `httpClient` argument has a connect timeout of 10 seconds and a request timeout of 30 seconds.
 
 **Data Classes**:
 - `StellarToml` - Main container for stellar.toml data
