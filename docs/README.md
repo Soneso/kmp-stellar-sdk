@@ -30,6 +30,7 @@ Welcome to the documentation for the Stellar SDK for Kotlin Multiplatform. This 
 - **[SEP Implementations](sep/)** - Stellar Ecosystem Proposal support
 
 ### Migration guides
+- **[Migrating to 1.16.0](migration/1.16.0.md)** - Observable changes between 1.15.0 and 1.16.0
 - **[Migrating to 1.15.0](migration/1.15.0.md)** - Observable changes between 1.14.0 and 1.15.0
 - **[Migrating to 1.12.0](migration/1.12.0.md)** - Observable changes between 1.11.0 and 1.12.0
 
@@ -72,7 +73,7 @@ This SDK provides an implementation of the Stellar protocol with:
 - SEP-9 (Standard KYC Fields) - Standardized customer data fields
 - SEP-10 (Web Authentication) - Secure challenge-response authentication
 - SEP-12 (KYC API) - Customer information management
-- SEP-23 (Strkey Encoding) - Encoding, decoding and strict validation of G, S, M, T, X, P, C, L and B strkeys
+- SEP-23 (Strkey Encoding) - Encoding, decoding and strict validation of G, S, M, T, X, P, C, W, L and B strkeys
 - SEP-24 (Hosted Deposit/Withdrawal) - Interactive anchor transfers
 - SEP-29 (Account Memo Requirements) - Memo required check before transaction submission
 - SEP-30 (Account Recovery) - Multi-party account recovery

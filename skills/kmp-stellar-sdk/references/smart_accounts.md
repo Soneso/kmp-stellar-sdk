@@ -109,7 +109,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 | `deployerKeypair` | `KeyPair?` | `null` | Null means use the default deterministic deployer |
 | `sessionExpiryMs` | `Long` | `604_800_000` (7 days) | Session duration for silent reconnect |
 | `signatureExpirationLedgers` | `Int` | `720` (`Util.LEDGERS_PER_HOUR`, ~1 hour) | Auth entry expiration, in ledgers (not seconds). **Replay-protection window**: if an attacker intercepts a signed envelope (via a compromised relayer, MITM, or logged XDR) they can resubmit it until this ledger passes. Default ~1 h is long for interactive flows — consider 60–180 (5–15 min) for high-value transfers |
-| `timeoutInSeconds` | `Int` | `30` | Network timeout for transaction ops |
+| `timeoutInSeconds` | `Int` | `30` | Transaction `TimeBounds` for transaction operations, in seconds |
 | `relayerUrl` | `String?` | `null` | Enables fee-bump relayer. See [Trust model](#relayer-modes) for the security boundary |
 | `indexerUrl` | `String?` | `null` | Enables credential-to-contract discovery |
 | `webauthnProvider` | `WebAuthnProvider?` | `null` | Platform passkey implementation |

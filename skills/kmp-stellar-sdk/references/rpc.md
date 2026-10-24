@@ -567,7 +567,7 @@ if (entry != null) {
 
 **Parameters:**
 - `contractId: String` -- the contract address (C... format)
-- `key: SCValXdr` -- the contract data key
+- `key: SCValXdr` -- the contract data key; a key that is or holds a muxed account (`M...`) or muxed contract (`W...`) address, directly or inside nested vectors and maps, throws `IllegalArgumentException` before the request
 - `durability: SorobanServer.Durability` -- `TEMPORARY` or `PERSISTENT`
 
 **Returns:** `GetLedgerEntriesResponse.LedgerEntryResult?` (null if not found).

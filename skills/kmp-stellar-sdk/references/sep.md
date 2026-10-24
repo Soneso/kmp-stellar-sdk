@@ -20,7 +20,7 @@ import com.soneso.stellar.sdk.*
 | SEP-09 | Standard KYC Fields | Standard vocabulary for KYC/AML data fields | [Details](sep-09.md) |
 | SEP-10 | Web Authentication | Authenticate accounts and obtain JWT tokens | [Details](sep-10.md) |
 | SEP-12 | KYC API | Submit and manage customer information | [Details](sep-12.md) |
-| SEP-23 | Strkey Encoding | Encode, decode and validate G, S, M, T, X, P, C, L and B strkeys | [Details](security.md#address-validation) |
+| SEP-23 | Strkey Encoding | Encode, decode and validate G, S, M, T, X, P, C, W, L and B strkeys | [Details](security.md#address-validation) |
 | SEP-24 | Interactive Deposit/Withdrawal | Interactive web flows for fiat on/off ramps | [Details](sep-24.md) |
 | SEP-29 | Account Memo Requirements | Refuse submission when a destination requires a memo the transaction lacks | [Details](troubleshooting.md#sep-0029-memo-required-accountrequiresmemoexception) |
 | SEP-30 | Account Recovery | Recover access to accounts via identity verification | [Details](sep-30.md) |

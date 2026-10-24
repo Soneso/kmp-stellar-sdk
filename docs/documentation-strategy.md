@@ -431,7 +431,9 @@ docs/
 │   ├── jvm.md                     # Android + server JVM
 │   └── macos.md                   # macOS desktop
 ├── migration/                     # Migration guides, one per release
-│   └── 1.12.0.md                  # Migrating to 1.12.0
+│   ├── 1.12.0.md                  # Migrating to 1.12.0
+│   ├── 1.15.0.md                  # Migrating to 1.15.0
+│   └── 1.16.0.md                  # Migrating to 1.16.0
 ├── testing.md                     # SDK testing (contributor doc)
 └── documentation-strategy.md      # This file
 ```

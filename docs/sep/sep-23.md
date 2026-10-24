@@ -1,6 +1,6 @@
 # SEP-23: Strkey Encoding
 
-SEP-23 defines how Stellar writes keys and identifiers as strkeys: base32 strings whose first letter names their type. Account ids start with `G`, secret seeds with `S`, muxed accounts with `M` and contracts with `C`; the [version bytes reference](#version-bytes-reference) lists every prefix. Muxed contracts follow [CAP-0084](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0084.md); the SDK encodes them with the `W` prefix. The SDK codec is the `StrKey` object, and every SDK type that reads or writes a strkey goes through it: `KeyPair`, `Address`, `MuxedAccount`, `MuxedContract`, `SignerKey` and `ClaimableBalanceId`. One string is therefore accepted or rejected identically on JVM, Android, iOS, macOS and JavaScript.
+SEP-23 defines how Stellar writes keys and identifiers as strkeys: base32 strings whose first letter names their type. Account ids start with `G`, secret seeds with `S`, muxed accounts with `M` and contracts with `C`; the [version bytes reference](#version-bytes-reference) lists every prefix. The muxed contract type `W` carries the muxed contract addresses of [CAP-0084](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0084.md) and is part of SEP-23 revision 1.4.0. The SDK codec is the `StrKey` object, and every SDK type that reads or writes a strkey goes through it: `KeyPair`, `Address`, `MuxedAccount`, `MuxedContract`, `SignerKey` and `ClaimableBalanceId`. One string is therefore accepted or rejected identically on JVM, Android, iOS, macOS and JavaScript.
 
 **Use Cases**:
 - Validate addresses entered by users or received from other services
@@ -15,7 +15,7 @@ Code examples assume a `suspend` calling context and these imports:
 import com.soneso.stellar.sdk.*
 ```
 
-The decode contract, check by check, is described in [Addresses and StrKey](../addresses.md). This page walks through each strkey type and the validation rules that SEP-23, or CAP-0084 for muxed contracts, requires.
+The decode contract, check by check, is described in [Addresses and StrKey](../addresses.md). This page walks through each strkey type and the validation rules that SEP-23 requires.
 
 ## Quick Start
 
