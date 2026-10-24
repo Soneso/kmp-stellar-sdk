@@ -5,6 +5,7 @@
 package com.soneso.stellar.sdk.sep.sep45
 
 import com.soneso.stellar.sdk.Auth
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
@@ -216,9 +217,9 @@ class WebAuthForContracts(
                 json(WebAuthForContracts.json)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
-                socketTimeoutMillis = 30_000
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeouts.SOCKET_TIMEOUT_MS
             }
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 3)

@@ -1,5 +1,6 @@
 package com.soneso.stellar.sdk.horizon.requests
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.horizon.responses.Response
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -47,7 +48,7 @@ internal actual suspend fun <T : Response> sseRequest(
             }
             timeout {
                 requestTimeoutMillis = null  // Infinite timeout for SSE streams
-                connectTimeoutMillis = 30_000
+                connectTimeoutMillis = HttpTimeouts.SSE_CONNECT_TIMEOUT_MS
                 socketTimeoutMillis = null  // Infinite timeout for SSE streams
             }
         }.execute { response ->

@@ -4,6 +4,7 @@
 
 package com.soneso.stellar.sdk.sep.sep12
 
+import com.soneso.stellar.sdk.HttpTimeouts
 import com.soneso.stellar.sdk.sep.sep01.StellarToml
 import com.soneso.stellar.sdk.sep.sep12.exceptions.*
 import io.ktor.client.*
@@ -600,8 +601,8 @@ class KYCService(
                 json(json)
             }
             install(HttpTimeout) {
-                connectTimeoutMillis = 10_000
-                requestTimeoutMillis = 30_000
+                connectTimeoutMillis = HttpTimeouts.CONNECT_TIMEOUT_MS
+                requestTimeoutMillis = HttpTimeouts.REQUEST_TIMEOUT_MS
             }
         }
 
