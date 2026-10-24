@@ -889,7 +889,7 @@ class SorobanServer(
      *
      * ```kotlin
      * val contractId = "CABC..."
-     * val asset = Asset.native()
+     * val asset = AssetTypeNative
      * val response = server.getSACBalance(contractId, asset, Network.TESTNET)
      * response.balanceEntry?.let {
      *     println("Balance: ${it.amount}")
