@@ -966,15 +966,30 @@ class ContractSpecTest {
 
     @Test
     fun testEnumConversionByValue() {
-        val entries = listOf(
-            createEnumEntry("Status", listOf("Pending", "Active", "Completed"))
+        val cases = listOf(0u, 1u, 2u, UInt.MAX_VALUE).map {
+            SCSpecUDTEnumCaseV0Xdr("", "Case$it", Uint32Xdr(it))
+        }
+        val spec = ContractSpec(listOf(SCSpecEntryXdr.UdtEnumV0(
+            SCSpecUDTEnumV0Xdr("", "", "Boundary", cases)
+        )))
+        val typeDef = createUdtTypeDef("Boundary")
+        val valid = listOf<Pair<Any, UInt>>(
+            0 to 0u, 2 to 2u, 0L to 0u, 0uL to 0u, 1u to 1u,
+            4294967295L to UInt.MAX_VALUE, 4294967295uL to UInt.MAX_VALUE,
+            UInt.MAX_VALUE to UInt.MAX_VALUE, "Case1" to 1u
         )
-        val spec = ContractSpec(entries)
-        val enumTypeDef = createUdtTypeDef("Status")
-
-        val result = spec.nativeToXdrSCVal(2, enumTypeDef)
-        assertTrue(result is SCValXdr.U32)
-        assertEquals(2u, result.value.value)
+        for ((value, code) in valid) {
+            val result = spec.nativeToXdrSCVal(value, typeDef)
+            assertEquals(SCValXdr.U32(Uint32Xdr(code)), result)
+            assertContentEquals(
+                XdrWriter().apply { writeInt(3); writeUnsignedInt(code) }.toByteArray(),
+                XdrWriter().apply { result.encode(this) }.toByteArray()
+            )
+        }
+        for (value in listOf<Any>(-1, -1L, 4294967296L, 4294967296uL, 4294967297L, 4294967297uL, ULong.MAX_VALUE)) {
+            val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(value, typeDef) }
+            assertEquals("Invalid enum value: Value $value out of range for enum Boundary", error.message)
+        }
     }
 
     @Test
@@ -1575,15 +1590,31 @@ class ContractSpecTest {
     fun testErrorConversion() {
         val spec = ContractSpec(emptyList())
         val typeDef = createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_ERROR)
-
-        // Test numeric error code
-        val result = spec.nativeToXdrSCVal(42, typeDef)
-        assertTrue(result is SCValXdr.Error)
-
-        // Test SCErrorXdr
-        val errorXdr = SCErrorXdr.ContractCode(Uint32Xdr(100u))
-        val result2 = spec.nativeToXdrSCVal(errorXdr, typeDef)
-        assertTrue(result2 is SCValXdr.Error)
+        val valid = listOf<Pair<Number, UInt>>(
+            42 to 42u, 7 to 7u, 7.toByte() to 7u, 7.toShort() to 7u,
+            7f to 7u, 0L to 0u, -0.0 to 0u, 4294967295L to UInt.MAX_VALUE,
+            4294967295.0 to UInt.MAX_VALUE, Float.fromBits(0x4F7FFFFF) to 4294967040u
+        )
+        for ((value, code) in valid) {
+            val result = spec.nativeToXdrSCVal(value, typeDef)
+            assertEquals(SCValXdr.Error(SCErrorXdr.ContractCode(Uint32Xdr(code))), result)
+            assertContentEquals(
+                XdrWriter().apply { writeInt(2); writeInt(0); writeUnsignedInt(code) }.toByteArray(),
+                XdrWriter().apply { result.encode(this) }.toByteArray()
+            )
+        }
+        val invalid = listOf<Number>(-1, -1L, 4294967296L, 4294967297L, 4294967295.5,
+            4294967296.0, Float.fromBits(0x4F800000), 0.5f, -0.5, Double.NaN, Double.POSITIVE_INFINITY,
+            Double.NEGATIVE_INFINITY)
+        for (value in invalid) {
+            val error = assertFailsWith<ContractSpecException> { spec.nativeToXdrSCVal(value, typeDef) }
+            assertEquals("Invalid type: Expected integral contract error code in 0..4294967295, got $value",
+                error.message)
+        }
+        for (error in listOf(SCErrorXdr.ContractCode(Uint32Xdr(100u)),
+            SCErrorXdr.Code(SCErrorTypeXdr.SCE_WASM_VM, SCErrorCodeXdr.SCEC_ARITH_DOMAIN))) {
+            assertSame(error, assertIs<SCValXdr.Error>(spec.nativeToXdrSCVal(error, typeDef)).value)
+        }
     }
 
     @Test

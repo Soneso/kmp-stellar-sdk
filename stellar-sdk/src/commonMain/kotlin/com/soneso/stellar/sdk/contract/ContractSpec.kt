@@ -911,9 +911,13 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         return when (value) {
             is SCErrorXdr -> Scv.toError(value)
             is Number -> {
-                // Accept numeric error codes and convert to SCErrorXdr.ContractCode
-                val errorCode = value.toInt().toUInt()
-                Scv.toError(SCErrorXdr.ContractCode(Uint32Xdr(errorCode)))
+                val errorCode = value.toDouble()
+                if (errorCode !in 0.0..UInt.MAX_VALUE.toDouble() || errorCode % 1.0 != 0.0) {
+                    throw ContractSpecException.invalidType(
+                        "Expected integral contract error code in 0..4294967295, got $value"
+                    )
+                }
+                Scv.toError(SCErrorXdr.ContractCode(Uint32Xdr(errorCode.toLong().toUInt())))
             }
             else -> throw ContractSpecException.invalidType(
                 "Expected SCErrorXdr or numeric error code for SC_SPEC_TYPE_ERROR, got ${value::class.simpleName}"
@@ -1231,6 +1235,15 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Handle enum type conversion
      */
     private fun handleEnumType(value: Any?, enumDef: SCSpecUDTEnumV0Xdr): SCValXdr {
+        val outOfRange = when (value) {
+            is Int -> value < 0
+            is Long -> value !in 0L..UInt.MAX_VALUE.toLong()
+            is ULong -> value > UInt.MAX_VALUE.toULong()
+            else -> false
+        }
+        if (outOfRange) {
+            throw ContractSpecException.invalidEnumValue("Value $value out of range for enum ${enumDef.name}")
+        }
         val enumValue: UInt = when (value) {
             is Int -> value.toUInt()
             is UInt -> value
