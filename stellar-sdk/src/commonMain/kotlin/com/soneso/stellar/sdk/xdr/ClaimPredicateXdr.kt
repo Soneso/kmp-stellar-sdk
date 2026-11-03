@@ -68,30 +68,35 @@ sealed class ClaimPredicateXdr {
   companion object {
 
     fun decode(reader: XdrReader): ClaimPredicateXdr {
-      val discriminant = ClaimPredicateTypeXdr.decode(reader)
-      return when (discriminant) {
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_UNCONDITIONAL -> Void
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_AND -> {
-          val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
-          AndPredicates(value)
+      reader.enterRecursion(500)
+      try {
+        val discriminant = ClaimPredicateTypeXdr.decode(reader)
+        return when (discriminant) {
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_UNCONDITIONAL -> Void
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_AND -> {
+            val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
+            AndPredicates(value)
+          }
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_OR -> {
+            val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
+            OrPredicates(value)
+          }
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_NOT -> {
+            val value = if (reader.readBoolean()) ClaimPredicateXdr.decode(reader) else null
+            NotPredicate(value)
+          }
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_BEFORE_ABSOLUTE_TIME -> {
+            val value = Int64Xdr.decode(reader)
+            AbsBefore(value)
+          }
+          ClaimPredicateTypeXdr.CLAIM_PREDICATE_BEFORE_RELATIVE_TIME -> {
+            val value = Int64Xdr.decode(reader)
+            RelBefore(value)
+          }
+          else -> throw IllegalArgumentException("Unknown ClaimPredicateXdr discriminant: $discriminant")
         }
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_OR -> {
-          val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
-          OrPredicates(value)
-        }
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_NOT -> {
-          val value = if (reader.readBoolean()) ClaimPredicateXdr.decode(reader) else null
-          NotPredicate(value)
-        }
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_BEFORE_ABSOLUTE_TIME -> {
-          val value = Int64Xdr.decode(reader)
-          AbsBefore(value)
-        }
-        ClaimPredicateTypeXdr.CLAIM_PREDICATE_BEFORE_RELATIVE_TIME -> {
-          val value = Int64Xdr.decode(reader)
-          RelBefore(value)
-        }
-        else -> throw IllegalArgumentException("Unknown ClaimPredicateXdr discriminant: $discriminant")
+      } finally {
+        reader.exitRecursion()
       }
     }
 

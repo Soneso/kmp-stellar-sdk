@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Binary XDR decoding throws `IllegalArgumentException` when recursive values, such as `SCValXdr` vectors and maps, claim predicates and contract spec types, nest beyond a shared depth of 500. An `XdrReader` keeps its full depth budget after a failed decode.
+
 ## [1.16.0] - 2026-10-24
 
 ### Added

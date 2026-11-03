@@ -27,10 +27,15 @@ data class SCPQuorumSetXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCPQuorumSetXdr {
-      val threshold = Uint32Xdr.decode(reader)
-      val validators = List(reader.readArrayLength()) { NodeIDXdr.decode(reader) }
-      val innerSets = List(reader.readArrayLength()) { SCPQuorumSetXdr.decode(reader) }
-      return SCPQuorumSetXdr(threshold, validators, innerSets)
+      reader.enterRecursion(500)
+      try {
+        val threshold = Uint32Xdr.decode(reader)
+        val validators = List(reader.readArrayLength()) { NodeIDXdr.decode(reader) }
+        val innerSets = List(reader.readArrayLength()) { SCPQuorumSetXdr.decode(reader) }
+        return SCPQuorumSetXdr(threshold, validators, innerSets)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SCPQuorumSetXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))

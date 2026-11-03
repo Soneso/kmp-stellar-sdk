@@ -188,9 +188,9 @@ internal fun sortAndValidateDelegates(
 /**
  * Maximum delegate tree traversal depth.
  *
- * Matches the XDR decode depth cap so that a tree the decoder accepts can
- * always be traversed. A traversal that would exceed this depth throws rather
- * than overflowing the stack.
+ * Equals the 128 nested delegates the XDR decoder accepts below a root delegate
+ * so that a tree the decoder accepts can always be traversed. A traversal that
+ * would exceed this depth throws rather than overflowing the stack.
  */
 internal const val DELEGATE_TRAVERSAL_CAP = 128
 

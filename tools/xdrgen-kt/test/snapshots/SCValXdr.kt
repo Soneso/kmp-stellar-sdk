@@ -36,17 +36,22 @@ sealed class SCValXdr {
   companion object {
 
     fun decode(reader: XdrReader): SCValXdr {
-      val discriminant = SCValTypeXdr.decode(reader)
-      return when (discriminant) {
-        SCValTypeXdr.SCV_STRING -> {
-          val value = SCStringXdr.decode(reader)
-          Str(value)
+      reader.enterRecursion(500)
+      try {
+        val discriminant = SCValTypeXdr.decode(reader)
+        return when (discriminant) {
+          SCValTypeXdr.SCV_STRING -> {
+            val value = SCStringXdr.decode(reader)
+            Str(value)
+          }
+          SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
+            val value = reader.readVariableOpaque()
+            ExecutableTag(value)
+          }
+          else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
         }
-        SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
-          val value = reader.readVariableOpaque()
-          ExecutableTag(value)
-        }
-        else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
+      } finally {
+        reader.exitRecursion()
       }
     }
 

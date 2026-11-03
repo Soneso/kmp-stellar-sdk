@@ -28,9 +28,9 @@ expect class XdrReader(input: ByteArray) {
     fun readArrayLength(): Int
 
     /**
-     * Increments the recursion depth counter and throws if the depth exceeds [cap].
+     * Checks [cap] before incrementing the shared recursion depth counter.
      *
-     * Call before each recursive invocation of a self-referential XDR decode function.
+     * Call on entry to a self-containing XDR decode function.
      * Must be paired with [exitRecursion] in a try/finally block.
      *
      * @param cap Maximum allowed nesting depth (inclusive)
@@ -41,7 +41,7 @@ expect class XdrReader(input: ByteArray) {
     /**
      * Decrements the recursion depth counter.
      *
-     * Must be called in a finally block after each [enterRecursion].
+     * Must be called in a finally block after each successful [enterRecursion].
      */
     fun exitRecursion()
 }

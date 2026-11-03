@@ -25,9 +25,14 @@ data class SorobanAuthorizedInvocationXdr(
   companion object {
 
     fun decode(reader: XdrReader): SorobanAuthorizedInvocationXdr {
-      val function = SorobanAuthorizedFunctionXdr.decode(reader)
-      val subInvocations = List(reader.readArrayLength()) { SorobanAuthorizedInvocationXdr.decode(reader) }
-      return SorobanAuthorizedInvocationXdr(function, subInvocations)
+      reader.enterRecursion(500)
+      try {
+        val function = SorobanAuthorizedFunctionXdr.decode(reader)
+        val subInvocations = List(reader.readArrayLength()) { SorobanAuthorizedInvocationXdr.decode(reader) }
+        return SorobanAuthorizedInvocationXdr(function, subInvocations)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SorobanAuthorizedInvocationXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))

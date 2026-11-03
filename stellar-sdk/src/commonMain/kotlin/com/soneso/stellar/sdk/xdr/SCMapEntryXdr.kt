@@ -25,9 +25,14 @@ data class SCMapEntryXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCMapEntryXdr {
-      val key = SCValXdr.decode(reader)
-      val `val` = SCValXdr.decode(reader)
-      return SCMapEntryXdr(key, `val`)
+      reader.enterRecursion(500)
+      try {
+        val key = SCValXdr.decode(reader)
+        val `val` = SCValXdr.decode(reader)
+        return SCMapEntryXdr(key, `val`)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SCMapEntryXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))

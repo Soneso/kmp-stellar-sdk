@@ -44,9 +44,8 @@ import kotlinx.serialization.json.JsonPrimitive
 internal object XdrJson {
 
     /**
-     * Maximum nesting depth accepted when decoding, matching the cap the binary decoder
-     * applies to recursive types. Decoding walks the tree with the call stack, so an
-     * unbounded document would otherwise exhaust it.
+     * Maximum JSON nesting depth accepted when decoding. The limit bounds the
+     * call-stack traversal of the document.
      */
     const val RECURSION_CAP: Int = 128
 

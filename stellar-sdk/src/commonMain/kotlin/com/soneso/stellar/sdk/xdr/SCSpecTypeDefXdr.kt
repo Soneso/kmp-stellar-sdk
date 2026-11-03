@@ -101,56 +101,61 @@ sealed class SCSpecTypeDefXdr {
   companion object {
 
     fun decode(reader: XdrReader): SCSpecTypeDefXdr {
-      val discriminant = SCSpecTypeXdr.decode(reader)
-      return when (discriminant) {
-        SCSpecTypeXdr.SC_SPEC_TYPE_VAL -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_BOOL -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_VOID -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_ERROR -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_U32 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_I32 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_U64 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_I64 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_DURATION -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_U128 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_I128 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_U256 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_I256 -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_BYTES -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_STRING -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS -> Void(discriminant)
-        SCSpecTypeXdr.SC_SPEC_TYPE_OPTION -> {
-          val value = SCSpecTypeOptionXdr.decode(reader)
-          Option(value)
+      reader.enterRecursion(500)
+      try {
+        val discriminant = SCSpecTypeXdr.decode(reader)
+        return when (discriminant) {
+          SCSpecTypeXdr.SC_SPEC_TYPE_VAL -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_BOOL -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_VOID -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_ERROR -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_U32 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_I32 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_U64 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_I64 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_TIMEPOINT -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_DURATION -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_U128 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_I128 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_U256 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_I256 -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_BYTES -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_STRING -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_ADDRESS -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_MUXED_ADDRESS -> Void(discriminant)
+          SCSpecTypeXdr.SC_SPEC_TYPE_OPTION -> {
+            val value = SCSpecTypeOptionXdr.decode(reader)
+            Option(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_RESULT -> {
+            val value = SCSpecTypeResultXdr.decode(reader)
+            Result(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_VEC -> {
+            val value = SCSpecTypeVecXdr.decode(reader)
+            Vec(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_MAP -> {
+            val value = SCSpecTypeMapXdr.decode(reader)
+            Map(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_TUPLE -> {
+            val value = SCSpecTypeTupleXdr.decode(reader)
+            Tuple(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_BYTES_N -> {
+            val value = SCSpecTypeBytesNXdr.decode(reader)
+            BytesN(value)
+          }
+          SCSpecTypeXdr.SC_SPEC_TYPE_UDT -> {
+            val value = SCSpecTypeUDTXdr.decode(reader)
+            Udt(value)
+          }
+          else -> throw IllegalArgumentException("Unknown SCSpecTypeDefXdr discriminant: $discriminant")
         }
-        SCSpecTypeXdr.SC_SPEC_TYPE_RESULT -> {
-          val value = SCSpecTypeResultXdr.decode(reader)
-          Result(value)
-        }
-        SCSpecTypeXdr.SC_SPEC_TYPE_VEC -> {
-          val value = SCSpecTypeVecXdr.decode(reader)
-          Vec(value)
-        }
-        SCSpecTypeXdr.SC_SPEC_TYPE_MAP -> {
-          val value = SCSpecTypeMapXdr.decode(reader)
-          Map(value)
-        }
-        SCSpecTypeXdr.SC_SPEC_TYPE_TUPLE -> {
-          val value = SCSpecTypeTupleXdr.decode(reader)
-          Tuple(value)
-        }
-        SCSpecTypeXdr.SC_SPEC_TYPE_BYTES_N -> {
-          val value = SCSpecTypeBytesNXdr.decode(reader)
-          BytesN(value)
-        }
-        SCSpecTypeXdr.SC_SPEC_TYPE_UDT -> {
-          val value = SCSpecTypeUDTXdr.decode(reader)
-          Udt(value)
-        }
-        else -> throw IllegalArgumentException("Unknown SCSpecTypeDefXdr discriminant: $discriminant")
+      } finally {
+        reader.exitRecursion()
       }
     }
 

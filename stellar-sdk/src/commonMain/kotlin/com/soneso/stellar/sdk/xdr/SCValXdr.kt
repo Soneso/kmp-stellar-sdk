@@ -219,95 +219,100 @@ sealed class SCValXdr {
   companion object {
 
     fun decode(reader: XdrReader): SCValXdr {
-      val discriminant = SCValTypeXdr.decode(reader)
-      return when (discriminant) {
-        SCValTypeXdr.SCV_BOOL -> {
-          val value = reader.readBoolean()
-          B(value)
+      reader.enterRecursion(500)
+      try {
+        val discriminant = SCValTypeXdr.decode(reader)
+        return when (discriminant) {
+          SCValTypeXdr.SCV_BOOL -> {
+            val value = reader.readBoolean()
+            B(value)
+          }
+          SCValTypeXdr.SCV_VOID -> Void(discriminant)
+          SCValTypeXdr.SCV_ERROR -> {
+            val value = SCErrorXdr.decode(reader)
+            Error(value)
+          }
+          SCValTypeXdr.SCV_U32 -> {
+            val value = Uint32Xdr.decode(reader)
+            U32(value)
+          }
+          SCValTypeXdr.SCV_I32 -> {
+            val value = Int32Xdr.decode(reader)
+            I32(value)
+          }
+          SCValTypeXdr.SCV_U64 -> {
+            val value = Uint64Xdr.decode(reader)
+            U64(value)
+          }
+          SCValTypeXdr.SCV_I64 -> {
+            val value = Int64Xdr.decode(reader)
+            I64(value)
+          }
+          SCValTypeXdr.SCV_TIMEPOINT -> {
+            val value = TimePointXdr.decode(reader)
+            Timepoint(value)
+          }
+          SCValTypeXdr.SCV_DURATION -> {
+            val value = DurationXdr.decode(reader)
+            Duration(value)
+          }
+          SCValTypeXdr.SCV_U128 -> {
+            val value = UInt128PartsXdr.decode(reader)
+            U128(value)
+          }
+          SCValTypeXdr.SCV_I128 -> {
+            val value = Int128PartsXdr.decode(reader)
+            I128(value)
+          }
+          SCValTypeXdr.SCV_U256 -> {
+            val value = UInt256PartsXdr.decode(reader)
+            U256(value)
+          }
+          SCValTypeXdr.SCV_I256 -> {
+            val value = Int256PartsXdr.decode(reader)
+            I256(value)
+          }
+          SCValTypeXdr.SCV_BYTES -> {
+            val value = SCBytesXdr.decode(reader)
+            Bytes(value)
+          }
+          SCValTypeXdr.SCV_STRING -> {
+            val value = SCStringXdr.decode(reader)
+            Str(value)
+          }
+          SCValTypeXdr.SCV_SYMBOL -> {
+            val value = SCSymbolXdr.decode(reader)
+            Sym(value)
+          }
+          SCValTypeXdr.SCV_VEC -> {
+            val value = if (reader.readBoolean()) SCVecXdr.decode(reader) else null
+            Vec(value)
+          }
+          SCValTypeXdr.SCV_MAP -> {
+            val value = if (reader.readBoolean()) SCMapXdr.decode(reader) else null
+            Map(value)
+          }
+          SCValTypeXdr.SCV_ADDRESS -> {
+            val value = SCAddressXdr.decode(reader)
+            Address(value)
+          }
+          SCValTypeXdr.SCV_CONTRACT_INSTANCE -> {
+            val value = SCContractInstanceXdr.decode(reader)
+            Instance(value)
+          }
+          SCValTypeXdr.SCV_LEDGER_KEY_CONTRACT_INSTANCE -> Void(discriminant)
+          SCValTypeXdr.SCV_LEDGER_KEY_NONCE -> {
+            val value = SCNonceKeyXdr.decode(reader)
+            NonceKey(value)
+          }
+          SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
+            val value = reader.readVariableOpaque()
+            ExecutableTag(value)
+          }
+          else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
         }
-        SCValTypeXdr.SCV_VOID -> Void(discriminant)
-        SCValTypeXdr.SCV_ERROR -> {
-          val value = SCErrorXdr.decode(reader)
-          Error(value)
-        }
-        SCValTypeXdr.SCV_U32 -> {
-          val value = Uint32Xdr.decode(reader)
-          U32(value)
-        }
-        SCValTypeXdr.SCV_I32 -> {
-          val value = Int32Xdr.decode(reader)
-          I32(value)
-        }
-        SCValTypeXdr.SCV_U64 -> {
-          val value = Uint64Xdr.decode(reader)
-          U64(value)
-        }
-        SCValTypeXdr.SCV_I64 -> {
-          val value = Int64Xdr.decode(reader)
-          I64(value)
-        }
-        SCValTypeXdr.SCV_TIMEPOINT -> {
-          val value = TimePointXdr.decode(reader)
-          Timepoint(value)
-        }
-        SCValTypeXdr.SCV_DURATION -> {
-          val value = DurationXdr.decode(reader)
-          Duration(value)
-        }
-        SCValTypeXdr.SCV_U128 -> {
-          val value = UInt128PartsXdr.decode(reader)
-          U128(value)
-        }
-        SCValTypeXdr.SCV_I128 -> {
-          val value = Int128PartsXdr.decode(reader)
-          I128(value)
-        }
-        SCValTypeXdr.SCV_U256 -> {
-          val value = UInt256PartsXdr.decode(reader)
-          U256(value)
-        }
-        SCValTypeXdr.SCV_I256 -> {
-          val value = Int256PartsXdr.decode(reader)
-          I256(value)
-        }
-        SCValTypeXdr.SCV_BYTES -> {
-          val value = SCBytesXdr.decode(reader)
-          Bytes(value)
-        }
-        SCValTypeXdr.SCV_STRING -> {
-          val value = SCStringXdr.decode(reader)
-          Str(value)
-        }
-        SCValTypeXdr.SCV_SYMBOL -> {
-          val value = SCSymbolXdr.decode(reader)
-          Sym(value)
-        }
-        SCValTypeXdr.SCV_VEC -> {
-          val value = if (reader.readBoolean()) SCVecXdr.decode(reader) else null
-          Vec(value)
-        }
-        SCValTypeXdr.SCV_MAP -> {
-          val value = if (reader.readBoolean()) SCMapXdr.decode(reader) else null
-          Map(value)
-        }
-        SCValTypeXdr.SCV_ADDRESS -> {
-          val value = SCAddressXdr.decode(reader)
-          Address(value)
-        }
-        SCValTypeXdr.SCV_CONTRACT_INSTANCE -> {
-          val value = SCContractInstanceXdr.decode(reader)
-          Instance(value)
-        }
-        SCValTypeXdr.SCV_LEDGER_KEY_CONTRACT_INSTANCE -> Void(discriminant)
-        SCValTypeXdr.SCV_LEDGER_KEY_NONCE -> {
-          val value = SCNonceKeyXdr.decode(reader)
-          NonceKey(value)
-        }
-        SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
-          val value = reader.readVariableOpaque()
-          ExecutableTag(value)
-        }
-        else -> throw IllegalArgumentException("Unknown SCValXdr discriminant: $discriminant")
+      } finally {
+        reader.exitRecursion()
       }
     }
 

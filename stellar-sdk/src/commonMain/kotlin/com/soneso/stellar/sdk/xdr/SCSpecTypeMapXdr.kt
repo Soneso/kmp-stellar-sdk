@@ -25,9 +25,14 @@ data class SCSpecTypeMapXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecTypeMapXdr {
-      val keyType = SCSpecTypeDefXdr.decode(reader)
-      val valueType = SCSpecTypeDefXdr.decode(reader)
-      return SCSpecTypeMapXdr(keyType, valueType)
+      reader.enterRecursion(500)
+      try {
+        val keyType = SCSpecTypeDefXdr.decode(reader)
+        val valueType = SCSpecTypeDefXdr.decode(reader)
+        return SCSpecTypeMapXdr(keyType, valueType)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SCSpecTypeMapXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
