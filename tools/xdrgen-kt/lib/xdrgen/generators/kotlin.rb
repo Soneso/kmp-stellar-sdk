@@ -14,10 +14,17 @@ module Xdrgen
     # - strings -> String
     # - opaque -> ByteArray
     class Kotlin < Base
-      # Structs that contain a variable-length array of themselves (directly recursive).
-      # Their generated decode method wraps each recursive element with depth-guard calls.
-      RECURSIVE_TYPES = %w[SorobanDelegateSignatureXdr].freeze
-      XDR_RECURSION_CAP = 128
+      # Types on a decode cycle. SCVec and SCMap wrappers do not consume depth.
+      RECURSIVE_TYPES = %w[
+        SorobanDelegateSignatureXdr SorobanAuthorizedInvocationXdr SCPQuorumSetXdr
+        ClaimPredicateXdr SCValXdr SCMapEntryXdr SCContractInstanceXdr
+        SCSpecTypeDefXdr SCSpecTypeOptionXdr SCSpecTypeResultXdr
+        SCSpecTypeVecXdr SCSpecTypeMapXdr SCSpecTypeTupleXdr
+      ].freeze
+      XDR_RECURSION_CAP = 500
+      # Checked against the shared counter. No guarded type contains an authorization entry,
+      # so the root delegate enters at depth 0 and 129 entries are the root plus 128 nested delegates.
+      DELEGATE_RECURSION_CAP = 129
 
       # XDR string positions that carry arbitrary bytes rather than text: the CAP-85
       # executable tag, which the ledger matches byte for byte. Each entry maps an XDR
@@ -275,10 +282,10 @@ module Xdrgen
           out.indent do
             out.puts ""
             out.puts "fun decode(reader: XdrReader): #{struct_name} {"
-            out.indent do
+            render_decode_guard(out, struct_name) do
               struct.members.each do |member|
                 local_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
-                out.puts "val #{local_name} = #{member_decode_expression(struct, member, 'reader', struct_name: struct_name)}"
+                out.puts "val #{local_name} = #{member_decode_expression(struct, member, 'reader')}"
               end
 
               param_list = struct.members.map { |m|
@@ -471,7 +478,7 @@ module Xdrgen
           out.indent do
             out.puts ""
             out.puts "fun decode(reader: XdrReader): #{union_name} {"
-            out.indent do
+            render_decode_guard(out, union_name) do
               out.puts "val discriminant = #{decode_expression(union.discriminant, 'reader')}"
               out.puts "return when (discriminant) {"
               out.indent do
@@ -1061,11 +1068,9 @@ module Xdrgen
         kotlin_type_for(member.declaration)
       end
 
-      def member_decode_expression(defn, member, reader_var, struct_name: nil)
+      def member_decode_expression(defn, member, reader_var)
         return "#{reader_var}.readVariableOpaque()" if bytes_backed_string_field?(defn, member)
-        return decode_expression(member.declaration, reader_var) if struct_name.nil?
-
-        decode_expression_guarded(struct_name, member.declaration, reader_var)
+        decode_expression(member.declaration, reader_var)
       end
 
       def member_encode_statement(defn, member, value_expr, writer_var, out)
@@ -1345,20 +1350,20 @@ module Xdrgen
         end
       end
 
-      # Like decode_expression but wraps variable-array element decodes with depth-guard
-      # calls when the containing struct is in RECURSIVE_TYPES and the element type
-      # resolves to the same struct (self-referential recursion).
-      def decode_expression_guarded(struct_name, decl, reader_var)
-        if RECURSIVE_TYPES.include?(struct_name) &&
-           decl.is_a?(AST::Declarations::Array) &&
-           !decl.fixed? &&
-           kotlin_type_for_typespec(decl.type) == struct_name
-          inner_decode = decode_expression_for_typespec(decl.type, reader_var)
-          "List(#{reader_var}.readArrayLength()) { " \
-            "#{reader_var}.enterRecursion(#{XDR_RECURSION_CAP}); " \
-            "try { #{inner_decode} } finally { #{reader_var}.exitRecursion() } }"
-        else
-          decode_expression(decl, reader_var)
+      # Guard the entry point so fields, optionals, arrays and union arms share a budget.
+      def render_decode_guard(out, type)
+        out.indent do
+          if RECURSIVE_TYPES.include?(type)
+            cap = type == 'SorobanDelegateSignatureXdr' ? DELEGATE_RECURSION_CAP : XDR_RECURSION_CAP
+            out.puts "reader.enterRecursion(#{cap})"
+            out.puts 'try {'
+            out.indent { yield }
+            out.puts '} finally {'
+            out.indent { out.puts 'reader.exitRecursion()' }
+            out.puts '}'
+          else
+            yield
+          end
         end
       end
 

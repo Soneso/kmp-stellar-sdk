@@ -24,9 +24,14 @@ data class SCContractInstanceXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCContractInstanceXdr {
-      val executable = ContractExecutableXdr.decode(reader)
-      val storage = if (reader.readBoolean()) SCMapXdr.decode(reader) else null
-      return SCContractInstanceXdr(executable, storage)
+      reader.enterRecursion(500)
+      try {
+        val executable = ContractExecutableXdr.decode(reader)
+        val storage = if (reader.readBoolean()) SCMapXdr.decode(reader) else null
+        return SCContractInstanceXdr(executable, storage)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SCContractInstanceXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))

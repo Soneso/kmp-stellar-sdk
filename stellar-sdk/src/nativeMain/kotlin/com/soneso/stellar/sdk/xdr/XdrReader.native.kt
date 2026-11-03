@@ -100,12 +100,12 @@ actual class XdrReader actual constructor(input: ByteArray) {
     }
 
     actual fun enterRecursion(cap: Int) {
-        recursionDepth++
-        if (recursionDepth > cap) {
+        if (recursionDepth >= cap) {
             throw IllegalArgumentException(
-                "XDR decode recursion depth $recursionDepth exceeds cap $cap"
+                "XDR decode recursion depth ${recursionDepth + 1} exceeds cap $cap"
             )
         }
+        recursionDepth++
     }
 
     actual fun exitRecursion() {

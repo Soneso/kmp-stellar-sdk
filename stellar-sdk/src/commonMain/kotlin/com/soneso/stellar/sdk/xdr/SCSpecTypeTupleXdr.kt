@@ -23,8 +23,13 @@ data class SCSpecTypeTupleXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecTypeTupleXdr {
-      val valueTypes = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
-      return SCSpecTypeTupleXdr(valueTypes)
+      reader.enterRecursion(500)
+      try {
+        val valueTypes = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
+        return SCSpecTypeTupleXdr(valueTypes)
+      } finally {
+        reader.exitRecursion()
+      }
     }
 
     fun fromXdrJson(json: String): SCSpecTypeTupleXdr = fromXdrJsonTree(XdrJson.parse(json, XDR_JSON_TYPE))
