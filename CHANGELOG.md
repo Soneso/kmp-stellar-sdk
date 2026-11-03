@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Binary XDR decoding throws `IllegalArgumentException` when recursive values, such as `SCValXdr` vectors and maps, claim predicates and contract spec types, nest beyond a shared depth of 500. An `XdrReader` keeps its full depth budget after a failed decode.
+- `ContractSpec` rejects `Int`, `Long` and `ULong` enum values outside the u32 range with `ContractSpecException`. Numeric contract error codes that are fractional, non-finite or outside the u32 range throw it too, and integral codes in that range convert exactly.
 
 ## [1.16.0] - 2026-10-24
 
