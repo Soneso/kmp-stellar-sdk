@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.12.3")
+        classpath("com.android.tools.build:gradle:9.5.1")
     }
 }
 
@@ -13,7 +13,6 @@ plugins {
     kotlin("jvm") version "2.2.21" apply false
     kotlin("plugin.serialization") version "2.2.21" apply false
     kotlin("plugin.compose") version "2.2.21" apply false
-    kotlin("android") version "2.2.21" apply false
     id("org.jetbrains.compose") version "1.9.3" apply false
     id("org.jetbrains.dokka") version "2.1.0" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.11" apply false

@@ -2,15 +2,20 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
     kotlin("plugin.serialization")
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "com.soneso.smartdemo.shared"
+        compileSdk = 35
+        minSdk = 24
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
+        // Runs commonTest on the Android target as host tests.
+        withHostTest { }
     }
 
     // No desktop/JVM target - passkeys are not supported on Desktop JVM
@@ -28,7 +33,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
@@ -39,12 +44,12 @@ kotlin {
         macosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 // ============================================================
                 // UI Framework - Compose Multiplatform
@@ -91,7 +96,7 @@ kotlin {
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
@@ -102,7 +107,7 @@ kotlin {
         // ============================================================
         // Android Platform
         // ============================================================
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 implementation("androidx.activity:activity-compose:1.8.2")
                 implementation("androidx.appcompat:appcompat:1.6.1")
@@ -112,15 +117,17 @@ kotlin {
 
                 // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
                 // Required by ReownConnector which implements WalletConnector for Android.
-                implementation("com.reown:android-core:1.6.17")
-                implementation("com.reown:sign:1.6.17")
+                // Reown 1.6.14 and later carry Kotlin 2.4 metadata and require compileSdk 37;
+                // this build uses Kotlin 2.2.21 and compileSdk 35, so both stay on 1.6.12.
+                implementation("com.reown:android-core:1.6.12")
+                implementation("com.reown:sign:1.6.12")
             }
         }
 
         // ============================================================
         // iOS Platform
         // ============================================================
-        val iosMain by creating {
+        val iosMain = create("iosMain") {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on iOS.
@@ -128,22 +135,22 @@ kotlin {
             }
         }
 
-        val iosX64Main by getting {
+        getByName("iosX64Main") {
             dependsOn(iosMain)
         }
 
-        val iosArm64Main by getting {
+        getByName("iosArm64Main") {
             dependsOn(iosMain)
         }
 
-        val iosSimulatorArm64Main by getting {
+        getByName("iosSimulatorArm64Main") {
             dependsOn(iosMain)
         }
 
         // ============================================================
         // macOS Platform
         // ============================================================
-        val macosMain by creating {
+        val macosMain = create("macosMain") {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on macOS.
@@ -151,18 +158,18 @@ kotlin {
             }
         }
 
-        val macosX64Main by getting {
+        getByName("macosX64Main") {
             dependsOn(macosMain)
         }
 
-        val macosArm64Main by getting {
+        getByName("macosArm64Main") {
             dependsOn(macosMain)
         }
 
         // ============================================================
         // JavaScript Platform (Browser)
         // ============================================================
-        val jsMain by getting {
+        getByName("jsMain") {
             dependencies {
                 implementation(compose.html.core)
                 // Freighter browser extension API for web wallet signing
@@ -171,29 +178,6 @@ kotlin {
                 // Ktor engine for the coordination client on the web.
                 implementation("io.ktor:ktor-client-js:3.3.3")
             }
-        }
-    }
-}
-
-android {
-    namespace = "com.soneso.smartdemo.shared"
-    compileSdk = 35
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    // Android doesn't automatically include commonMain/resources in the APK.
-    // This makes WASM files accessible via ClassLoader.getResourceAsStream()
-    // at runtime (used by WasmResource.android.kt to load token contract WASM).
-    sourceSets {
-        getByName("main") {
-            resources.srcDirs("src/commonMain/resources")
         }
     }
 }

@@ -16,7 +16,7 @@ kotlin {
     }
 
     sourceSets {
-        val jsMain by getting {
+        getByName("jsMain") {
             dependencies {
                 implementation(project(":smart-account-demo:shared"))
                 implementation(compose.ui)

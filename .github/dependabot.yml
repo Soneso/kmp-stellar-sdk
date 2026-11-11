@@ -17,6 +17,10 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # Reown 1.6.14 and later carry Kotlin 2.4 metadata and require compileSdk 37; the smart
+      # account demo builds with Kotlin 2.2.21 and compileSdk 35, so it stays on 1.6.12.
+      # The rule suppresses version and security update pull requests for all com.reown artifacts.
+      - dependency-name: "com.reown:*"
   - package-ecosystem: bundler
     directory: /tools/xdrgen-kt
     schedule:
