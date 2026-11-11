@@ -4,7 +4,7 @@ This directory holds the development tools of the KMP Stellar SDK, one tool per 
 
 | Tool | Purpose | Requirements |
 |---|---|---|
-| `xdrgen-kt/` | Generates the Kotlin XDR types and the XDR-JSON (SEP-51) test suite from the pinned `.x` definition files. | Ruby 3 with Bundler, curl |
+| `xdrgen-kt/` | Generates the Kotlin XDR types and the XDR-JSON (SEP-51) test suite from the pinned `.x` definition files. | Ruby 3.2 or later with Bundler, curl |
 | `sep-51-oracle/` | Derives the XDR-JSON name of every enum member, struct field and union arm and checks the names against the pinned reference CLI. | Ruby; the pinned `stellar-xdr` CLI for the reference checks |
 | `sep-51-corpus/` | Generates the SEP-51 conformance corpus from hand-written seeds through the reference CLI. | Python 3, the pinned `stellar-xdr` CLI |
 | `matrix-generator/` | Generates the compatibility matrices under `compatibility/`. | Python 3, network access |
