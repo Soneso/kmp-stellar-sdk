@@ -4,7 +4,7 @@ Generates Kotlin XDR types from Stellar's `.x` definition files using the [xdrge
 
 ## Prerequisites
 
-- Ruby 3.x with Bundler
+- Ruby 3.2 or later with Bundler
 - curl (for downloading .x files)
 
 ## Usage

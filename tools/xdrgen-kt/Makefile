@@ -4,7 +4,7 @@
 # Uses the existing download-xdr.sh and generate.rb scripts.
 #
 # Prerequisites:
-#   - Ruby 3.x with Bundler
+#   - Ruby 3.2 or later with Bundler
 #   - curl (for downloading .x files)
 #
 # Usage:

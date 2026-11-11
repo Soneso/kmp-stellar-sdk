@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Binary XDR decoding throws `IllegalArgumentException` when recursive values, such as `SCValXdr` vectors and maps, claim predicates and contract spec types, nest beyond a shared depth of 500. An `XdrReader` keeps its full depth budget after a failed decode.
 - `ContractSpec` rejects `Int`, `Long` and `ULong` enum values outside the u32 range with `ContractSpecException`. Numeric contract error codes that are fractional, non-finite or outside the u32 range throw it too, and integral codes in that range convert exactly.
 
+### Security
+- XDR generator: xdrgen resolves activesupport to 8.1.4.1, which fixes GHSA-8474-xrp6-wh69. Build tooling only, generated output is unchanged.
+
 ## [1.16.0] - 2026-10-24
 
 ### Added
