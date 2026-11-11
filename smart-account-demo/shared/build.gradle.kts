@@ -2,15 +2,20 @@ plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
     kotlin("plugin.serialization")
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "com.soneso.smartdemo.shared"
+        compileSdk = 35
+        minSdk = 24
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
+        // Runs commonTest on the Android target as host tests.
+        withHostTest { }
     }
 
     // No desktop/JVM target - passkeys are not supported on Desktop JVM
@@ -171,29 +176,6 @@ kotlin {
                 // Ktor engine for the coordination client on the web.
                 implementation("io.ktor:ktor-client-js:3.3.3")
             }
-        }
-    }
-}
-
-android {
-    namespace = "com.soneso.smartdemo.shared"
-    compileSdk = 35
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    // Android doesn't automatically include commonMain/resources in the APK.
-    // This makes WASM files accessible via ClassLoader.getResourceAsStream()
-    // at runtime (used by WasmResource.android.kt to load token contract WASM).
-    sourceSets {
-        getByName("main") {
-            resources.srcDirs("src/commonMain/resources")
         }
     }
 }

@@ -6,8 +6,8 @@ import java.io.IOException
  * Android implementation for loading WASM resources.
  *
  * Uses the Thread context ClassLoader to access WASM files packaged in the APK.
- * The WASM files from commonMain/resources/wasm/ are included in the Android build
- * via the sourceSets configuration in build.gradle.kts.
+ * The Android Kotlin Multiplatform library plugin packages the WASM files from
+ * commonMain/resources/wasm/ as Java resources of the shared module.
  *
  * Android packages these resources into the APK, making them accessible via
  * ClassLoader.getResourceAsStream() at runtime. The Thread context ClassLoader
@@ -35,8 +35,7 @@ actual suspend fun loadWasmResource(wasmFilename: String): ByteArray {
         throw IllegalArgumentException(
             "WASM file not found in Android resources: '$wasmFilename'. " +
             "Expected location: wasm/$wasmFilename. " +
-            "Ensure the WASM files are properly packaged in the Android APK " +
-            "(check build.gradle.kts sourceSets configuration)."
+            "Ensure the file is present in commonMain/resources/wasm/ of the shared module."
         )
     } catch (e: IOException) {
         throw IllegalArgumentException("Failed to read WASM file '$wasmFilename': ${e.message}", e)

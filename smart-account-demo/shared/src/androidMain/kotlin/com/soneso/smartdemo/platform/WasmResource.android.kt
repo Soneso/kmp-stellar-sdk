@@ -25,8 +25,7 @@ actual suspend fun loadWasmResource(wasmFilename: String): ByteArray {
             ?: throw IllegalArgumentException(
                 "WASM file not found in Android resources: '$wasmFilename'. " +
                 "Expected APK path: wasm/$wasmFilename. " +
-                "Ensure the file is present in commonMain/resources/wasm/ and that " +
-                "the build.gradle.kts sourceSets configuration includes it in the Android build."
+                "Ensure the file is present in commonMain/resources/wasm/ of the shared module."
             )
 
         resourceStream.use { it.readBytes() }

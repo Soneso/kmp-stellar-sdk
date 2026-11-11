@@ -13,17 +13,17 @@ Setup is described in `CONTRIBUTING.md`. The Kotlin, Android, and JVM target ver
 python3 tools/coverage/coverage_summary.py --min 90
 ./gradlew :stellar-sdk:jsNodeTest -PexcludeIntegrationTests --no-daemon
 ./gradlew :stellar-sdk:macosArm64Test -PexcludeIntegrationTests --no-daemon
-./gradlew :stellar-sdk:testDebugUnitTest -PexcludeIntegrationTests --no-daemon
+./gradlew :stellar-sdk:testAndroidHostTest -PexcludeIntegrationTests --no-daemon
 ./gradlew :stellar-sdk:verifyTestNamespaces --no-daemon
 ```
 
-- Pass `-PexcludeIntegrationTests` to every test task; without it the integration tests run against testnet. `check`, `build` and `test` without it run them too, and `check` also runs the browser, iOS simulator, macOS x64, and Android tasks and Android Lint, more than 160 tasks.
-- The JVM unit suite (about 10,600 tests) takes 35 to 70 seconds, the JS suite 60 to 90 seconds, and the Android suite two to four minutes. The macOS suite takes about 30 seconds with a warm Kotlin/Native cache and about three minutes when a source change recompiles and links the test binary. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
+- Pass `-PexcludeIntegrationTests` to every test task; without it the integration tests run against testnet. `check` and `build` without it run them too, and `check` also runs the browser, iOS simulator, macOS x64, and Android host test tasks, more than 100 tasks.
+- The JVM unit suite (about 10,600 tests) takes 35 to 70 seconds, the JS suite 60 to 90 seconds, and the Android host suite about 30 seconds, about a minute when its test sources recompile. The macOS suite takes about 30 seconds with a warm Kotlin/Native cache and about three minutes when a source change recompiles and links the test binary. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
 - The build cache can answer a test task from cache without running a test. `--rerun` forces execution when you need the evidence.
 - The Android tasks, `check` and the documentation build need the Android SDK location: `ANDROID_HOME` or `sdk.dir` in the gitignored `local.properties`. The iOS simulator tests need `-PexcludeIntegrationTests` because the simulator rejects the testnet certificate chain.
 - `verifyTestNamespaces` fails a test outside the `unitTests` or `integrationTests` packages; CI does not run it.
 - The coverage script counts a line as covered only when all of its branches are covered; Kover measures the JVM target only.
-- No separate Kotlin linter or formatter is configured; `kotlin.code.style=official` in `gradle.properties` sets the style, and Android Lint runs through `check`.
+- No linter or formatter is configured; `kotlin.code.style=official` in `gradle.properties` sets the style.
 - The API documentation builds with `./gradlew :stellar-sdk:dokkaGenerateHtml --no-daemon` in about three minutes into `stellar-sdk/build/dokka/html/`; the Pages workflow copies that output to the gitignored `docs/api/latest/` and publishes it from `main`. The package descriptions Dokka reads are in `stellar-sdk/dokka/packages.md`.
 - `./gradlew :stellar-sdk:assemble -x test -x allTests` builds every target without tests; it needs Xcode and the Android SDK and takes minutes.
 - The demos `demo/` and `smart-account-demo/` are Gradle modules in `settings.gradle.kts` that CI does not build; a change to an API they use is compiled against them locally.
@@ -32,7 +32,7 @@ python3 tools/coverage/coverage_summary.py --min 90
 
 Before reporting a change as done:
 
-1. The JVM unit suite and `verifyTestNamespaces` pass. The JS and macOS suites pass when the change touches platform code or an `expect` declaration; the Android suite when it touches `androidMain` or `androidUnitTest`.
+1. The JVM unit suite and `verifyTestNamespaces` pass. The JS and macOS suites pass when the change touches platform code or an `expect` declaration; the Android suite when it touches `androidMain` or `androidHostTest`.
 2. Area gates. After a generator, override, or XDR pin change: `make -C tools/xdrgen-kt test` passes and `make -C tools/xdrgen-kt update` leaves a clean tree. After a change that touches XDR-JSON names or either SEP-51 pin: `ruby tools/sep-51-oracle/emitted_names.rb`, and `Sep51RollbackRehearsalTest` passes or its frozen constants were changed on purpose. After a matrix generator change: `python3 -m unittest discover -s tools/matrix-generator/tests`.
 3. A test that would fail without the change exists. A bug fix starts with the failing test.
 4. `CHANGELOG.md` has an entry under `[Unreleased]` in the Keep a Changelog section the change belongs to (Added, Changed, Deprecated, Removed, Fixed, Security), in present tense, one entry per user-visible change.

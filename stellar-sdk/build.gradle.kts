@@ -1,7 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.serialization")
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.dokka")
     id("org.jetbrains.kotlinx.kover")
     id("maven-publish")
@@ -32,11 +32,19 @@ kotlin {
     }
 
     // Android target
-    androidTarget {
+    android {
+        namespace = "com.soneso.stellar.sdk"
+        compileSdk = 35
+        minSdk = 24
+        // Apps compile against API 34 or later, the floor the androidx dependencies of
+        // androidMain already set. Without this value AGP sets the floor to compileSdk.
+        aarMetadata {
+            minCompileSdk = 34
+        }
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
-        publishLibraryVariants("release")
+        withHostTest { }
     }
 
     // JS target (Browser and Node.js)
@@ -226,10 +234,10 @@ kotlin {
             }
         }
 
-        // Android unit tests compile against the JVM actual declarations, matching the
-        // dependsOn(jvmMain) above. Without it the Android unit test compilation sees the
+        // Android host tests compile against the JVM actual declarations, matching the
+        // dependsOn(jvmMain) above. Without it the Android host test compilation sees the
         // common expect declarations with no actuals and fails to resolve them.
-        val androidUnitTest by getting {
+        val androidHostTest by getting {
             dependsOn(jvmTest)
         }
 
@@ -301,35 +309,26 @@ kotlin {
     }
 }
 
-// Android Library Configuration
-android {
-    namespace = "com.soneso.stellar.sdk"
-    compileSdk = 35
+// The Android host test compilation includes the JVM test source set, whose framework is
+// JUnit 5. Selecting the same framework here keeps one kotlin-test implementation on the
+// host test classpaths; the JUnit 4 runner the task defaults to would bring a second one, and
+// the two collide on the capability they share.
+val androidHostTestTaskName = "testAndroidHostTest"
+tasks.withType<Test>().named { it == androidHostTestTaskName }.configureEach {
+    useJUnitPlatform()
 
-    defaultConfig {
-        minSdk = 24
+    // The task runs the common test source set, so the property that keeps the network-bound
+    // tests out of the other targets has to reach it too.
+    if (project.hasProperty("excludeIntegrationTests")) {
+        exclude("**/integrationTests/**")
     }
+}
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    // The Android unit test variant compiles the JVM test source set, whose framework is
-    // JUnit 5. Selecting the same framework here keeps one kotlin-test implementation on the
-    // variant's classpath; the JUnit 4 runner AGP defaults to would bring a second one, and the
-    // two collide on the capability they share.
-    testOptions {
-        unitTests.all {
-            it.useJUnitPlatform()
-
-            // The variant runs the common test source set, so the property that keeps the
-            // network-bound tests out of the other targets has to reach it too.
-            if (project.hasProperty("excludeIntegrationTests")) {
-                it.exclude("**/integrationTests/**")
-            }
-        }
-    }
+// The Android plugin registers the host test task after this script has run, so the block above
+// selects it by name lazily. A renamed task would leave both settings unapplied and let the
+// integration tests run against testnet; the configuration fails instead.
+afterEvaluate {
+    tasks.named<Test>(androidHostTestTaskName)
 }
 
 // Kover Code Coverage Configuration

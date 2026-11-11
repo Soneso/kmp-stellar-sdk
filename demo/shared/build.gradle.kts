@@ -1,7 +1,7 @@
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
 }
 
@@ -34,7 +34,10 @@ val generateVersionFile by tasks.registering {
 }
 
 kotlin {
-    androidTarget {
+    android {
+        namespace = "com.soneso.demo.shared"
+        compileSdk = 35
+        minSdk = 24
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -199,39 +202,6 @@ kotlin {
                 implementation(compose.html.core)
             }
         }
-    }
-}
-
-android {
-    namespace = "com.soneso.demo.shared"
-    compileSdk = 35
-
-    defaultConfig {
-        minSdk = 24
-    }
-
-    // ============================================================
-    // WASM Resources Configuration for Android
-    // ============================================================
-    // Android doesn't automatically include commonMain/resources in the APK.
-    // We need to explicitly configure the source sets to include WASM files
-    // from commonMain/resources/wasm/ so they can be loaded via ClassLoader
-    // at runtime.
-    //
-    // This configuration:
-    // 1. Adds commonMain/resources to Android's source sets
-    // 2. Ensures WASM files are packaged into the APK as Java resources
-    // 3. Makes them accessible via ClassLoader.getResourceAsStream()
-    sourceSets {
-        getByName("main") {
-            // Include commonMain resources in Android builds
-            resources.srcDirs("src/commonMain/resources")
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
