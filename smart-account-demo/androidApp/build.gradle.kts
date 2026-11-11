@@ -45,6 +45,8 @@ dependencies {
     // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
     // com.reown:android-core provides CoreClient (relay, pairing, metadata).
     // com.reown:sign provides SignClient (session proposal, request/response, delegates).
-    implementation("com.reown:android-core:1.6.17")
-    implementation("com.reown:sign:1.6.17")
+    // Reown 1.6.14 and later carry Kotlin 2.4 metadata and require compileSdk 37; this build
+    // uses Kotlin 2.2.21 and compileSdk 35, so both artifacts stay on 1.6.12.
+    implementation("com.reown:android-core:1.6.12")
+    implementation("com.reown:sign:1.6.12")
 }
