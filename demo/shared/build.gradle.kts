@@ -6,7 +6,7 @@ plugins {
 }
 
 // Task to generate Version.kt file with the demo version
-val generateVersionFile by tasks.registering {
+val generateVersionFile = tasks.register("generateVersionFile") {
     val outputDir = layout.buildDirectory.dir("generated/src/commonMain/kotlin")
     val versionFile = outputDir.map { it.file("com/soneso/demo/DemoVersion.kt") }
     val demoVersion = project.property("demo.version") as String
@@ -63,7 +63,7 @@ kotlin {
             baseName = "shared"
             isStatic = true
             // Export stellar-sdk for iOS
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
@@ -75,12 +75,12 @@ kotlin {
             baseName = "shared"
             isStatic = true
             // Export stellar-sdk for macOS
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             kotlin.srcDir(layout.buildDirectory.dir("generated/src/commonMain/kotlin"))
             dependencies {
                 // ============================================================
@@ -129,7 +129,7 @@ kotlin {
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
@@ -139,7 +139,7 @@ kotlin {
         // ============================================================
         // Android Platform
         // ============================================================
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 // Android-specific Compose integration
                 implementation("androidx.activity:activity-compose:1.8.2")
@@ -150,7 +150,7 @@ kotlin {
         // ============================================================
         // Desktop Platform (JVM)
         // ============================================================
-        val desktopMain by getting {
+        getByName("desktopMain") {
             dependencies {
                 // Desktop-specific Compose support
                 implementation(compose.desktop.common)
@@ -160,43 +160,43 @@ kotlin {
         // ============================================================
         // iOS Platform
         // ============================================================
-        val iosMain by creating {
+        val iosMain = create("iosMain") {
             dependsOn(commonMain)
             // No additional dependencies needed - stellar-sdk provides everything
         }
 
-        val iosX64Main by getting {
+        getByName("iosX64Main") {
             dependsOn(iosMain)
         }
 
-        val iosArm64Main by getting {
+        getByName("iosArm64Main") {
             dependsOn(iosMain)
         }
 
-        val iosSimulatorArm64Main by getting {
+        getByName("iosSimulatorArm64Main") {
             dependsOn(iosMain)
         }
 
         // ============================================================
         // macOS Platform
         // ============================================================
-        val macosMain by creating {
+        val macosMain = create("macosMain") {
             dependsOn(commonMain)
             // No additional dependencies needed - stellar-sdk provides everything
         }
 
-        val macosX64Main by getting {
+        getByName("macosX64Main") {
             dependsOn(macosMain)
         }
 
-        val macosArm64Main by getting {
+        getByName("macosArm64Main") {
             dependsOn(macosMain)
         }
 
         // ============================================================
         // JavaScript Platform (Browser)
         // ============================================================
-        val jsMain by getting {
+        getByName("jsMain") {
             dependencies {
                 // HTML-based Compose for web
                 implementation(compose.html.core)

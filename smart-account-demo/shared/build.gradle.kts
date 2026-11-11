@@ -33,7 +33,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
@@ -44,12 +44,12 @@ kotlin {
         macosTarget.binaries.framework {
             baseName = "shared"
             isStatic = true
-            export(project(":stellar-sdk"))
+            export(project.dependencies.project(":stellar-sdk"))
         }
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 // ============================================================
                 // UI Framework - Compose Multiplatform
@@ -96,7 +96,7 @@ kotlin {
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
@@ -107,7 +107,7 @@ kotlin {
         // ============================================================
         // Android Platform
         // ============================================================
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 implementation("androidx.activity:activity-compose:1.8.2")
                 implementation("androidx.appcompat:appcompat:1.6.1")
@@ -125,7 +125,7 @@ kotlin {
         // ============================================================
         // iOS Platform
         // ============================================================
-        val iosMain by creating {
+        val iosMain = create("iosMain") {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on iOS.
@@ -133,22 +133,22 @@ kotlin {
             }
         }
 
-        val iosX64Main by getting {
+        getByName("iosX64Main") {
             dependsOn(iosMain)
         }
 
-        val iosArm64Main by getting {
+        getByName("iosArm64Main") {
             dependsOn(iosMain)
         }
 
-        val iosSimulatorArm64Main by getting {
+        getByName("iosSimulatorArm64Main") {
             dependsOn(iosMain)
         }
 
         // ============================================================
         // macOS Platform
         // ============================================================
-        val macosMain by creating {
+        val macosMain = create("macosMain") {
             dependsOn(commonMain)
             dependencies {
                 // Ktor engine for the coordination client on macOS.
@@ -156,18 +156,18 @@ kotlin {
             }
         }
 
-        val macosX64Main by getting {
+        getByName("macosX64Main") {
             dependsOn(macosMain)
         }
 
-        val macosArm64Main by getting {
+        getByName("macosArm64Main") {
             dependsOn(macosMain)
         }
 
         // ============================================================
         // JavaScript Platform (Browser)
         // ============================================================
-        val jsMain by getting {
+        getByName("jsMain") {
             dependencies {
                 implementation(compose.html.core)
                 // Freighter browser extension API for web wallet signing

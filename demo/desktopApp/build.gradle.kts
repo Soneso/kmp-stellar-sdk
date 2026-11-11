@@ -10,7 +10,7 @@ kotlin {
     jvm()
 
     sourceSets {
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 implementation(project(":demo:shared"))
                 implementation(compose.desktop.currentOs)

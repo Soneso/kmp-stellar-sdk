@@ -154,7 +154,7 @@ kotlin {
     targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
         compilations.getByName("main") {
             cinterops {
-                val libsodium by creating {
+                create("libsodium") {
                     defFile(project.file("src/nativeInterop/cinterop/libsodium.def"))
                     // iOS targets: pass include path for header resolution
                     if (konanTarget.family == org.jetbrains.kotlin.konan.target.Family.IOS) {
@@ -177,7 +177,7 @@ kotlin {
     }
 
     sourceSets {
-        val commonMain by getting {
+        val commonMain = getByName("commonMain") {
             dependencies {
                 // JSON tree types for multiplatform. Exposed via `api` because the SDK's
                 // public surface (the XDR-JSON methods on every generated XDR type) takes
@@ -195,7 +195,7 @@ kotlin {
             }
         }
 
-        val commonTest by getting {
+        val commonTest = getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
@@ -203,7 +203,7 @@ kotlin {
             }
         }
 
-        val jvmMain by getting {
+        val jvmMain = getByName("jvmMain") {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:3.3.3")
                 implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
@@ -211,7 +211,7 @@ kotlin {
             }
         }
 
-        val jvmTest by getting {
+        val jvmTest = getByName("jvmTest") {
             dependencies {
                 implementation(kotlin("test-junit5"))
                 implementation("org.junit.jupiter:junit-jupiter:6.1.3")
@@ -223,7 +223,7 @@ kotlin {
         // Android source set: inherits all JVM platform code (BouncyCastle crypto, StrKey, XDR, etc.)
         // and adds Android-specific APIs (Credential Manager for WebAuthn passkeys).
         // The dependsOn(jvmMain) ensures the JVM actual declarations are used for Android compilation.
-        val androidMain by getting {
+        getByName("androidMain") {
             dependsOn(jvmMain)
             dependencies {
                 // Android Credential Manager API for WebAuthn/passkey support
@@ -237,11 +237,11 @@ kotlin {
         // Android host tests compile against the JVM actual declarations, matching the
         // dependsOn(jvmMain) above. Without it the Android host test compilation sees the
         // common expect declarations with no actuals and fails to resolve them.
-        val androidHostTest by getting {
+        getByName("androidHostTest") {
             dependsOn(jvmTest)
         }
 
-        val jsMain by getting {
+        getByName("jsMain") {
             dependencies {
                 implementation("io.ktor:ktor-client-js:3.3.3")
                 // Use libsodium-wrappers-sumo instead of standard build
@@ -251,61 +251,61 @@ kotlin {
             }
         }
 
-        val jsTest by getting {
+        getByName("jsTest") {
             dependencies {
                 implementation(kotlin("test-js"))
             }
         }
 
-        val nativeMain by creating {
+        val nativeMain = create("nativeMain") {
             dependsOn(commonMain)
 
             // Using libsodium for all native platforms
             kotlin.srcDir("src/nativeMain/kotlin")
         }
 
-        val nativeTest by creating {
+        val nativeTest = create("nativeTest") {
             dependsOn(commonTest)
             kotlin.srcDir("src/nativeTest/kotlin")
         }
 
-        val iosMain by creating {
+        val iosMain = create("iosMain") {
             dependsOn(nativeMain)
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:3.3.3")
             }
         }
 
-        val iosTest by creating {
+        val iosTest = create("iosTest") {
             dependsOn(nativeTest)
         }
 
         // Configure iOS targets to use shared source sets
-        val iosX64Main by getting { dependsOn(iosMain) }
-        val iosArm64Main by getting { dependsOn(iosMain) }
-        val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
+        getByName("iosX64Main") { dependsOn(iosMain) }
+        getByName("iosArm64Main") { dependsOn(iosMain) }
+        getByName("iosSimulatorArm64Main") { dependsOn(iosMain) }
 
-        val iosX64Test by getting { dependsOn(iosTest) }
-        val iosArm64Test by getting { dependsOn(iosTest) }
-        val iosSimulatorArm64Test by getting { dependsOn(iosTest) }
+        getByName("iosX64Test") { dependsOn(iosTest) }
+        getByName("iosArm64Test") { dependsOn(iosTest) }
+        getByName("iosSimulatorArm64Test") { dependsOn(iosTest) }
 
         // macOS source sets
-        val macosMain by creating {
+        val macosMain = create("macosMain") {
             dependsOn(nativeMain)
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:3.3.3")
             }
         }
 
-        val macosTest by creating {
+        val macosTest = create("macosTest") {
             dependsOn(nativeTest)
         }
 
-        val macosX64Main by getting { dependsOn(macosMain) }
-        val macosArm64Main by getting { dependsOn(macosMain) }
+        getByName("macosX64Main") { dependsOn(macosMain) }
+        getByName("macosArm64Main") { dependsOn(macosMain) }
 
-        val macosX64Test by getting { dependsOn(macosTest) }
-        val macosArm64Test by getting { dependsOn(macosTest) }
+        getByName("macosX64Test") { dependsOn(macosTest) }
+        getByName("macosArm64Test") { dependsOn(macosTest) }
     }
 }
 
