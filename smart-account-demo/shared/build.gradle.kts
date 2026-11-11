@@ -92,7 +92,7 @@ kotlin {
                 // Ktor + kotlinx.serialization. Versions track the stellar-sdk.
                 // ============================================================
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("io.ktor:ktor-client-core:3.3.3")
+                implementation("io.ktor:ktor-client-core:3.5.2")
             }
         }
 
@@ -100,7 +100,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-                implementation("io.ktor:ktor-client-mock:3.3.3")
+                implementation("io.ktor:ktor-client-mock:3.5.2")
             }
         }
 
@@ -113,7 +113,7 @@ kotlin {
                 implementation("androidx.appcompat:appcompat:1.6.1")
 
                 // Ktor engine for the coordination client on Android.
-                implementation("io.ktor:ktor-client-cio:3.3.3")
+                implementation("io.ktor:ktor-client-cio:3.5.2")
 
                 // Reown (WalletConnect v2) for external wallet connection via Freighter Mobile.
                 // Required by ReownConnector which implements WalletConnector for Android.

@@ -20,7 +20,7 @@ java {
 }
 
 // Ktor 3.x (current stable line). Pure relay server: no :stellar-sdk dependency.
-val ktorVersion = "3.5.0"
+val ktorVersion = "3.5.2"
 
 dependencies {
     implementation("io.ktor:ktor-server-core:$ktorVersion")

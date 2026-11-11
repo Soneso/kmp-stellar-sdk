@@ -21,7 +21,7 @@ java {
 }
 
 // Ktor 3.x (current stable line). Client side: the agent talks to the coordination server.
-val ktorVersion = "3.5.0"
+val ktorVersion = "3.5.2"
 
 dependencies {
     // KMP SDK JVM variant. Headless connect and the multi-signer pipeline come from here.

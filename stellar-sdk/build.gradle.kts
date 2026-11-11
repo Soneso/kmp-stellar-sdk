@@ -185,7 +185,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-                implementation("io.ktor:ktor-client-core:3.3.3")
+                implementation("io.ktor:ktor-client-core:3.5.2")
                 implementation("io.ktor:ktor-client-content-negotiation:3.3.3")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.3")
                 // BigInteger support for multiplatform. Exposed via `api` because the
@@ -199,13 +199,13 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-                implementation("io.ktor:ktor-client-mock:3.3.3")
+                implementation("io.ktor:ktor-client-mock:3.5.2")
             }
         }
 
         val jvmMain = getByName("jvmMain") {
             dependencies {
-                implementation("io.ktor:ktor-client-cio:3.3.3")
+                implementation("io.ktor:ktor-client-cio:3.5.2")
                 implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
                 implementation("commons-codec:commons-codec:1.16.1")
             }
