@@ -21,6 +21,11 @@ updates:
       # account demo builds with Kotlin 2.2.21 and compileSdk 35, so it stays on 1.6.12.
       # The rule suppresses version and security update pull requests for all com.reown artifacts.
       - dependency-name: "com.reown:*"
+      # Ktor 3.5.2 requires Kotlin 2.3.21; the SDK and the demos build with Kotlin 2.2.21. A patch
+      # update of the Ktor 3.5 line in one module also rewrites the 3.3.3 pins of the same
+      # artifacts in every other module, so the patch-only rule does not hold the SDK on 3.3.
+      # The rule suppresses version and security update pull requests for all io.ktor artifacts.
+      - dependency-name: "io.ktor:*"
   - package-ecosystem: bundler
     directory: /tools/xdrgen-kt
     schedule:
