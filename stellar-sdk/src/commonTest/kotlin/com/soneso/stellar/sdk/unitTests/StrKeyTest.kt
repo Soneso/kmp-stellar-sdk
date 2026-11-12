@@ -1657,7 +1657,7 @@ class StrKeyTest {
     //
     // A strkey is written in the 32 characters of the base32 alphabet and in nothing else. The
     // alphabet check rejects the pad character, whitespace and every other byte, and reports the
-    // same verdict on every platform even though the codec behind it is platform-specific.
+    // same verdict on every platform through the shared codec.
 
     /** Asserts that [candidate], every character of which is ASCII, fails the alphabet check. */
     private fun assertRejectedByAlphabet(
@@ -1818,8 +1818,7 @@ class StrKeyTest {
     //
     // A key has exactly one strkey. Padding, characters written after padding and whitespace all
     // produce a string no encoder emits, and every type rejects every one of them. These cases run
-    // from common code, so each target answers for the codec it carries and all of them have to
-    // give the same answer.
+    // from common code, so every target exercises the shared codec.
     //
     // Every variant below lengthens the string, so for a type of one fixed encoded length the
     // check that reports it is the encoded-length check rather than the alphabet. For the signed

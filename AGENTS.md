@@ -22,6 +22,7 @@ python3 tools/coverage/coverage_summary.py --min 90
 - The build cache can answer a test task from cache without running a test. `--rerun` forces execution when you need the evidence.
 - The Android tasks, `check` and the documentation build need the Android SDK location: `ANDROID_HOME` or `sdk.dir` in the gitignored `local.properties`. The iOS simulator tests need `-PexcludeIntegrationTests` because the simulator rejects the testnet certificate chain.
 - `verifyTestNamespaces` fails a test outside the `unitTests` or `integrationTests` packages; CI does not run it.
+- `verifyNoRuntimeCommonsCodec` fails when `commons-codec` resolves on the JVM or Android runtime classpath, because Android below API 28 shadows a bundled copy with its own; `jvmTest` and `check` depend on it, so CI runs it.
 - The coverage script counts a line as covered only when all of its branches are covered; Kover measures the JVM target only.
 - No linter or formatter is configured; `kotlin.code.style=official` in `gradle.properties` sets the style.
 - The API documentation builds with `./gradlew :stellar-sdk:dokkaGenerateHtml --no-daemon` in about three minutes into `stellar-sdk/build/dokka/html/`; the Pages workflow copies that output to the gitignored `docs/api/latest/` and publishes it from `main`. The package descriptions Dokka reads are in `stellar-sdk/dokka/packages.md`.

@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The Android artifact is built with Android Gradle plugin 9 and the Android Kotlin Multiplatform library plugin. Apps keep the requirements of earlier releases: minimum SDK 24 and compile SDK 34 or later.
+- The JVM and Android artifacts no longer depend on Apache Commons Codec (`commons-codec`); every platform writes strkeys with the SDK's own base32 codec.
 
 ### Fixed
+- Strkey encoding and decoding no longer throw `NoSuchMethodError` on Android 7.0 to 8.1 (API 24 to 27), where the system ships its own Apache Commons Codec.
 - Binary XDR decoding throws `IllegalArgumentException` when recursive values, such as `SCValXdr` vectors and maps, claim predicates and contract spec types, nest beyond a shared depth of 500. An `XdrReader` keeps its full depth budget after a failed decode.
 - `ContractSpec` rejects `Int`, `Long` and `ULong` enum values outside the u32 range with `ContractSpecException`. Numeric contract error codes that are fractional, non-finite or outside the u32 range throw it too, and integral codes in that range convert exactly.
 
