@@ -207,7 +207,6 @@ kotlin {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:3.3.3")
                 implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
-                implementation("commons-codec:commons-codec:1.16.1")
             }
         }
 
@@ -217,10 +216,12 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter:6.1.3")
                 // Add SLF4J implementation to fix logging warnings
                 implementation("org.slf4j:slf4j-simple:2.0.20")
+                // Reference implementation the base32 codec is compared against in tests only.
+                implementation("commons-codec:commons-codec:1.16.1")
             }
         }
 
-        // Android source set: inherits all JVM platform code (BouncyCastle crypto, StrKey, XDR, etc.)
+        // Android source set: inherits all JVM platform code (BouncyCastle crypto, XDR, etc.)
         // and adds Android-specific APIs (Credential Manager for WebAuthn passkeys).
         // The dependsOn(jvmMain) ensures the JVM actual declarations are used for Android compilation.
         getByName("androidMain") {
@@ -414,8 +415,63 @@ val verifyTestNamespaces = tasks.register("verifyTestNamespaces") {
     }
 }
 
+// Runtime Classpath Guard
+//
+// Android below API 28 ships its own Apache Commons Codec in the boot class path, and those
+// classes take precedence over the ones an app bundles, so a Commons Codec on the SDK's runtime
+// classpath would run against the older system copy. The guard fails when commons-codec resolves
+// on the runtime classpath of the JVM target or of the Android library, whether this build
+// declares it or another library brings it in. jvmTest depends on the guard, so every run of the
+// JVM tests, the CI jobs included, runs it first.
+val guardedRuntimeClasspaths = listOf("jvmRuntimeClasspath", "androidRuntimeClasspath")
+val commonsCodecModule = "commons-codec:commons-codec"
+
+val verifyNoRuntimeCommonsCodec = tasks.register("verifyNoRuntimeCommonsCodec") {
+    group = "verification"
+    description = "Fails when commons-codec resolves on the runtime classpath of the JVM target or the Android library."
+
+    val roots = guardedRuntimeClasspaths.map { name ->
+        name to configurations.named(name).flatMap { it.incoming.resolutionResult.rootComponent }
+    }
+    val forbiddenModule = commonsCodecModule
+
+    doLast {
+        val violations = roots.flatMap { (configuration, root) ->
+            val visited = mutableSetOf<org.gradle.api.artifacts.component.ComponentIdentifier>()
+            val pending = ArrayDeque(listOf(root.get()))
+            val found = mutableListOf<String>()
+            while (pending.isNotEmpty()) {
+                val component = pending.removeFirst()
+                if (!visited.add(component.id)) continue
+                val module = component.moduleVersion
+                if (module != null && "${module.group}:${module.name}" == forbiddenModule) {
+                    found += "$forbiddenModule:${module.version} resolves on $configuration"
+                }
+                component.dependencies
+                    .filterIsInstance<org.gradle.api.artifacts.result.ResolvedDependencyResult>()
+                    .filter { !it.isConstraint }
+                    .forEach { pending += it.selected }
+            }
+            found
+        }
+
+        if (violations.isNotEmpty()) {
+            throw GradleException(
+                violations.joinToString("\n") {
+                    "$it: Android below API 28 ships its own Apache Commons Codec in the boot " +
+                        "class path, which shadows a bundled one."
+                }
+            )
+        }
+    }
+}
+
 tasks.named("check") {
-    dependsOn(verifyTestNamespaces)
+    dependsOn(verifyTestNamespaces, verifyNoRuntimeCommonsCodec)
+}
+
+tasks.named("jvmTest") {
+    dependsOn(verifyNoRuntimeCommonsCodec)
 }
 
 // Dokka 2.x generates docs from shared source sets without requiring native compilation

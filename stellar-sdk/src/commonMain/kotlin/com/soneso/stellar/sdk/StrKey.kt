@@ -3,17 +3,102 @@ package com.soneso.stellar.sdk
 import kotlin.experimental.and
 
 /**
- * Platform-specific Base32 codec interface.
+ * Base32 codec with the RFC 4648 alphabet, shared by every target.
+ *
+ * It depends on no platform or third-party codec, because the class path of an Android system
+ * can carry its own copy of such a library ahead of the one an app ships.
  *
  * [isInAlphabet] is the gate every strkey decode passes through. It accepts only the 32
  * characters of the base32 alphabet, so the pad character, whitespace and any other byte make it
- * return false and the same string is accepted or rejected identically on every platform.
- * [decode] takes input that gate accepts, and reports anything else as an invalid argument.
+ * return false. [decode] takes input that gate accepts, and reports anything else as an invalid
+ * argument.
  */
-internal expect object Base32Codec {
-    fun encode(data: ByteArray): ByteArray
-    fun decode(data: ByteArray): ByteArray
-    fun isInAlphabet(data: ByteArray): Boolean
+internal object Base32Codec {
+    private val NOT_IN_ALPHABET: Byte = 0xff.toByte()
+
+    private val decodingTable: ByteArray = ByteArray(256) { NOT_IN_ALPHABET }.apply {
+        BASE32_ALPHABET.forEachIndexed { index, char ->
+            this[char.code] = index.toByte()
+        }
+    }
+
+    /**
+     * Encodes [data] and pads the result with `=` to a multiple of eight characters. An empty
+     * [data] encodes to an empty array.
+     */
+    fun encode(data: ByteArray): ByteArray {
+        if (data.isEmpty()) return byteArrayOf()
+
+        val output = mutableListOf<Byte>()
+        var buffer = 0
+        var bitsLeft = 0
+
+        for (byte in data) {
+            buffer = (buffer shl 8) or (byte.toInt() and 0xFF)
+            bitsLeft += 8
+
+            while (bitsLeft >= 5) {
+                val index = (buffer ushr (bitsLeft - 5)) and 0x1F
+                output.add(BASE32_ALPHABET[index].code.toByte())
+                bitsLeft -= 5
+            }
+        }
+
+        if (bitsLeft > 0) {
+            val index = (buffer shl (5 - bitsLeft)) and 0x1F
+            output.add(BASE32_ALPHABET[index].code.toByte())
+        }
+
+        while (output.size % 8 != 0) {
+            output.add('='.code.toByte())
+        }
+
+        return output.toByteArray()
+    }
+
+    /**
+     * Decodes [data], which must have passed [isInAlphabet].
+     *
+     * A byte outside the alphabet carries no five-bit value, so decoding it would either
+     * corrupt the result or cut it short. Such a byte is reported instead.
+     *
+     * @throws IllegalArgumentException if [data] holds a byte outside the base32 alphabet
+     */
+    fun decode(data: ByteArray): ByteArray {
+        val output = mutableListOf<Byte>()
+        var buffer = 0
+        var bitsLeft = 0
+
+        for (byte in data) {
+            val value = decodingTable[byte.toInt() and 0xFF]
+            require(value != NOT_IN_ALPHABET) { INVALID_BASE32_MESSAGE }
+
+            buffer = (buffer shl 5) or value.toInt()
+            bitsLeft += 5
+
+            if (bitsLeft >= 8) {
+                output.add(((buffer ushr (bitsLeft - 8)) and 0xFF).toByte())
+                bitsLeft -= 8
+            }
+        }
+
+        return output.toByteArray()
+    }
+
+    /**
+     * Reports whether every byte of [data] is one of the 32 base32 alphabet characters.
+     *
+     * The pad character and whitespace are not among them: a strkey is written without padding,
+     * and accepting either would let one key be written as more than one string.
+     */
+    fun isInAlphabet(data: ByteArray): Boolean {
+        for (byte in data) {
+            if (decodingTable[byte.toInt() and 0xFF] == NOT_IN_ALPHABET) {
+                return false
+            }
+        }
+        return true
+    }
 }
 
 /**
@@ -32,16 +117,16 @@ private fun paddedToFourBytes(length: Int): Int = (length + 3) / 4 * 4
 /**
  * The characters a strkey is written in, in the order that gives each its five-bit value.
  *
- * Every codec in this module builds its tables from this one declaration, so no platform can
- * hold a different idea of which characters a strkey may contain.
+ * The codec and the strkey decoder build their tables from this one declaration, so the two
+ * cannot hold a different idea of which characters a strkey may contain.
  */
 internal const val BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
 /**
  * What a decode reports about a string that is not written in [BASE32_ALPHABET].
  *
- * Every check that asks that question - the guard on the ASCII range, the alphabet check and each
- * platform codec - reports it in these words, so one string is never described two ways.
+ * Every check that asks that question - the guard on the ASCII range, the alphabet check and the
+ * codec - reports it in these words, so one string is never described two ways.
  */
 internal const val INVALID_BASE32_MESSAGE = "Invalid base32 encoded string"
 
