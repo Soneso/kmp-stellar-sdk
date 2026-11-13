@@ -12,7 +12,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 from dataclasses import dataclass
 
 # Allow imports from the parent tools/matrix-generator package
@@ -340,29 +340,89 @@ def _struct_body(struct_name: str, sources: Sequence[str]) -> Optional[str]:
     return None
 
 
-# stellar-rpc registers each JSON-RPC method in cmd/stellar-rpc/internal/jsonrpc.go
-# as ``methodName: protocol.<Prefix>MethodName``.
-_METHOD_REGISTRATION = re.compile(r"\bmethodName:\s*protocol\.(\w+)MethodName\b")
+# Go string and rune literals; parsing keeps them whole and drops comments.
+_GO_LITERAL = r'"(?:\\.|[^"\\\n])*"|`[^`]*`|\'(?:\\.|[^\'\\\n])*\''
+_GO_COMMENT_OR_LITERAL = re.compile(rf'({_GO_LITERAL})|//[^\n]*|/\*.*?\*/', re.DOTALL)
+# Token of the bracket scan: a literal, which it skips, a bracket or a comma.
+_GO_SCAN_TOKEN = re.compile(rf'{_GO_LITERAL}|[{{}}()\[\],]')
+# Opening brace of a registration block: the map literal or the handler list.
+_REGISTRATION_BLOCK = re.compile(
+    r'\bLimitsByMethod\s*\{|\[\]struct\s*\{[^{}]*\bmethodName\s+string\b[^{}]*\}\s*\{')
+# Map literal entry and handler list field that name a method.
+_MAP_ENTRY = re.compile(r'protocol\.(\w+)MethodName\s*:\s*\{.*\}', re.DOTALL)
+_METHOD_NAME_FIELD = re.compile(r'methodName\s*:\s*protocol\.(\w+)MethodName')
+# A method name constant in code; a literal matches the first alternative.
+_METHOD_NAME_REFERENCE = re.compile(rf'{_GO_LITERAL}|\bprotocol\s*\.\s*(\w+MethodName)\b')
 
 
-def verify_method_set(jsonrpc_source: str) -> None:
+def _block_entries(code: str, start: int, version: str) -> Tuple[List[str], int]:
+    """Top-level entries of the composite literal whose body starts at *start*, and the index after it."""
+    entries, depth, begin = [], 0, start
+    for token in _GO_SCAN_TOKEN.finditer(code, start):
+        if token.group(0) in '{([':
+            depth += 1
+        elif token.group(0) in '})]' and depth > 0:
+            depth -= 1
+        elif token.group(0) in '})],' and depth == 0:
+            entries.append(code[begin:token.start()].strip())
+            if token.group(0) != ',':
+                return [entry for entry in entries if entry], token.end()
+            begin = token.end()
+    raise ValueError(f"RPC source {version}: method registration block is not closed")
+
+
+def _registered_prefixes(jsonrpc_source: str, version: str) -> List[str]:
+    """Method prefixes (``GetHealth``) of the one registration block, in source order."""
+    code = _GO_COMMENT_OR_LITERAL.sub(lambda m: m.group(1) or ' ', jsonrpc_source)
+    blocks = list(_REGISTRATION_BLOCK.finditer(code))
+    if len(blocks) != 1:
+        raise ValueError(f"RPC source {version} holds {len(blocks)} method registration blocks, "
+                         f"expected one LimitsByMethod map literal or one methodName handler list")
+    entries, end = _block_entries(code, blocks[0].end(), version)
+    if not entries:
+        raise ValueError(f"RPC source {version}: the method registration block is empty")
+    # A method registered or changed outside the block would escape the check.
+    for reference in _METHOD_NAME_REFERENCE.finditer(code):
+        if reference.group(1) and not blocks[0].start() <= reference.start() < end:
+            raise ValueError(f"RPC source {version}: method name reference outside the "
+                             f"registration block: protocol.{reference.group(1)}")
+    prefixes = []
+    for entry in entries:
+        if blocks[0].group(0).startswith('LimitsByMethod'):
+            match = _MAP_ENTRY.fullmatch(entry)
+        else:
+            fields = _block_entries(entry, 1, version)[0] if entry.startswith('{') else []
+            named = [f for f in fields if re.match(r'methodName\s*:', f)]
+            match = len(named) == 1 and _METHOD_NAME_FIELD.fullmatch(named[0])
+        if not match:
+            raise ValueError(f"RPC source {version}: unrecognized method registration entry: {entry}")
+        prefixes.append(match.group(1))
+    return prefixes
+
+
+def verify_method_set(jsonrpc_source: str, version: str) -> None:
     """
     Require the methods that *jsonrpc_source* registers to be exactly the
     methods of :attr:`GoProtocolParser.METHOD_NAME_MAPPING`.
 
-    The matrix computes coverage over the mapped methods; this check keeps
-    that denominator equal to the methods the release serves.
+    A stellar-rpc release registers them in one block of its jsonrpc.go: as
+    the keys of a ``LimitsByMethod`` map literal (the server refuses to start
+    unless they equal the served methods) or as the ``methodName`` fields of a
+    handler list, each written as ``protocol.GetHealthMethodName``. The matrix
+    computes coverage over the mapped methods; this check keeps that
+    denominator equal to the methods the release serves.
 
     Args:
-        jsonrpc_source: Text of the release's cmd/stellar-rpc/internal/jsonrpc.go.
+        jsonrpc_source: Text of the release's jsonrpc.go.
+        version: RPC version that error messages name.
 
     Raises:
-        ValueError: If the file registers no method in that form, or naming
-            every missing and every unexpected method.
+        ValueError: Naming *version* and the entry when the source holds not
+            exactly one block, an empty or unclosed one, an entry in another
+            form, or a method name constant outside the block; or naming every
+            missing and every unexpected method.
     """
-    registered = set(_METHOD_REGISTRATION.findall(jsonrpc_source))
-    if not registered:
-        raise ValueError("No methodName: protocol.<Name>MethodName registrations in jsonrpc.go")
+    registered = set(_registered_prefixes(jsonrpc_source, version))
     mapping = GoProtocolParser.METHOD_NAME_MAPPING
     missing = sorted(mapping[prefix] for prefix in mapping.keys() - registered)
     unexpected = sorted(prefix[0].lower() + prefix[1:] for prefix in registered - mapping.keys())

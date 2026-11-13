@@ -78,7 +78,9 @@ The default run cites the newest stable stellar-rpc release: the highest `vX.Y.Z
 
 The response fields of a method include the fields of the structs its response struct embeds, which may be declared in any of the fetched protocol files. Fields ending in `Json` are the JSON-format variants of XDR fields and are not counted, because the SDK decodes XDR.
 
-The run exits non-zero and writes no matrix when the release lookup fails, when the methods that the release registers in `cmd/stellar-rpc/internal/jsonrpc.go` differ from the mapped methods, or when any mapped RPC method lacks its request or response file.
+The RPC method list comes from the `LimitsByMethod` map literal of `cmd/stellar-rpc/internal/rpcv1/jsonrpc.go` or, when GitHub answers HTTP 404 for that file at the tag, from the `methodName` handler list of `cmd/stellar-rpc/internal/jsonrpc.go`. `--local` reads a file of either form.
+
+The run exits non-zero and writes no matrix when the release lookup fails, when the method list file cannot be fetched, holds not exactly one registration block, or has an empty block, or when an entry of the block names no method as a `protocol.<Name>MethodName` constant or such a constant appears outside the block. It does the same when the registered methods differ from the mapped methods, or when any mapped RPC method lacks its request or response file.
 
 ### SEPs
 
@@ -144,7 +146,7 @@ SDK version is read from `gradle.properties` (`version=x.y.z`). Intermediate JSO
 
 ## Tests
 
-The tests patch every network call. Run them from the repository root:
+The tests patch every network call. The two `stellar-rpc-*.go` fixtures in `tests/fixtures/` are copies of the stellar-rpc method list files at v30.0.0 and v30.0.1. Run the tests from the repository root:
 
 ```bash
 python3 -m unittest discover -s tools/matrix-generator/tests

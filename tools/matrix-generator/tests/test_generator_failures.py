@@ -1,12 +1,14 @@
 """Lookups and stages that the matrices depend on take their values from the source or fail."""
 
 import contextlib
+import http.client
 import io
 import json
 import tempfile
 import unittest
+import urllib.error
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Dict, Tuple
 from unittest import mock
 
 import matrix_test_support as support
@@ -15,12 +17,86 @@ import common
 import github_fetcher
 import run_analysis
 import run_horizon_analysis
-from github_fetcher import GitHubFetchError
+from github_fetcher import GitHubFetchError, SourceFileNotFoundError, fetch_rpc_jsonrpc_source
 from rpc_parser import RPCMethodExtractor
 
 enter_context = support.enter_context
 
 GO_MOD_URL = "https://raw.githubusercontent.com/stellar/stellar-rpc/v28.0.1/go.mod"
+
+
+def _method_source_url(tag: str, path: str) -> str:
+    return f"https://raw.githubusercontent.com/stellar/stellar-rpc/{tag}/cmd/stellar-rpc/internal/{path}"
+
+
+RPCV1_URL = _method_source_url("v30.0.1", "rpcv1/jsonrpc.go")
+INTERNAL_URL = _method_source_url("v30.0.1", "jsonrpc.go")
+
+
+class MethodSourceFetchTest(unittest.TestCase):
+    """The method list file is read at the tag; the older path only after HTTP 404 at that tag."""
+
+    def setUp(self) -> None:
+        self.responses: Dict[str, Any] = {}
+        self.fake = support.FakeUrlopen(self.responses)
+        enter_context(self, mock.patch.object(github_fetcher.urllib.request, "urlopen", self.fake))
+        enter_context(self, mock.patch.object(github_fetcher, "get_github_token", return_value=None))
+
+    def test_reads_the_rpcv1_file(self) -> None:
+        self.responses[RPCV1_URL] = (support.RPC_V30_0_1_SOURCE.read_bytes(), None)
+        self.responses[INTERNAL_URL] = (b"internal source", None)
+        self.assertEqual(fetch_rpc_jsonrpc_source("v30.0.1"),
+                         support.RPC_V30_0_1_SOURCE.read_text(encoding="utf-8"))
+        self.assertEqual(self.fake.requested, [RPCV1_URL])
+
+    def test_falls_back_to_the_internal_file_of_the_same_tag_on_404(self) -> None:
+        rpcv1_url = _method_source_url("v30.0.0", "rpcv1/jsonrpc.go")
+        internal_url = _method_source_url("v30.0.0", "jsonrpc.go")
+        self.responses[rpcv1_url] = support.http_error(rpcv1_url, 404, "Not Found")
+        self.responses[internal_url] = (support.RPC_V30_0_0_SOURCE.read_bytes(), None)
+        self.responses[RPCV1_URL] = (b"rpcv1 source of another tag", None)
+        self.assertEqual(fetch_rpc_jsonrpc_source("v30.0.0"),
+                         support.RPC_V30_0_0_SOURCE.read_text(encoding="utf-8"))
+        self.assertEqual(self.fake.requested, [rpcv1_url, internal_url])
+
+    def test_any_other_failure_on_either_path_raises_naming_the_tag_and_url(self) -> None:
+        failures = {
+            "HTTP 500 error fetching": lambda url: support.http_error(url, 500, "Internal Server Error"),
+            "rate limit exceeded": lambda url: support.http_error(url, 403, "rate limit exceeded"),
+            "Network error fetching": lambda url: urllib.error.URLError("connection refused"),
+            "Timeout fetching": lambda url: TimeoutError("timed out"),
+            "'utf-8' codec can't decode": lambda url: (b"package rpcv1 \xff", None),
+            "IncompleteRead(7 bytes read, 100 more expected)":
+                lambda url: (http.client.IncompleteRead(b"package", 100), None),
+            "[Errno 54] Connection reset by peer":
+                lambda url: (ConnectionResetError(54, "Connection reset by peer"), None),
+        }
+        for failing_url, earlier_requests in ((RPCV1_URL, []), (INTERNAL_URL, [RPCV1_URL])):
+            for cause, response in failures.items():
+                with self.subTest(url=failing_url, failure=cause):
+                    self.fake.requested.clear()
+                    self.responses[RPCV1_URL] = support.http_error(RPCV1_URL, 404, "Not Found")
+                    self.responses[INTERNAL_URL] = (b"internal source", None)
+                    self.responses[failing_url] = response(failing_url)
+
+                    with self.assertRaises(GitHubFetchError) as context:
+                        fetch_rpc_jsonrpc_source("v30.0.1")
+
+                    self.assertNotIsInstance(context.exception, SourceFileNotFoundError)
+                    message = str(context.exception)
+                    self.assertTrue(message.startswith(
+                        f"Failed to read {failing_url} for stellar-rpc tag v30.0.1: "), message)
+                    self.assertIn(cause, message)
+                    self.assertEqual(self.fake.requested, earlier_requests + [failing_url])
+
+    def test_both_paths_absent_names_both_urls(self) -> None:
+        for url in (RPCV1_URL, INTERNAL_URL):
+            self.responses[url] = support.http_error(url, 404, "Not Found")
+        with self.assertRaises(SourceFileNotFoundError) as context:
+            fetch_rpc_jsonrpc_source("v30.0.1")
+        self.assertEqual(str(context.exception), "No JSON-RPC method source for stellar-rpc tag v30.0.1: "
+                                                 f"HTTP 404 for {RPCV1_URL} and {INTERNAL_URL}")
+        self.assertEqual(self.fake.requested, [RPCV1_URL, INTERNAL_URL])
 
 
 class GoStellarSdkRefTest(unittest.TestCase):
