@@ -22,11 +22,17 @@ from github_fetcher import (
     fetch_all_rpc_response_files,
 )
 from generate_rpc_comparison import RPCComparisonAnalyzer
-from rpc_parser import GoProtocolParser, RPCMethodExtractor, verify_method_set
+from rpc_parser import GoProtocolParser, RPCMethodExtractor, _registered_prefixes, verify_method_set
 
 enter_context = support.enter_context
 
 ALL_METHODS = sorted(GoProtocolParser.METHOD_NAME_MAPPING.values())
+# The method prefixes stellar-rpc v30.0.0 and v30.0.1 register, in their source order.
+SERVED_PREFIXES_V30 = [
+    "GetHealth", "GetEvents", "GetNetwork", "GetVersionInfo", "GetLatestLedger", "GetLedgers",
+    "GetLedgerEntries", "GetTransaction", "GetTransactions", "SendTransaction",
+    "SimulateTransaction", "GetFeeStats",
+]
 BASE_URL = "https://raw.githubusercontent.com/stellar/go-stellar-sdk/v0.7.2/protocols/rpc/"
 
 
@@ -197,22 +203,105 @@ class ResponseFileTest(unittest.TestCase):
 class MethodSetTest(unittest.TestCase):
     """The mapped methods are checked against the registrations in jsonrpc.go."""
 
+    def assert_rejected(self, source: str, *parts: str) -> None:
+        with self.assertRaises(ValueError) as context:
+            verify_method_set(source, "v30.0.1")
+        for part in ("v30.0.1",) + parts:
+            self.assertIn(part, str(context.exception))
+
     def test_full_set_passes(self) -> None:
-        verify_method_set(support.jsonrpc_file())
+        verify_method_set(support.jsonrpc_file(), "v28.0.1")
 
     def test_missing_method_is_named(self) -> None:
         prefixes = [p for p in support.METHOD_PREFIXES if p != "GetEvents"]
         with self.assertRaisesRegex(ValueError, r"missing: getEvents\b"):
-            verify_method_set(support.jsonrpc_file(prefixes))
+            verify_method_set(support.jsonrpc_file(prefixes), "v28.0.1")
 
     def test_unexpected_method_is_named(self) -> None:
         prefixes = support.METHOD_PREFIXES + ("GetLedgerState",)
         with self.assertRaisesRegex(ValueError, r"unexpected: getLedgerState\b"):
-            verify_method_set(support.jsonrpc_file(prefixes))
+            verify_method_set(support.jsonrpc_file(prefixes), "v28.0.1")
 
     def test_string_literal_registrations_raise(self) -> None:
-        with self.assertRaisesRegex(ValueError, "No methodName: protocol.<Name>MethodName registrations"):
-            verify_method_set('handlers := []struct{}{\n\t{methodName: "getHealth"},\n}\n')
+        self.assert_rejected('handlers := []struct {\n\tmethodName string\n}{\n\t{methodName: "getHealth"},\n}\n',
+                             'unrecognized method registration entry: {methodName: "getHealth"}')
+
+    def test_both_registration_forms_register_the_served_methods(self) -> None:
+        for fixture in (support.RPC_V30_0_0_SOURCE, support.RPC_V30_0_1_SOURCE):
+            with self.subTest(fixture=fixture.name):
+                source = fixture.read_text(encoding="utf-8")
+                self.assertEqual(_registered_prefixes(source, "v30.0.1"), SERVED_PREFIXES_V30)
+                verify_method_set(source, "v30.0.1")
+
+    def test_comments_and_literals_in_the_block_are_not_entries_or_brackets(self) -> None:
+        cases = {
+            support.RPC_V30_0_1_SOURCE: ("\t\tprotocol.GetFeeStatsMethodName: {",
+                                         "\t\t// protocol.GetFooMethodName: {},\n"
+                                         "\t\t/* protocol.GetBarMethodName: {}, */ protocol.GetFeeStatsMethodName: {"),
+            support.RPC_V30_0_0_SOURCE: ("longName:             toSnakeCase(protocol.GetHealthMethodName),",
+                                         'longName:             "get_health) // }", // ignored },'),
+        }
+        for fixture, (old, new) in cases.items():
+            with self.subTest(fixture=fixture.name):
+                source = fixture.read_text(encoding="utf-8")
+                self.assertIn(old, source)
+                self.assertEqual(_registered_prefixes(source.replace(old, new), "v30.0.1"),
+                                 SERVED_PREFIXES_V30)
+
+    def test_unrecognized_entry_is_named(self) -> None:
+        cases = {
+            support.RPC_V30_0_1_SOURCE: ("protocol.GetFeeStatsMethodName: {", '"getFeeStats": {'),
+            support.RPC_V30_0_0_SOURCE: ("methodName:           protocol.GetFeeStatsMethodName,",
+                                         'methodName: "getFeeStats",'),
+        }
+        for fixture, (old, new) in cases.items():
+            with self.subTest(fixture=fixture.name):
+                source = fixture.read_text(encoding="utf-8")
+                self.assertIn(old, source)
+                self.assert_rejected(source.replace(old, new), "unrecognized method registration entry", new)
+
+    def test_handler_without_exactly_one_method_name_is_named(self) -> None:
+        source = support.RPC_V30_0_0_SOURCE.read_text(encoding="utf-8")
+        old = "\t\t\tmethodName: protocol.GetHealthMethodName,\n"
+        self.assertIn(old, source)
+        for count in (0, 2):
+            with self.subTest(method_names=count):
+                self.assert_rejected(source.replace(old, old * count),
+                                     "unrecognized method registration entry", "methods.NewHealthCheck(")
+
+    def test_method_name_reference_outside_the_block_is_named(self) -> None:
+        reference = "protocol.GetLedgerStateMethodName"
+        cases = {
+            support.RPC_V30_0_1_SOURCE: ("\tspecs = jsonrpc.LimitsByMethod{\n",
+                                         f"\tspecs = append(specs, jsonrpc.HandlerSpec{{MethodName: {reference}}})\n"),
+            support.RPC_V30_0_0_SOURCE: ("\thandlersMap := handler.Map{}\n",
+                                         "\thandlers = append(handlers, handlers[0])\n"
+                                         f"\thandlers[len(handlers)-1].methodName = {reference}\n"),
+        }
+        for fixture, (anchor, added) in cases.items():
+            source = fixture.read_text(encoding="utf-8")
+            self.assertEqual(source.count(anchor), 1)
+            for spelling in (reference, "protocol.\n\t\tGetLedgerStateMethodName"):
+                with self.subTest(fixture=fixture.name, spelling=spelling):
+                    self.assert_rejected(source.replace(anchor, added.replace(reference, spelling) + anchor),
+                                         f"method name reference outside the registration block: {reference}")
+            with self.subTest(fixture=fixture.name, spelling="comment and literals"):
+                quoted = f'\t// {reference}\n\t_ = "{reference}" + `{reference}`\n'
+                verify_method_set(source.replace(anchor, quoted + anchor), "v30.0.1")
+
+    def test_empty_block_raises(self) -> None:
+        self.assert_rejected("specs = jsonrpc.LimitsByMethod{\n}.Apply(specs)\n", "registration block is empty")
+
+    def test_source_without_exactly_one_block_raises(self) -> None:
+        v30_0_1 = support.RPC_V30_0_1_SOURCE.read_text(encoding="utf-8")
+        for source, count in (("package rpcv1\n", "0"),
+                              (v30_0_1 + support.RPC_V30_0_0_SOURCE.read_text(encoding="utf-8"), "2")):
+            with self.subTest(blocks=count):
+                self.assert_rejected(source, f"holds {count} method registration blocks")
+
+    def test_unclosed_block_raises(self) -> None:
+        self.assert_rejected("specs = jsonrpc.LimitsByMethod{\n\tprotocol.GetHealthMethodName: {},\n",
+                             "is not closed")
 
 
 class PipelineMethodSetTest(unittest.TestCase):
@@ -238,6 +327,19 @@ class PipelineMethodSetTest(unittest.TestCase):
             self.run_with(support.jsonrpc_file(prefixes))
         self.assertFalse(self.pipeline.rpc_methods_file.exists())
         self.extractor.extract_methods.assert_not_called()
+
+    def test_registration_outside_the_block_raises_before_parsing(self) -> None:
+        source = support.jsonrpc_file() + "\nfunc init() { handlers[0].methodName = protocol.GetLedgerStateMethodName }\n"
+        with self.assertRaisesRegex(ValueError, "RPC source v28.0.1: method name reference outside the "
+                                                "registration block: protocol.GetLedgerStateMethodName"):
+            self.run_with(source)
+        self.assertFalse(self.pipeline.rpc_methods_file.exists())
+        self.extractor.extract_methods.assert_not_called()
+
+    def test_source_without_a_registration_block_raises_naming_the_release(self) -> None:
+        with self.assertRaisesRegex(ValueError, "RPC source v28.0.1 holds 0 method registration blocks"):
+            self.run_with("package internal\n")
+        self.assertFalse(self.pipeline.rpc_methods_file.exists())
 
     def test_registered_method_set_is_written(self) -> None:
         cls = self.run_with(support.jsonrpc_file())

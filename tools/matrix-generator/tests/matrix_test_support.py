@@ -7,6 +7,7 @@ Run from the repository root:
 
 import sys
 import unittest
+import urllib.error
 from email.message import Message
 from pathlib import Path
 from typing import Any, ContextManager, Dict, List, Optional, Sequence, TypeVar
@@ -25,6 +26,11 @@ METHOD_PREFIXES = (
 )
 
 RELEASE_PAGE_2_URL = "https://api.github.com/repositories/1/releases?per_page=100&page=2"
+
+# Copies of the stellar-rpc method list files at v30.0.0 and v30.0.1.
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+RPC_V30_0_0_SOURCE = FIXTURES_DIR / "stellar-rpc-v30.0.0-jsonrpc.go"
+RPC_V30_0_1_SOURCE = FIXTURES_DIR / "stellar-rpc-v30.0.1-rpcv1-jsonrpc.go"
 
 # The release_info of stellar-rpc v28.0.1, as the RPC pipeline stores it.
 RELEASE_INFO = {
@@ -69,7 +75,15 @@ def jsonrpc_file(prefixes: Sequence[str] = METHOD_PREFIXES) -> str:
         f"\t\t\tlongName:             toSnakeCase(protocol.{prefix}MethodName),\n\t\t}},\n"
         for index, prefix in enumerate(prefixes)
     )
-    return f"package internal\n\nvar handlers = []struct{{}}{{\n{registrations}}}\n"
+    return (
+        "package internal\n\nvar handlers = []struct {\n\tmethodName string\n\tlongName   string\n}{\n"
+        f"{registrations}}}\n"
+    )
+
+
+def http_error(url: str, code: int, reason: str) -> urllib.error.HTTPError:
+    """Return the error ``urlopen`` raises when GitHub answers *url* with status *code*."""
+    return urllib.error.HTTPError(url, code, reason, Message(), None)
 
 
 def request_file(prefix: str) -> str:
@@ -102,6 +116,9 @@ class _FakeResponse:
             self.headers["Link"] = link
 
     def read(self) -> bytes:
+        """Return the body, or raise it when it is the exception the read fails with."""
+        if isinstance(self._body, Exception):
+            raise self._body
         return self._body
 
     def __enter__(self) -> "_FakeResponse":
@@ -112,18 +129,22 @@ class _FakeResponse:
 
 
 class FakeUrlopen:
-    """Stand-in for ``urllib.request.urlopen`` serving canned bodies by URL.
+    """Stand-in for ``urllib.request.urlopen`` serving canned responses by URL.
 
-    Every requested URL is recorded; an unknown URL raises ``KeyError`` so an
-    unexpected request fails the test.
+    A response is a ``(body, link)`` pair or an exception that the request
+    raises. Every requested URL is recorded; an unknown URL raises
+    ``KeyError`` so an unexpected request fails the test.
     """
 
-    def __init__(self, responses: Dict[str, Sequence[Any]]) -> None:
+    def __init__(self, responses: Dict[str, Any]) -> None:
         self._responses = responses
         self.requested: List[str] = []
 
     def __call__(self, request: Any, timeout: Optional[float] = None) -> _FakeResponse:
         url = request.full_url
         self.requested.append(url)
-        body, link = self._responses[url]
+        response = self._responses[url]
+        if isinstance(response, Exception):
+            raise response
+        body, link = response
         return _FakeResponse(body, link)

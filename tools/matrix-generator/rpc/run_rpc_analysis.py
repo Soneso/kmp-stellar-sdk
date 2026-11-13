@@ -240,7 +240,7 @@ class RPCAnalysisPipeline:
         self.progress.start_step("Parsing RPC Methods")
 
         # The mapped methods must be the methods the release registers.
-        verify_method_set(self.jsonrpc_source)
+        verify_method_set(self.jsonrpc_source, self.release_info["version"])
 
         extractor = RPCMethodExtractor(self.release_info, protocol_source=self.protocol_source)
         rpc_data = extractor.extract_methods()

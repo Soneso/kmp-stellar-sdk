@@ -12,6 +12,7 @@ from unittest import mock
 
 import matrix_test_support as support
 
+import common
 import github_fetcher
 import run_rpc_analysis
 from generate_rpc_comparison import RPCComparisonAnalyzer
@@ -320,6 +321,34 @@ class LocalModeTest(unittest.TestCase):
             pipeline.protocol_source,
             "https://raw.githubusercontent.com/stellar/go-stellar-sdk/v0.7.2/protocols/rpc/",
         )
+
+    def test_local_file_of_either_form_writes_the_methods_from_the_pinned_request_files(self) -> None:
+        self.write_go_mod("github.com/stellar/go-stellar-sdk v0.7.2")
+        base = "https://raw.githubusercontent.com/stellar/go-stellar-sdk/v0.7.2/protocols/rpc/"
+        request_urls = [f"{base}{common.camel_to_snake(prefix)}.go" for prefix in support.METHOD_PREFIXES]
+        for fixture, path in ((support.RPC_V30_0_0_SOURCE, "jsonrpc.go"),
+                              (support.RPC_V30_0_1_SOURCE, "rpcv1/jsonrpc.go")):
+            with self.subTest(fixture=fixture.name):
+                local = self.tmp / "cmd" / "stellar-rpc" / "internal" / path
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_bytes(fixture.read_bytes())
+                fake = support.FakeUrlopen({url: (support.request_file(prefix).encode("utf-8"), None)
+                                            for url, prefix in zip(request_urls, support.METHOD_PREFIXES)})
+                with mock.patch.object(run_rpc_analysis, "DATA_DIR", self.tmp / fixture.stem), \
+                        mock.patch.object(github_fetcher.urllib.request, "urlopen", fake), \
+                        mock.patch.object(github_fetcher, "get_github_token", return_value=None), \
+                        contextlib.redirect_stdout(io.StringIO()):
+                    pipeline = run_rpc_analysis.RPCAnalysisPipeline(local_jsonrpc_path=str(local))
+                    pipeline.fetch_rpc_release()
+                    pipeline.parse_rpc_methods()
+                methods = json.loads(pipeline.rpc_methods_file.read_text(encoding="utf-8"))["methods"]
+                self.assertEqual(sorted(methods), [
+                    "getEvents", "getFeeStats", "getHealth", "getLatestLedger", "getLedgerEntries",
+                    "getLedgers", "getNetwork", "getTransaction", "getTransactions", "getVersionInfo",
+                    "sendTransaction", "simulateTransaction",
+                ])
+                self.assertEqual(methods["getEvents"]["required_params"], ["startLedger"])
+                self.assertEqual(fake.requested, request_urls)
 
 
 class MatrixHeaderTest(unittest.TestCase):
