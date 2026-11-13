@@ -1,5 +1,6 @@
 package com.soneso.smartdemo.agent
 
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
 import com.soneso.stellar.sdk.smartaccount.core.ContractErrorCodes
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.oz.TransactionResult
@@ -98,6 +99,25 @@ class OutcomeTest {
     @Test
     fun smartAccountExceptionWithAPolicyCodeYieldsRejected() {
         val outcome = classifyError(TransactionException.simulationFailed("Error(Contract, #3221)"))
+        assertTrue(outcome is CallOutcome.Rejected)
+        assertEquals(3221, outcome.errorCode)
+    }
+
+    @Test
+    fun maskedSimulationFailureWithAPolicyCodeInTheEventsYieldsRejected() {
+        // stellar-rpc 30.0.1 masks the policy's error in the host error header; the SDK appends
+        // the code found in the diagnostic events to the message.
+        val outcome = classifyError(
+            TransactionException.simulationFailed(
+                "Re-simulation error: HostError: Error(Auth, InvalidAction)",
+                emptyList(),
+                ReportedContractError(
+                    3221u,
+                    ReportedContractError.Provenance.DIAGNOSTIC_EVENTS,
+                    "CDCYWK73YTYFJZZSJ5V7EDFNHYBG4QN3VUNG2IGD27KJDDPNCZKBCBXK"
+                )
+            )
+        )
         assertTrue(outcome is CallOutcome.Rejected)
         assertEquals(3221, outcome.errorCode)
     }

@@ -1824,7 +1824,9 @@ class OZWalletOperations internal constructor(
 
         if (simulation.error != null) {
             throw TransactionException.simulationFailed(
-                "Simulation error: ${simulation.error}"
+                "Simulation error: ${simulation.error}",
+                simulation.events.orEmpty(),
+                simulation.reportedContractError()
             )
         }
 

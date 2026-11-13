@@ -4,8 +4,15 @@ import com.soneso.stellar.sdk.rpc.*
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.SorobanContractParserException
 import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
+import com.soneso.stellar.sdk.rpc.exception.FailedSimulationResponseException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
+import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures
+import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_A
+import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_A_CONTRACT
+import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_C1
+import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_C2
 import com.soneso.stellar.sdk.rpc.requests.GetLedgersRequest
 import com.soneso.stellar.sdk.rpc.requests.GetTransactionsRequest
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
@@ -2359,5 +2366,165 @@ class SorobanServerTest {
             assertEquals(GetTransactionStatus.SUCCESS, response.status)
             assertEquals(1, requests.size)
         }
+    }
+
+    // ========== Failed simulations carry their data ==========
+
+    private val invokeResultsRequired =
+        "invalid simulateTransactionResponse: results must contain exactly one element if the operation is an InvokeHostFunctionOperation"
+
+    private suspend fun extendTransaction(): Transaction = TransactionBuilder(
+        Account(KeyPair.random().getAccountId(), 1L),
+        Network.TESTNET
+    )
+        .addOperation(ExtendFootprintTTLOperation(extendTo = 1000))
+        .setSorobanData(SorobanDataBuilder().build())
+        .setTimeout(300)
+        .setBaseFee(100)
+        .build()
+
+    @Test
+    fun testPrepareTransaction_maskedFailure_carriesTheReportedContractError() = runTest {
+        for (rpc30_0_0 in listOf(false, true)) {
+            createMockServer(SimulationFixtures.body(CASE_A, rpc30_0_0)).use { server ->
+                val exception = assertFailsWith<PrepareTransactionException> {
+                    server.prepareTransaction(createTestTransaction())
+                }
+
+                val simulation = SimulationFixtures.response(CASE_A, rpc30_0_0)
+                assertEquals(
+                    "Simulation failed: ${simulation.error}" + SimulationFixtures.suffix(3201u, CASE_A_CONTRACT),
+                    exception.message
+                )
+                assertEquals(simulation.error, exception.simulationError)
+                assertEquals(simulation.events, exception.diagnosticEventsXdr)
+                assertEquals(
+                    ReportedContractError(3201u, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, CASE_A_CONTRACT),
+                    exception.reportedContractError
+                )
+            }
+        }
+    }
+
+    @Test
+    fun testPrepareTransaction_contractErrorHeader_messageHasNoSuffix() = runTest {
+        for ((case, code) in listOf(CASE_C1 to 3200u, CASE_C2 to 8u)) {
+            for (rpc30_0_0 in listOf(false, true)) {
+                createMockServer(SimulationFixtures.body(case, rpc30_0_0)).use { server ->
+                    val exception = assertFailsWith<PrepareTransactionException> {
+                        server.prepareTransaction(createTestTransaction())
+                    }
+
+                    val simulation = SimulationFixtures.response(case, rpc30_0_0)
+                    assertEquals("Simulation failed: ${simulation.error}", exception.message)
+                    assertEquals(simulation.events, exception.diagnosticEventsXdr)
+                    assertEquals(
+                        ReportedContractError(code, ReportedContractError.Provenance.HOST_ERROR, null),
+                        exception.reportedContractError
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun testPrepareTransaction_rpc30_0_0TextWithoutEvents_messageHasNoSuffix() = runTest {
+        val text = SimulationFixtures.response(CASE_A, rpc30_0_0 = true).error!!
+        createMockServer(SimulationFixtures.simulateErrorBody(text, events = null)).use { server ->
+            val exception = assertFailsWith<PrepareTransactionException> {
+                server.prepareTransaction(createTestTransaction())
+            }
+
+            assertEquals("Simulation failed: $text", exception.message)
+            assertEquals(emptyList(), exception.diagnosticEventsXdr)
+            assertNull(exception.reportedContractError)
+        }
+    }
+
+    @Test
+    fun testPrepareTransaction_callerOwnedEvents_areCopied() = runTest {
+        val events = mutableListOf(SimulationFixtures.contractErrorEvent(3016u), "AAAA")
+        val expected = events.toList()
+        createMockServer(SIMULATE_ERROR_RESPONSE).use { server ->
+            val exception = assertFailsWith<PrepareTransactionException> {
+                server.prepareTransaction(
+                    createTestTransaction(),
+                    SimulateTransactionResponse(error = SimulationFixtures.MASKED_AUTH, events = events)
+                )
+            }
+
+            events.add("added")
+            events.clear()
+
+            assertEquals(expected, exception.diagnosticEventsXdr)
+            assertFalse(exception.diagnosticEventsXdr is MutableList<*>)
+            assertEquals(3016u, exception.reportedContractError?.code)
+        }
+    }
+
+    @Test
+    fun testAssembleTransaction_failedSimulation_throwsWithTheSimulationData() = runTest {
+        val caseA = SimulationFixtures.response(CASE_A)
+        val caseASuffix = SimulationFixtures.suffix(3201u, CASE_A_CONTRACT)
+        val caseAReported =
+            ReportedContractError(3201u, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, CASE_A_CONTRACT)
+        val oneResult = listOf(SimulateTransactionResponse.SimulateHostFunctionResult(xdr = "AAAAAQ=="))
+
+        val withoutResults = assertFailsWith<FailedSimulationResponseException> {
+            assembleTransaction(createTestTransaction(), caseA)
+        }
+        assertEquals(invokeResultsRequired + caseASuffix, withoutResults.message)
+        assertEquals(caseA.error, withoutResults.simulationError)
+        assertEquals(caseA.events, withoutResults.diagnosticEventsXdr)
+        assertEquals(caseAReported, withoutResults.reportedContractError)
+
+        val withOneResult = assertFailsWith<FailedSimulationResponseException> {
+            assembleTransaction(createTestTransaction(), caseA.copy(results = oneResult))
+        }
+        assertEquals("Simulation failed: ${caseA.error}$caseASuffix", withOneResult.message)
+        assertEquals(caseAReported, withOneResult.reportedContractError)
+
+        val extend = assertFailsWith<FailedSimulationResponseException> {
+            assembleTransaction(extendTransaction(), caseA)
+        }
+        assertEquals("Simulation failed: ${caseA.error}$caseASuffix", extend.message)
+        assertEquals(caseA.events, extend.diagnosticEventsXdr)
+        assertEquals(caseAReported, extend.reportedContractError)
+
+        val header = assertFailsWith<IllegalArgumentException> {
+            assembleTransaction(createTestTransaction(), SimulationFixtures.response(CASE_C1))
+        }
+        assertEquals(invokeResultsRequired, header.message, "a header code adds no suffix")
+
+        val twoResultsWithoutEvents = assertFailsWith<FailedSimulationResponseException> {
+            assembleTransaction(
+                createTestTransaction(),
+                SimulateTransactionResponse(error = SimulationFixtures.MASKED_AUTH, results = oneResult + oneResult)
+            )
+        }
+        assertEquals(invokeResultsRequired, twoResultsWithoutEvents.message)
+        assertEquals(emptyList(), twoResultsWithoutEvents.diagnosticEventsXdr)
+        assertNull(twoResultsWithoutEvents.reportedContractError)
+        assertEquals(
+            ReportedContractError(3200u, ReportedContractError.Provenance.HOST_ERROR, null),
+            assertIs<FailedSimulationResponseException>(header).reportedContractError
+        )
+    }
+
+    @Test
+    fun testAssembleTransaction_callerOwnedEvents_areCopied() = runTest {
+        val events = mutableListOf(SimulationFixtures.contractErrorEvent(3016u))
+        val expected = events.toList()
+
+        val exception = assertFailsWith<FailedSimulationResponseException> {
+            assembleTransaction(
+                extendTransaction(),
+                SimulateTransactionResponse(error = SimulationFixtures.MASKED_AUTH, events = events)
+            )
+        }
+        events.clear()
+
+        assertEquals(expected, exception.diagnosticEventsXdr)
+        assertFalse(exception.diagnosticEventsXdr is MutableList<*>)
     }
 }

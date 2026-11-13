@@ -8,6 +8,7 @@ import com.soneso.stellar.sdk.contract.ContractClient
 import com.soneso.stellar.sdk.contract.bindings.*
 import com.soneso.stellar.sdk.contract.exception.SimulationFailedException
 import com.soneso.stellar.sdk.integrationTests.fundTestAccountAndAwaitVisibility
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
 import com.soneso.stellar.sdk.xdr.SCValXdr
@@ -175,6 +176,11 @@ class BindingsSpecTestContractIntegrationTest {
         assertTrue(
             simulationFailure.message!!.contains("Error(Contract, #1)"),
             "simulation error identifies contract error #1 (NumberMustBeOdd): ${simulationFailure.message}"
+        )
+        assertEquals(
+            ReportedContractError(1u, ReportedContractError.Provenance.HOST_ERROR, null),
+            simulationFailure.reportedContractError,
+            "the host error header reports contract error #1"
         )
 
         // --- keyword-named methods: `val` and `from` (param `finally`) ---

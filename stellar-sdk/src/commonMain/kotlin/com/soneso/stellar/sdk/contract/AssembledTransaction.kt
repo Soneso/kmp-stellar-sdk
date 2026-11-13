@@ -7,6 +7,7 @@ import com.soneso.stellar.sdk.rpc.SorobanDataBuilder
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.SimulationFailureMessage
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.xdr.*
@@ -192,20 +193,25 @@ class AssembledTransaction<T> internal constructor(
         if (restore && simulation!!.restorePreamble != null && !isReadCall()) {
             try {
                 restoreFootprint()
-            } catch (_: ContractException) {
-                throw RestorationFailureException("Failed to restore contract data.", this)
+            } catch (e: ContractException) {
+                throw RestorationFailureException("Failed to restore contract data.", this, e)
             } catch (e: Exception) {
-                throw RestorationFailureException("Failed to restore contract data: ${e.message}", this)
+                throw RestorationFailureException("Failed to restore contract data: ${e.message}", this, e)
             }
             // Re-simulate after restoration
             return simulate(restore = false)
         }
 
         // Check for simulation errors
-        if (simulation!!.error != null) {
+        val failedSimulation = simulation!!
+        val simulationError = failedSimulation.error
+        if (simulationError != null) {
+            val reported = failedSimulation.reportedContractError()
             throw SimulationFailedException(
-                "Transaction simulation failed: ${simulation!!.error}",
-                this
+                SimulationFailureMessage.compose("Transaction simulation failed: ", simulationError, reported),
+                this,
+                failedSimulation.events.orEmpty(),
+                reported
             )
         }
 

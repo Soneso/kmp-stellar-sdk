@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.horizon.exceptions.ConnectionErrorException
 import com.soneso.stellar.sdk.isFatal
 import com.soneso.stellar.sdk.requireContractStrKey
 import com.soneso.stellar.sdk.rpc.exception.AccountNotFoundException
+import com.soneso.stellar.sdk.rpc.exception.FailedSimulationResponseException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.rpc.requests.*
@@ -827,17 +828,22 @@ class SorobanServer(
      * @param transaction The transaction to prepare
      * @param simulateResponse The simulation results to apply
      * @return A copy of the transaction with simulation results applied
-     * @throws PrepareTransactionException If simulation contains an error
+     * @throws PrepareTransactionException If simulation contains an error; it carries the
+     *   response's diagnostic events and the contract error the simulation reports
      */
     suspend fun prepareTransaction(
         transaction: Transaction,
         simulateResponse: SimulateTransactionResponse
     ): Transaction {
         // Check for simulation error
-        if (simulateResponse.error != null) {
+        val simulationError = simulateResponse.error
+        if (simulationError != null) {
+            val reported = simulateResponse.reportedContractError()
             throw PrepareTransactionException(
-                message = "Simulation failed: ${simulateResponse.error}",
-                simulationError = simulateResponse.error
+                message = SimulationFailureMessage.compose("Simulation failed: ", simulationError, reported),
+                simulationError = simulationError,
+                diagnosticEventsXdr = simulateResponse.events.orEmpty(),
+                reportedContractError = reported
             )
         }
 
@@ -1289,6 +1295,9 @@ class SorobanServer(
     }
 }
 
+private const val INVOKE_RESULTS_REQUIRED_MESSAGE =
+    "invalid simulateTransactionResponse: results must contain exactly one element if the operation is an InvokeHostFunctionOperation"
+
 /**
  * Assembles a transaction by applying simulation results.
  *
@@ -1313,6 +1322,8 @@ class SorobanServer(
  * @param simulateResponse The simulation results to apply
  * @return A new transaction with simulation results applied
  * @throws IllegalArgumentException If transaction is not a Soroban transaction
+ * @throws FailedSimulationResponseException If [simulateResponse] reports an error; it carries the
+ *   response's diagnostic events and the contract error the simulation reports
  * @throws IllegalArgumentException If simulation results are invalid for the operation
  */
 fun assembleTransaction(
@@ -1321,6 +1332,23 @@ fun assembleTransaction(
 ): Transaction {
     require(transaction.isSorobanTransaction()) {
         "unsupported transaction: must contain exactly one InvokeHostFunctionOperation, ExtendFootprintTTLOperation, or RestoreFootprintOperation"
+    }
+
+    simulateResponse.error?.let { simulationError ->
+        val reported = simulateResponse.reportedContractError()
+        val invokeWithoutSingleResult = transaction.operations[0] is InvokeHostFunctionOperation &&
+            (simulateResponse.results == null || simulateResponse.results.size != 1)
+        val message = if (invokeWithoutSingleResult) {
+            INVOKE_RESULTS_REQUIRED_MESSAGE + SimulationFailureMessage.suffix(reported)
+        } else {
+            SimulationFailureMessage.compose("Simulation failed: ", simulationError, reported)
+        }
+        throw FailedSimulationResponseException(
+            message,
+            simulationError,
+            simulateResponse.events.orEmpty(),
+            reported
+        )
     }
 
     // Calculate classic fee (excluding resource fees from existing soroban data)
@@ -1341,9 +1369,7 @@ fun assembleTransaction(
         // If the operation is an InvokeHostFunctionOperation, we need to update the auth entries
         // if existing entries are empty and the simulation result contains auth entries.
         if (simulateResponse.results == null || simulateResponse.results.size != 1) {
-            throw IllegalArgumentException(
-                "invalid simulateTransactionResponse: results must contain exactly one element if the operation is an InvokeHostFunctionOperation"
-            )
+            throw IllegalArgumentException(INVOKE_RESULTS_REQUIRED_MESSAGE)
         }
 
         val simulateHostFunctionResult = simulateResponse.results[0]

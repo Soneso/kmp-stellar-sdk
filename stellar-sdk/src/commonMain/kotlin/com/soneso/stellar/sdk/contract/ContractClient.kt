@@ -1,11 +1,14 @@
 package com.soneso.stellar.sdk.contract
 
 import com.soneso.stellar.sdk.*
+import com.soneso.stellar.sdk.contract.exception.ContractClientSimulationException
 import com.soneso.stellar.sdk.contract.exception.SendTransactionFailedException
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.SimulationFailureMessage
 import com.soneso.stellar.sdk.xdr.*
 
 /**
@@ -685,7 +688,7 @@ class ContractClient private constructor(
             network: Network
         ): ContractClient {
             requireContractStrKey(contractId, "The contract to load")
-            val server = SorobanServer(rpcUrl)
+            val server = sorobanServerFor(rpcUrl)
 
             val contractSpec = try {
                 val contractInfo = server.loadContractInfoForContractId(contractId)
@@ -707,7 +710,7 @@ class ContractClient private constructor(
                 )
             }
 
-            return ContractClient(contractId, rpcUrl, network, contractSpec)
+            return ContractClient(contractId, rpcUrl, network, contractSpec, sorobanServerFor(rpcUrl))
         }
 
         /**
@@ -956,7 +959,7 @@ class ContractClient private constructor(
             // spec deploys anyway; the forContract fallback reports it with its usual
             // error semantics.
             val contractInfo = if (loadSpec) {
-                SorobanServer(rpcUrl).use { rpc ->
+                sorobanServerFor(rpcUrl).use { rpc ->
                     try {
                         rpc.loadContractInfoForWasmId(wasmId)
                     } catch (_: SorobanContractParserException) {
@@ -978,7 +981,8 @@ class ContractClient private constructor(
                 signer = signer,
                 network = network,
                 rpcUrl = rpcUrl,
-                salt = salt
+                salt = salt,
+                server = sorobanServerFor(rpcUrl)
             )
 
             return clientForDeployedContract(contractId, rpcUrl, network, contractInfo, loadSpec)
@@ -1107,7 +1111,7 @@ class ContractClient private constructor(
             rpcUrl = rpcUrl,
             salt = salt,
             loadSpec = loadSpec,
-            server = SorobanServer(rpcUrl)
+            server = sorobanServerFor(rpcUrl)
         )
 
         /**
@@ -1216,7 +1220,7 @@ class ContractClient private constructor(
             network: Network,
             rpcUrl: String
         ): String {
-            val server = SorobanServer(rpcUrl)
+            val server = sorobanServerFor(rpcUrl)
 
             val account = server.getAccount(source)
 
@@ -1232,8 +1236,8 @@ class ContractClient private constructor(
                 .build()
 
             val simulateResponse = server.simulateTransaction(transaction)
-            if (simulateResponse.error != null) {
-                throw IllegalStateException("WASM upload simulation failed: ${simulateResponse.error}")
+            simulateResponse.error?.let { simulationError ->
+                throw simulationFailure("WASM upload simulation failed: ", simulationError, simulateResponse)
             }
 
             val preparedTransaction = server.prepareTransaction(transaction, simulateResponse)
@@ -1285,7 +1289,7 @@ class ContractClient private constructor(
             // with its usual error semantics; with arguments, the parse failure means
             // they cannot be converted, so it propagates before anything deploys.
             val contractInfo = if (constructorArgs.isNotEmpty() || loadSpec) {
-                SorobanServer(rpcUrl).use { rpc ->
+                sorobanServerFor(rpcUrl).use { rpc ->
                     try {
                         rpc.loadContractInfoForWasmId(wasmId)
                     } catch (e: SorobanContractParserException) {
@@ -1332,7 +1336,8 @@ class ContractClient private constructor(
                 signer = signer,
                 network = network,
                 rpcUrl = rpcUrl,
-                salt = salt
+                salt = salt,
+                server = sorobanServerFor(rpcUrl)
             )
 
             return clientForDeployedContract(contractId, rpcUrl, network, contractInfo, loadSpec)
@@ -1427,8 +1432,8 @@ class ContractClient private constructor(
                 .build()
 
             val simulateResponse = server.simulateTransaction(transaction)
-            if (simulateResponse.error != null) {
-                throw IllegalStateException("Contract deployment simulation failed: ${simulateResponse.error}")
+            simulateResponse.error?.let { simulationError ->
+                throw simulationFailure("Contract deployment simulation failed: ", simulationError, simulateResponse)
             }
 
             val preparedTransaction = server.prepareTransaction(transaction, simulateResponse)
@@ -1467,10 +1472,34 @@ class ContractClient private constructor(
             contractInfo: SorobanContractInfo?,
             loadSpec: Boolean
         ): ContractClient = when {
-            !loadSpec -> ContractClient(contractId, rpcUrl, network, null)
+            !loadSpec -> ContractClient(contractId, rpcUrl, network, null, sorobanServerFor(rpcUrl))
             contractInfo?.specEntries?.isNotEmpty() == true ->
-                ContractClient(contractId, rpcUrl, network, ContractSpec(contractInfo.specEntries))
+                ContractClient(
+                    contractId,
+                    rpcUrl,
+                    network,
+                    ContractSpec(contractInfo.specEntries),
+                    sorobanServerFor(rpcUrl)
+                )
             else -> forContract(contractId, rpcUrl, network)
+        }
+
+        /**
+         * Returns the exception for a failed upload or deployment simulation: [prefix] and the
+         * simulation error, with the contract error suffix when the diagnostic events report one.
+         */
+        private fun simulationFailure(
+            prefix: String,
+            simulationError: String,
+            simulateResponse: SimulateTransactionResponse
+        ): ContractClientSimulationException {
+            val reported = simulateResponse.reportedContractError()
+            return ContractClientSimulationException(
+                SimulationFailureMessage.compose(prefix, simulationError, reported),
+                simulationError,
+                simulateResponse.events.orEmpty(),
+                reported
+            )
         }
 
         /**
