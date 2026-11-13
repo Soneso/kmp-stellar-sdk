@@ -5,6 +5,8 @@ import com.soneso.stellar.sdk.contract.*
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.contract.AssembledTransaction
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.rpc.exception.SimulationFailureDetails
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
 import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -834,5 +836,66 @@ class ContractExceptionTest {
         assertSame(assembledTransaction, exception3.assembledTransaction)
         assertSame(exception1.assembledTransaction, exception2.assembledTransaction)
         assertSame(exception2.assembledTransaction, exception3.assembledTransaction)
+    }
+
+    // ==================== Simulation data ====================
+
+    private val reported = ReportedContractError(3201u, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, CONTRACT_ID)
+
+    @Test
+    fun testSimulationFailedExceptionConstructorWithoutEventsCarriesNoSimulationData() {
+        for (message in listOf(TEST_MESSAGE, "HostError: Error(Contract, #3016)")) {
+            val exception = SimulationFailedException(message, assembledTransaction)
+
+            assertEquals(message, exception.message)
+            assertEquals(emptyList(), exception.diagnosticEventsXdr)
+            assertNull(exception.reportedContractError)
+        }
+    }
+
+    @Test
+    fun testSimulationFailedExceptionKeepsAnImmutableCopyOfTheEvents() {
+        val events = mutableListOf("AAAA", "BBBB")
+        val exception = SimulationFailedException(TEST_MESSAGE, assembledTransaction, events, reported)
+
+        events.add("CCCC")
+        events.clear()
+
+        assertEquals(listOf("AAAA", "BBBB"), exception.diagnosticEventsXdr)
+        assertFalse(exception.diagnosticEventsXdr is MutableList<*>)
+        assertEquals(reported, exception.reportedContractError)
+        assertEquals(TEST_MESSAGE, exception.message)
+        assertSame(assembledTransaction, exception.assembledTransaction)
+        assertTrue((exception as ContractException) is SimulationFailureDetails)
+    }
+
+    @Test
+    fun testRestorationFailureExceptionKeepsTheCause() {
+        val cause = SimulationFailedException(TEST_MESSAGE, assembledTransaction, listOf("AAAA"), reported)
+        val exception = RestorationFailureException("Failed to restore contract data.", assembledTransaction, cause)
+
+        assertEquals("Failed to restore contract data.", exception.message)
+        assertSame(assembledTransaction, exception.assembledTransaction)
+        assertSame(cause, exception.cause)
+    }
+
+    @Test
+    fun testContractClientSimulationExceptionIsAnIllegalStateExceptionWithData() {
+        val events = mutableListOf("AAAA")
+        val exception: Exception = ContractClientSimulationException(
+            "WASM upload simulation failed: x",
+            "x",
+            events,
+            reported
+        )
+
+        events.clear()
+
+        val failure = assertIs<ContractClientSimulationException>(assertIs<IllegalStateException>(exception))
+        assertEquals("WASM upload simulation failed: x", failure.message)
+        assertEquals("x", failure.simulationError)
+        assertEquals(listOf("AAAA"), failure.diagnosticEventsXdr)
+        assertFalse(failure.diagnosticEventsXdr is MutableList<*>)
+        assertEquals(reported, failure.reportedContractError)
     }
 }

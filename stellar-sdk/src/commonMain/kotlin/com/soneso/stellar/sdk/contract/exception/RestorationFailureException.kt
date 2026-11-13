@@ -9,10 +9,23 @@ import com.soneso.stellar.sdk.contract.AssembledTransaction
  * [AssembledTransaction.simulate] automatically attempts restoration. This exception
  * indicates that the restoration transaction failed.
  *
+ * The failure of the restoration, such as a [SimulationFailedException] of the restore
+ * simulation, is the [cause] when the SDK throws this exception.
+ *
  * @property message The error message
  * @property assembledTransaction The AssembledTransaction whose restoration failed
  */
-class RestorationFailureException(
-    message: String,
-    assembledTransaction: AssembledTransaction<*>
-) : ContractException(message, assembledTransaction)
+class RestorationFailureException : ContractException {
+
+    /**
+     * Creates the exception without a cause.
+     */
+    constructor(message: String, assembledTransaction: AssembledTransaction<*>) :
+        super(message, assembledTransaction)
+
+    /**
+     * Creates the exception with the [cause] of the failed restoration.
+     */
+    constructor(message: String, assembledTransaction: AssembledTransaction<*>, cause: Throwable) :
+        super(message, assembledTransaction, cause)
+}

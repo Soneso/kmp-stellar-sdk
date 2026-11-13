@@ -62,6 +62,23 @@ data class SimulateTransactionResponse(
     }
 
     /**
+     * Returns the contract error that this failed simulation reports, or null.
+     *
+     * An `Error(Contract, #N)` in the host error header, the first line of [error], is the result.
+     * After a masked header (`Error(Context, ...)` or `Error(Auth, ...)`), the earliest diagnostic
+     * event in [events] that reports a contract error is the result; entries that do not decode
+     * are skipped. Otherwise, and for a successful simulation, the result is null. This function
+     * never throws.
+     *
+     * The selection from the events is a heuristic, and without RPC debug events a code is
+     * available only from an `Error(Contract, #N)` header; see [ReportedContractError].
+     *
+     * @return the reported contract error, or null
+     */
+    fun reportedContractError(): ReportedContractError? =
+        SimulationContractErrors.extract(error, events)
+
+    /**
      * Result of simulating a host function invocation.
      *
      * @property auth List of base64-encoded SorobanAuthorizationEntry XDR objects required for authorization

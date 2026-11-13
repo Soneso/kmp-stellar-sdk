@@ -7,6 +7,12 @@
 
 package com.soneso.stellar.sdk.smartaccount.core
 
+import com.soneso.stellar.sdk.rpc.exception.SimulationFailureDetails
+import com.soneso.stellar.sdk.rpc.responses.EventSnapshot
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
+import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
+import com.soneso.stellar.sdk.rpc.responses.SimulationFailureMessage
+
 /**
  * Error codes for Smart Account operations.
  *
@@ -502,9 +508,35 @@ sealed class TransactionException(
 
     /**
      * Transaction simulation failed error.
+     *
+     * When thrown for a failed simulation response, it carries the response's diagnostic events
+     * and the contract error the simulation reports. Created through the constructor without
+     * them, it carries an empty list and null.
+     *
+     * @param message The error message, used as given
+     * @param diagnosticEventsXdr The base64 DiagnosticEvent XDR strings of the failed simulation
+     * @param cause Optional underlying cause
+     * @property diagnosticEventsXdr Immutable copy of the base64 DiagnosticEvent XDR strings
+     * @property reportedContractError The contract error the failed simulation reports, or null.
+     *   The selection from the diagnostic events is a heuristic, and without RPC debug events a
+     *   code is available only from an `Error(Contract, #N)` header; see [ReportedContractError].
      */
-    class SimulationFailed(message: String, cause: Throwable? = null) :
-        TransactionException(SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED, message, cause)
+    class SimulationFailed(
+        message: String,
+        diagnosticEventsXdr: List<String>,
+        override val reportedContractError: ReportedContractError?,
+        cause: Throwable? = null
+    ) : TransactionException(SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED, message, cause),
+        SimulationFailureDetails {
+
+        override val diagnosticEventsXdr: List<String> = EventSnapshot(diagnosticEventsXdr)
+
+        /**
+         * Creates the error without simulation data: [diagnosticEventsXdr] is empty and
+         * [reportedContractError] is null.
+         */
+        constructor(message: String, cause: Throwable? = null) : this(message, emptyList(), null, cause)
+    }
 
     /**
      * Transaction signing failed error.
@@ -534,6 +566,34 @@ sealed class TransactionException(
          */
         fun simulationFailed(reason: String, cause: Throwable? = null) =
             SimulationFailed("Transaction simulation failed: $reason", cause)
+
+        /**
+         * Creates a transaction simulation failed error for a failed simulation response.
+         *
+         * The message is `Transaction simulation failed: ` followed by [reason]. When
+         * [reportedContractError] was found in the diagnostic events, the message ends with
+         * ` (contract error in diagnostic events: Error(Contract, #N), contract C...)`, without the
+         * contract part when the event has no contract ID, so the code also reaches readers of the
+         * message. Otherwise the message equals the one of the two-argument factory.
+         *
+         * @param reason Description of why simulation failed, without the contract error suffix
+         * @param diagnosticEventsXdr The base64 DiagnosticEvent XDR strings of the response
+         * @param reportedContractError The contract error the response reports, typically
+         *   [SimulateTransactionResponse.reportedContractError]
+         * @param cause Optional underlying cause
+         * @return SimulationFailed exception instance carrying the events and the reported error
+         */
+        fun simulationFailed(
+            reason: String,
+            diagnosticEventsXdr: List<String>,
+            reportedContractError: ReportedContractError?,
+            cause: Throwable? = null
+        ) = SimulationFailed(
+            "Transaction simulation failed: $reason" + SimulationFailureMessage.suffix(reportedContractError),
+            diagnosticEventsXdr,
+            reportedContractError,
+            cause
+        )
 
         /**
          * Creates a transaction signing failed error.
@@ -965,6 +1025,26 @@ object ContractErrorCodes {
         return CONTRACT_ERROR_REGEX.findAll(message)
             .mapNotNull { match -> match.groupValues[1].toIntOrNull()?.let { decode(it) } }
             .firstOrNull()
+    }
+
+    /**
+     * Decodes the contract error that a failed simulation reports into the OZ contract and
+     * variant name that defined it.
+     *
+     * Reads only [SimulationFailureDetails.reportedContractError]; the message and later events
+     * are not searched. Returns null when the failure carries no reported error or its code is not
+     * a known OZ smart-account contract error. The reported error comes from the host error
+     * header or, after a masked header, from the earliest contract error in the diagnostic
+     * events; that selection is a heuristic, and a foreign contract's code can collide with this
+     * table.
+     *
+     * @param failure The exception thrown for the failed simulation
+     * @return the named OZ contract error, or null
+     */
+    fun decodeFromSimulationFailure(failure: SimulationFailureDetails): OZContractError? {
+        val code = failure.reportedContractError?.code ?: return null
+        if (code > Int.MAX_VALUE.toUInt()) return null
+        return decode(code.toInt())
     }
 
     private val CONTRACT_ERROR_REGEX = Regex("""Error\s*\(\s*Contract\s*,\s*#(\d+)\s*\)""")

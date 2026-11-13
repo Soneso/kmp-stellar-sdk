@@ -7,8 +7,11 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount.core
 
+import com.soneso.stellar.sdk.rpc.exception.SimulationFailureDetails
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
 import com.soneso.stellar.sdk.smartaccount.core.ContractErrorCodes
 import com.soneso.stellar.sdk.smartaccount.core.OZContractError
+import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -177,5 +180,45 @@ class ContractErrorCodesTest {
                 "Error(Contract, #99999999999999999) then Error(Contract, #3114)"
             )?.code
         )
+    }
+
+    private class Failure(override val reportedContractError: ReportedContractError?) : SimulationFailureDetails {
+        override val diagnosticEventsXdr: List<String> = emptyList()
+    }
+
+    @Test
+    fun testDecodeFromSimulationFailure_decodesTheReportedCode() {
+        assertEquals(
+            OZContractError(3201, "SimpleThresholdError", "InvalidThreshold"),
+            ContractErrorCodes.decodeFromSimulationFailure(
+                Failure(ReportedContractError(3201u, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, null))
+            )
+        )
+        assertEquals(
+            OZContractError(3200, "SimpleThresholdError", "SmartAccountNotInstalled"),
+            ContractErrorCodes.decodeFromSimulationFailure(
+                Failure(ReportedContractError(3200u, ReportedContractError.Provenance.HOST_ERROR, null))
+            )
+        )
+    }
+
+    @Test
+    fun testDecodeFromSimulationFailure_noReportOrUnknownCode_returnsNull() {
+        assertNull(ContractErrorCodes.decodeFromSimulationFailure(Failure(null)))
+        for (code in listOf(9999u, 3001u, Int.MAX_VALUE.toUInt() + 1u, UInt.MAX_VALUE)) {
+            assertNull(
+                ContractErrorCodes.decodeFromSimulationFailure(
+                    Failure(ReportedContractError(code, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, null))
+                ),
+                "code $code"
+            )
+        }
+    }
+
+    @Test
+    fun testDecodeFromSimulationFailure_doesNotReadTheMessage() {
+        val failure = TransactionException.SimulationFailed("HostError: Error(Contract, #3016)")
+        assertNull(ContractErrorCodes.decodeFromSimulationFailure(failure))
+        assertEquals(3016, ContractErrorCodes.decodeFromMessage(failure.message)?.code)
     }
 }

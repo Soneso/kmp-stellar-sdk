@@ -9,6 +9,7 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
+import com.soneso.stellar.sdk.rpc.exception.SimulationFailureDetails
 import com.soneso.stellar.sdk.smartaccount.core.ContractErrorCodes
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
@@ -23,6 +24,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
@@ -128,6 +130,11 @@ class OZConstructorPoliciesIntegrationTest {
             assertEquals(3201, decoded.code)
             assertEquals("InvalidThreshold", decoded.name)
             assertEquals("SimpleThresholdError", decoded.contract)
+            assertEquals(
+                decoded,
+                ContractErrorCodes.decodeFromSimulationFailure(assertIs<SimulationFailureDetails>(exception)),
+                "the reported contract error must name the same policy error"
+            )
         } finally {
             kit.close()
         }

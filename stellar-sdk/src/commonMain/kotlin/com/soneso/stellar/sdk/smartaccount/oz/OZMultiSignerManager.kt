@@ -461,7 +461,11 @@ class OZMultiSignerManager internal constructor(
             useUpgradedAuth = kit.config.useUpgradedAuth
         )
         if (simulation.error != null) {
-            throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
+            throw TransactionException.simulationFailed(
+                "Simulation error: ${simulation.error}",
+                simulation.events.orEmpty(),
+                simulation.reportedContractError()
+            )
         }
         val authEntries = simulation.results?.firstOrNull()?.parseAuth()
             ?: throw TransactionException.simulationFailed("No auth entries returned from simulation")
@@ -554,7 +558,11 @@ class OZMultiSignerManager internal constructor(
             useUpgradedAuth = kit.config.useUpgradedAuth
         )
         if (resignedSimulation.error != null) {
-            throw TransactionException.simulationFailed("Re-simulation error: ${resignedSimulation.error}")
+            throw TransactionException.simulationFailed(
+                "Re-simulation error: ${resignedSimulation.error}",
+                resignedSimulation.events.orEmpty(),
+                resignedSimulation.reportedContractError()
+            )
         }
 
         return kit.transactionOperations.submitMultiSignerTransaction(

@@ -495,7 +495,11 @@ class OZTransactionOperations internal constructor(
 
         // STEP 5: Check for simulation errors
         if (simulation.error != null) {
-            throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
+            throw TransactionException.simulationFailed(
+                "Simulation error: ${simulation.error}",
+                simulation.events.orEmpty(),
+                simulation.reportedContractError()
+            )
         }
 
         // STEP 6: Extract auth entries from simulation
@@ -665,7 +669,11 @@ class OZTransactionOperations internal constructor(
         )
 
         if (reSimulation.error != null) {
-            throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
+            throw TransactionException.simulationFailed(
+                "Re-simulation error: ${reSimulation.error}",
+                reSimulation.events.orEmpty(),
+                reSimulation.reportedContractError()
+            )
         }
 
         // STEP 11: Assemble transaction from re-simulation.
@@ -905,7 +913,11 @@ class OZTransactionOperations internal constructor(
         )
 
         if (simulation.error != null) {
-            throw TransactionException.simulationFailed("Failed to simulate funding transfer: ${simulation.error}")
+            throw TransactionException.simulationFailed(
+                "Failed to simulate funding transfer: ${simulation.error}",
+                simulation.events.orEmpty(),
+                simulation.reportedContractError()
+            )
         }
 
         // Extract auth entries from simulation
@@ -941,7 +953,11 @@ class OZTransactionOperations internal constructor(
         )
 
         if (reSimulation.error != null) {
-            throw TransactionException.simulationFailed("Re-simulation error: ${reSimulation.error}")
+            throw TransactionException.simulationFailed(
+                "Re-simulation error: ${reSimulation.error}",
+                reSimulation.events.orEmpty(),
+                reSimulation.reportedContractError()
+            )
         }
 
         // STEP 10: Assemble the transaction using the SDK's prepareTransaction.
@@ -1041,7 +1057,11 @@ class OZTransactionOperations internal constructor(
         )
 
         if (simulation.error != null) {
-            throw TransactionException.simulationFailed("Simulation error: ${simulation.error}")
+            throw TransactionException.simulationFailed(
+                "Simulation error: ${simulation.error}",
+                simulation.events.orEmpty(),
+                simulation.reportedContractError()
+            )
         }
 
         val results = simulation.results

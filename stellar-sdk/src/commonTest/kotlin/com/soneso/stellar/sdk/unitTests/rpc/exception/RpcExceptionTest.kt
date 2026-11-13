@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests.rpc.exception
 
 import com.soneso.stellar.sdk.horizon.exceptions.NetworkException
 import com.soneso.stellar.sdk.rpc.exception.*
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
 import kotlin.test.*
 
 /**
@@ -11,6 +12,7 @@ import kotlin.test.*
  * - AccountNotFoundException: construction, message, properties
  * - PrepareTransactionException: construction, message, simulationError
  * - SorobanRpcException: construction, message, errorCode, data, inheritance
+ * - FailedSimulationResponseException and the simulation data of both simulation exceptions
  */
 class RpcExceptionTest {
 
@@ -253,5 +255,68 @@ class RpcExceptionTest {
 
         assertTrue(rpcError is SorobanRpcException)
         assertFalse(rpcError is AccountNotFoundException)
+    }
+
+    // ========== Simulation data ==========
+
+    private val reported = ReportedContractError(3016u, ReportedContractError.Provenance.DIAGNOSTIC_EVENTS, null)
+
+    @Test
+    fun testPrepareTransactionException_constructorsWithoutEvents_carryNoSimulationData() {
+        val hostError = "HostError: Error(Contract, #3016)"
+        val cases = listOf(
+            PrepareTransactionException("m") to "m",
+            PrepareTransactionException(hostError) to hostError,
+            PrepareTransactionException("Simulation failed: $hostError", hostError) to "Simulation failed: $hostError"
+        )
+        for ((exception, message) in cases) {
+            assertEquals(message, exception.message)
+            assertEquals(emptyList(), exception.diagnosticEventsXdr)
+            assertNull(exception.reportedContractError)
+        }
+        assertNull(PrepareTransactionException("m").simulationError)
+        assertEquals(hostError, PrepareTransactionException("Simulation failed: $hostError", hostError).simulationError)
+    }
+
+    @Test
+    fun testPrepareTransactionException_keepsAnImmutableCopyOfTheEvents() {
+        val events = mutableListOf("AAAA", "BBBB")
+        val exception = PrepareTransactionException("m", "e", events, reported)
+
+        events.add("CCCC")
+        events.clear()
+
+        assertEquals(listOf("AAAA", "BBBB"), exception.diagnosticEventsXdr)
+        assertFalse(exception.diagnosticEventsXdr is MutableList<*>)
+        assertEquals(reported, exception.reportedContractError)
+        assertEquals("m", exception.message)
+        assertEquals("e", exception.simulationError)
+    }
+
+    @Test
+    fun testFailedSimulationResponseException_isAnIllegalArgumentExceptionWithData() {
+        val events = mutableListOf("AAAA")
+        val exception: Exception = FailedSimulationResponseException("m", "e", events, reported)
+
+        events.clear()
+
+        val failure = assertIs<FailedSimulationResponseException>(assertIs<IllegalArgumentException>(exception))
+        assertEquals("m", failure.message)
+        assertEquals("e", failure.simulationError)
+        assertEquals(listOf("AAAA"), failure.diagnosticEventsXdr)
+        assertFalse(failure.diagnosticEventsXdr is MutableList<*>)
+        assertEquals(reported, failure.reportedContractError)
+    }
+
+    @Test
+    fun testSimulationFailureDetails_oneHandlerReadsTheData() {
+        val failures: List<Exception> = listOf(
+            PrepareTransactionException("m", "e", listOf("AAAA"), reported),
+            FailedSimulationResponseException("m", "e", listOf("AAAA"), reported)
+        )
+        for (failure in failures) {
+            assertEquals(reported, (failure as? SimulationFailureDetails)?.reportedContractError)
+        }
+        assertNull((SorobanRpcException(-32601, "Method not found") as Exception as? SimulationFailureDetails))
     }
 }

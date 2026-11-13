@@ -1,5 +1,8 @@
 package com.soneso.stellar.sdk.rpc.exception
 
+import com.soneso.stellar.sdk.rpc.responses.EventSnapshot
+import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
+
 /**
  * Exception thrown when preparing a Soroban transaction fails.
  *
@@ -33,13 +36,35 @@ package com.soneso.stellar.sdk.rpc.exception
  * }
  * ```
  *
+ * When the failed simulation reports a contract error, [reportedContractError] holds it; when it
+ * was found in the diagnostic events, the message also ends with
+ * ` (contract error in diagnostic events: Error(Contract, #N), contract C...)`, while
+ * [simulationError] stays the raw error text of the response.
+ *
+ * @param diagnosticEventsXdr The base64 DiagnosticEvent XDR strings of the failed simulation
  * @property message A descriptive error message explaining why preparation failed
  * @property simulationError Optional detailed error from the simulation response,
  *           providing contract-specific failure information
+ * @property diagnosticEventsXdr Immutable copy of the base64 DiagnosticEvent XDR strings
+ * @property reportedContractError The contract error the failed simulation reports, or null.
+ *   The selection from the diagnostic events is a heuristic, and without RPC debug events a code
+ *   is available only from an `Error(Contract, #N)` header; see [ReportedContractError].
  *
  * @see <a href="https://developers.stellar.org/docs/smart-contracts/guides/transactions/submit-transaction">Submit a Transaction</a>
  */
 class PrepareTransactionException(
     override val message: String,
-    val simulationError: String? = null
-) : Exception(message)
+    val simulationError: String?,
+    diagnosticEventsXdr: List<String>,
+    override val reportedContractError: ReportedContractError?
+) : Exception(message), SimulationFailureDetails {
+
+    override val diagnosticEventsXdr: List<String> = EventSnapshot(diagnosticEventsXdr)
+
+    /**
+     * Creates the exception without simulation data: [diagnosticEventsXdr] is empty and
+     * [reportedContractError] is null.
+     */
+    constructor(message: String, simulationError: String? = null) :
+        this(message, simulationError, emptyList(), null)
+}
