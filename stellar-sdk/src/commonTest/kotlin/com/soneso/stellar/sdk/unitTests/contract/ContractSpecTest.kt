@@ -2499,6 +2499,102 @@ class ContractSpecTest {
         assertTrue(ex.message!!.contains("Unsupported UDT type"))
     }
 
+    // ========== UDT lookup when a function, event or error enum shares the name ==========
+
+    private val sharedUdtType = createUdtTypeDef("transfer")
+
+    // The encoded XDR of the struct {value: 1}, of the void union case A and of the enum case A.
+    private val sharedStructXdr = "AAAAEQAAAAEAAAABAAAADwAAAAV2YWx1ZQAAAAAAAAMAAAAB"
+    private val sharedUnionXdr = "AAAAEAAAAAEAAAABAAAADwAAAAFBAAAA"
+    private val sharedEnumXdr = "AAAAAwAAAAE="
+
+    private fun sharedFunction() = createFunctionEntry("transfer", emptyList())
+
+    private fun sharedStruct() = createStructEntry("transfer", listOf("value" to SCSpecTypeXdr.SC_SPEC_TYPE_U32))
+
+    private fun sharedUnion() = createUnionEntry("transfer", listOf("A" to 0))
+
+    private fun sharedEnum(): SCSpecEntryXdr = SCSpecEntryXdr.UdtEnumV0(
+        SCSpecUDTEnumV0Xdr("", "", "transfer", listOf(SCSpecUDTEnumCaseV0Xdr("", "A", Uint32Xdr(1u))))
+    )
+
+    private fun sharedErrorEnum(): SCSpecEntryXdr = SCSpecEntryXdr.UdtErrorEnumV0(
+        SCSpecUDTErrorEnumV0Xdr("", "", "transfer", listOf(SCSpecUDTErrorEnumCaseV0Xdr("", "A", Uint32Xdr(2u))))
+    )
+
+    private fun sharedEvent(): SCSpecEntryXdr = SCSpecEntryXdr.EventV0(
+        SCSpecEventV0Xdr(
+            "", "", "transfer", emptyList(), emptyList(),
+            SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE
+        )
+    )
+
+    private fun encodeShared(entries: List<SCSpecEntryXdr>, value: Any): String =
+        ContractSpec(entries).nativeToXdrSCVal(value, sharedUdtType).toXdrBase64()
+
+    private fun decodeShared(entries: List<SCSpecEntryXdr>, base64Xdr: String): Any? =
+        ContractSpec(entries).scValToNative(SCValXdr.fromXdrBase64(base64Xdr), sharedUdtType)
+
+    @Test
+    fun testStructConvertsWithFunctionOfItsNameBeforeOrAfter() {
+        val functionFirst = listOf(sharedFunction(), sharedStruct())
+        val structFirst = listOf(sharedStruct(), sharedFunction())
+        assertEquals(sharedStructXdr, encodeShared(functionFirst, mapOf("value" to 1)))
+        assertEquals(sharedStructXdr, encodeShared(structFirst, mapOf("value" to 1)))
+        assertEquals(mapOf("value" to 1u), decodeShared(functionFirst, sharedStructXdr))
+        assertEquals(mapOf("value" to 1u), decodeShared(structFirst, sharedStructXdr))
+    }
+
+    @Test
+    fun testUnionConvertsWithFunctionOfItsNameBeforeOrAfter() {
+        val functionFirst = listOf(sharedFunction(), sharedUnion())
+        val unionFirst = listOf(sharedUnion(), sharedFunction())
+        assertEquals(sharedUnionXdr, encodeShared(functionFirst, NativeUnionVal.VoidCase("A")))
+        assertEquals(sharedUnionXdr, encodeShared(unionFirst, NativeUnionVal.VoidCase("A")))
+        assertEquals(NativeUnionVal.VoidCase("A"), decodeShared(functionFirst, sharedUnionXdr))
+        assertEquals(NativeUnionVal.VoidCase("A"), decodeShared(unionFirst, sharedUnionXdr))
+    }
+
+    @Test
+    fun testEnumConvertsWithFunctionOfItsNameBeforeOrAfter() {
+        val functionFirst = listOf(sharedFunction(), sharedEnum())
+        val enumFirst = listOf(sharedEnum(), sharedFunction())
+        assertEquals(sharedEnumXdr, encodeShared(functionFirst, "A"))
+        assertEquals(sharedEnumXdr, encodeShared(enumFirst, "A"))
+        assertEquals(1u, decodeShared(functionFirst, sharedEnumXdr))
+        assertEquals(1u, decodeShared(enumFirst, sharedEnumXdr))
+    }
+
+    @Test
+    fun testEnumConvertsAfterErrorEnumOfItsName() {
+        val entries = listOf(sharedErrorEnum(), sharedEnum())
+        assertEquals(sharedEnumXdr, encodeShared(entries, "A"))
+        assertEquals(1u, decodeShared(entries, sharedEnumXdr))
+    }
+
+    @Test
+    fun testStructConvertsAfterEventOfItsName() {
+        val entries = listOf(sharedEvent(), sharedStruct())
+        assertEquals(sharedStructXdr, encodeShared(entries, mapOf("value" to 1)))
+        assertEquals(mapOf("value" to 1u), decodeShared(entries, sharedStructXdr))
+    }
+
+    @Test
+    fun testUdtNameOnlyAFunctionCarriesReportsTheEntryKind() {
+        val entries = listOf(sharedFunction())
+        val encodeError = assertFailsWith<ContractSpecException> {
+            encodeShared(entries, mapOf("value" to 1))
+        }
+        assertEquals("Invalid type: Unsupported UDT type: SC_SPEC_ENTRY_FUNCTION_V0", encodeError.message)
+        val decodeError = assertFailsWith<ContractSpecException> {
+            decodeShared(entries, sharedStructXdr)
+        }
+        assertEquals(
+            "Invalid type: Failed to parse UDT transfer: unsupported entry type SC_SPEC_ENTRY_FUNCTION_V0",
+            decodeError.message
+        )
+    }
+
     // ========== handleStructType: vector representation (numeric field names) ==========
 
     @Test
