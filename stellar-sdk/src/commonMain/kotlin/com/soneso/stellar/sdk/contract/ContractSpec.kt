@@ -148,7 +148,8 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
 
     /**
      * Finds any spec entry by name.
-     * Searches across functions, structs, unions, enums, error enums, and events.
+     * Searches functions, structs, unions, enums, error enums, and events in spec order
+     * and returns the first entry with that name.
      *
      * @param name The entry name to search for
      * @return The spec entry, or null if not found
@@ -164,6 +165,21 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 is SCSpecEntryXdr.EventV0 -> entry.value.name == name
             }
         }
+    }
+
+    /**
+     * Returns the first struct, union or enum entry named [name]. Without one, returns the
+     * entry [findEntry] finds, so the caller reports its kind.
+     */
+    private fun findUdtEntry(name: String): SCSpecEntryXdr? {
+        return entries.firstOrNull { entry ->
+            when (entry) {
+                is SCSpecEntryXdr.UdtStructV0 -> entry.value.name == name
+                is SCSpecEntryXdr.UdtUnionV0 -> entry.value.name == name
+                is SCSpecEntryXdr.UdtEnumV0 -> entry.value.name == name
+                else -> false
+            }
+        } ?: findEntry(name)
     }
 
     /**
@@ -306,6 +322,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * - **Error** → SCErrorXdr
      * - **ContractInstance** → SCContractInstanceXdr
      * - **ExecutableTag** → String when the tag bytes decode as UTF-8, ByteArray otherwise
+     *
+     * A user-defined type converts with the first struct, union or enum entry of its name
+     * and skips any function, event or error enum of that name.
      *
      * @param scVal The XDR value to convert
      * @param typeDef The type specification (nullable for direct type inference)
@@ -488,7 +507,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Converts a UDT (User-Defined Type) SCVal to native Kotlin value.
      */
     private fun scValUdtToNative(scVal: SCValXdr, udt: SCSpecTypeUDTXdr): Any {
-        val entry = findEntry(udt.name)
+        val entry = findUdtEntry(udt.name)
             ?: throw ContractSpecException.entryNotFound(udt.name)
 
         return when (entry) {
@@ -614,6 +633,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * [Address.AddressType.CONTRACT]. A parameter of spec type `MuxedAddress` also
      * takes a muxed account (M...) or muxed contract (W...) strkey, or an [Address] of
      * type [Address.AddressType.MUXED_ACCOUNT] or [Address.AddressType.MUXED_CONTRACT].
+     *
+     * A user-defined type converts with the first struct, union or enum entry of its name
+     * and skips any function, event or error enum of that name.
      *
      * @param value The native Kotlin value to convert
      * @param typeDef The target type specification
@@ -1121,7 +1143,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * Handle user-defined type (struct, union, enum)
      */
     private fun handleUDTType(value: Any?, typeDef: SCSpecTypeDefXdr.Udt): SCValXdr {
-        val entry = findEntry(typeDef.value.name)
+        val entry = findUdtEntry(typeDef.value.name)
             ?: throw ContractSpecException.entryNotFound(typeDef.value.name)
 
         return when (entry) {
