@@ -1162,7 +1162,7 @@ kit.signerManager.removeSigner(
 
 **Preconditions.** A call like `kit.transactionOperations.transfer(...)`, `kit.signerManager.removeSigner(...)`, or any other kit method throws `TransactionException.SimulationFailed`. The contract rejected the auth check (`__check_auth`) or an enforcement hook on a policy.
 
-**Flow.** The simulation error message contains the host error surfaced by RPC — typically of the form `...Error(Contract, #3004)...` for a smart-account error or `...Error(Contract, #3221)...` for a policy error. Pass the exception's message to `ContractErrorCodes.decodeFromMessage`, which extracts and decodes the first known marker in one step, and act on the result.
+**Flow.** The exception carries the contract error the simulation reports as `reportedContractError`. Its code comes from the host error header, such as `Error(Contract, #3004)`. When the header is a masked `Error(Auth, ...)` or `Error(Context, ...)`, the code comes from the earliest contract error in the diagnostic events. Pass the exception to `ContractErrorCodes.decodeFromSimulationFailure`, which decodes that code, and act on the result.
 
 ```kotlin
 val amount = "100"
@@ -1173,12 +1173,12 @@ try {
         amount        = "10"
     )
 } catch (e: TransactionException.SimulationFailed) {
-    // decodeFromMessage scans the message for "Error(Contract, #NNNN)" markers and
-    // resolves the first known code to its contract + variant name (or null).
-    val decoded = ContractErrorCodes.decodeFromMessage(e.message)
+    // decodeFromSimulationFailure resolves the code in e.reportedContractError
+    // to its contract + variant name (or null).
+    val decoded = ContractErrorCodes.decodeFromSimulationFailure(e)
     // Representative cases and action hints:
     val hint = if (decoded == null) {
-        "No known contract code in message: ${e.message}"
+        "No known contract code: ${e.message}"
     } else when (decoded.code) {
         3004 -> "NoSignersAndPolicies — rule would have 0 signers and 0 policies; add one first"
         3016 -> "UnauthorizedSigner — signer not on resolved rule; pass resolveContextRuleIds or adjust selectedSigners"
@@ -1193,15 +1193,15 @@ try {
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK; `ContractErrorCodes.decodeFromMessage(e.message)` extracts and decodes the code in one step — no hand-rolled message parsing is needed. It resolves to an `OZContractError(code, contract, name)` across the full on-chain surface — smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227) — returning null when the message is null, carries no marker, or carries only unknown codes; the smart-account codes are also exposed as named constants for direct branching (and `ContractErrorCodes.decode(code)` resolves a code you already hold). The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** `reportedContractError` holds the code from either place, so no message parsing is needed. `ContractErrorCodes.decodeFromSimulationFailure(e)` resolves it to an `OZContractError(code, contract, name)` across the full on-chain surface: smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227). It returns null when the exception carries no reported contract error or the code is not a known OZ code. A masked header in a response without diagnostic events reports no code. The smart-account codes are also exposed as named constants for direct branching, and `ContractErrorCodes.decode(code)` resolves a code you already hold. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
-// WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class
-// CORRECT: catch TransactionException.SimulationFailed and decode its message
+// WRONG: catch (e: ContractException) { when (e.code) { ... } }  (not thrown by the kit, and it has no code)
+// CORRECT: catch TransactionException.SimulationFailed and decode its reportedContractError
 
 // WRONG: matching on e.code (which is SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED)
 //        — that is the SDK error kind, not the on-chain contract code
-// CORRECT: pass e.message to ContractErrorCodes.decodeFromMessage
+// CORRECT: pass e to ContractErrorCodes.decodeFromSimulationFailure
 ```
 
 ---
@@ -1276,7 +1276,7 @@ try {
     val res = kit.policyManager.addSimpleThreshold(0u, policyAddress, threshold = 2u)
     if (!res.success) println("submit failed: ${res.error}")
 } catch (e: TransactionException.SimulationFailed) {
-    // The message contains the contract error code and name
+    // The message can contain the contract error code
     println("simulation failed: ${e.message}")
 } catch (e: ValidationException.InvalidInput) {
     println("client-side validation: ${e.message}")

@@ -446,7 +446,7 @@ try {
 // CORRECT: response.successful — Boolean; on failure inspect response.resultXdr
 ```
 
-A rejected `submitTransaction` raises `BadRequestException` (result codes in the body); a returned `TransactionResponse` reports `successful` and `resultXdr` (`tx_failed`: check operation results; `tx_bad_seq`: reload the account). Soroban contract failures raise the 10 exception types in `com.soneso.stellar.sdk.contract.exception` (SimulationFailedException, SendTransactionFailedException, TransactionFailedException, ExpiredStateException, ...); check RPC health with `SorobanServer.getHealth()` (`status != "healthy"`). Full error catalog and solutions: [Troubleshooting Guide](./references/troubleshooting.md)
+A rejected `submitTransaction` raises `BadRequestException` (result codes in the body); a returned `TransactionResponse` reports `successful` and `resultXdr` (`tx_failed`: check operation results; `tx_bad_seq`: reload the account). Soroban contract failures raise the 11 exception types in `com.soneso.stellar.sdk.contract.exception` (SimulationFailedException, SendTransactionFailedException, TransactionFailedException, ExpiredStateException, ...); check RPC health with `SorobanServer.getHealth()` (`status != "healthy"`). Full error catalog and solutions: [Troubleshooting Guide](./references/troubleshooting.md)
 
 ## 10. Security Best Practices
 

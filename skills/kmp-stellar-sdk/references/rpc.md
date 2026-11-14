@@ -254,7 +254,7 @@ if (simResponse.error != null) {
 - `authMode: SimulateTransactionRequest.AuthMode?` -- optional auth mode (ENFORCE, RECORD, RECORD_ALLOW_NONROOT)
 - `useUpgradedAuth: Boolean` -- `true` by default: a Protocol 27+ RPC returns ADDRESS_V2 (CAP-71) auth entries in recording modes. The key is sent on every request with the current value; pass `false` to request legacy ADDRESS entries, required on networks below Protocol 27 where V2 entries invalidate the transaction. Pre-27 RPCs ignore the flag and return legacy ADDRESS entries; detect support by inspecting the returned arm, not by error. `prepareTransaction(tx, useUpgradedAuth = ...)` forwards the same flag.
 
-**Response fields:** `error` (String?), `transactionData` (String?), `events` (List\<String\>?), `minResourceFee` (Long?), `results` (List\<SimulateHostFunctionResult\>?), `restorePreamble` (RestorePreamble?), `stateChanges` (List\<LedgerEntryChange\>?), `latestLedger` (Long?).
+**Response fields:** `error` (String?), `transactionData` (String?), `events` (List\<String\>?), `minResourceFee` (Long?), `results` (List\<SimulateHostFunctionResult\>?), `restorePreamble` (RestorePreamble?), `stateChanges` (List\<LedgerEntryChange\>?), `latestLedger` (Long?). `reportedContractError()` returns the contract error a failed simulation reports, or null.
 
 **SimulateHostFunctionResult:** `auth` (List\<String\>?), `xdr` (String?). Parse with `parseAuth()` and `parseXdr()`.
 

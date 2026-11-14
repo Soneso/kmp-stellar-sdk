@@ -75,7 +75,7 @@ arriving from a UI or an external system; the full rules are in security.md.
 | Exception | Trigger | Key Properties |
 |-----------|---------|----------------|
 | `SorobanRpcException` | JSON-RPC error response | `errorCode: Int`, `data: String?` |
-| `PrepareTransactionException` | Simulation failed during prepare | `simulationError: String?` |
+| `PrepareTransactionException` | Simulation failed during prepare | `simulationError: String?`, `diagnosticEventsXdr: List<String>`, `reportedContractError: ReportedContractError?` |
 | `AccountNotFoundException` | Account not found via RPC | `accountId: String` |
 
 ### Contract Exceptions (ContractClient / AssembledTransaction)
@@ -85,16 +85,18 @@ All extend `ContractException`:
 | Exception | Trigger | Key Properties |
 |-----------|---------|----------------|
 | `ContractException` | Base class | `assembledTransaction: AssembledTransaction<*>?` |
-| `SimulationFailedException` | Simulation error | `assembledTransaction` |
+| `SimulationFailedException` | Simulation error | `assembledTransaction`, `diagnosticEventsXdr`, `reportedContractError` |
 | `SendTransactionFailedException` | Network rejected tx | `assembledTransaction` |
 | `TransactionFailedException` | Tx executed but failed | `assembledTransaction` |
 | `TransactionStillPendingException` | Polling timed out after a status response; if every status request failed, the last request failure is thrown | `assembledTransaction` |
 | `ExpiredStateException` | Ledger entries archived | `assembledTransaction` |
-| `RestorationFailureException` | Auto-restore failed | `assembledTransaction` |
+| `RestorationFailureException` | Auto-restore failed | `assembledTransaction`, `cause` |
 | `NeedsMoreSignaturesException` | Auth entries need signing | `assembledTransaction` |
 | `NoSignatureNeededException` | Read-only call, no sig needed | `assembledTransaction` |
 | `NotYetSimulatedException` | Operation called before simulate | `assembledTransaction` |
 | `ContractSpecException` | Spec parsing / type conversion | `functionName`, `argumentName`, `entryName` |
+
+A failed upload or deployment simulation in `ContractClient` (`install`, `deploy`, `deployFromWasmId`, `deployFromExternalRef`) throws `ContractClientSimulationException`. It is an `IllegalStateException`, not a `ContractException`, and carries `simulationError`, `diagnosticEventsXdr` and `reportedContractError`.
 
 ---
 
