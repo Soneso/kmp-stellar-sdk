@@ -1,9 +1,9 @@
 # Soroban RPC vs KMP Stellar SDK Compatibility Matrix
 
-**RPC Version:** v30.0.0 (released 2026-10-21)  
-**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v30.0.0](https://github.com/stellar/stellar-rpc/releases/tag/v30.0.0)  
-**SDK Version:** 1.16.0  
-**Generated:** 2026-10-24 16:58:00
+**RPC Version:** v30.0.1 (released 2026-11-12)  
+**RPC Source:** [https://github.com/stellar/stellar-rpc/releases/tag/v30.0.1](https://github.com/stellar/stellar-rpc/releases/tag/v30.0.1)  
+**SDK Version:** 1.17.0  
+**Generated:** 2026-11-14 04:03:10
 
 ## Overall Coverage
 
