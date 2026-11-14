@@ -202,6 +202,12 @@ def balance_braces(text: str, start: int) -> int:
             depth -= 1
             if depth == 0:
                 return i
+        elif ch == "'":
+            i += 1
+            while i < n and text[i] != "'" and text[i] != "\n":
+                if text[i] == "\\":
+                    i += 1
+                i += 1
         elif ch == '"':
             if i + 2 < n and text[i : i + 3] == '"""':
                 i += 3
@@ -921,7 +927,7 @@ def extract_top_level_functions(clean: str) -> list[TopLevelFunctionInfo]:
 CLASS_START = re.compile(
     r"^[ \t]*"
     r"((?:@Deprecated(?:\([^)]*\))?\s*)?)"  # optional @Deprecated
-    r"((?:(?:public|expect|actual|sealed|data|abstract|open)\s+)*)"  # modifiers (incl. public for explicit API mode + expect/actual)
+    r"((?:(?:public|private|internal|protected|expect|actual|sealed|data|abstract|open)\s+)*)"  # modifiers
     r"(data\s+object|object|enum\s+class|fun\s+interface|interface|class)\s+"  # kind
     r"(\w+)",  # name
     re.MULTILINE,
@@ -938,11 +944,11 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
 
     results = []
 
-    # Stack of (short_name, body_end_index) for currently-open enclosing classes.
+    # Stack of (short_name, body_end_index, is_public) for enclosing classes.
     # As CLASS_START matches iterate left-to-right, we pop any enclosure whose
     # body has already closed before the current match and qualify the class
     # name with the remaining enclosing chain (joined by `.`).
-    enclosing_stack: list[tuple[str, int]] = []
+    enclosing_stack: list[tuple[str, int, bool]] = []
 
     for m in CLASS_START.finditer(clean):
         # Pop enclosures whose body ended before this match
@@ -954,12 +960,10 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
         kind_raw = m.group(3).strip()
         class_name = m.group(4)
 
-        # Skip private/internal classes
-        # Check the text before the match on the same line
-        line_start = clean.rfind("\n", 0, m.start()) + 1
-        prefix = clean[line_start : m.start()].strip()
-        if prefix in ("private", "internal", "protected"):
-            continue
+        modifier_tokens = modifiers.split()
+        is_public = not any(t in ("private", "internal", "protected") for t in modifier_tokens)
+        if enclosing_stack:
+            is_public = is_public and enclosing_stack[-1][2]
 
         # Determine kind string
         kind = ""
@@ -1024,14 +1028,14 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
         if pos < len(clean) and clean[pos] == ":":
             pos += 1
             # Collect supertypes, respecting nested parens/angles.
-            # Stop at { when balanced, or at newline when balanced
-            # (handles body-less classes like sealed subclass data classes).
+            # A balanced newline ends a bodyless declaration only when neither
+            # side continues the list or a supertype's constructor call.
             super_parts: list[str] = []
             sp_paren = 0
             sp_angle = 0
             while pos < len(clean):
                 ch = clean[pos]
-                if ch == "{" and sp_paren == 0 and sp_angle == 0:
+                if ch in ("{", "}", ";") and sp_paren == 0 and sp_angle == 0:
                     break
                 if ch == "(":
                     sp_paren += 1
@@ -1042,14 +1046,17 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
                 elif ch == ">":
                     sp_angle -= 1
                 elif ch == "\n" and sp_paren == 0 and sp_angle == 0:
-                    # Newline at balanced depth — check if next non-ws is {
                     rest = clean[pos + 1 :].lstrip()
-                    if rest.startswith("{"):
+                    super_text = "".join(super_parts).rstrip()
+                    if (
+                        not super_text
+                        or super_text.endswith(",")
+                        or rest.startswith(("{", ",", "("))
+                    ):
                         super_parts.append(" ")
                         pos += 1
                         continue
                     else:
-                        # Class has no body — stop here
                         break
                 super_parts.append(ch)
                 pos += 1
@@ -1079,7 +1086,6 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
             body = clean[pos + 1 : body_end]
 
         # Detect KMP expect/actual modifiers
-        modifier_tokens = modifiers.split()
         is_expect = "expect" in modifier_tokens
         is_actual = "actual" in modifier_tokens
 
@@ -1092,11 +1098,13 @@ def parse_kotlin_file(filepath: Path) -> tuple[list[ClassInfo], list[TopLevelFun
         else:
             qualified_name = class_name
 
-        # Push this class onto the stack so later matches inside its body
-        # receive a qualified name. Push the short name (not the qualified
-        # name) — joining across the stack produces the full chain.
+        # Record non-public enclosures too, so their descendants inherit the
+        # visibility. Short names joined across the stack form the full chain.
         if has_body:
-            enclosing_stack.append((class_name, body_end))
+            enclosing_stack.append((class_name, body_end, is_public))
+
+        if not is_public:
+            continue
 
         # Build ClassInfo
         info = ClassInfo(
