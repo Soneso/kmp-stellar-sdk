@@ -358,7 +358,9 @@ class HorizonServer(
      * This method submits a base64-encoded transaction envelope to Horizon and waits for it
      * to be ingested into a ledger. By default, this function checks if destination accounts
      * require a memo as defined in SEP-0029. Use the overloaded version with skipMemoRequiredCheck
-     * to bypass this validation.
+     * to bypass this validation. The check decodes the envelope with its line breaks (`\r` and `\n`)
+     * removed, since Horizon's base64 decoder skips them; an envelope it cannot decode is not checked.
+     * The envelope is submitted as passed.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @return [com.soneso.stellar.sdk.horizon.responses.TransactionResponse] containing the result
@@ -381,10 +383,12 @@ class HorizonServer(
      *
      * This method submits a base64-encoded transaction envelope to Horizon and waits for it
      * to be ingested into a ledger. The submission uses the submitHttpClient with extended
-     * timeout (65 seconds) to account for transaction processing time.
+     * timeout (65 seconds) to account for transaction processing time. The SEP-0029 check decodes
+     * the envelope with its line breaks (`\r` and `\n`) removed, since Horizon's base64 decoder
+     * skips them; an envelope it cannot decode is not checked. The envelope is submitted as passed.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
-     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check
+     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check and submit the string without decoding it
      * @return [com.soneso.stellar.sdk.horizon.responses.TransactionResponse] containing the result
      * @throws com.soneso.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when skipMemoRequiredCheck is false and a transaction is trying to submit an operation to an account which requires a memo
      * @throws com.soneso.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException
@@ -421,7 +425,9 @@ class HorizonServer(
      * Unlike the synchronous version ([submitTransaction]), which blocks and waits for the
      * transaction to be ingested in Horizon, this endpoint relays the response from Stellar Core
      * directly back to the user. By default, this function checks if destination accounts
-     * require a memo as defined in SEP-0029.
+     * require a memo as defined in SEP-0029. The check decodes the envelope with its line breaks
+     * (`\r` and `\n`) removed, since Horizon's base64 decoder skips them; an envelope it cannot
+     * decode is not checked. The envelope is submitted as passed.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @return [com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse] containing the submission status
@@ -446,6 +452,9 @@ class HorizonServer(
      * Unlike the synchronous version, which blocks and waits for the transaction to be ingested
      * in Horizon, this endpoint relays the response from Stellar Core directly back to the user.
      * This is useful for fire-and-forget scenarios or when you want to poll for results separately.
+     * The SEP-0029 check decodes the envelope with its line breaks (`\r` and `\n`) removed, since
+     * Horizon's base64 decoder skips them; an envelope it cannot decode is not checked. The envelope
+     * is submitted as passed.
      *
      * The async endpoint has different HTTP status code semantics:
      * - HTTP 201: Transaction submitted successfully (PENDING status)
@@ -453,7 +462,7 @@ class HorizonServer(
      * - HTTP 400: Either a validation error (ERROR status with error_result_xdr) or malformed request
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
-     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check
+     * @param skipMemoRequiredCheck Set to true to skip the SEP-0029 memo required check and submit the string without decoding it
      * @return [com.soneso.stellar.sdk.horizon.responses.SubmitTransactionAsyncResponse] containing the submission status
      * @throws com.soneso.stellar.sdk.horizon.exceptions.AccountRequiresMemoException when skipMemoRequiredCheck is false and a transaction is trying to submit an operation to an account which requires a memo
      * @throws com.soneso.stellar.sdk.horizon.exceptions.NetworkException All the exceptions below are subclasses of NetworkException

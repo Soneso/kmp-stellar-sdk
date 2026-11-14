@@ -13,6 +13,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
@@ -27,6 +30,7 @@ import kotlin.test.*
  * - Muxed destinations, which are exempt
  * - V0, V1 and fee bump envelopes
  * - Horizon outcomes per destination: memo required, not required, missing, other error
+ * - Envelope strings with line breaks, which are checked and submitted as passed
  * - Envelopes that cannot be decoded
  */
 class Sep29CheckerTest {
@@ -604,5 +608,218 @@ class Sep29CheckerTest {
         assertEquals(destinationAccountId, exception.accountId)
 
         server.close()
+    }
+
+    // ===== Envelope strings through both submit methods =====
+
+    /**
+     * A server whose account lookups and submissions go to one mock engine, which records every
+     * request as "METHOD path" and the form-encoded body of every submission as sent. With
+     * [answerMalformed] a submission gets Horizon's answer to an envelope it cannot decode.
+     */
+    private fun recordingServer(
+        requests: MutableList<String>,
+        postedBodies: MutableList<String>,
+        memoRequired: Boolean,
+        answerMalformed: Boolean = false
+    ): HorizonServer {
+        val engine = MockEngine { request ->
+            val path = request.url.encodedPath
+            requests.add("${request.method.value} $path")
+            val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
+            when (path) {
+                "/transactions", "/transactions_async" -> {
+                    val body = request.body.toByteArray().decodeToString()
+                    postedBodies.add(body)
+                    when {
+                        answerMalformed -> respond(
+                            transactionMalformedJson(path, parseQueryString(body)["tx"].orEmpty()),
+                            HttpStatusCode.BadRequest,
+                            headersOf(HttpHeaders.ContentType, "application/problem+json; charset=utf-8")
+                        )
+                        path == "/transactions" -> respond(submittedTransactionJson, HttpStatusCode.OK, jsonHeaders)
+                        else -> respond("""{"hash": "abc", "tx_status": "PENDING"}""", HttpStatusCode.Created, jsonHeaders)
+                    }
+                }
+                else -> respond(accountJson(path.substringAfterLast('/'), memoRequired), HttpStatusCode.OK, jsonHeaders)
+            }
+        }
+        val client = HttpClient(engine) {
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true; isLenient = true }) }
+        }
+        return HorizonServer(serverUri.toString(), httpClient = client, submitHttpClient = client)
+    }
+
+    /**
+     * Horizon's HTTP 400 body for an envelope it cannot decode, echoing the envelope. The async
+     * endpoint adds the decoder error, an error value that Go encodes as `{}`.
+     */
+    private fun transactionMalformedJson(path: String, envelope: String): String = buildJsonObject {
+        put("type", "https://stellar.org/horizon-errors/transaction_malformed")
+        put("title", "Transaction Malformed")
+        put("status", 400)
+        put(
+            "detail",
+            "Horizon could not decode the transaction envelope in this request. A transaction should be an XDR " +
+                "TransactionEnvelope struct encoded using base64.  The envelope read from this request is echoed " +
+                "in the `extras.envelope_xdr` field of this response for your convenience."
+        )
+        putJsonObject("extras") {
+            put("envelope_xdr", envelope)
+            if (path == "/transactions_async") putJsonObject("error") {}
+        }
+    }.toString()
+
+    private val submitPaths = listOf("/transactions", "/transactions_async")
+
+    /**
+     * Calls the submit method that posts to [path] and returns the hash of its response; without
+     * [skip] it calls the one-argument overload.
+     */
+    private suspend fun submit(server: HorizonServer, path: String, envelope: String, skip: Boolean): String = when {
+        path == "/transactions" && skip -> server.submitTransaction(envelope, skipMemoRequiredCheck = true).hash
+        path == "/transactions" -> server.submitTransaction(envelope).hash
+        skip -> server.submitTransactionAsync(envelope, skipMemoRequiredCheck = true).hash
+        else -> server.submitTransactionAsync(envelope).hash
+    }
+
+    private fun paymentToDestination(): Transaction =
+        buildTransaction(listOf(PaymentOperation(destinationAccountId, AssetTypeNative, "10.0000000")))
+
+    private fun v0EnvelopeXdr(): String {
+        val transaction = paymentToDestination()
+        transaction.envelopeType = EnvelopeTypeXdr.ENVELOPE_TYPE_TX_V0
+        return transaction.toEnvelopeXdrBase64()
+    }
+
+    private val envelopeKinds: Map<String, () -> String> = mapOf(
+        "V0" to { v0EnvelopeXdr() },
+        "V1" to { paymentToDestination().toEnvelopeXdrBase64() },
+        "fee bump" to {
+            FeeBumpTransactionBuilder(paymentToDestination())
+                .setFeeSource(txSourceAccountId)
+                .setBaseFee(200)
+                .build()
+                .toEnvelopeXdrBase64()
+        }
+    )
+
+    private val lineBreaks: Map<String, (String) -> String> = mapOf(
+        "LF lines" to { envelope: String -> envelope.chunked(76).joinToString("\n") },
+        "CRLF lines" to { envelope: String -> envelope.chunked(76).joinToString("\r\n") },
+        "a trailing LF" to { envelope: String -> envelope + "\n" },
+        "a trailing CRLF" to { envelope: String -> envelope + "\r\n" }
+    )
+
+    /** A V0 payment envelope of 140 bytes ends in one `=`; its last digit carries two unused bits, set here. */
+    private fun nonzeroPaddingBitsXdr(): String {
+        val envelope = v0EnvelopeXdr()
+        assertEquals(188, envelope.length)
+        assertTrue(envelope.endsWith("=") && !envelope.endsWith("=="), envelope)
+        val digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        return envelope.substring(0, 186) + digits[digits.indexOf(envelope[186]) or 3] + "="
+    }
+
+    /** Strings that neither the check nor Horizon can decode. */
+    @OptIn(ExperimentalEncodingApi::class)
+    private val undecodableEnvelopes: Map<String, () -> String> = mapOf(
+        "invalid base64" to { "invalid-base64-string!!!" },
+        "bytes that are not an envelope" to { Base64.encode("this is not xdr at all".encodeToByteArray()) },
+        "a truncated envelope" to {
+            Base64.encode(Base64.decode(paymentToDestination().toEnvelopeXdrBase64()).copyOfRange(0, 24))
+        },
+        "a space" to { paymentToDestination().toEnvelopeXdrBase64().let { it.substring(0, 76) + " " + it.substring(76) } },
+        "a tab" to { paymentToDestination().toEnvelopeXdrBase64().let { it.substring(0, 76) + "\t" + it.substring(76) } },
+        "missing padding" to { v0EnvelopeXdr().trimEnd('=') }
+    )
+
+    @Test
+    fun testSubmitMethodsCheckEnvelopesWithLineBreaks() = runTest {
+        for (path in submitPaths) for ((kind, build) in envelopeKinds) for ((name, insert) in lineBreaks) {
+            val case = "$path, $kind envelope with $name"
+            val requests = mutableListOf<String>()
+            val server = recordingServer(requests, mutableListOf(), memoRequired = true)
+
+            val exception = assertFailsWith<AccountRequiresMemoException>(case) { submit(server, path, insert(build()), false) }
+
+            assertEquals(destinationAccountId, exception.accountId, case)
+            assertEquals(0, exception.operationIndex, case)
+            assertEquals(listOf("GET /accounts/$destinationAccountId"), requests, case)
+            server.close()
+        }
+    }
+
+    @Test
+    fun testSubmitMethodsPostCheckedEnvelopesWithLineBreaksAsPassed() = runTest {
+        for (path in submitPaths) for ((kind, build) in envelopeKinds) for ((name, insert) in lineBreaks) {
+            val case = "$path, $kind envelope with $name"
+            val requests = mutableListOf<String>()
+            val postedBodies = mutableListOf<String>()
+            val server = recordingServer(requests, postedBodies, memoRequired = false)
+            val input = insert(build())
+
+            submit(server, path, input, false)
+
+            assertEquals(listOf("GET /accounts/$destinationAccountId", "POST $path"), requests, case)
+            val form = parseQueryString(postedBodies.single())
+            assertEquals(setOf("tx"), form.names(), case)
+            assertEquals(listOf(input), form.getAll("tx"), case)
+            server.close()
+        }
+    }
+
+    @Test
+    fun testSubmitMethodsPostUndecodableEnvelopesUncheckedAndReturnHorizonsAnswer() = runTest {
+        for (path in submitPaths) for ((name, envelope) in undecodableEnvelopes) {
+            val case = "$path, envelope with $name"
+            val requests = mutableListOf<String>()
+            val postedBodies = mutableListOf<String>()
+            val server = recordingServer(requests, postedBodies, memoRequired = true, answerMalformed = true)
+            val input = envelope()
+
+            val exception = assertFailsWith<BadRequestException>(case) { submit(server, path, input, false) }
+
+            assertEquals(400, exception.code, case)
+            assertEquals(transactionMalformedJson(path, input), exception.body, case)
+            assertEquals(listOf("POST $path"), requests, case)
+            assertEquals(listOf(input), parseQueryString(postedBodies.single()).getAll("tx"), case)
+            server.close()
+        }
+    }
+
+    @Test
+    fun testSubmitMethodsPostEnvelopeWithNonzeroPaddingBitsUnchecked() = runTest {
+        val expectedHashes = mapOf(
+            "/transactions" to "b9d0b2292c4e09e8eb22d036171491e87b8d2086bf8b265874c8d182cb9c9020",
+            "/transactions_async" to "abc"
+        )
+        for (path in submitPaths) {
+            val requests = mutableListOf<String>()
+            val postedBodies = mutableListOf<String>()
+            val server = recordingServer(requests, postedBodies, memoRequired = true)
+            val input = nonzeroPaddingBitsXdr()
+
+            assertEquals(expectedHashes.getValue(path), submit(server, path, input, false), path)
+
+            assertEquals(listOf("POST $path"), requests, path)
+            assertEquals(listOf(input), parseQueryString(postedBodies.single()).getAll("tx"), path)
+            server.close()
+        }
+    }
+
+    @Test
+    fun testSubmitMethodsPostEnvelopeWithLineBreaksUncheckedWhenTheCheckIsSkipped() = runTest {
+        for (path in submitPaths) {
+            val requests = mutableListOf<String>()
+            val postedBodies = mutableListOf<String>()
+            val server = recordingServer(requests, postedBodies, memoRequired = true)
+            val input = paymentToDestination().toEnvelopeXdrBase64().chunked(76).joinToString("\r\n")
+
+            submit(server, path, input, true)
+
+            assertEquals(listOf("POST $path"), requests, path)
+            assertEquals(listOf(input), parseQueryString(postedBodies.single()).getAll("tx"), path)
+            server.close()
+        }
     }
 }
