@@ -53,8 +53,9 @@ internal class Sep29Checker(
      * 4. For each unique destination, checks if the account requires a memo
      * 5. Throws AccountRequiresMemoException if a memo is required but not present
      *
-     * Envelopes that cannot be decoded are skipped without raising an error, so a malformed
-     * envelope fails at submission rather than in the check.
+     * The envelope is decoded with every `\r` and `\n` removed, because Horizon's base64 decoder
+     * skips line breaks; no other character is removed. Envelopes that still cannot be decoded
+     * are skipped without raising an error and reach Horizon unchecked.
      *
      * @param transactionEnvelopeXdr Base64-encoded transaction envelope XDR
      * @throws AccountRequiresMemoException when a transaction is trying to submit an operation
@@ -114,7 +115,8 @@ internal class Sep29Checker(
     @OptIn(ExperimentalEncodingApi::class)
     private fun decodeTransaction(transactionEnvelopeXdr: String): CheckedTransaction? {
         val envelope = try {
-            TransactionEnvelopeXdr.decode(XdrReader(Base64.decode(transactionEnvelopeXdr)))
+            val base64 = transactionEnvelopeXdr.replace("\r", "").replace("\n", "")
+            TransactionEnvelopeXdr.decode(XdrReader(Base64.decode(base64)))
         } catch (e: Throwable) {
             if (isFatal(e)) throw e
             return null
