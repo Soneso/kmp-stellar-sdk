@@ -539,7 +539,7 @@ The SDK uses audited cryptographic libraries with no custom crypto:
 
 | Platform | Crypto Dependency | Other |
 |----------|------------------|-------|
-| JVM | `org.bouncycastle:bcprov-jdk18on` | `commons-codec` (Base32) |
+| JVM | `org.bouncycastle:bcprov-jdk18on` | -- |
 | Native | libsodium (C interop) | -- |
 | JS | `libsodium-wrappers-sumo` (npm) | -- |
 

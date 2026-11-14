@@ -1208,7 +1208,7 @@ if (result.isTupleCase) {
 | `NoSignatureNeededException` | Signing a read-only call (set force=true) |
 | `ContractSpecException` | Spec parsing or type conversion error |
 
-All contract exceptions extend `ContractException` and carry the `AssembledTransaction`:
+The exceptions in the table extend `ContractException`:
 
 ```kotlin
 import com.soneso.stellar.sdk.contract.exception.*
@@ -1225,12 +1225,14 @@ try {
 } catch (e: SimulationFailedException) {
     println("Simulation failed: ${e.message}")
     // Access the assembled transaction for debugging
-    println("Simulation response: ${e.assembledTransaction.simulation}")
+    println("Simulation response: ${e.assembledTransaction?.simulation}")
 } catch (e: NeedsMoreSignaturesException) {
-    println("Need signatures from: ${e.assembledTransaction.needsNonInvokerSigningBy()}")
+    println("Need signatures from: ${e.assembledTransaction?.needsNonInvokerSigningBy()}")
 } catch (e: TransactionFailedException) {
     println("Transaction failed: ${e.message}")
 } catch (e: ContractException) {
     println("Contract error: ${e.message}")
 }
 ```
+
+A failed upload or deployment simulation in `ContractClient` (`install`, `deploy`, `deployFromWasmId`, `deployFromExternalRef`) throws `ContractClientSimulationException`. It is an `IllegalStateException`, not a `ContractException`.
