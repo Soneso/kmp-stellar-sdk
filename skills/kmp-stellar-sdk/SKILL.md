@@ -2,10 +2,10 @@
 name: kmp-stellar-sdk
 description: Build Stellar blockchain applications with the Soneso KMP (Kotlin Multiplatform) SDK. Covers keypair generation, transaction building, Horizon queries, Soroban smart contracts, smart accounts (OpenZeppelin) with passkey / WebAuthn authentication, XDR encoding, and SEP integrations. Use when the developer is working with Kotlin, KMP, or Android and mentions Stellar, blockchain, cryptocurrency, passkey, or smart wallet operations.
 license: Apache-2.0
-compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.16.0. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
+compatibility: Requires Kotlin 2.2+ and com.soneso.stellar:stellar-sdk 1.17.0. Supports JVM (Java 17+), Android (API 24+), iOS, macOS, and JavaScript (Browser/Node.js).
 metadata:
   author: soneso
-  version: "1.6.0"
+  version: "1.7.0"
   sdk_repo: https://github.com/Soneso/kmp-stellar-sdk
 ---
 
@@ -20,7 +20,7 @@ The KMP Stellar SDK (`com.soneso.stellar:stellar-sdk`) is a Kotlin Multiplatform
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.16.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.17.0")
 }
 ```
 
@@ -446,7 +446,7 @@ try {
 // CORRECT: response.successful — Boolean; on failure inspect response.resultXdr
 ```
 
-A rejected `submitTransaction` raises `BadRequestException` (result codes in the body); a returned `TransactionResponse` reports `successful` and `resultXdr` (`tx_failed`: check operation results; `tx_bad_seq`: reload the account). Soroban contract failures raise the 10 exception types in `com.soneso.stellar.sdk.contract.exception` (SimulationFailedException, SendTransactionFailedException, TransactionFailedException, ExpiredStateException, ...); check RPC health with `SorobanServer.getHealth()` (`status != "healthy"`). Full error catalog and solutions: [Troubleshooting Guide](./references/troubleshooting.md)
+A rejected `submitTransaction` raises `BadRequestException` (result codes in the body); a returned `TransactionResponse` reports `successful` and `resultXdr` (`tx_failed`: check operation results; `tx_bad_seq`: reload the account). Soroban contract failures raise the 11 exception types in `com.soneso.stellar.sdk.contract.exception` (SimulationFailedException, SendTransactionFailedException, TransactionFailedException, ExpiredStateException, ...); check RPC health with `SorobanServer.getHealth()` (`status != "healthy"`). Full error catalog and solutions: [Troubleshooting Guide](./references/troubleshooting.md)
 
 ## 10. Security Best Practices
 

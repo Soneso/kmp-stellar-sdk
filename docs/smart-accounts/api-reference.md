@@ -3720,7 +3720,7 @@ sealed class WebAuthnException : SmartAccountException {
 
 ```kotlin
 sealed class TransactionException : SmartAccountException {
-    class SimulationFailed(message: String, cause: Throwable? = null)
+    class SimulationFailed(message: String, diagnosticEventsXdr: List<String>, reportedContractError: ReportedContractError?, cause: Throwable? = null) : SimulationFailureDetails
     class SigningFailed(message: String, cause: Throwable? = null)
     class SubmissionFailed(message: String, cause: Throwable? = null)
     class Timeout(message: String = "Transaction timed out", cause: Throwable? = null)
@@ -3799,7 +3799,7 @@ sealed class IndexerException : SmartAccountException {
 
 ### ContractErrorCodes
 
-Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code — smart account, WebAuthn, or a policy contract — into the contract and variant name that defined it. A failed transaction surfaces the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Alternatively, pass a thrown `TransactionException`'s message directly to `decodeFromMessage`, which extracts and decodes the first known marker in one step. Error code range: 3xxx.
+Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code of the smart account, WebAuthn, or a policy contract into the contract and variant name that defined it. A failed transaction can surface the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Alternatively, pass a thrown `TransactionException`'s message directly to `decodeFromMessage`, which extracts and decodes the first known marker in one step. `decodeFromSimulationFailure` decodes the `reportedContractError` that a `SimulationFailed` carries. Error code range: 3xxx.
 
 `decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000–3016; 3001 unused), `WebAuthnError` (3110–3119), and the policy enums `SimpleThresholdError` (3200–3203), `WeightedThresholdError` (3210–3214), and `SpendingLimitError` (3220–3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Note that several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
 
@@ -3830,6 +3830,9 @@ object ContractErrorCodes {
 
     /** Extracts and decodes the first known Error(Contract, #NNNN) marker from an error message, or null. */
     fun decodeFromMessage(message: String?): OZContractError?
+
+    /** Decodes the reported contract error of a failed simulation, or null. */
+    fun decodeFromSimulationFailure(failure: SimulationFailureDetails): OZContractError?
 }
 ```
 

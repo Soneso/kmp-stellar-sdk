@@ -42,17 +42,19 @@ cd kmp-stellar-sdk && zip -r ../kmp-stellar-sdk.zip . -x "*.DS_Store"
 The reference describes the released SDK. The maintainer regenerates it at
 every release preparation on the `release-prep` branch, together with the
 skill version fields and the zip. The regenerated file changes when the
-release changes the public API surface:
+public API changed since the last release or a generator fix changed its
+extraction:
 
 - New SEP implementation added
 - New public class, method, or property in any non-XDR / non-crypto package
 - Class moved between packages
 - Field renamed, type changed, or signature otherwise modified
 - Class deprecated or removed
+- A generator fix changes the extracted entries
 
-A pull request that changes the API leaves the reference and the zip
-unchanged. On `main`, a fresh generation therefore differs from the committed
-file by the API added since the last release.
+A pull request that changes the API or the generator leaves the reference
+and the zip unchanged. On `main`, a fresh generation therefore differs from
+the committed file by unreleased API changes and generator corrections.
 
 ## What gets included
 
@@ -62,7 +64,8 @@ file by the API added since the last release.
 - **Excluded directories**: `xdr/` and `crypto/` (internal generated /
   platform-impl code).
 - **Excluded declarations**: `private`, `internal`, and `protected` classes,
-  methods, and properties.
+  methods, and properties, including declarations nested inside a non-public
+  class, interface, or object.
 - **KMP `expect`/`actual`**: when both a commonMain `expect` declaration and
   one or more platform `actual` declarations exist for the same name, the
   `expect` is dropped from the output. The `actual` is the authoritative
@@ -93,3 +96,9 @@ Kotlin parser. If a future SDK change uses a declaration shape that the script
 doesn't yet recognize, the affected classes silently drop from the output.
 After any large API change, check the regenerated `api_reference.md`
 against the actual source (counts and a few spot-checked sections).
+
+Run the parser regression tests from the repository root:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 tools/skill-generator/test_generate_api_reference.py
+```
