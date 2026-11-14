@@ -3,16 +3,13 @@ package com.soneso.stellar.sdk.contract.exception
 import com.soneso.stellar.sdk.contract.AssembledTransaction
 
 /**
- * Base exception class for all contract-related errors.
+ * Base class of the exceptions in this package except [ContractClientSimulationException].
  *
- * All exceptions thrown by [com.soneso.stellar.sdk.contract.ContractClient] and
- * [com.soneso.stellar.sdk.contract.AssembledTransaction] extend this class.
- *
- * The exception retains a reference to the [AssembledTransaction] that caused
- * the error, allowing access to transaction state for debugging.
+ * [com.soneso.stellar.sdk.contract.ContractClient] and [AssembledTransaction] also throw
+ * other exceptions, such as [IllegalArgumentException] and [IllegalStateException].
  *
  * @property message The error message
- * @property assembledTransaction The AssembledTransaction that caused the error
+ * @property assembledTransaction The AssembledTransaction that caused the error, or null if none did
  * @property cause The underlying cause, if any
  */
 open class ContractException(
