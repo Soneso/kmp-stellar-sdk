@@ -27,6 +27,11 @@ class ContractErrorCodesTest {
         assertEquals(OZContractError(3000, "SmartAccountError", "ContextRuleNotFound"), ContractErrorCodes.decode(3000))
         assertEquals(OZContractError(3015, "SmartAccountError", "NameTooLong"), ContractErrorCodes.decode(3015))
         assertEquals(OZContractError(3016, "SmartAccountError", "UnauthorizedSigner"), ContractErrorCodes.decode(3016))
+        assertEquals(
+            OZContractError(3017, "SmartAccountError", "DelegatedSignerIsContextContract"),
+            ContractErrorCodes.decode(3017)
+        )
+        assertEquals(OZContractError(3018, "SmartAccountError", "SelfDelegatedSigner"), ContractErrorCodes.decode(3018))
     }
 
     @Test
@@ -60,6 +65,7 @@ class ContractErrorCodesTest {
     fun testDecode_unusedAndGapCodes_returnNull() {
         // 3001 is unused in SmartAccountError; the policy enums have gaps.
         assertNull(ContractErrorCodes.decode(3001))
+        assertNull(ContractErrorCodes.decode(3019))
         assertNull(ContractErrorCodes.decode(3204))
         assertNull(ContractErrorCodes.decode(3215))
         assertNull(ContractErrorCodes.decode(3120))
@@ -78,7 +84,14 @@ class ContractErrorCodesTest {
         assertEquals(3000, ContractErrorCodes.CONTEXT_RULE_NOT_FOUND)
         assertEquals(3015, ContractErrorCodes.NAME_TOO_LONG)
         assertEquals(3016, ContractErrorCodes.UNAUTHORIZED_SIGNER)
+        assertEquals(3017, ContractErrorCodes.DELEGATED_SIGNER_IS_CONTEXT_CONTRACT)
+        assertEquals(3018, ContractErrorCodes.SELF_DELEGATED_SIGNER)
         assertEquals("NameTooLong", ContractErrorCodes.decode(ContractErrorCodes.NAME_TOO_LONG)?.name)
+        assertEquals(
+            "DelegatedSignerIsContextContract",
+            ContractErrorCodes.decode(ContractErrorCodes.DELEGATED_SIGNER_IS_CONTEXT_CONTRACT)?.name
+        )
+        assertEquals("SelfDelegatedSigner", ContractErrorCodes.decode(ContractErrorCodes.SELF_DELEGATED_SIGNER)?.name)
     }
 
     @Test
@@ -102,6 +115,8 @@ class ContractErrorCodesTest {
             3014 to ("SmartAccountError" to "ContextRuleIdsLengthMismatch"),
             3015 to ("SmartAccountError" to "NameTooLong"),
             3016 to ("SmartAccountError" to "UnauthorizedSigner"),
+            3017 to ("SmartAccountError" to "DelegatedSignerIsContextContract"),
+            3018 to ("SmartAccountError" to "SelfDelegatedSigner"),
             3110 to ("WebAuthnError" to "SignaturePayloadInvalid"),
             3111 to ("WebAuthnError" to "ClientDataTooLong"),
             3112 to ("WebAuthnError" to "JsonParseError"),
@@ -130,7 +145,7 @@ class ContractErrorCodesTest {
             3226 to ("SpendingLimitError" to "LessThanZero"),
             3227 to ("SpendingLimitError" to "OnlyCallContractAllowed")
         )
-        assertEquals(43, expected.size)
+        assertEquals(45, expected.size)
         for ((code, contractAndName) in expected) {
             val decoded = ContractErrorCodes.decode(code)
             assertEquals(OZContractError(code, contractAndName.first, contractAndName.second), decoded)

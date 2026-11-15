@@ -404,15 +404,19 @@ class OZTransactionOperations internal constructor(
      * Flow:
      * 1. Require connected wallet (credential ID + contract ID)
      * 2. Build and simulate the transaction to discover required auth entries
-     * 3. For each auth entry matching the smart account contract:
+     * 3. Before any prompt: validate the signers that the smart account entries add to the
+     *    wallet through `add_signer`, `batch_add_signer` or `add_context_rule`, and read the
+     *    wallet's WASM hash once to select its [AuthDigestScheme]
+     *    ([OZSmartAccountConfig.authDigestSchemes]); the same response sets the expiration
+     * 4. For each auth entry matching the smart account contract:
      *    - Build the auth payload hash from the entry's nonce and invocation
      *    - Resolve context rule IDs (automatic or via callback)
-     *    - Compute auth digest: SHA-256(payloadHash || contextRuleIds.toXDR())
+     *    - Compute the auth digest of the scheme ([SmartAccountAuth.computeEntryAuthDigest])
      *    - Authenticate with WebAuthn using the auth digest as challenge
      *    - Normalize signature and attach to the auth entry
-     * 4. Rebuild transaction with signed auth entries and re-simulate
-     * 5. Assemble, optionally sign with deployer, and submit via relayer or RPC
-     * 6. Poll for on-chain confirmation
+     * 5. Rebuild transaction with signed auth entries and re-simulate
+     * 6. Assemble, optionally sign with deployer, and submit via relayer or RPC
+     * 7. Poll for on-chain confirmation
      *
      * ## Fee Sponsoring and Deployer Signing
      *
@@ -447,7 +451,9 @@ class OZTransactionOperations internal constructor(
      * @throws WalletException.NotConnected if no wallet is connected
      * @throws WalletException.HeadlessConnection if the kit is connected headlessly (no passkey
      *   credential); use the multi-signer / external-signer pipeline instead
-     * @throws ValidationException if configuration is invalid
+     * @throws ValidationException if configuration is invalid, or if a smart account entry adds
+     *   a signer that [OZSignerManager.addDelegated] or [OZContextRuleManager.addContextRule]
+     *   refuses
      * @throws TransactionException if simulation, signing, or submission fails
      * @throws WebAuthnException if biometric authentication fails
      * @throws CredentialException if credential lookup fails during signing
@@ -512,9 +518,10 @@ class OZTransactionOperations internal constructor(
 
         // STEP 7-8: Sign auth entries matching our contract
         val signedAuthEntries = if (simulatedAuthEntries.isNotEmpty()) {
-            // Get latest ledger ONCE before the signing loop
-            val latestLedger = kit.sorobanServer.getLatestLedger()
-            val expiration = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
+            // Validate added signers, select the digest scheme and set the expiration ONCE,
+            // before the signing loop asks for any passkey
+            val signingState = kit.prepareSigningOperation(contractId, simulatedAuthEntries)
+            val expiration = signingState.expirationLedger
 
             // Pre-fetch context rules ONCE for all auth entries (avoids N+1 RPC calls per entry)
             val contextRules = kit.contextRuleManager.listContextRules()
@@ -541,21 +548,14 @@ class OZTransactionOperations internal constructor(
 
                 // This entry matches our smart account contract -- sign it
 
-                // (a) Build the auth payload hash for WebAuthn signing
-                val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
-                    entry = entry,
-                    expirationLedger = expiration,
-                    networkPassphrase = kit.config.networkPassphrase
-                )
-
-                // (b) Require WebAuthn provider
+                // (a) Require WebAuthn provider
                 val webauthnProvider = kit.config.webauthnProvider
                     ?: throw ValidationException.invalidInput(
                         "webauthnProvider",
                         "WebAuthn provider is required for signing auth entries but is not configured"
                     )
 
-                // (c) Decode credential ID bytes for allowCredentials constraint
+                // (b) Decode credential ID bytes for allowCredentials constraint
                 val credIdBytes = try {
                     Util.base64urlDecode(credentialId)
                 } catch (e: IllegalArgumentException) {
@@ -564,7 +564,7 @@ class OZTransactionOperations internal constructor(
                     )
                 }
 
-                // (d) Resolve key data from storage or on-chain context rules.
+                // (c) Resolve key data from storage or on-chain context rules.
                 // Storage lookup is an optimization; fall through to on-chain lookup on any failure.
                 val keyData: ByteArray
                 val stored = try {
@@ -578,13 +578,13 @@ class OZTransactionOperations internal constructor(
                     keyData = findKeyDataFromContextRules(credIdBytes)
                 }
 
-                // (e) Build the connected signer — required for context rule resolution
+                // (d) Build the connected signer, which context rule resolution needs
                 val signer = ExternalSigner(
                     verifierAddress = kit.config.webauthnVerifierAddress,
                     keyData = keyData
                 )
 
-                // (f) Resolve context rule IDs for this auth entry (using pre-fetched rules)
+                // (e) Resolve context rule IDs for this auth entry (using pre-fetched rules)
                 val resolvedContextRuleIds = if (resolveContextRuleIds != null) {
                     resolveContextRuleIds(entry, entryIndex)
                 } else {
@@ -593,10 +593,17 @@ class OZTransactionOperations internal constructor(
                     )
                 }
 
-                // (g) Compute auth digest binding rule IDs to the payload hash
-                val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
+                // (f) Compute the auth digest of the wallet's scheme, binding the rule IDs to the
+                // signature payload (prepareSigningOperation sets the scheme for wallet entries)
+                val authDigest = SmartAccountAuth.computeEntryAuthDigest(
+                    entry = entry,
+                    expirationLedger = expiration,
+                    networkPassphrase = kit.config.networkPassphrase,
+                    contextRuleIds = resolvedContextRuleIds,
+                    scheme = signingState.schemeForWalletEntry(contractId)
+                ).authDigest
 
-                // (h) Authenticate with passkey using auth digest as challenge (triggers biometric prompt).
+                // (g) Authenticate with passkey using auth digest as challenge (triggers biometric prompt).
                 // Transport hints from storage allow the OS/browser to route to the correct authenticator
                 // without an extra discovery step. null transports is the correct fallback when the
                 // credential is not in local storage (e.g. cross-device credential).
@@ -605,17 +612,17 @@ class OZTransactionOperations internal constructor(
                     allowCredentials = listOf(AllowCredential(id = credIdBytes, transports = stored?.transports))
                 )
 
-                // (i) Normalize DER signature to compact format with low-S
+                // (h) Normalize DER signature to compact format with low-S
                 val compactSig = SmartAccountUtils.normalizeSignature(authResult.signature)
 
-                // (j) Build WebAuthn signature
+                // (i) Build WebAuthn signature
                 val webAuthnSig = WebAuthnSignature(
                     authenticatorData = authResult.authenticatorData,
                     clientData = authResult.clientDataJSON,
                     signature = compactSig
                 )
 
-                // (k) Attach the signature and context rule IDs to the auth entry
+                // (j) Attach the signature and context rule IDs to the auth entry
                 val signedEntry = SmartAccountAuth.signAuthEntry(
                     entry = entry,
                     signer = signer,

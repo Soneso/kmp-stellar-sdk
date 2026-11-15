@@ -7,12 +7,14 @@
 
 package com.soneso.stellar.sdk.unitTests.smartaccount.oz
 
+import com.soneso.stellar.sdk.unitTests.smartaccount.IndependentAuthDigest
 import com.soneso.stellar.sdk.unitTests.smartaccount.MockWebAuthnProvider
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildAccountEntryXdr
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildAuthEntry
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildConfig
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildMinimalSorobanData
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildNoRpcMockServer
+import com.soneso.stellar.sdk.unitTests.smartaccount.contractInstanceEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.latestLedgerResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.ledgerEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.relayerSuccessWithoutHashJson
@@ -38,6 +40,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SubmissionMethod
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.smartaccount.core.WalletException
+import com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType
 import com.soneso.stellar.sdk.smartaccount.oz.InMemoryStorageAdapter
 import com.soneso.stellar.sdk.smartaccount.oz.OZConstants
 import com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig
@@ -54,6 +57,7 @@ import com.soneso.stellar.sdk.smartaccount.oz.WebAuthnProvider
 import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageFromAddressXdr
 import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
+import com.soneso.stellar.sdk.xdr.ContractIDXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsXdr
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationWithAddressXdr
 import com.soneso.stellar.sdk.xdr.HashIDPreimageSorobanAuthorizationXdr
@@ -61,6 +65,8 @@ import com.soneso.stellar.sdk.xdr.HashIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.HashXdr
 import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
+import com.soneso.stellar.sdk.xdr.MuxedContractXdr
+import com.soneso.stellar.sdk.xdr.SCAddressXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
@@ -72,6 +78,7 @@ import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
 import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
+import com.soneso.stellar.sdk.xdr.Uint64Xdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import com.soneso.stellar.sdk.xdr.toXdrBase64
@@ -960,8 +967,27 @@ class TransactionOperationsValidationTest {
             "0000000000000000000000000000000000000000000000000000000000000005"
     )
 
-    /** Ledger sequence reported by [latestLedgerResponseJson]. */
+    /** Ledger sequence reported by [latestLedgerResponseJson] and [walletInstanceResponse]. */
     private val latestLedgerSequence = 1000
+
+    /**
+     * The answer to the code read a signing operation makes for the connected wallet
+     * [validContractAddress2]: its instance entry, running a WASM hash no table maps (so the
+     * wallet signs the legacy digest), reported at [latestLedgerSequence].
+     */
+    private fun walletInstanceResponse(
+        executable: ContractExecutableXdr = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32)))
+    ): String =
+        contractInstanceEntriesResponseJson(validContractAddress2, executable, latestLedgerSequence.toLong())
+
+    /** The signature payload of [entry] at [expirationLedger] on testnet. */
+    private suspend fun signaturePayload(entry: SorobanAuthorizationEntryXdr): ByteArray =
+        SmartAccountAuth.buildAuthPayloadHash(entry, expirationLedger, Network.TESTNET.networkPassphrase)
+
+    /** The executable of the stellar-accounts 0.8.0 build, which signs the preimage digest. */
+    private val v08Executable = ContractExecutableXdr.WasmHash(
+        HashXdr(hexToBytes("c514d35ea67eaea9bfc1fb3327854c0c06111bc1ddebd4fe217c504c1004b9e1"))
+    )
 
     /**
      * Signature expiration ledger applied by submit(): the latest ledger plus the
@@ -1272,10 +1298,11 @@ class TransactionOperationsValidationTest {
     /** A complete on-chain context rule with a `Default` context type, matching every invocation. */
     private fun defaultContextRuleScVal(
         id: UInt,
-        signers: List<SCValXdr> = emptyList()
+        signers: List<SCValXdr> = emptyList(),
+        contextType: SCValXdr = Scv.toVec(listOf(Scv.toSymbol("Default")))
     ): SCValXdr {
         val fields = listOf(
-            "context_type" to Scv.toVec(listOf(Scv.toSymbol("Default"))),
+            "context_type" to contextType,
             "id" to Scv.toUint32(id),
             "name" to Scv.toString("Default rule"),
             "policies" to Scv.toVec(emptyList()),
@@ -1356,7 +1383,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -1414,6 +1441,289 @@ class TransactionOperationsValidationTest {
         assertTrue(submittedEvent.success)
     }
 
+    @Test
+    fun contractCall_v08Wallet_challengeIsThePreimageDigest() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val authEntry = buildAuthEntry(validContractAddress2)
+        val simulateAuth = simulateAuthResponseJson(listOf(authEntry.toXdrBase64()), sorobanData)
+        val countZero = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData)
+        val txHash = "a2b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                walletInstanceResponse(v08Executable),
+                accountJson,
+                countZero,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = provider,
+            withStoredCredential = true
+        )
+
+        val result = kit.transactionOperations.contractCall(
+            target = validContractAddress,
+            targetFn = "increment",
+            resolveContextRuleIds = { _, _ -> listOf(0u) }
+        )
+
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+        assertEquals(1, provider.authenticateCallCount)
+        val payload = signaturePayload(authEntry)
+        assertContentEquals(
+            IndependentAuthDigest.preimageDigest(validContractAddress2, payload, listOf(0u)),
+            provider.lastAuthenticateChallenge
+        )
+        assertFalse(
+            IndependentAuthDigest.legacyDigest(payload, listOf(0u)).contentEquals(provider.lastAuthenticateChallenge!!),
+            "A 0.8.0 wallet must not be asked to sign the legacy digest"
+        )
+    }
+
+    /** A simulated wallet entry whose root invocation is [functionName] on [validContractAddress2]. */
+    private fun rawWalletCallEntry(functionName: String, args: List<SCValXdr>): SorobanAuthorizationEntryXdr =
+        buildAuthEntry(validContractAddress2).copy(
+            rootInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.ContractFn(
+                    InvokeContractArgsXdr(Address(validContractAddress2).toSCAddress(), SCSymbolXdr(functionName), args)
+                ),
+                subInvocations = emptyList()
+            )
+        )
+
+    /** Runs a contract call whose simulation returns [entry] for a 0.8.0 wallet; the passkey signs its preimage digest. */
+    private suspend fun assertContractCallSigns(entry: SorobanAuthorizationEntryXdr) {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val simulateAuth = simulateAuthResponseJson(listOf(entry.toXdrBase64()), sorobanData)
+        val countZero = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData)
+        val txHash = "b3c4d5e6f708192a3b4c5d6e7f80910a1b2c3d4e5f60718293a4b5c6d7e8f901"
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                walletInstanceResponse(v08Executable),
+                accountJson,
+                countZero,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = provider,
+            withStoredCredential = true
+        )
+
+        val result = kit.transactionOperations.contractCall(
+            target = validContractAddress2,
+            targetFn = (entry.rootInvocation.function as SorobanAuthorizedFunctionXdr.ContractFn).value.functionName.value,
+            resolveContextRuleIds = { _, _ -> listOf(0u) }
+        )
+
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+        assertEquals(1, provider.authenticateCallCount)
+        assertContentEquals(
+            IndependentAuthDigest.preimageDigest(validContractAddress2, signaturePayload(entry), listOf(0u)),
+            provider.lastAuthenticateChallenge
+        )
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfExternalWithEmptyKeyData_signs() = runTest {
+        assertContractCallSigns(
+            rawWalletCallEntry("add_signer", listOf(Scv.toUint32(0u), externalSignerScVal(validContractAddress, ByteArray(0))))
+        )
+    }
+
+    @Test
+    fun contractCall_rawBatchAddSignerOfExternalWithEmptyKeyData_signs() = runTest {
+        assertContractCallSigns(
+            rawWalletCallEntry(
+                "batch_add_signer",
+                listOf(Scv.toUint32(0u), Scv.toVec(listOf(externalSignerScVal(validContractAddress, ByteArray(0)))))
+            )
+        )
+    }
+
+    @Test
+    fun contractCall_rawAddContextRuleOfExternalWithEmptyKeyData_signs() = runTest {
+        assertContractCallSigns(
+            rawWalletCallEntry(
+                "add_context_rule",
+                listOf(
+                    ContextRuleType.Default.toScVal(),
+                    Scv.toString("rule"),
+                    Scv.toVoid(),
+                    Scv.toVec(listOf(externalSignerScVal(validContractAddress, ByteArray(0)))),
+                    SCValXdr.Map(SCMapXdr(emptyList()))
+                )
+            )
+        )
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfExternalWithAnAccountVerifier_signs() = runTest {
+        val accountVerifier = KeyPair.random().getAccountId()
+        assertContractCallSigns(
+            rawWalletCallEntry("add_signer", listOf(Scv.toUint32(0u), externalSignerScVal(accountVerifier, ByteArray(65) { 4 })))
+        )
+    }
+
+    private val muxedContractAddress: SCAddressXdr = SCAddressXdr.MuxedContract(
+        MuxedContractXdr(Uint64Xdr(42uL), ContractIDXdr(HashXdr(ByteArray(32) { 7 })))
+    )
+
+    /** Runs a contract call whose simulation returns [entry] and expects the refusal naming [field] before any passkey. */
+    private suspend fun assertContractCallRefusesMuxedContract(entry: SorobanAuthorizationEntryXdr, field: String) {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val simulateAuth = simulateAuthResponseJson(listOf(entry.toXdrBase64()), buildMinimalSorobanData().toXdrBase64())
+        val methods = mutableListOf<String>()
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(accountJson, simulateAuth),
+            webauthnProvider = provider,
+            withStoredCredential = true,
+            onRequest = { _, body -> methods.add(rpcMethodOf(body)) }
+        )
+
+        val ex = assertFailsWith<ValidationException.InvalidInput> {
+            kit.transactionOperations.contractCall(
+                target = validContractAddress2,
+                targetFn = "add_signer",
+                resolveContextRuleIds = { _, _ -> listOf(0u) }
+            )
+        }
+        assertTrue(
+            ex.message.contains(
+                "$field has an unsupported address type: SC_ADDRESS_TYPE_MUXED_CONTRACT, got: ${Address.fromSCAddress(muxedContractAddress)}"
+            ),
+            ex.message
+        )
+        assertEquals(0, provider.authenticateCallCount)
+        assertEquals(listOf("getLedgerEntries", "simulateTransaction"), methods, "No instance read after the refusal")
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfMuxedContractDelegate_refusedBeforeAnyPasskey() = runTest {
+        assertContractCallRefusesMuxedContract(
+            rawWalletCallEntry(
+                "add_signer",
+                listOf(Scv.toUint32(0u), Scv.toVec(listOf(Scv.toSymbol("Delegated"), Scv.toAddress(muxedContractAddress))))
+            ),
+            "Delegated signer address"
+        )
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfMuxedContractVerifier_refusedBeforeAnyPasskey() = runTest {
+        assertContractCallRefusesMuxedContract(
+            rawWalletCallEntry(
+                "add_signer",
+                listOf(
+                    Scv.toUint32(0u),
+                    Scv.toVec(listOf(Scv.toSymbol("External"), Scv.toAddress(muxedContractAddress), Scv.toBytes(ByteArray(65) { 4 })))
+                )
+            ),
+            "External signer verifier address"
+        )
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfAccountDelegate_signs() = runTest {
+        val delegate = KeyPair.random().getAccountId()
+        assertContractCallSigns(
+            rawWalletCallEntry(
+                "add_signer",
+                listOf(Scv.toUint32(0u), Scv.toVec(listOf(Scv.toSymbol("Delegated"), Scv.toAddress(Address(delegate).toSCAddress()))))
+            )
+        )
+    }
+
+    @Test
+    fun contractCall_instanceReadFails_asksNoPasskey() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val simulateAuth = simulateAuthResponseJson(listOf(buildAuthEntry(validContractAddress2).toXdrBase64()), sorobanData)
+        val rpcError = """{"jsonrpc":"2.0","id":"test-id","error":{"code":-32603,"message":"instance read failed"}}"""
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(accountJson, simulateAuth, rpcError),
+            webauthnProvider = provider,
+            withStoredCredential = true
+        )
+
+        assertFailsWith<com.soneso.stellar.sdk.rpc.exception.SorobanRpcException> {
+            kit.transactionOperations.contractCall(
+                target = validContractAddress,
+                targetFn = "increment",
+                resolveContextRuleIds = { _, _ -> listOf(0u) }
+            )
+        }
+        assertEquals(0, provider.authenticateCallCount, "No passkey prompt before the scheme is known")
+    }
+
+    @Test
+    fun contractCall_rawAddSignerOfContractDelegate_refusedBeforeAnyRequestOrPasskey() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val walletAddress = Address(validContractAddress2).toSCAddress()
+        val addSignerEntry = buildAuthEntry(validContractAddress2).copy(
+            rootInvocation = SorobanAuthorizedInvocationXdr(
+                function = SorobanAuthorizedFunctionXdr.ContractFn(
+                    InvokeContractArgsXdr(
+                        contractAddress = walletAddress,
+                        functionName = SCSymbolXdr("add_signer"),
+                        args = listOf(
+                            Scv.toUint32(0u),
+                            Scv.toVec(listOf(Scv.toSymbol("Delegated"), Scv.toAddress(Address(validContractAddress).toSCAddress())))
+                        )
+                    )
+                ),
+                subInvocations = emptyList()
+            )
+        )
+        val simulateAuth = simulateAuthResponseJson(listOf(addSignerEntry.toXdrBase64()), sorobanData)
+        val methods = mutableListOf<String>()
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(accountJson, simulateAuth),
+            webauthnProvider = provider,
+            withStoredCredential = true,
+            onRequest = { _, body -> methods.add(rpcMethodOf(body)) }
+        )
+
+        val ex = assertFailsWith<ValidationException.InvalidAddress> {
+            kit.transactionOperations.contractCall(
+                target = validContractAddress2,
+                targetFn = "add_signer",
+                resolveContextRuleIds = { _, _ -> listOf(0u) }
+            )
+        }
+        assertTrue(ex.message.contains(validContractAddress), "The refusal names the contract delegate: ${ex.message}")
+        assertEquals(0, provider.authenticateCallCount)
+        assertEquals(listOf("getLedgerEntries", "simulateTransaction"), methods, "No instance read after the refusal")
+    }
+
     // ========================================================================
     // Credential arm of the kit's internal simulations
     //
@@ -1440,7 +1750,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -1488,7 +1798,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -1534,7 +1844,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero
             ),
@@ -1572,7 +1882,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero
             ),
@@ -1623,7 +1933,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -1685,7 +1995,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -1731,7 +2041,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countOne,
                 accountJson,
@@ -1771,6 +2081,102 @@ class TransactionOperationsValidationTest {
     }
 
     @Test
+    fun contractCall_withoutResolver_v08Wallet_challengeBindsTheRuleIdInThePreimage() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val authEntry = buildAuthEntry(validContractAddress2)
+        val simulateAuth = simulateAuthResponseJson(listOf(authEntry.toXdrBase64()), sorobanData)
+        val countOne = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(1u)).toXdrBase64(), sorobanData)
+        val ruleId = 7u
+        val ruleJson = simulateValueResponseJson(defaultContextRuleScVal(id = ruleId).toXdrBase64(), sorobanData)
+        val txHash = "c2b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                walletInstanceResponse(v08Executable),
+                accountJson,
+                countOne,
+                accountJson,
+                ruleJson,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = provider,
+            withStoredCredential = true
+        )
+
+        val result = kit.transactionOperations.contractCall(target = validContractAddress, targetFn = "increment")
+
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+        assertContentEquals(
+            IndependentAuthDigest.preimageDigest(validContractAddress2, signaturePayload(authEntry), listOf(ruleId)),
+            provider.lastAuthenticateChallenge,
+            "Challenge must be the preimage digest binding the auto-resolved rule ID $ruleId"
+        )
+    }
+
+    @Test
+    fun contractCall_withoutResolver_onChainExternalRefRule_parsesAndDefaultRuleSigns() = runTest {
+        val deployer = KeyPair.random()
+        val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
+        val sorobanData = buildMinimalSorobanData().toXdrBase64()
+        val authEntry = buildAuthEntry(validContractAddress2)
+        val simulateAuth = simulateAuthResponseJson(listOf(authEntry.toXdrBase64()), sorobanData)
+        val countTwo = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(2u)).toXdrBase64(), sorobanData)
+        val externalRefType = Scv.toVec(
+            listOf(
+                Scv.toSymbol("CreateContractExternalRef"),
+                Scv.toAddress(Address(validContractAddress).toSCAddress()),
+                Scv.toString("account-v1")
+            )
+        )
+        val externalRefRule = simulateValueResponseJson(
+            defaultContextRuleScVal(id = 0u, contextType = externalRefType).toXdrBase64(),
+            sorobanData
+        )
+        val defaultRule = simulateValueResponseJson(defaultContextRuleScVal(id = 1u).toXdrBase64(), sorobanData)
+        val txHash = "c3b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
+
+        val provider = passkeyProvider()
+        val kit = createSigningKit(
+            deployer = deployer,
+            responses = listOf(
+                accountJson,
+                simulateAuth,
+                walletInstanceResponse(v08Executable),
+                accountJson,
+                countTwo,
+                accountJson,
+                externalRefRule,
+                accountJson,
+                defaultRule,
+                accountJson,
+                simulateAuth,
+                sendTransactionResponseJson("PENDING", hash = txHash)
+            ),
+            trailingResponse = getTransactionResponseJson("SUCCESS", ledger = 1001L),
+            webauthnProvider = provider,
+            withStoredCredential = true
+        )
+
+        val result = kit.transactionOperations.contractCall(target = validContractAddress, targetFn = "increment")
+
+        assertTrue(result.success, "Submission must succeed; error=${result.error}")
+        assertContentEquals(
+            IndependentAuthDigest.preimageDigest(validContractAddress2, signaturePayload(authEntry), listOf(1u)),
+            provider.lastAuthenticateChallenge,
+            "The call context matches the Default rule 1, not the executable reference rule 0"
+        )
+    }
+
+    @Test
     fun contractCall_withoutResolverAndNoMatchingRule_throwsInvalidInput() = runTest {
         val deployer = KeyPair.random()
         val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
@@ -1786,7 +2192,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero
             ),
@@ -2428,7 +2834,7 @@ class TransactionOperationsValidationTest {
                 decimalsJson,
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countOne,
                 accountJson,
@@ -3190,7 +3596,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -3273,7 +3679,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,
@@ -3325,7 +3731,7 @@ class TransactionOperationsValidationTest {
             responses = listOf(
                 accountJson,
                 simulateAuth,
-                latestLedgerResponseJson(latestLedgerSequence),
+                walletInstanceResponse(),
                 accountJson,
                 countZero,
                 accountJson,

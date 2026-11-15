@@ -80,31 +80,31 @@ class OZValidationLimitsTest {
     // MARK: - External signer key size
 
     @Test
-    fun testExternalSigner_at256Bytes_ok() {
+    fun testExternalSigner_at256Bytes_ok() = runTest {
         val signer = ExternalSigner(verifier, ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE) { 0x01 })
-        requireValidSigners(listOf(signer))
+        requireValidSigners(listOf(signer), contractId)
     }
 
     @Test
-    fun testExternalSigner_257Bytes_throws() {
+    fun testExternalSigner_257Bytes_throws() = runTest {
         val signer = ExternalSigner(verifier, ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE + 1) { 0x01 })
         assertFailsWith<ValidationException.InvalidInput> {
-            requireValidSigners(listOf(signer))
+            requireValidSigners(listOf(signer), contractId)
         }
     }
 
     @Test
-    fun testDelegatedSigner_hasNoKeyData_skipped() {
+    fun testDelegatedSigner_hasNoKeyData_skipped() = runTest {
         // Delegated signers carry no key data and must never trip the external-key check.
-        requireValidSigners(listOf(DelegatedSigner(account)))
+        requireValidSigners(listOf(DelegatedSigner(account)), contractId)
     }
 
     @Test
-    fun testMixedSigners_oversizedExternal_throws() {
+    fun testMixedSigners_oversizedExternal_throws() = runTest {
         val delegated = DelegatedSigner(account)
         val oversized = ExternalSigner(verifier, ByteArray(OZConstants.MAX_EXTERNAL_KEY_SIZE + 1) { 0x02 })
         assertFailsWith<ValidationException.InvalidInput> {
-            requireValidSigners(listOf(delegated, oversized))
+            requireValidSigners(listOf(delegated, oversized), contractId)
         }
     }
 

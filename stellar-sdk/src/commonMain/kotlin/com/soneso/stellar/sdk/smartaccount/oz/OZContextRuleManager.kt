@@ -24,10 +24,12 @@ import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
  * Type of context rule that determines which operations it applies to.
  *
  * Context rules use pattern matching to determine when signers and policies should be enforced.
- * Three types of context matching are supported:
+ * Four types of context matching are supported:
  * - Default: Matches any operation (fallback rule)
  * - CallContract: Matches invocations to a specific contract address
  * - CreateContract: Matches contract deployments using a specific WASM hash
+ * - CreateContractExternalRef: Matches contract deployments from the executable reference that
+ *   an owner contract stores under a tag (CAP-0085)
  *
  * Example usage:
  * ```kotlin
@@ -39,6 +41,9 @@ import com.soneso.stellar.sdk.xdr.SorobanAuthorizedInvocationXdr
  *
  * // Rule for deploying contracts with a specific WASM hash
  * val deployRule = ContextRuleType.CreateContract(wasmHashData)
+ *
+ * // Rule for deploying contracts from an executable reference
+ * val refRule = ContextRuleType.CreateContractExternalRef(owner = "CDEF5678...", tag = "account-v1")
  * ```
  */
 sealed class ContextRuleType {
@@ -73,12 +78,27 @@ sealed class ContextRuleType {
     }
 
     /**
+     * Matches contract deployments from a CAP-0085 executable reference: the WASM hash that the
+     * contract [owner] stores under [tag].
+     *
+     * The hash is resolved when the contract is deployed, so the rule trusts the owner contract
+     * to keep the reference pointing at acceptable code. An account build without this rule
+     * kind, such as stellar-accounts 0.7, rejects it during simulation.
+     *
+     * @property owner Contract address (C-address) that stores the executable reference
+     * @property tag The tag the reference is stored under
+     */
+    data class CreateContractExternalRef(val owner: String, val tag: String) : ContextRuleType()
+
+    /**
      * Converts the context rule type to its on-chain ScVal representation.
      *
      * The on-chain representation is:
      * - Default: `ScVal::Vec([Symbol("Default")])`
      * - CallContract: `ScVal::Vec([Symbol("CallContract"), Address(contractAddress)])`
      * - CreateContract: `ScVal::Vec([Symbol("CreateContract"), Bytes(wasmHash)])`
+     * - CreateContractExternalRef:
+     *   `ScVal::Vec([Symbol("CreateContractExternalRef"), Address(owner), String(tag)])`
      *
      * @return The SCVal representation of this context rule type
      * @throws ValidationException if address conversion fails
@@ -110,6 +130,19 @@ sealed class ContextRuleType {
                 Scv.toVec(listOf(
                     Scv.toSymbol("CreateContract"),
                     Scv.toBytes(wasmHash)
+                ))
+            }
+
+            is CreateContractExternalRef -> {
+                val scAddress = try {
+                    Address(owner).toSCAddress()
+                } catch (e: Exception) {
+                    throw ValidationException.invalidAddress(owner, e)
+                }
+                Scv.toVec(listOf(
+                    Scv.toSymbol("CreateContractExternalRef"),
+                    Scv.toAddress(scAddress),
+                    Scv.toString(tag)
                 ))
             }
         }
@@ -201,7 +234,7 @@ class OZContextRuleManager internal constructor(
      * and policies that constrain how operations can be executed.
      *
      * Flow:
-     * 1. Validates inputs (name, signers count, policies count, policy addresses)
+     * 1. Validates inputs (name, signers count, the signers, policies count, policy addresses)
      * 2. Builds contract invocation for add_context_rule
      * 3. Simulates to get auth entries
      * 4. Signs auth entries (requires user interaction)
@@ -212,13 +245,18 @@ class OZContextRuleManager internal constructor(
      * - Maximum 15 signers per context rule
      * - Maximum 5 policies per context rule
      *
+     * A Delegated signer must be a Stellar account (G-address) other than the shared default
+     * deployer. A contract address, the wallet included, is refused, because a contract
+     * delegate can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc).
+     *
      * IMPORTANT: This is a state-changing operation requiring smart account authorization.
      * The user will be prompted for biometric authentication.
      *
      * @param contextType The type of context this rule applies to
      * @param name A human-readable name for the rule (e.g., "DefaultRule", "TokenTransfers")
      * @param validUntil Optional ledger number when this rule expires (null = no expiration)
-     * @param signers List of signers who can authorize operations matching this context
+     * @param signers List of signers who can authorize operations matching this context.
+     *   Delegated signers must be G-addresses other than the shared default deployer.
      * @param policies Map of policy contract addresses to their installation parameters
      * @param selectedSigners Optional list of signers for multi-signer authorization.
      *   When empty (default), uses single-signer auth with the connected passkey.
@@ -274,7 +312,7 @@ class OZContextRuleManager internal constructor(
             )
         }
 
-        requireValidSigners(signers)
+        requireValidSigners(signers, contractId)
 
         requireValidPolicies(policies)
 
@@ -580,6 +618,7 @@ class OZContextRuleManager internal constructor(
      * - Default: Vec([Symbol("Default")])
      * - CallContract: Vec([Symbol("CallContract"), Address(contractAddress)])
      * - CreateContract: Vec([Symbol("CreateContract"), Bytes(wasmHash)])
+     * - CreateContractExternalRef: Vec([Symbol("CreateContractExternalRef"), Address(owner), String(tag)])
      */
     private fun parseContextRuleType(scVal: SCValXdr): ContextRuleType {
         val vec = try { Scv.fromVec(scVal) } catch (e: Exception) {
@@ -610,6 +649,21 @@ class OZContextRuleManager internal constructor(
                     throw ValidationException.invalidInput("context_type", "Expected Bytes for CreateContract context_type: ${e.message}")
                 }
                 ContextRuleType.CreateContract(wasmHash)
+            }
+            "CreateContractExternalRef" -> {
+                if (vec.size < 3) {
+                    throw ValidationException.invalidInput(
+                        "context_type",
+                        "CreateContractExternalRef context_type needs an owner and a tag element, got ${vec.size - 1} element(s)"
+                    )
+                }
+                val owner = try { Address.fromSCVal(vec[1]).toString() } catch (e: Exception) {
+                    throw ValidationException.invalidInput("context_type", "Expected Address for CreateContractExternalRef owner: ${e.message}")
+                }
+                val tag = try { Scv.fromString(vec[2]) } catch (e: Exception) {
+                    throw ValidationException.invalidInput("context_type", "Expected String for CreateContractExternalRef tag: ${e.message}")
+                }
+                ContextRuleType.CreateContractExternalRef(owner, tag)
             }
             else -> throw ValidationException.invalidInput("context_type", "Unknown context_type discriminant: $discriminant")
         }
@@ -806,7 +860,9 @@ class OZContextRuleManager internal constructor(
      *
      * Walks the invocation tree recursively and extracts the context type for each invocation:
      * - ContractFn invocations produce [ContextRuleType.CallContract] with the contract address
-     * - Create contract invocations produce [ContextRuleType.CreateContract] with the WASM hash
+     * - Create contract invocations produce [ContextRuleType.CreateContract] with the WASM hash,
+     *   or [ContextRuleType.CreateContractExternalRef] with the owner and tag of an executable
+     *   reference
      *
      * @param entry The auth entry whose invocation tree to traverse
      * @return Ordered list of context types, one per invocation node (depth-first)
@@ -834,14 +890,10 @@ class OZContextRuleManager internal constructor(
                 }
                 result.add(ContextRuleType.CallContract(contractAddress))
             }
-            is SorobanAuthorizedFunctionXdr.CreateContractHostFn -> {
-                val wasmHash = extractWasmHash(function.value.executable)
-                result.add(ContextRuleType.CreateContract(wasmHash))
-            }
-            is SorobanAuthorizedFunctionXdr.CreateContractV2HostFn -> {
-                val wasmHash = extractWasmHash(function.value.executable)
-                result.add(ContextRuleType.CreateContract(wasmHash))
-            }
+            is SorobanAuthorizedFunctionXdr.CreateContractHostFn ->
+                result.add(createContractContextType(function.value.executable))
+            is SorobanAuthorizedFunctionXdr.CreateContractV2HostFn ->
+                result.add(createContractContextType(function.value.executable))
         }
     }
 
@@ -855,16 +907,28 @@ class OZContextRuleManager internal constructor(
         }
     }
 
-    private fun extractWasmHash(executable: ContractExecutableXdr): ByteArray {
+    /**
+     * Maps the executable of a create-contract invocation to the context type the contract
+     * matches: [ContextRuleType.CreateContract] for a WASM hash,
+     * [ContextRuleType.CreateContractExternalRef] for an executable reference.
+     */
+    private fun createContractContextType(executable: ContractExecutableXdr): ContextRuleType {
         return when (executable) {
-            is ContractExecutableXdr.WasmHash -> executable.value.value
+            is ContractExecutableXdr.WasmHash -> ContextRuleType.CreateContract(executable.value.value)
+            is ContractExecutableXdr.ExternalRef -> {
+                val owner = try {
+                    Address.fromSCAddress(executable.value.executableOwner).toString()
+                } catch (e: Exception) {
+                    throw ValidationException.invalidInput(
+                        "executable",
+                        "Failed to parse the executable reference owner of a CreateContract invocation: ${e.message}"
+                    )
+                }
+                ContextRuleType.CreateContractExternalRef(owner, executable.value.tag.decodeToString())
+            }
             is ContractExecutableXdr.Void -> throw ValidationException.invalidInput(
                 "executable",
                 "CreateContract invocation references a Stellar Asset Contract, not a WASM contract"
-            )
-            is ContractExecutableXdr.ExternalRef -> throw ValidationException.invalidInput(
-                "executable",
-                "CreateContract invocation references an external executable, not a WASM contract"
             )
         }
     }

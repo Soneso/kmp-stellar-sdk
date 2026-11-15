@@ -7,10 +7,22 @@
 
 package com.soneso.stellar.sdk.smartaccount.oz
 
+import com.soneso.stellar.sdk.smartaccount.core.AuthDigestScheme
+
 /**
  * Configuration defaults and contract limits for OpenZeppelin smart account operations.
  */
 object OZConstants {
+
+    /**
+     * Account WASM hashes (lowercase hex) whose digest scheme needs no configuration:
+     * the stellar-accounts 0.8.0 build of `multisig-account-example` (Stellar CLI 28.1.0).
+     * [OZSmartAccountConfig.authDigestSchemes] entries take precedence; every other hash
+     * signs with [AuthDigestScheme.LEGACY_CONCAT].
+     */
+    internal val KNOWN_AUTH_DIGEST_SCHEMES: Map<String, AuthDigestScheme> = mapOf(
+        "c514d35ea67eaea9bfc1fb3327854c0c06111bc1ddebd4fe217c504c1004b9e1" to AuthDigestScheme.PREIMAGE_V1
+    )
 
     /**
      * Default session expiry in milliseconds (7 days).

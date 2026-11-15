@@ -48,7 +48,7 @@ data class EditSignerEntry(
  * Named `EditPolicyEntry` to avoid conflict with [PolicyEntry] in `PolicyManagementSection.kt`
  * which is a simpler UI-only data class without on-chain tracking fields.
  *
- * @property info Known policy metadata from [KNOWN_POLICIES], or null for unknown policy contracts.
+ * @property info Policy metadata from [RECOGNIZED_POLICIES], or null for unknown policy contracts.
  * @property label Display label for the policy.
  * @property address The policy contract's C-address.
  * @property scVal The encoded policy parameters as an SCVal, or null if loaded from an existing rule.

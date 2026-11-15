@@ -955,7 +955,7 @@ data class OZContractError(
  */
 object ContractErrorCodes {
 
-    // Smart account contract (SmartAccountError, codes 3000-3016; 3001 is unused).
+    // Smart account contract (SmartAccountError, codes 3000-3018; 3001 is unused).
 
     /** The referenced context rule does not exist on the account. */
     const val CONTEXT_RULE_NOT_FOUND = 3000
@@ -1005,6 +1005,12 @@ object ContractErrorCodes {
     /** The signer is not authorized to sign the given context rule. */
     const val UNAUTHORIZED_SIGNER = 3016
 
+    /** A Delegated signer's address is the contract of a context being authorized. */
+    const val DELEGATED_SIGNER_IS_CONTEXT_CONTRACT = 3017
+
+    /** A Delegated signer's address is the smart account itself. */
+    const val SELF_DELEGATED_SIGNER = 3018
+
     /**
      * Decodes a raw contract error [code] into the OZ contract and variant name that
      * defined it, or null if [code] is not a known OZ smart-account contract error.
@@ -1050,7 +1056,7 @@ object ContractErrorCodes {
     private val CONTRACT_ERROR_REGEX = Regex("""Error\s*\(\s*Contract\s*,\s*#(\d+)\s*\)""")
 
     private val CODE_TABLE: Map<Int, OZContractError> = listOf(
-        // SmartAccountError (3000-3016; 3001 unused)
+        // SmartAccountError (3000-3018; 3001 unused)
         OZContractError(3000, "SmartAccountError", "ContextRuleNotFound"),
         OZContractError(3002, "SmartAccountError", "UnvalidatedContext"),
         OZContractError(3003, "SmartAccountError", "ExternalVerificationFailed"),
@@ -1067,6 +1073,8 @@ object ContractErrorCodes {
         OZContractError(3014, "SmartAccountError", "ContextRuleIdsLengthMismatch"),
         OZContractError(3015, "SmartAccountError", "NameTooLong"),
         OZContractError(3016, "SmartAccountError", "UnauthorizedSigner"),
+        OZContractError(3017, "SmartAccountError", "DelegatedSignerIsContextContract"),
+        OZContractError(3018, "SmartAccountError", "SelfDelegatedSigner"),
         // WebAuthnError (3110-3119)
         OZContractError(3110, "WebAuthnError", "SignaturePayloadInvalid"),
         OZContractError(3111, "WebAuthnError", "ClientDataTooLong"),

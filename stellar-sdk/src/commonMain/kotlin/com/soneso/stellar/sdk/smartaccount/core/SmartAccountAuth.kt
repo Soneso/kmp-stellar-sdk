@@ -23,6 +23,66 @@ import com.soneso.stellar.sdk.xdr.SorobanCredentialsXdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrReader
 import com.soneso.stellar.sdk.xdr.XdrWriter
+import com.soneso.stellar.sdk.xdr.toXdrBase64
+
+/**
+ * The digest that the `__check_auth` of an OpenZeppelin smart account build checks.
+ *
+ * Every signer of one auth entry commits to the same digest. Its form depends on the code
+ * the smart account runs, so the kit reads the wallet's WASM hash before each signing
+ * operation and selects the scheme through [com.soneso.stellar.sdk.smartaccount.oz.OZSmartAccountConfig.authDigestSchemes].
+ */
+enum class AuthDigestScheme {
+    /**
+     * The digest of stellar-accounts 0.7:
+     * `auth_digest = SHA-256(signature_payload || XDR(ScVal::Vec([ScVal::U32(id), ...])))`.
+     * Delegated signers authorize `__check_auth(Bytes(auth_digest))`.
+     */
+    LEGACY_CONCAT,
+
+    /**
+     * The digest of stellar-accounts 0.8.0:
+     * `auth_digest = SHA-256(XDR(AuthDigestPreimage))`, where `AuthDigestPreimage` is the
+     * `ScVal::Map` with the Symbol keys `account` (the smart account address),
+     * `context_rule_ids` (`Vec` of `U32`) and `signature_payload` (32 `Bytes`). Delegated
+     * signers authorize `__check_auth(AuthDigestPreimage)`.
+     */
+    PREIMAGE_V1
+}
+
+/**
+ * The digest material every signer of one smart account auth entry commits to.
+ *
+ * @property signaturePayload The 32-byte payload the host passes to `__check_auth`.
+ * @property authDigest The 32-byte digest that External signers (passkeys, Ed25519 keys) sign.
+ * @property delegatedAuthArgs The `__check_auth` arguments that Delegated signers authorize.
+ *   Two digests compare these by their XDR encoding.
+ */
+data class EntryAuthDigest(
+    val signaturePayload: ByteArray,
+    val authDigest: ByteArray,
+    val delegatedAuthArgs: List<SCValXdr>
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+
+        other as EntryAuthDigest
+
+        return signaturePayload.contentEquals(other.signaturePayload) &&
+            authDigest.contentEquals(other.authDigest) &&
+            delegatedAuthArgsXdr() == other.delegatedAuthArgsXdr()
+    }
+
+    override fun hashCode(): Int {
+        var result = signaturePayload.contentHashCode()
+        result = 31 * result + authDigest.contentHashCode()
+        result = 31 * result + delegatedAuthArgsXdr().hashCode()
+        return result
+    }
+
+    private fun delegatedAuthArgsXdr(): List<String> = delegatedAuthArgs.map { it.toXdrBase64() }
+}
 
 /**
  * Authentication utilities for Smart Account authorization entries.
@@ -32,26 +92,29 @@ import com.soneso.stellar.sdk.xdr.XdrWriter
  * signature map construction required by the Soroban authorization protocol.
  *
  * Key responsibilities:
- * - Building Soroban authorization payload hashes for WebAuthn challenges
+ * - Building Soroban authorization payload hashes and the auth digests signers sign
  * - Signing authorization entries with Smart Account signers
  * - Managing signature expiration and map entry ordering
  * - Variant-specific encoding of signature values per [SmartAccountSignature.toAuthPayloadBytes]
  *
  * Example usage:
  * ```kotlin
- * // Build payload hash for WebAuthn signing
- * val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+ * // Compute the digest the wallet's code checks (the WebAuthn challenge)
+ * val digest = SmartAccountAuth.computeEntryAuthDigest(
  *     entry = authEntry,
  *     expirationLedger = currentLedger + 100u,
- *     networkPassphrase = Network.TESTNET.networkPassphrase
+ *     networkPassphrase = Network.TESTNET.networkPassphrase,
+ *     contextRuleIds = listOf(0u),
+ *     scheme = AuthDigestScheme.PREIMAGE_V1
  * )
  *
- * // Compute the signature over the payload hash, then attach it to the entry
+ * // Compute the signature over digest.authDigest, then attach it to the entry
  * val signedEntry = SmartAccountAuth.signAuthEntry(
  *     entry = authEntry,
  *     signer = webAuthnSigner,
  *     signature = webAuthnSignature,
- *     expirationLedger = currentLedger + 100u
+ *     expirationLedger = currentLedger + 100u,
+ *     contextRuleIds = listOf(0u)
  * )
  * ```
  */
@@ -62,7 +125,7 @@ object SmartAccountAuth {
     // ========================================================================
 
     /**
-     * Computes the auth digest that binds context rule IDs to the signature payload.
+     * Computes the stellar-accounts 0.7 auth digest, [AuthDigestScheme.LEGACY_CONCAT] only.
      *
      * The digest is computed as:
      * ```
@@ -70,31 +133,139 @@ object SmartAccountAuth {
      * ```
      *
      * Where `contextRuleIds.toXDR()` is the XDR encoding of `ScVal::Vec([ScVal::U32(id), ...])`.
+     * A wallet on stellar-accounts 0.8.0 checks the [AuthDigestScheme.PREIMAGE_V1] digest
+     * instead, which this function cannot produce.
      *
      * @param signaturePayload The 32-byte signature payload hash from [buildAuthPayloadHash]
      * @param contextRuleIds The context rule IDs to bind into the digest
      * @return The 32-byte SHA-256 auth digest
      * @throws TransactionException.SigningFailed if XDR encoding fails
      */
+    @Deprecated(
+        message = "Computes the stellar-accounts 0.7 digest only. Use computeEntryAuthDigest " +
+            "with the AuthDigestScheme of the code the wallet runs."
+    )
     suspend fun buildAuthDigest(
+        signaturePayload: ByteArray,
+        contextRuleIds: List<UInt>
+    ): ByteArray = legacyAuthDigest(signaturePayload, contextRuleIds)
+
+    /**
+     * Computes the signature payload, the auth digest and the delegated `__check_auth`
+     * arguments of a smart account auth entry for [scheme].
+     *
+     * The signature payload is [buildAuthPayloadHash] of the entry. With
+     * [AuthDigestScheme.LEGACY_CONCAT] the digest is
+     * `SHA-256(signature_payload || XDR(ScVal::Vec([ScVal::U32(id), ...])))` and Delegated
+     * signers authorize `Bytes(auth_digest)`. With [AuthDigestScheme.PREIMAGE_V1] the digest is
+     * `SHA-256(XDR(AuthDigestPreimage))`, the preimage binding the entry's credential address as
+     * the smart account, and Delegated signers authorize the preimage itself.
+     *
+     * The scheme must be the one the wallet's `__check_auth` checks. A signature over the other
+     * digest is rejected by the contract when the transaction is simulated or submitted, after
+     * every signer has signed, and nothing executes.
+     *
+     * Example:
+     * ```kotlin
+     * val digest = SmartAccountAuth.computeEntryAuthDigest(
+     *     entry = authEntry,
+     *     expirationLedger = currentLedger + 100u,
+     *     networkPassphrase = Network.TESTNET.networkPassphrase,
+     *     contextRuleIds = listOf(0u),
+     *     scheme = AuthDigestScheme.PREIMAGE_V1
+     * )
+     * // digest.authDigest is the WebAuthn challenge and the message an Ed25519 signer signs
+     * ```
+     *
+     * @param entry The smart account authorization entry. Must carry address-bearing
+     *   credentials (Address, AddressV2, or AddressWithDelegates).
+     * @param expirationLedger The ledger number at which the signatures expire
+     * @param networkPassphrase The network passphrase
+     * @param contextRuleIds The context rule IDs the signatures satisfy, one per auth context
+     * @param scheme The digest scheme of the code the smart account runs
+     * @return The signature payload, the auth digest and the delegated `__check_auth` arguments
+     * @throws TransactionException.SigningFailed if the credentials are source-account (Void)
+     *   or if XDR encoding fails
+     */
+    suspend fun computeEntryAuthDigest(
+        entry: SorobanAuthorizationEntryXdr,
+        expirationLedger: UInt,
+        networkPassphrase: String,
+        contextRuleIds: List<UInt>,
+        scheme: AuthDigestScheme
+    ): EntryAuthDigest {
+        val signaturePayload = buildAuthPayloadHash(entry, expirationLedger, networkPassphrase)
+        return when (scheme) {
+            AuthDigestScheme.LEGACY_CONCAT -> {
+                val authDigest = legacyAuthDigest(signaturePayload, contextRuleIds)
+                EntryAuthDigest(
+                    signaturePayload = signaturePayload,
+                    authDigest = authDigest,
+                    delegatedAuthArgs = listOf(Scv.toBytes(authDigest))
+                )
+            }
+            AuthDigestScheme.PREIMAGE_V1 -> {
+                // buildAuthPayloadHash has already refused credentials without an address.
+                val account = entry.credentials.addressCredentials()!!.address
+                val preimage = buildAuthDigestPreimage(account, signaturePayload, contextRuleIds)
+                EntryAuthDigest(
+                    signaturePayload = signaturePayload,
+                    authDigest = getSha256Crypto().hash(encodeScVal(preimage, "AuthDigestPreimage")),
+                    delegatedAuthArgs = listOf(preimage)
+                )
+            }
+        }
+    }
+
+    /**
+     * Encodes the `AuthDigestPreimage` contract struct of stellar-accounts 0.8.0: an
+     * `ScVal::Map` with the Symbol keys in name order, `account`, `context_rule_ids` and
+     * `signature_payload`.
+     *
+     * @param account The smart account performing the authorization check
+     * @param signaturePayload The 32-byte payload the host passes to `__check_auth`
+     * @param contextRuleIds The context rule IDs, one per auth context
+     * @throws IllegalArgumentException if [signaturePayload] is not 32 bytes
+     */
+    internal fun buildAuthDigestPreimage(
+        account: SCAddressXdr,
+        signaturePayload: ByteArray,
+        contextRuleIds: List<UInt>
+    ): SCValXdr {
+        require(signaturePayload.size == SIGNATURE_PAYLOAD_SIZE) {
+            "Signature payload must be $SIGNATURE_PAYLOAD_SIZE bytes, got ${signaturePayload.size}"
+        }
+        return Scv.toMap(
+            linkedMapOf(
+                Scv.toSymbol("account") to Scv.toAddress(account),
+                Scv.toSymbol("context_rule_ids") to Scv.toVec(contextRuleIds.map { id -> Scv.toUint32(id) }),
+                Scv.toSymbol("signature_payload") to Scv.toBytes(signaturePayload)
+            )
+        )
+    }
+
+    private const val SIGNATURE_PAYLOAD_SIZE = 32
+
+    private suspend fun legacyAuthDigest(
         signaturePayload: ByteArray,
         contextRuleIds: List<UInt>
     ): ByteArray {
         val ruleIdsScVal = Scv.toVec(contextRuleIds.map { id -> Scv.toUint32(id) })
+        val ruleIdsXdr = encodeScVal(ruleIdsScVal, "context rule IDs ScVal")
+        return getSha256Crypto().hash(signaturePayload + ruleIdsXdr)
+    }
 
-        val ruleIdsXdr: ByteArray = try {
-            val writer = XdrWriter()
-            ruleIdsScVal.encode(writer)
-            writer.toByteArray()
-        } catch (e: Exception) {
-            throw TransactionException.signingFailed(
-                "Failed to XDR encode context rule IDs ScVal",
-                e
-            )
-        }
-
-        val concatenated = signaturePayload + ruleIdsXdr
-        return getSha256Crypto().hash(concatenated)
+    /**
+     * XDR-encodes [value].
+     *
+     * @throws TransactionException.SigningFailed naming [description] if XDR encoding fails
+     */
+    private fun encodeScVal(value: SCValXdr, description: String): ByteArray = try {
+        val writer = XdrWriter()
+        value.encode(writer)
+        writer.toByteArray()
+    } catch (e: Exception) {
+        throw TransactionException.signingFailed("Failed to XDR encode $description", e)
     }
 
     /**

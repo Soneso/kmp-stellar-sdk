@@ -76,7 +76,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.soneso.smartdemo.config.DemoConfig
-import com.soneso.smartdemo.config.KNOWN_POLICIES
+import com.soneso.smartdemo.config.RECOGNIZED_POLICIES
 import com.soneso.smartdemo.config.PolicyInfo
 import com.soneso.smartdemo.flows.ContextRuleEditDiff
 import com.soneso.smartdemo.flows.ContextRuleEditResult
@@ -101,6 +101,7 @@ import com.soneso.smartdemo.ui.components.SignerPickerDialog
 import com.soneso.smartdemo.util.hexToByteArray
 import com.soneso.smartdemo.util.isUserCancellation
 import com.soneso.smartdemo.util.toHexString
+import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.smartaccount.core.ExternalSigner
@@ -140,6 +141,8 @@ class ContextRuleBuilderScreen(
         var contextTypeOption by remember { mutableStateOf(ContextTypeOption.DEFAULT) }
         var contractAddress by remember { mutableStateOf("") }
         var wasmHashHex by remember { mutableStateOf("") }
+        var refOwner by remember { mutableStateOf("") }
+        var refTag by remember { mutableStateOf("") }
         var hasExpiry by remember { mutableStateOf(false) }
         var expiryLedger by remember { mutableStateOf("") }
         var existingExpiryLedger by remember { mutableStateOf<UInt?>(null) }
@@ -223,6 +226,11 @@ class ContextRuleBuilderScreen(
                     contextTypeOption = ContextTypeOption.CREATE_CONTRACT
                     wasmHashHex = ct.wasmHash.toHexString()
                 }
+                is ContextRuleType.CreateContractExternalRef -> {
+                    contextTypeOption = ContextTypeOption.CREATE_CONTRACT_EXTERNAL_REF
+                    refOwner = ct.owner
+                    refTag = ct.tag
+                }
             }
             if (parsed.validUntil != null) {
                 hasExpiry = true
@@ -251,7 +259,7 @@ class ContextRuleBuilderScreen(
             // Read on-chain params for each known policy using a single server instance.
             SorobanServer(DemoConfig.RPC_URL).use { server ->
                 val loadedPolicyEntries = parsed.policies.mapIndexed { i, addr ->
-                    val known = KNOWN_POLICIES.find { it.address == addr }
+                    val known = RECOGNIZED_POLICIES.find { it.address == addr }
                     val params = if (known != null) {
                         readPolicyParamsWithServer(server, contractId, addr, known.type, parsed.id)
                     } else null
@@ -748,7 +756,7 @@ class ContextRuleBuilderScreen(
                             if (option == ContextTypeOption.CALL_CONTRACT && contractAddress.isEmpty()) {
                                 contractAddress = DemoConfig.NATIVE_TOKEN_CONTRACT
                             }
-                            fieldErrors = fieldErrors - "contractAddress" - "wasmHash"
+                            fieldErrors = fieldErrors - "contractAddress" - "wasmHash" - "refOwner"
                         },
                         contractAddress = contractAddress,
                         onContractAddressChanged = {
@@ -760,8 +768,16 @@ class ContextRuleBuilderScreen(
                             wasmHashHex = it
                             fieldErrors = fieldErrors - "wasmHash"
                         },
+                        refOwner = refOwner,
+                        onRefOwnerChanged = {
+                            refOwner = it
+                            fieldErrors = fieldErrors - "refOwner"
+                        },
+                        refTag = refTag,
+                        onRefTagChanged = { refTag = it },
                         contractAddressError = fieldErrors["contractAddress"],
                         wasmHashError = fieldErrors["wasmHash"],
+                        refOwnerError = fieldErrors["refOwner"],
                         enabled = !isSubmitting && !isEditing
                     )
 
@@ -1169,6 +1185,7 @@ class ContextRuleBuilderScreen(
                                     contextTypeOption = contextTypeOption,
                                     contractAddress = contractAddress,
                                     wasmHashHex = wasmHashHex,
+                                    refOwner = refOwner,
                                     hasExpiry = hasExpiry,
                                     expiryLedger = expiryLedger,
                                     signers = signers
@@ -1198,7 +1215,7 @@ class ContextRuleBuilderScreen(
                                         }
 
                                         val selectedContextType = buildContextType(
-                                            contextTypeOption, contractAddress, wasmHashHex
+                                            contextTypeOption, contractAddress, wasmHashHex, refOwner, refTag
                                         )
                                         val validUntilVal = resolveExpiryLedger(hasExpiry, expiryLedger)
                                         val flowPolicies = policies.map { policy ->
@@ -1284,7 +1301,7 @@ class ContextRuleBuilderScreen(
 
                         try {
                             val selectedContextType = buildContextType(
-                                contextTypeOption, contractAddress, wasmHashHex
+                                contextTypeOption, contractAddress, wasmHashHex, refOwner, refTag
                             )
                             val validUntilVal = resolveExpiryLedger(hasExpiry, expiryLedger)
                             val flowPolicies = policies.map { policy ->
@@ -1437,8 +1454,13 @@ class ContextRuleBuilderScreen(
         onContractAddressChanged: (String) -> Unit,
         wasmHashHex: String,
         onWasmHashChanged: (String) -> Unit,
+        refOwner: String,
+        onRefOwnerChanged: (String) -> Unit,
+        refTag: String,
+        onRefTagChanged: (String) -> Unit,
         contractAddressError: String?,
         wasmHashError: String?,
+        refOwnerError: String?,
         enabled: Boolean = true
     ) {
         var contextTypeExpanded by remember { mutableStateOf(false) }
@@ -1566,6 +1588,42 @@ class ContextRuleBuilderScreen(
                     } else null
                 )
             }
+
+            AnimatedVisibility(
+                visible = selectedOption == ContextTypeOption.CREATE_CONTRACT_EXTERNAL_REF,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = refOwner,
+                        onValueChange = onRefOwnerChanged,
+                        label = { Text("Executable Owner (C...)") },
+                        placeholder = { Text("Owner contract address") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        isError = refOwnerError != null,
+                        supportingText = if (refOwnerError != null) {
+                            { Text(refOwnerError) }
+                        } else null
+                    )
+                    OutlinedTextField(
+                        value = refTag,
+                        onValueChange = onRefTagChanged,
+                        label = { Text("Executable Tag") },
+                        placeholder = { Text("Tag the owner stores the code under") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled
+                    )
+                    Text(
+                        text = "The owner contract can change the code this reference resolves to.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 
@@ -1589,7 +1647,9 @@ class ContextRuleBuilderScreen(
     private fun buildContextType(
         option: ContextTypeOption,
         contractAddress: String,
-        wasmHashHex: String
+        wasmHashHex: String,
+        refOwner: String,
+        refTag: String
     ): ContextRuleType {
         return when (option) {
             ContextTypeOption.DEFAULT -> OZBuilders.createDefaultContextType()
@@ -1597,6 +1657,8 @@ class ContextRuleBuilderScreen(
                 OZBuilders.createCallContractContextType(contractAddress.trim())
             ContextTypeOption.CREATE_CONTRACT ->
                 OZBuilders.createCreateContractContextType(wasmHashHex.trim().lowercase())
+            ContextTypeOption.CREATE_CONTRACT_EXTERNAL_REF ->
+                OZBuilders.createCreateContractExternalRefContextType(refOwner.trim(), refTag)
         }
     }
 
@@ -1651,6 +1713,7 @@ class ContextRuleBuilderScreen(
         contextTypeOption: ContextTypeOption,
         contractAddress: String,
         wasmHashHex: String,
+        refOwner: String,
         hasExpiry: Boolean,
         expiryLedger: String,
         signers: List<SmartAccountSigner>
@@ -1675,6 +1738,15 @@ class ContextRuleBuilderScreen(
                     errors["wasmHash"] = "Must be 64 hex characters (32 bytes), got ${hex.length}"
                 } else if (!hex.all { it in '0'..'9' || it in 'a'..'f' }) {
                     errors["wasmHash"] = "Invalid hex characters"
+                }
+            }
+            ContextTypeOption.CREATE_CONTRACT_EXTERNAL_REF -> {
+                val owner = refOwner.trim()
+                if (!owner.startsWith("C") || owner.length != 56) {
+                    errors["refOwner"] =
+                        "Invalid executable owner. Must start with C and be 56 characters, got ${owner.length}"
+                } else if (!StrKey.isValidContract(owner)) {
+                    errors["refOwner"] = "Invalid executable owner. Not a valid contract address: $owner"
                 }
             }
             ContextTypeOption.DEFAULT -> { /* no extra validation */ }
@@ -1792,5 +1864,9 @@ private enum class ContextTypeOption(
     CREATE_CONTRACT(
         "Create Contract",
         "Matches contract deployments using a specific WASM hash"
+    ),
+    CREATE_CONTRACT_EXTERNAL_REF(
+        "Create Contract from Reference",
+        "Matches contract deployments from the code an owner contract stores under a tag"
     )
 }
