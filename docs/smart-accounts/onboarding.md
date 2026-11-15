@@ -61,7 +61,7 @@ You do not need to construct on-chain data structures manually; the SDK handles 
 
 A signer is an entity authorized to approve transactions on a smart account. The contract stores signers per context rule (explained below). There are three types:
 
-**Delegated**: A Stellar address (G-address for accounts, C-address for contracts) that authorizes using Soroban's built-in verification. For accounts, this means signing the authorization entries with the account's secret key, which Soroban verifies automatically. For contracts, Soroban invokes the contract's own `__check_auth`. No external verifier contract is needed.
+**Delegated**: A Stellar address (G-address for accounts, C-address for contracts) that authorizes using Soroban's built-in verification. For accounts, this means signing the authorization entries with the account's secret key, which Soroban verifies automatically. For contracts, Soroban invokes the contract's own `__check_auth`; the SDK adds only account delegates, because a contract delegate can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc). No external verifier contract is needed.
 
 On-chain representation: `Vec([Symbol("Delegated"), Address(address)])`
 
@@ -102,7 +102,7 @@ You can add rules that apply only to specific scenarios. For example, a rule tha
 
 Each context rule stores:
 - An ID (`u32`)
-- A type: `Default`, `CallContract(address)`, or `CreateContract(wasmHash: ByteArray)`. `wasmHash` is a 32-byte `ByteArray` containing the SHA-256 hash of a compiled smart contract binary. `CreateContract` matches contract creation operations targeting that specific binary.
+- A type: `Default`, `CallContract(address)`, `CreateContract(wasmHash: ByteArray)`, or `CreateContractExternalRef(owner, tag)`. `wasmHash` is a 32-byte `ByteArray` containing the SHA-256 hash of a compiled smart contract binary. `CreateContract` matches contract creation operations targeting that specific binary, `CreateContractExternalRef` those that deploy from the executable reference the `owner` contract stores under `tag` (CAP-85).
 - A name (human-readable string, up to 20 UTF-8 bytes)
 - A list of signers (up to 15)
 - A list of policies (up to 5)
@@ -111,7 +111,7 @@ Each context rule stores:
 
 When a transaction requires authorization, the signature authorizes against one specific context rule, chosen on the client side and bound into the signed payload. A rule is eligible when it matches the operation's context type — either a rule for that specific context (e.g. `CallContract("C...")`) or a Default rule, which matches any operation. The SDK selects an eligible rule automatically based on the operation and the selected signers; the contract then validates exactly that rule. An expired rule fails validation.
 
-Because a `CreateContract` rule is identified by a 32-byte WASM hash only, automatic rule selection throws a `ValidationException` for a create-contract operation whose executable is a CAP-85 external reference or a Stellar Asset Contract — neither executable carries a WASM hash to match. Authorize such deployments by supplying explicit rule IDs through the `resolveContextRuleIds` callback (see the [API reference](api-reference.md#resolvecontextruleids)).
+Automatic rule selection matches a create-contract operation whose executable is a CAP-85 external reference to a `CreateContractExternalRef` rule with the same owner and tag, or to a Default rule. It throws a `ValidationException` for a Stellar Asset Contract executable, which carries neither a WASM hash nor a reference to match. Authorize such deployments by supplying explicit rule IDs through the `resolveContextRuleIds` callback (see the [API reference](api-reference.md#resolvecontextruleids)).
 
 SDK methods:
 ```kotlin
