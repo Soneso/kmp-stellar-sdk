@@ -63,6 +63,43 @@ Tests for Soroban smart contract interactions:
 
 See `contract/INTEGRATION_TESTS_README.md` for details.
 
+### SACClientIntegrationTest.kt
+
+Tests for the Stellar Asset Contract (SAC) client `SACClient` against live testnet, in the
+`contract/` directory (package `com.soneso.stellar.sdk.integrationTests.contract`):
+
+| Test | Description | Key Features Tested |
+|------|-------------|---------------------|
+| `testSacClient` | Deploys the SAC of a new `TEST` asset, reads and transfers it, and reads the XLM SAC | `InvokeHostFunctionOperation.createStellarAssetContract`, `ContractClient.forContract` on a SAC, read-only `balance`/`decimals`/`name`/`symbol`, `transferAndSubmit`, transfer to a muxed account (M...), non-invoker authorization |
+| `testTransferToMuxedContract` | Transfers to a muxed contract (W...) address | `to_muxed_id` in the `transfer` event, balance of a contract (C...) holder; needs protocol 30 |
+| `testProtocolGate` | Checks the protocol gate offline on mocked `getLatestLedger` answers | `networkProtocolAtLeast` with protocol 30, 29, and an answer without `protocolVersion` |
+
+**Setup**: each network test funds an issuer and two holders, A and B, with
+`fundTestAccountAndAwaitVisibility`. One issuer transaction gives A and B a trustline to
+`TEST`, an issuer transaction deploys the SAC (its created contract id must equal
+`Asset.getContractId`), and a classic payment gives A 1000 TEST.
+
+**`testSacClient` Details**:
+- `ContractClient.forContract` on the SAC id returns the 17 functions of the embedded spec
+- A read-only client reads A's balance of 10,000,000,000 base units, 7 decimals, the name
+  `TEST:<issuer>`, and the symbol `TEST`
+- A sends 100 TEST to B with `transferAndSubmit`
+- A sends 25 TEST to a muxed account of B: the `transfer` event names B's G address and
+  carries `amount` and `to_muxed_id` in its data
+- With the issuer as the source, A authorizes a transfer of 10.5 TEST through
+  `needsNonInvokerSigningBy()` and `signAuthEntries()`
+- The XLM SAC has the testnet contract id, 7 decimals, and the name and symbol `native`
+
+**Protocol 30 gate**: `testTransferToMuxedContract` calls `networkProtocolAtLeast(sorobanServer, 30)`
+before it funds an account. On a network below protocol 30 it prints that muxed contract
+destinations need protocol 30 and returns; a failed `getLatestLedger` request or an answer
+without `protocolVersion` fails the test. `testProtocolGate` checks these outcomes without a
+network.
+
+**Timeout**: 600 seconds per network test, for three funded accounts
+
+**Prerequisites**: Network connectivity to Stellar testnet Horizon and Soroban RPC servers
+
 ### TestUtils.kt
 
 `fundTestAccountAndAwaitVisibility` funds a test account and returns only once the endpoints the

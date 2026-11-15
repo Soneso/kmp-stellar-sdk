@@ -9,6 +9,7 @@ import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SimulationFailureMessage
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 
 /**
@@ -102,7 +103,8 @@ class ContractClient private constructor(
     val rpcUrl: String,
     val network: Network,
     private val contractSpec: ContractSpec?,
-    val server: SorobanServer = SorobanServer(rpcUrl)
+    val server: SorobanServer = SorobanServer(rpcUrl),
+    private val readOnly: Boolean = false
 ) {
 
     /**
@@ -636,7 +638,9 @@ class ContractClient private constructor(
             parameters = parameters
         )
 
-        val sourceAccount = server.getAccount(source)
+        // A read-only client loads no account: its transactions are never sent, and simulating
+        // one needs no account entry for the source.
+        val sourceAccount = if (readOnly) Account(source, 0L) else server.getAccount(source)
         val builder = TransactionBuilder(
             sourceAccount = sourceAccount,
             network = network
@@ -651,7 +655,8 @@ class ContractClient private constructor(
             transactionSigner = signer,
             parseResultXdrFn = parseResultXdrFn,
             transactionBuilder = builder,
-            useUpgradedAuth = options.useUpgradedAuth
+            useUpgradedAuth = options.useUpgradedAuth,
+            readOnly = readOnly
         )
     }
 
@@ -673,6 +678,10 @@ class ContractClient private constructor(
          * - Contract introspection
          * - Manual result parsing helpers (funcResToNative)
          *
+         * A Stellar Asset Contract runs no wasm, so the network holds no spec for it; such a
+         * contract opens with the embedded spec of [SACSpec] after one more read of its
+         * instance entry. [SACClient] offers typed calls for it.
+         *
          * Throws an exception if the contract spec cannot be loaded.
          *
          * @param contractId The contract ID (C... address)
@@ -689,11 +698,25 @@ class ContractClient private constructor(
         ): ContractClient {
             requireContractStrKey(contractId, "The contract to load")
             val server = sorobanServerFor(rpcUrl)
+            return forContractInternal(contractId, rpcUrl, network, server)
+        }
 
+        /**
+         * [forContract] with the server that loads the spec supplied by the caller, the seam
+         * through which unit tests inject a mocked server.
+         */
+        internal suspend fun forContractInternal(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            server: SorobanServer
+        ): ContractClient {
             val contractSpec = try {
                 val contractInfo = server.loadContractInfoForContractId(contractId)
                 if (contractInfo?.specEntries?.isNotEmpty() == true) {
                     ContractSpec(contractInfo.specEntries)
+                } else if (contractInfo == null && isStellarAssetContract(contractId, server)) {
+                    ContractSpec(SACClient.specEntries())
                 } else {
                     // forContract guarantees a usable spec; an empty spec entry set is a load failure.
                     throw IllegalStateException(
@@ -711,6 +734,41 @@ class ContractClient private constructor(
             }
 
             return ContractClient(contractId, rpcUrl, network, contractSpec, sorobanServerFor(rpcUrl))
+        }
+
+        /**
+         * Whether the instance entry of [contractId] holds the Stellar asset executable. The
+         * spec loader yields no contract info for a missing instance or code entry and for a
+         * Stellar Asset Contract alike, so this one read tells them apart.
+         */
+        private suspend fun isStellarAssetContract(contractId: String, server: SorobanServer): Boolean {
+            val entry = server.getContractData(
+                contractId,
+                Scv.toLedgerKeyContractInstance(),
+                SorobanServer.Durability.PERSISTENT
+            ) ?: return false
+            val data = LedgerEntryDataXdr.fromXdrBase64(entry.xdr) as? LedgerEntryDataXdr.ContractData ?: return false
+            val instance = data.value.`val` as? SCValXdr.Instance ?: return false
+            return instance.value.executable is ContractExecutableXdr.Void
+        }
+
+        /**
+         * Builds a client with the given spec entries without a request, the construction path
+         * of [SACClient]. A [readOnly] client builds its transactions without loading the source
+         * account, and they refuse to sign, submit, or restore.
+         *
+         * @throws IllegalArgumentException if [contractId] is not a contract (C...) address
+         */
+        internal fun forSpecEntries(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            specEntries: List<SCSpecEntryXdr>,
+            readOnly: Boolean,
+            server: SorobanServer = SorobanServer(rpcUrl)
+        ): ContractClient {
+            requireContractStrKey(contractId, "The contract to invoke")
+            return ContractClient(contractId, rpcUrl, network, ContractSpec(specEntries), server, readOnly)
         }
 
         /**

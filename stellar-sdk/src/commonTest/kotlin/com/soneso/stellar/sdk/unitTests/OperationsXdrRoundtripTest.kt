@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.unitTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.xdr.*
+import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 /**
@@ -991,6 +992,79 @@ class OperationsXdrRoundtripTest {
                 address = Address(ACCOUNT_A),
                 salt = ByteArray(16)
             )
+        }
+    }
+
+    /**
+     * The operation body that deploys the Stellar Asset Contract of [asset], built by hand: a
+     * CREATE_CONTRACT host function with the asset preimage, the Stellar asset executable and no
+     * authorization entry.
+     */
+    private fun stellarAssetContractBody(asset: AssetXdr): OperationBodyXdr =
+        OperationBodyXdr.InvokeHostFunctionOp(
+            InvokeHostFunctionOpXdr(
+                hostFunction = HostFunctionXdr.CreateContract(
+                    CreateContractArgsXdr(
+                        contractIdPreimage = ContractIDPreimageXdr.FromAsset(asset),
+                        executable = ContractExecutableXdr.Void
+                    )
+                ),
+                auth = emptyList()
+            )
+        )
+
+    /** Asserts that [body] decodes through [InvokeHostFunctionOperation.fromXdr] and re-encodes to its bytes. */
+    private fun assertInvokeHostFunctionBodyRoundTrips(body: OperationBodyXdr) {
+        val restored = InvokeHostFunctionOperation.fromXdr(assertIs<OperationBodyXdr.InvokeHostFunctionOp>(body).value)
+        assertContentEquals(encodedBody(body), encodedBody(restored.toOperationBody()))
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateStellarAssetContractNative() {
+        val body = InvokeHostFunctionOperation.createStellarAssetContract(ASSET_NATIVE).toOperationBody()
+
+        assertContentEquals(encodedBody(stellarAssetContractBody(AssetXdr.Void)), encodedBody(body))
+        assertInvokeHostFunctionBodyRoundTrips(body)
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateStellarAssetContractIssuedAsset() {
+        val usd = AssetXdr.AlphaNum4(
+            AlphaNum4Xdr(
+                AssetCode4Xdr(byteArrayOf(0x55, 0x53, 0x44, 0)),
+                KeyPair.fromAccountId(ACCOUNT_A).getXdrAccountId()
+            )
+        )
+
+        val body = InvokeHostFunctionOperation.createStellarAssetContract(ASSET_USD).toOperationBody()
+
+        assertContentEquals(encodedBody(stellarAssetContractBody(usd)), encodedBody(body))
+        assertInvokeHostFunctionBodyRoundTrips(body)
+    }
+
+    @Test
+    fun testInvokeHostFunctionCreateStellarAssetContractPreimageDerivesTheContractId() = runTest {
+        val vectors = listOf(
+            Triple(AssetTypeNative, Network.TESTNET, "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"),
+            Triple(
+                AssetTypeCreditAlphaNum4("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"),
+                Network.PUBLIC,
+                "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
+            )
+        )
+        for ((asset, network, contractId) in vectors) {
+            val hostFunction = InvokeHostFunctionOperation.createStellarAssetContract(asset).hostFunction
+            val preimage = HashIDPreimageXdr.ContractID(
+                HashIDPreimageContractIDXdr(
+                    networkId = HashXdr(network.networkId()),
+                    contractIdPreimage = assertIs<HostFunctionXdr.CreateContract>(hostFunction).value.contractIdPreimage
+                )
+            )
+            val writer = XdrWriter()
+            preimage.encode(writer)
+
+            assertEquals(contractId, StrKey.encodeContract(Util.hash(writer.toByteArray())), "$asset")
+            assertEquals(contractId, asset.getContractId(network), "$asset")
         }
     }
 

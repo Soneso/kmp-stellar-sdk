@@ -11,10 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SimulateTransactionResponse.reportedContractError()` returns the contract error a failed simulation reports, with its code, where it was found and the emitting contract: from an `Error(Contract, #N)` host error header or, after an `Error(Context, ...)` or `Error(Auth, ...)` header, from the earliest contract error in the diagnostic events.
 - `TransactionException.SimulationFailed`, `SimulationFailedException` and `PrepareTransactionException` carry the diagnostic events and the reported contract error through the new interface `SimulationFailureDetails`. `ContractErrorCodes.decodeFromSimulationFailure` names the OZ error.
 - `ContractClient` upload and deployment calls throw `ContractClientSimulationException`, an `IllegalStateException`, for a failed simulation. `RestorationFailureException` carries the failure of the restoration as its cause.
+- `SACClient` opens a Stellar Asset Contract from an `Asset` or a contract id without an RPC request. It has typed `balance`, `transfer`, `transferAndSubmit`, `decimals`, `name` and `symbol`, `toBaseUnits()` for decimal amounts, and a read-only mode without a keypair.
+- `SACSpec` embeds the Stellar Asset Contract spec at upstream commit 4f08d14.
+- `InvokeHostFunctionOperation.createStellarAssetContract` builds the operation that deploys the Stellar Asset Contract of an `Asset`.
 
 ### Changed
 - The Android artifact is built with Android Gradle plugin 9 and the Android Kotlin Multiplatform library plugin. Apps keep the requirements of earlier releases: minimum SDK 24 and compile SDK 34 or later.
 - The JVM and Android artifacts no longer depend on Apache Commons Codec (`commons-codec`); every platform writes strkeys with the SDK's own base32 codec.
+- `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
 
 ### Fixed
 - A failed simulation whose host error masks the contract error as `Error(Context, InvalidAction)` (a failing constructor) or `Error(Auth, InvalidAction)` (a failing `__check_auth`), the form stellar-rpc 30.0.1 returns, names the code: the message ends with ` (contract error in diagnostic events: Error(Contract, #N), contract C...)` when a diagnostic event reports it, so `ContractErrorCodes.decodeFromMessage` finds the code.
