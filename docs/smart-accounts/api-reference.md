@@ -285,7 +285,8 @@ data class OZSmartAccountConfig(
     val externalWallet: ExternalWalletAdapter? = null,
     val externalEd25519Adapter: OZExternalEd25519SignerAdapter? = null,
     val maxContextRuleScanId: UInt = 50u,
-    val defaultPolicies: Map<String, SCValXdr> = emptyMap()
+    val defaultPolicies: Map<String, SCValXdr> = emptyMap(),
+    val authDigestSchemes: Map<String, AuthDigestScheme> = emptyMap()
 )
 ```
 
@@ -308,6 +309,7 @@ data class OZSmartAccountConfig(
 - `externalEd25519Adapter`: Optional Ed25519 adapter (`OZExternalEd25519SignerAdapter`) backing the adapter custody model for `SelectedSigner.Ed25519` signers (hardware wallet, HSM, remote signing service). The kit injects it into `kit.externalSigners`. See [External Signer Management](#external-signer-management).
 - `maxContextRuleScanId`: Upper bound on rule IDs to scan when iterating context rules (defaults to 50). Increase if the account has had many add/remove cycles.
 - `defaultPolicies`: Policies installed on a new wallet's Default context rule at deploy time, keyed by policy contract address (C...) with the policy's install parameters as the value (see `PolicyInstallParams.toScVal()`). Applied through the contract constructor by `createWallet` and `deployPendingCredential`; a per-call `policies` argument overrides it. Defaults to no policies. Maximum 5. See the `createWallet` `policies` parameter for the built-in policies' install constraints at deploy time.
+- `authDigestSchemes`: Maps account WASM hashes (64-character hex) to the `AuthDigestScheme` their `__check_auth` checks. Built in, the stellar-accounts 0.8.0 build `c514d35e...` maps to `PREIMAGE_V1`; configured entries override the built-in mapping, and the kit signs `LEGACY_CONCAT` for an unmapped hash. Map each own build that implements `PREIMAGE_V1`; without the entry the contract rejects every authorization after the signers have signed. Defaults to empty.
 
 ### Platform-Specific Providers
 
@@ -1398,11 +1400,11 @@ suspend fun addDelegated(
 ): TransactionResult
 ```
 
-Adds a delegated signer (account or contract) to a context rule.
+Adds a delegated signer (a Stellar account) to a context rule.
 
 **Parameters**:
 - `contextRuleId`: Context rule ID
-- `address`: Stellar address (G for accounts, C for contracts)
+- `address`: Stellar account address (G...)
 - `selectedSigners`: Optional multi-signer authorization (default: single-signer with the connected passkey).
 - `forceMethod`: Optional override to force relayer or RPC submission (default: auto-detect based on config).
 
@@ -1410,7 +1412,8 @@ Adds a delegated signer (account or contract) to a context rule.
 
 **Throws**:
 - `WalletException.NotConnected`: Wallet is not connected
-- `ValidationException`: Invalid address format
+- `ValidationException.InvalidAddress`: Invalid address format, or a contract address
+- `ValidationException.InvalidInput`: The wallet itself or the shared default deployer
 - `TransactionException`: Simulation, signing, or submission failed
 - `WebAuthnException`: Biometric authentication failed
 
@@ -1898,7 +1901,7 @@ suspend fun addContextRule(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `contextType` | `ContextRuleType` | Rule scope: `Default`, `CallContract(address)`, or `CreateContract(wasmHash)` |
+| `contextType` | `ContextRuleType` | Rule scope: `Default`, `CallContract(address)`, `CreateContract(wasmHash)`, or `CreateContractExternalRef(owner, tag)` |
 | `name` | `String` | Human-readable name stored on-chain |
 | `validUntil` | `UInt?` | Optional expiry ledger number (null = no expiry) |
 | `signers` | `List<SmartAccountSigner>` | Signers who can authorize operations matching this context |
@@ -1916,7 +1919,7 @@ suspend fun addContextRule(
 
 **Returns**: `TransactionResult`
 
-**Throws**: `WalletException.NotConnected` if no wallet is connected. `ValidationException` if name is empty, signer/policy count exceeds limits, or policy address is invalid. `TransactionException` if submission fails.
+**Throws**: `WalletException.NotConnected` if no wallet is connected. `ValidationException` if name is empty, signer/policy count exceeds limits, policy address is invalid, or a Delegated signer is not a Stellar account (G...) other than the shared default deployer. `TransactionException` if submission fails.
 
 **Example**:
 
@@ -2115,6 +2118,7 @@ sealed class ContextRuleType {
     object Default : ContextRuleType()
     data class CallContract(val contractAddress: String) : ContextRuleType()
     data class CreateContract(val wasmHash: ByteArray) : ContextRuleType()
+    data class CreateContractExternalRef(val owner: String, val tag: String) : ContextRuleType()
 }
 ```
 
@@ -2131,7 +2135,7 @@ ContextRuleType.CallContract("CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2H
 ContextRuleType.CreateContract(wasmHashBytes)
 ```
 
-The on-chain rule schema identifies a `CreateContract` rule by a 32-byte WASM hash only. Automatic context-rule resolution therefore throws a `ValidationException` for a create-contract invocation whose executable is a CAP-85 external reference or a Stellar Asset Contract — neither executable carries a WASM hash to match. Authorize such deployments by supplying explicit rule IDs through the [`resolveContextRuleIds`](#resolvecontextruleids) callback instead of relying on automatic resolution.
+Automatic context-rule resolution matches a create-contract invocation whose executable is a CAP-85 external reference to a `CreateContractExternalRef` rule with the same owner and tag, or to a Default rule. It throws a `ValidationException` for a Stellar Asset Contract executable, which carries neither a WASM hash nor a reference to match. Authorize such deployments by supplying explicit rule IDs through the [`resolveContextRuleIds`](#resolvecontextruleids) callback.
 
 ---
 
@@ -2192,6 +2196,16 @@ Creates a CreateContract context rule type for a specific WASM hash.
 - `wasmHash`: 32-byte array
 
 **Throws**: `ValidationException.InvalidInput` if the hash length is incorrect
+
+#### createCreateContractExternalRefContextType
+
+```kotlin
+fun createCreateContractExternalRefContextType(owner: String, tag: String): ContextRuleType
+```
+
+Creates a CreateContractExternalRef context rule type for contracts deployed from the executable reference that the `owner` contract (C-address, validated) stores under `tag` (CAP-85).
+
+**Throws**: `ValidationException.InvalidAddress` if the owner is not a valid C-address
 
 #### Deprecated context-type builder names
 
@@ -2863,7 +2877,7 @@ interface OZExternalEd25519SignerAdapter {
 **Parameters**:
 - `verifierAddress`: C-strkey of the Ed25519 verifier contract identifying the on-chain signer slot.
 - `publicKey`: 32-byte Ed25519 public key identifying the signer slot.
-- `authDigest`: 32-byte digest to sign, computed as `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
+- `authDigest`: 32-byte digest to sign, of the wallet's `AuthDigestScheme`: `SHA-256(signaturePayload || contextRuleIds.toXDR())` for stellar-accounts 0.7, `SHA-256(XDR(AuthDigestPreimage))` for 0.8.0.
 
 ```kotlin
 class MyHardwareAdapter : OZExternalEd25519SignerAdapter {
@@ -3303,7 +3317,20 @@ These helpers are the lower-level building blocks the kit uses internally to con
 ### SmartAccountAuth
 
 ```kotlin
+enum class AuthDigestScheme { LEGACY_CONCAT, PREIMAGE_V1 }
+
+data class EntryAuthDigest(val signaturePayload: ByteArray, val authDigest: ByteArray, val delegatedAuthArgs: List<SCValXdr>)
+
 object SmartAccountAuth {
+    suspend fun computeEntryAuthDigest(
+        entry: SorobanAuthorizationEntryXdr,
+        expirationLedger: UInt,
+        networkPassphrase: String,
+        contextRuleIds: List<UInt>,
+        scheme: AuthDigestScheme
+    ): EntryAuthDigest
+
+    @Deprecated("Computes the stellar-accounts 0.7 digest only. Use computeEntryAuthDigest with the AuthDigestScheme of the code the wallet runs.")
     suspend fun buildAuthDigest(
         signaturePayload: ByteArray,
         contextRuleIds: List<UInt>
@@ -3341,7 +3368,8 @@ object SmartAccountAuth {
 }
 ```
 
-- `buildAuthDigest(signaturePayload, contextRuleIds)` — computes `SHA-256(signaturePayload || contextRuleIds.toXDR())`.
+- `computeEntryAuthDigest(entry, expirationLedger, networkPassphrase, contextRuleIds, scheme)`: returns the signature payload of the entry, the digest that External signers sign, and the `__check_auth` arguments that Delegated signers authorize. `scheme` must be the one the wallet's code checks: `LEGACY_CONCAT` for stellar-accounts 0.7, `PREIMAGE_V1` for 0.8.0; the contract rejects a signature over the other digest.
+- `buildAuthDigest(signaturePayload, contextRuleIds)`: deprecated, computes the stellar-accounts 0.7 digest `SHA-256(signaturePayload || contextRuleIds.toXDR())` only. Use `computeEntryAuthDigest` with the wallet's scheme.
 - `buildAuthPayloadHash(entry, expirationLedger, networkPassphrase)` — computes the `HashIdPreimage::SorobanAuthorization` hash that must be signed to authorize an entry with address credentials.
 - `buildSourceAccountAuthPayloadHash(entry, address, nonce, expirationLedger, networkPassphrase, useUpgradedAuth = true)` — variant for source-account credentials, typically used when converting them to address credentials for relayer fee sponsoring. `useUpgradedAuth` selects the arm: true (the default) hashes the ADDRESS_V2 address-bound preimage, false the legacy ADDRESS preimage.
 - `signAuthEntry(entry, signer, signature, expirationLedger, contextRuleIds)` — attaches a pre-computed signature to an authorization entry. Does NOT perform cryptographic signing. Returns a fresh entry; when `contextRuleIds` is non-empty it overrides any existing identifiers in the payload.
@@ -3801,13 +3829,13 @@ sealed class IndexerException : SmartAccountException {
 
 Defined in `smartaccount/core/SmartAccountErrors.kt`. Named constants for the smart-account contract's own error enum (the codes a caller is most likely to branch on), plus `decode(code)`, which resolves any known code of the smart account, WebAuthn, or a policy contract into the contract and variant name that defined it. A failed transaction can surface the raw `Error(Contract, #NNNN)` message inside the exception (typically `TransactionException.SimulationFailed`); extract the code and pass it to `decode`, or match it against a constant. Alternatively, pass a thrown `TransactionException`'s message directly to `decodeFromMessage`, which extracts and decodes the first known marker in one step. `decodeFromSimulationFailure` decodes the `reportedContractError` that a `SimulationFailed` carries. Error code range: 3xxx.
 
-`decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000–3016; 3001 unused), `WebAuthnError` (3110–3119), and the policy enums `SimpleThresholdError` (3200–3203), `WeightedThresholdError` (3210–3214), and `SpendingLimitError` (3220–3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Note that several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings — the two are distinguished by the exception type they arrive through.
+`decode` returns an `OZContractError` (`code`, `contract`, `name`) or `null` for an unknown code. It covers the full on-chain surface: `SmartAccountError` (3000-3018; 3001 unused), `WebAuthnError` (3110-3119), and the policy enums `SimpleThresholdError` (3200-3203), `WeightedThresholdError` (3210-3214), and `SpendingLimitError` (3220-3227). Variant names repeat across the policy enums, so `contract` disambiguates; `code` is globally unique. Several 3xxx values also exist in the SDK-side [`SmartAccountErrorCode`](#smartaccounterrorcode) enum with different meanings; the exception type they arrive through tells the two apart.
 
 ```kotlin
 data class OZContractError(val code: Int, val contract: String, val name: String)
 
 object ContractErrorCodes {
-    // Smart account contract (SmartAccountError, 3000-3016; 3001 unused)
+    // Smart account contract (SmartAccountError, 3000-3018; 3001 unused)
     const val CONTEXT_RULE_NOT_FOUND = 3000
     const val UNVALIDATED_CONTEXT = 3002
     const val EXTERNAL_VERIFICATION_FAILED = 3003
@@ -3824,6 +3852,8 @@ object ContractErrorCodes {
     const val CONTEXT_RULE_IDS_LENGTH_MISMATCH = 3014
     const val NAME_TOO_LONG = 3015
     const val UNAUTHORIZED_SIGNER = 3016
+    const val DELEGATED_SIGNER_IS_CONTEXT_CONTRACT = 3017
+    const val SELF_DELEGATED_SIGNER = 3018
 
     /** Resolves any known contract error code into its contract and variant, or null. */
     fun decode(code: Int): OZContractError?
