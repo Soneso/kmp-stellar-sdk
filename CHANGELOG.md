@@ -7,15 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-16
+
+Migration guide: [docs/migration/1.18.0.md](docs/migration/1.18.0.md)
+
 ### Added
 - Smart accounts on OpenZeppelin stellar-accounts 0.8. Before it asks the first signer of an operation, the kit reads the WASM hash the wallet runs, with one `getLedgerEntries` request that also sets the signature expiration in place of `getLatestLedger`. It signs the 0.8 digest, `sha256` of the `AuthDigestPreimage` XDR that binds the account address, for the 0.8.0 build `c514d35e...` and for every hash that `OZSmartAccountConfig.authDigestSchemes` maps to `AuthDigestScheme.PREIMAGE_V1`; the map can also map `c514d35e...` to `AuthDigestScheme.LEGACY_CONCAT`. Every other wallet signs the 0.7 digest as before. On 0.8 wallets a Delegated signer authorizes the preimage. Map each own build that implements `PREIMAGE_V1`: without the entry the contract rejects the authorization after the signers have signed, and nothing executes.
 - `SmartAccountAuth.computeEntryAuthDigest` returns the signature payload, the digest and the delegated `__check_auth` arguments of an auth entry for an `AuthDigestScheme`, as `EntryAuthDigest`.
 - `OZBuilders.createCreateContractExternalRefContextType(owner, tag)` builds a rule for contracts deployed from an executable reference (CAP-0085).
+- Automatic context rule resolution matches a contract deploy from an executable reference to a `CreateContractExternalRef` rule with the same owner and tag, or to a Default rule. A Stellar Asset Contract deploy still throws `ValidationException`.
 - `ContractErrorCodes` decodes 3017 `DelegatedSignerIsContextContract` and 3018 `SelfDelegatedSigner`.
 
 ### Changed
 - Breaking: `ContextRuleType` has the subtype `CreateContractExternalRef(owner, tag)`. `listContextRules` returns such rules, where it threw "Unknown context_type discriminant", and the kit signs for wallets that hold one. An exhaustive `when` over `ContextRuleType` needs a branch for it.
 - Breaking: `OZSignerManager.addDelegated` and `OZContextRuleManager.addContextRule` refuse a Delegated signer with a contract (`C...`) address, the wallet included, because a contract delegate can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc). `submit` and the multi-signer pipeline refuse the same signers, and a muxed contract address (`W...`) as a Delegated address or an External verifier, in `add_signer`, `batch_add_signer` and `add_context_rule` calls on the wallet before they ask any signer. Contract delegates already on a wallet are read as before; to close the gap, remove such a signer, or upgrade the wallet and every smart account it delegates to.
+- The smart account pages and the agent skill describe the 0.8 authorization digest with its `authDigestSchemes` setting and the `CreateContractExternalRef` rule kind. They state that the kit refuses to add contract delegates and list the error codes 3017 and 3018. A migration guide covers the breaking changes.
 
 ### Deprecated
 - `SmartAccountAuth.buildAuthDigest` computes the 0.7 digest only; use `computeEntryAuthDigest` with the wallet's scheme.
