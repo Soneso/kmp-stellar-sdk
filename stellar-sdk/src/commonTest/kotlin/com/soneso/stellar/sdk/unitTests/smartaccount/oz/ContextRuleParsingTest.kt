@@ -1344,11 +1344,11 @@ class ContextRuleParsingTest {
     }
 
     // ========================================================================
-    // resolveContextRuleIdsForEntry — executables without a WASM hash
+    // resolveContextRuleIdsForEntry — executable references
     // ========================================================================
 
     @Test
-    fun testResolveContextRuleIds_createContractWithExternalRefExecutable_throwsValidationException() = runTest {
+    fun testResolveContextRuleIds_createContractWithExternalRefExecutable_namesTheUnmatchedContext() = runTest {
         val kit = createConnectedKit()
         val manager = kit.contextRuleManager
 
@@ -1379,8 +1379,10 @@ class ContextRuleParsingTest {
             manager.resolveContextRuleIdsForEntry(entry, emptyList(), emptyList())
         }
         assertTrue(
-            ex.message!!.contains("external executable"),
-            "Exception message should name the external executable"
+            ex.message.contains(
+                "No context rule matches CreateContractExternalRef(owner=$validContractAddress2, tag=my-tag)"
+            ),
+            "Exception message should name the executable reference context; got: ${ex.message}"
         )
     }
 }

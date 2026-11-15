@@ -27,6 +27,7 @@ import com.soneso.stellar.sdk.xdr.HostFunctionXdr
 import com.soneso.stellar.sdk.xdr.Int64Xdr
 import com.soneso.stellar.sdk.xdr.InvokeContractArgsXdr
 import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
+import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
 import com.soneso.stellar.sdk.xdr.SCContractInstanceXdr
 import com.soneso.stellar.sdk.xdr.LedgerFootprintXdr
 import com.soneso.stellar.sdk.xdr.PublicKeyXdr
@@ -48,6 +49,7 @@ import com.soneso.stellar.sdk.xdr.ThresholdsXdr
 import com.soneso.stellar.sdk.xdr.Uint256Xdr
 import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrWriter
+import com.soneso.stellar.sdk.xdr.fromXdrBase64
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -60,6 +62,9 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -67,7 +72,7 @@ import kotlin.test.assertTrue
 // RPC mock response builders
 // ---------------------------------------------------------------------------
 
-internal fun ledgerEntriesResponseJson(accountXdrBase64: String): String = """
+internal fun ledgerEntriesResponseJson(accountXdrBase64: String, latestLedger: Long = 100): String = """
 {
   "jsonrpc": "2.0",
   "id": "test-id",
@@ -79,7 +84,7 @@ internal fun ledgerEntriesResponseJson(accountXdrBase64: String): String = """
         "lastModifiedLedgerSeq": 100
       }
     ],
-    "latestLedger": 100
+    "latestLedger": $latestLedger
   }
 }
 """.trimIndent()
@@ -236,9 +241,13 @@ internal fun buildMinimalSorobanData(): SorobanTransactionDataXdr = SorobanTrans
  * `SorobanServer.getContractData(...)` return a non-null entry — the structural signal
  * `verifyContractExists` reads to confirm the contract exists on-chain.
  */
-internal fun contractInstanceEntriesResponseJson(contractId: String): String {
+internal fun contractInstanceEntriesResponseJson(
+    contractId: String,
+    executable: ContractExecutableXdr = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32) { 0 })),
+    latestLedger: Long = 100
+): String {
     val instance = SCContractInstanceXdr(
-        executable = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32) { 0 })),
+        executable = executable,
         storage = null
     )
     val entryData = LedgerEntryDataXdr.ContractData(
@@ -250,7 +259,37 @@ internal fun contractInstanceEntriesResponseJson(contractId: String): String {
             `val` = Scv.toContractInstance(instance)
         )
     )
-    return ledgerEntriesResponseJson(entryData.toXdrBase64())
+    return ledgerEntriesResponseJson(entryData.toXdrBase64(), latestLedger)
+}
+
+/** The RPC method of a JSON-RPC request body. */
+internal fun rpcRequestMethod(requestBody: String): String =
+    Json.parseToJsonElement(requestBody).jsonObject["method"]!!.jsonPrimitive.content
+
+/**
+ * Answers the ledger read a signing operation makes before it asks any signer. A
+ * `getLedgerEntries` request (the wallet's code read) gets the persistent instance entry of the
+ * contract its key names, running [executable]; a `getLatestLedger` request (an operation
+ * without a smart account entry) gets the latest ledger. Both report [latestLedger]. The
+ * all-zero default WASM hash is mapped by no table, so the wallet signs the legacy digest.
+ */
+internal fun signingLedgerReadResponseJson(
+    requestBody: String,
+    executable: ContractExecutableXdr = ContractExecutableXdr.WasmHash(HashXdr(ByteArray(32) { 0 })),
+    latestLedger: Long = 1000
+): String = when (val method = rpcRequestMethod(requestBody)) {
+    "getLedgerEntries" -> {
+        val keyBase64 = Json.parseToJsonElement(requestBody).jsonObject["params"]!!
+            .jsonObject["keys"]!!.jsonArray[0].jsonPrimitive.content
+        val key = LedgerKeyXdr.fromXdrBase64(keyBase64) as LedgerKeyXdr.ContractData
+        contractInstanceEntriesResponseJson(
+            Address.fromSCAddress(key.value.contract).toString(),
+            executable,
+            latestLedger
+        )
+    }
+    "getLatestLedger" -> latestLedgerResponseJson(latestLedger.toInt())
+    else -> error("Expected the signing ledger read, got $method")
 }
 
 internal fun stubHostFunction(contractId: String): HostFunctionXdr =
@@ -382,12 +421,12 @@ internal fun buildHeadlessConnectThenSubmissionMockServer(
     txHash: String
 ): SorobanServer {
     var requestIndex = 0
-    val mockEngine = MockEngine { _ ->
+    val mockEngine = MockEngine { request ->
         val responseBody = when (requestIndex++) {
             0 -> contractInstanceJson
             1 -> ledgerEntriesResponseJson(accountXdrBase64)
             2 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
-            3 -> latestLedgerResponseJson()
+            3 -> signingLedgerReadResponseJson(request.body.toByteArray().decodeToString())
             4 -> ledgerEntriesResponseJson(accountXdrBase64)
             5 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
             6 -> ledgerEntriesResponseJson(accountXdrBase64)
@@ -412,7 +451,7 @@ internal fun buildHeadlessConnectThenSubmissionMockServer(
  * Response sequence:
  * 1. getLedgerEntries — deployer account lookup (first simulation)
  * 2. simulateTransaction — main invocation simulation
- * 3. getLatestLedger — current ledger sequence
+ * 3. signing ledger read: getLedgerEntries of the wallet instance, or getLatestLedger
  * 4. getLedgerEntries — deployer account lookup (context-rule-count simulation)
  * 5. simulateTransaction — get_context_rules_count query (returns U32(0))
  */
@@ -423,11 +462,11 @@ internal fun buildSequentialMockServer(
     countXdrBase64: String
 ): SorobanServer {
     var requestIndex = 0
-    val mockEngine = MockEngine { _ ->
+    val mockEngine = MockEngine { request ->
         val responseBody = when (requestIndex++) {
             0 -> ledgerEntriesResponseJson(accountXdrBase64)
             1 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
-            2 -> latestLedgerResponseJson()
+            2 -> signingLedgerReadResponseJson(request.body.toByteArray().decodeToString())
             3 -> ledgerEntriesResponseJson(accountXdrBase64)
             4 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
             else -> error("Unexpected RPC request at index ${requestIndex - 1}")
@@ -447,7 +486,7 @@ internal fun buildSequentialMockServer(
  *
  * 1. getLedgerEntries — deployer account lookup (first simulation)
  * 2. simulateTransaction — main invocation simulation
- * 3. getLatestLedger — current ledger sequence
+ * 3. signing ledger read: getLedgerEntries of the wallet instance, or getLatestLedger
  * 4. getLedgerEntries — deployer account lookup (context-rule-count simulation)
  * 5. simulateTransaction — get_context_rules_count query (returns U32(0))
  * 6. getLedgerEntries — deployer account lookup (re-fetch before re-simulation)
@@ -472,7 +511,7 @@ internal fun buildSequentialMockServerWithSubmission(
         val responseBody = when (index) {
             0 -> ledgerEntriesResponseJson(accountXdrBase64)
             1 -> simulateWithAuthResponseJson(authEntryBase64, sorobanDataBase64)
-            2 -> latestLedgerResponseJson()
+            2 -> signingLedgerReadResponseJson(request.body.toByteArray().decodeToString())
             3 -> ledgerEntriesResponseJson(accountXdrBase64)
             4 -> simulateCountResponseJson(countXdrBase64, sorobanDataBase64)
             5 -> ledgerEntriesResponseJson(accountXdrBase64)

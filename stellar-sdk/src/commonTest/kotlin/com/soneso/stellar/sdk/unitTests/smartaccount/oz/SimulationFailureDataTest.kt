@@ -35,6 +35,7 @@ import com.soneso.stellar.sdk.unitTests.smartaccount.MockWebAuthnProvider
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildAccountEntryXdr
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildAuthEntry
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildMinimalSorobanData
+import com.soneso.stellar.sdk.unitTests.smartaccount.contractInstanceEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.latestLedgerResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.ledgerEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.simulateCountResponseJson
@@ -566,7 +567,7 @@ class SimulationFailureDataTest {
                 listOf(
                     account(deployer),
                     simulateWithAuthResponseJson(buildAuthEntry(VERIFIER_B).toXdrBase64(), sorobanData),
-                    latestLedgerResponseJson(),
+                    contractInstanceEntriesResponseJson(VERIFIER_B),
                     account(deployer),
                     simulateCountResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData),
                     account(deployer),

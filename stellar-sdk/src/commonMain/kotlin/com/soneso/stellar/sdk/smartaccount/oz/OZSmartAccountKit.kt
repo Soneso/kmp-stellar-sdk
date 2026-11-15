@@ -8,8 +8,19 @@
 package com.soneso.stellar.sdk.smartaccount.oz
 import com.soneso.stellar.sdk.smartaccount.core.*
 
+import com.soneso.stellar.sdk.Address
 import com.soneso.stellar.sdk.KeyPair
+import com.soneso.stellar.sdk.Util
+import com.soneso.stellar.sdk.addressCredentials
 import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.scval.Scv
+import com.soneso.stellar.sdk.xdr.ContractDataDurabilityXdr
+import com.soneso.stellar.sdk.xdr.ContractExecutableXdr
+import com.soneso.stellar.sdk.xdr.LedgerEntryDataXdr
+import com.soneso.stellar.sdk.xdr.LedgerKeyContractDataXdr
+import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
+import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import kotlinx.coroutines.sync.Mutex
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.sync.withLock
@@ -372,6 +383,94 @@ class OZSmartAccountKit private constructor(
         }
     }
 
+    /**
+     * Prepares one signing operation over the simulated [authEntries] for the smart account
+     * [contractId]. Both signing pipelines call it once, before they ask any signer.
+     *
+     * For each auth entry of the smart account, validates the signers its invocation tree adds
+     * to the wallet ([requireValidAddedSigners]). With at least one such entry, reads the
+     * wallet's instance once ([resolveAuthDigestScheme]) and takes the signature expiration
+     * from the latest ledger of that response; otherwise reads the latest ledger alone and
+     * makes no instance read.
+     *
+     * @param contractId The connected smart account (C-address)
+     * @param authEntries The auth entries the simulation returned
+     * @return The digest scheme of the wallet (null without a smart account entry) and the
+     *   ledger at which the signatures expire
+     * @throws ValidationException if an added signer is refused
+     * @throws TransactionException.SigningFailed if an added signer is malformed or the
+     *   instance entry cannot be read as a contract instance
+     */
+    internal suspend fun prepareSigningOperation(
+        contractId: String,
+        authEntries: List<SorobanAuthorizationEntryXdr>
+    ): SigningOperationState {
+        val walletEntries = authEntries.filter { entry ->
+            val credentials = entry.credentials.addressCredentials() ?: return@filter false
+            val entryAddress = try { Address.fromSCAddress(credentials.address).toString() } catch (_: Exception) { null }
+            entryAddress == contractId
+        }
+        for (entry in walletEntries) {
+            requireValidAddedSigners(entry, contractId)
+        }
+
+        val (scheme, latestLedger) = if (walletEntries.isNotEmpty()) {
+            val read = resolveAuthDigestScheme(contractId)
+            read.scheme to read.latestLedger
+        } else {
+            null to sorobanServer.getLatestLedger().sequence
+        }
+        return SigningOperationState(
+            authDigestScheme = scheme,
+            expirationLedger = latestLedger.toUInt() + config.signatureExpirationLedgers.toUInt()
+        )
+    }
+
+    /**
+     * Reads the WASM hash the smart account [contractId] runs and maps it to its digest scheme
+     * with [OZSmartAccountConfig.authDigestSchemeFor].
+     *
+     * One `getLedgerEntries` request for the persistent contract instance entry. A WASM
+     * executable maps through the configured and built-in tables; an external reference or a
+     * missing entry signs with [AuthDigestScheme.LEGACY_CONCAT]. RPC errors propagate.
+     *
+     * @param contractId The smart account (C-address)
+     * @return The scheme and the latest ledger of the response
+     * @throws TransactionException.SigningFailed if the returned entry is not a contract instance
+     */
+    internal suspend fun resolveAuthDigestScheme(contractId: String): AuthDigestSchemeRead {
+        val instanceKey = LedgerKeyXdr.ContractData(
+            LedgerKeyContractDataXdr(
+                contract = Address(contractId).toSCAddress(),
+                key = Scv.toLedgerKeyContractInstance(),
+                durability = ContractDataDurabilityXdr.PERSISTENT
+            )
+        )
+        val response = sorobanServer.getLedgerEntries(listOf(instanceKey))
+        val entry = response.entries?.firstOrNull()
+            ?: return AuthDigestSchemeRead(AuthDigestScheme.LEGACY_CONCAT, response.latestLedger)
+
+        val data = try {
+            entry.parseXdr()
+        } catch (e: IllegalArgumentException) {
+            throw TransactionException.signingFailed(
+                "Failed to decode the instance entry of $contractId to read its code: ${e.message}",
+                e
+            )
+        }
+        val instance = when (data) {
+            is LedgerEntryDataXdr.ContractData -> (data.value.`val` as? SCValXdr.Instance)?.value
+            else -> null
+        } ?: throw TransactionException.signingFailed(
+            "The instance entry of $contractId is not a contract instance (${data.discriminant})"
+        )
+        val scheme = when (val executable = instance.executable) {
+            is ContractExecutableXdr.WasmHash -> config.authDigestSchemeFor(Util.bytesToHex(executable.value.value))
+            is ContractExecutableXdr.ExternalRef, ContractExecutableXdr.Void -> AuthDigestScheme.LEGACY_CONCAT
+        }
+        return AuthDigestSchemeRead(scheme, response.latestLedger)
+    }
+
     /** Cached deployer keypair to avoid repeated creation. See [getDeployer]. */
     private var cachedDeployer: KeyPair? = null
 
@@ -487,3 +586,36 @@ class OZSmartAccountKit private constructor(
         )
     }
 }
+
+/**
+ * The state one signing operation signs against, read before any signer is asked.
+ *
+ * @property authDigestScheme The digest scheme of the wallet's code, or null when no auth entry
+ *   belongs to the wallet and no instance read was made
+ * @property expirationLedger The ledger at which the signatures expire
+ */
+internal data class SigningOperationState(
+    val authDigestScheme: AuthDigestScheme?,
+    val expirationLedger: UInt
+) {
+    /**
+     * The digest scheme an auth entry of the smart account [contractId] signs with.
+     *
+     * @throws IllegalStateException if the state was prepared without an entry of [contractId],
+     *   so no scheme was read
+     */
+    fun schemeForWalletEntry(contractId: String): AuthDigestScheme = checkNotNull(authDigestScheme) {
+        "No digest scheme was resolved for the auth entry of $contractId"
+    }
+}
+
+/**
+ * The result of one instance read of a smart account.
+ *
+ * @property scheme The digest scheme the wallet's code checks
+ * @property latestLedger The latest ledger the RPC reported with the read
+ */
+internal data class AuthDigestSchemeRead(
+    val scheme: AuthDigestScheme,
+    val latestLedger: Long
+)

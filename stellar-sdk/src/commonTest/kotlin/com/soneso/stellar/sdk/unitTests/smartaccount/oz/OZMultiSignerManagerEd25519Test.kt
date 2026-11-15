@@ -14,6 +14,7 @@ import com.soneso.stellar.sdk.unitTests.smartaccount.buildAuthEntry
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildMinimalSorobanData
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildSequentialMockServer
 import com.soneso.stellar.sdk.unitTests.smartaccount.buildSequentialMockServerWithSubmission
+import com.soneso.stellar.sdk.unitTests.smartaccount.contractInstanceEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.latestLedgerResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.ledgerEntriesResponseJson
 import com.soneso.stellar.sdk.unitTests.smartaccount.simulateCountResponseJson
@@ -1099,7 +1100,7 @@ class OZMultiSignerManagerEd25519Test {
             listOf(
                 ledgerEntriesResponseJson(accountXdr),
                 simulateWithAuthResponseJson(authEntryXdr, sorobanDataXdr),
-                latestLedgerResponseJson(),
+                contractInstanceEntriesResponseJson(VERIFIER_B),
                 ledgerEntriesResponseJson(accountXdr),
                 simulateCountResponseJson(countZeroXdr, sorobanDataXdr),
                 ledgerEntriesResponseJson(accountXdr),
