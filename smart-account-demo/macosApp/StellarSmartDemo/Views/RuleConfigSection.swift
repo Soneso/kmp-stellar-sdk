@@ -102,6 +102,7 @@ struct RuleConfigSection: View {
                         }
                         viewModel.fieldErrors.removeValue(forKey: "contractAddress")
                         viewModel.fieldErrors.removeValue(forKey: "wasmHash")
+                        viewModel.fieldErrors.removeValue(forKey: "refOwner")
                     }
                 )) {
                     ForEach(ContextTypeOption.allCases, id: \.self) { option in
@@ -139,6 +140,31 @@ struct RuleConfigSection: View {
                     isMonospace: true,
                     isEnabled: !viewModel.isSubmitting
                 )
+            }
+
+            // Executable owner and tag inputs for createContractExternalRef
+            if viewModel.contextTypeOption == .createContractExternalRef {
+                ValidationTextField(
+                    label: "Executable Owner (C...)",
+                    text: Binding(
+                        get: { viewModel.refOwner },
+                        set: { viewModel.refOwner = $0
+                               viewModel.fieldErrors.removeValue(forKey: "refOwner") }
+                    ),
+                    error: viewModel.fieldErrors["refOwner"],
+                    placeholder: "Owner contract address",
+                    isMonospace: true,
+                    isEnabled: !viewModel.isSubmitting
+                )
+                ValidationTextField(
+                    label: "Executable Tag",
+                    text: $viewModel.refTag,
+                    placeholder: "Tag the owner stores the code under",
+                    isEnabled: !viewModel.isSubmitting
+                )
+                Text("The owner contract can change the code this reference resolves to.")
+                    .font(.caption2)
+                    .foregroundColor(Material3Colors.onSurfaceVariant)
             }
         }
     }

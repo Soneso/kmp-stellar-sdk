@@ -9,6 +9,7 @@ package com.soneso.smartdemo
 
 import com.soneso.smartdemo.config.DemoConfig
 import com.soneso.smartdemo.config.KNOWN_POLICIES
+import com.soneso.smartdemo.config.RECOGNIZED_POLICIES
 import com.soneso.smartdemo.flows.ApproveResult
 import com.soneso.smartdemo.flows.ContextRuleResult
 import com.soneso.smartdemo.flows.FlowPolicyEntry
@@ -628,7 +629,7 @@ class MacOSBridge {
      * Adds a new context rule to the smart account.
      *
      * The bridge constructs all Kotlin SDK types internally from the Swift-friendly descriptors:
-     * - [contextTypeName] and [contextTypeParam] → [ContextRuleType] sealed class instance.
+     * - [contextTypeName], [contextTypeParam] and [contextTypeTag] → [ContextRuleType] sealed class instance.
      * - [signerDescriptors] → [List<SmartAccountSigner>] via the appropriate builder function.
      * - [policyDescriptors] → [List<FlowPolicyEntry>] with encoded [SCValXdr] parameters.
      * - [validUntilOffset] is resolved to an absolute ledger via [resolveAbsoluteLedger].
@@ -638,9 +639,12 @@ class MacOSBridge {
      *
      * Requires passkey authentication.
      *
-     * @param contextTypeName Context type tag: "default", "call_contract", or "create_contract".
+     * @param contextTypeName Context type name: "default", "call_contract", "create_contract", or
+     *   "create_contract_external_ref".
      * @param contextTypeParam For "call_contract": target contract C-address.
-     *   For "create_contract": lowercase hex WASM hash. Null for "default".
+     *   For "create_contract": lowercase hex WASM hash. For "create_contract_external_ref": the
+     *   executable owner contract C-address. Null for "default".
+     * @param contextTypeTag For "create_contract_external_ref": the executable tag. Null otherwise.
      * @param name Human-readable rule name stored on-chain.
      * @param validUntilOffset Ledger offset from now for rule expiry, or null for no expiry.
      * @param signerDescriptors Signers to register on this rule.
@@ -655,6 +659,7 @@ class MacOSBridge {
     suspend fun addContextRule(
         contextTypeName: String,
         contextTypeParam: String?,
+        contextTypeTag: String?,
         name: String,
         validUntilOffset: Int?,
         signerDescriptors: List<SignerDescriptor>,
@@ -664,7 +669,7 @@ class MacOSBridge {
         ed25519SecretKeys: Map<String, String> = emptyMap()
     ): ContextRuleResult {
         // Build ContextRuleType.
-        val contextType = buildContextRuleType(contextTypeName, contextTypeParam)
+        val contextType = buildContextRuleType(contextTypeName, contextTypeParam, contextTypeTag)
 
         // Resolve absolute ledger for optional expiry.
         val validUntil: UInt? = if (validUntilOffset != null) {
@@ -850,19 +855,22 @@ class MacOSBridge {
     // =========================================================================
 
     /**
-     * Returns the list of known policy contracts for the current testnet configuration.
+     * Returns the policy contracts offered for new rules on the current testnet configuration.
      *
      * Used by the rule builder to show pre-configured policy options.
      */
-    fun getKnownPolicies(): List<PolicyInfoBridge> =
-        KNOWN_POLICIES.map { p ->
-            PolicyInfoBridge(
-                type = p.type,
-                name = p.name,
-                description = p.description,
-                address = p.address
-            )
-        }
+    fun getKnownPolicies(): List<PolicyInfoBridge> = KNOWN_POLICIES.map { it.toBridge() }
+
+    /**
+     * Returns every policy contract the demo can read on an existing rule: the offered
+     * policies and the earlier deployments that existing rules still use.
+     *
+     * Used by the rule builder to label a rule's policies and read their parameters.
+     */
+    fun getRecognizedPolicies(): List<PolicyInfoBridge> = RECOGNIZED_POLICIES.map { it.toBridge() }
+
+    private fun com.soneso.smartdemo.config.PolicyInfo.toBridge(): PolicyInfoBridge =
+        PolicyInfoBridge(type = type, name = name, description = description, address = address)
 
     /** Returns the native XLM token SAC contract address. */
     fun getNativeTokenContract(): String = DemoConfig.NATIVE_TOKEN_CONTRACT
@@ -1291,16 +1299,18 @@ class MacOSBridge {
     }
 
     /**
-     * Constructs a [ContextRuleType] from a type name string and an optional parameter.
+     * Constructs a [ContextRuleType] from a type name string, an optional parameter and an
+     * optional tag.
      *
      * @throws IllegalArgumentException if contextTypeName is not one of "default",
-     *   "call_contract", or "create_contract", if "call_contract" or "create_contract" is
-     *   missing its parameter, or if the "create_contract" parameter is not a valid
+     *   "call_contract", "create_contract", or "create_contract_external_ref", if a type is
+     *   missing its parameter or tag, or if the "create_contract" parameter is not a valid
      *   even-length hex string.
      */
     private fun buildContextRuleType(
         contextTypeName: String,
-        contextTypeParam: String?
+        contextTypeParam: String?,
+        contextTypeTag: String?
     ): ContextRuleType {
         return when (contextTypeName.lowercase()) {
             "call_contract" -> {
@@ -1312,6 +1322,13 @@ class MacOSBridge {
                 val hex = contextTypeParam
                     ?: throw IllegalArgumentException("create_contract requires a WASM hash hex string")
                 OZBuilders.createCreateContractContextType(hex)
+            }
+            "create_contract_external_ref" -> {
+                val owner = contextTypeParam
+                    ?: throw IllegalArgumentException("create_contract_external_ref requires an executable owner address")
+                val tag = contextTypeTag
+                    ?: throw IllegalArgumentException("create_contract_external_ref requires an executable tag")
+                OZBuilders.createCreateContractExternalRefContextType(owner, tag)
             }
             "default" -> OZBuilders.createDefaultContextType()
             // An unrecognized tag must not fall through to Default — that would grant the
@@ -1386,10 +1403,11 @@ class MacOSBridge {
      * Converts a [ParsedContextRule] to a [ParsedRuleBridge] for Swift consumption.
      */
     private fun convertRuleToBridge(rule: ParsedContextRule): ParsedRuleBridge {
-        val (contextTypeName, contextTypeParam) = when (val ct = rule.contextType) {
-            is ContextRuleType.Default -> Pair("default", null)
-            is ContextRuleType.CallContract -> Pair("call_contract", ct.contractAddress)
-            is ContextRuleType.CreateContract -> Pair("create_contract", ct.wasmHash.toHexString())
+        val (contextTypeName, contextTypeParam, contextTypeTag) = when (val ct = rule.contextType) {
+            is ContextRuleType.Default -> Triple("default", null, null)
+            is ContextRuleType.CallContract -> Triple("call_contract", ct.contractAddress, null)
+            is ContextRuleType.CreateContract -> Triple("create_contract", ct.wasmHash.toHexString(), null)
+            is ContextRuleType.CreateContractExternalRef -> Triple("create_contract_external_ref", ct.owner, ct.tag)
         }
 
         val signerDescs = rule.signers.map { signer ->
@@ -1407,9 +1425,9 @@ class MacOSBridge {
             }
         }
 
-        // Policies are stored on-chain; we expose their addresses and resolve known policy types.
+        // Policies are stored on-chain; we expose their addresses and resolve recognized policy types.
         val policyDescs = rule.policies.map { address ->
-            val known = KNOWN_POLICIES.find { it.address == address }
+            val known = RECOGNIZED_POLICIES.find { it.address == address }
             PolicyDescriptor(
                 policyAddress = address,
                 policyType = known?.type ?: "unknown",
@@ -1421,6 +1439,7 @@ class MacOSBridge {
             name = rule.name,
             contextType = contextTypeName,
             contextTypeParam = contextTypeParam,
+            contextTypeTag = contextTypeTag,
             validUntil = rule.validUntil?.toLong(),
             signers = signerDescs,
             signerIds = rule.signerIds.map { it.toInt() },
@@ -1563,7 +1582,7 @@ class MacOSBridge {
 
     /**
      * Builds an [EditPolicyEntry] for the new-policy and modified-policy arms of an edit
-     * diff: KNOWN_POLICIES lookup, SCVal encoding via [buildPolicyScVal], and entry
+     * diff: RECOGNIZED_POLICIES lookup, SCVal encoding via [buildPolicyScVal], and entry
      * assembly. A new policy ([modified] = false) is not on-chain yet, and a modified
      * policy is always an original, so `isOriginal` mirrors [modified] at both call sites.
      *
@@ -1578,7 +1597,7 @@ class MacOSBridge {
         onChainId: UInt?,
         modified: Boolean
     ): EditPolicyEntry {
-        val known = KNOWN_POLICIES.find { it.address == desc.policyAddress }
+        val known = RECOGNIZED_POLICIES.find { it.address == desc.policyAddress }
         return EditPolicyEntry(
             info = known?.let { com.soneso.smartdemo.config.PolicyInfo(it.type, it.name, it.description, it.address) },
             label = known?.name ?: "Unknown Policy",

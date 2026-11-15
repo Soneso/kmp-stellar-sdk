@@ -19,11 +19,13 @@ object DemoConfig {
 
     // -- Smart Account Contract --
 
-    /** WASM hash of the multisig smart account contract (OZ stellar-contracts v0.7.0).
-     *  Passed to OZSmartAccountConfig.accountWasmHash for wallet deployment.
+    /** WASM hash of the multisig smart account contract (OZ stellar-contracts v0.8.0).
+     *  Passed to OZSmartAccountConfig.accountWasmHash for wallet deployment. The SDK signs
+     *  for this build with the v0.8.0 digest and for wallets on other builds, such as the
+     *  v0.7.0 build 86b49fe0, with the v0.7 digest.
      *  This hash can change when the contract is upgraded or testnet is reset.
      *  See docs/smart-accounts/README.md#testnet-contract-addresses for upload instructions. */
-    const val ACCOUNT_WASM_HASH = "86b49fe03f7df0ad1c2a28bd8361b923ab57096e09f397f92f0c00ae3bd06d28"
+    const val ACCOUNT_WASM_HASH = "c514d35ea67eaea9bfc1fb3327854c0c06111bc1ddebd4fe217c504c1004b9e1"
 
     // -- Verifier Contracts --
 
@@ -131,7 +133,7 @@ object DemoConfig {
 }
 
 /**
- * Known policy contracts deployed on testnet.
+ * A policy contract deployed on testnet.
  */
 data class PolicyInfo(
     val type: String,
@@ -140,23 +142,47 @@ data class PolicyInfo(
     val address: String
 )
 
+/**
+ * The OZ stellar-contracts v0.8.0 policy contracts, offered for new rules.
+ */
 val KNOWN_POLICIES = listOf(
     PolicyInfo(
         type = "threshold",
         name = "Threshold (M-of-N)",
         description = "Requires M signatures out of N total signers",
-        address = "CAZJ3UVRY3R3S5C5BH32GMYBRSN23N75ZEEXEOLXOUUAHDFIMVP4AXUC"
+        address = "CAZ2WFUDXGX265LOEARFEOYYUL6F4BYWXZLGUAWZNJY3MRFPNLSZVS4S"
     ),
     PolicyInfo(
         type = "spending_limit",
         name = "Spending Limit",
         description = "Limits spending to a maximum amount per time period",
-        address = "CBQE7L3UNP5IR4I7IBKLS7NV256WHR5TTH26HTMUIK7WXJC6J64RSE2L"
+        address = "CC3CEYQAP6NPNFIYSWL5MVZRCPJZGWX4XO7WDEJOUVGO2FZX5OONYPA5"
     ),
     PolicyInfo(
         type = "weighted_threshold",
         name = "Weighted Threshold",
         description = "Requires minimum total weight from signers with different voting weights",
-        address = "CAF4OCRIB73T5777UWAQS7KGOG6WVIZ3EFXNNUYSPFSBKW2Q5XEIOSPW"
+        address = "CDBYLFLUNPAYGE3AHZSMB4TFWECFCCHX6CJFMFO6HRPKK2W5PFU2LCKE"
     )
 )
+
+/**
+ * The OZ stellar-contracts v0.7.0 policy contracts that rules on v0.7.0 wallets use. The demo
+ * reads and labels them but does not offer them for new rules.
+ */
+private val LEGACY_POLICIES = listOf(
+    "threshold" to "CAZJ3UVRY3R3S5C5BH32GMYBRSN23N75ZEEXEOLXOUUAHDFIMVP4AXUC",
+    "spending_limit" to "CBQE7L3UNP5IR4I7IBKLS7NV256WHR5TTH26HTMUIK7WXJC6J64RSE2L",
+    "weighted_threshold" to "CAF4OCRIB73T5777UWAQS7KGOG6WVIZ3EFXNNUYSPFSBKW2Q5XEIOSPW"
+).map { (type, address) ->
+    val current = KNOWN_POLICIES.first { it.type == type }
+    current.copy(name = "${current.name} (v0.7.0)", address = address)
+}
+
+/**
+ * Every policy contract the demo can read on an existing rule: the offered v0.8.0 policies
+ * first, then the v0.7.0 policies.
+ */
+val RECOGNIZED_POLICIES: List<PolicyInfo> = KNOWN_POLICIES + LEGACY_POLICIES.filter { legacy ->
+    KNOWN_POLICIES.none { it.address == legacy.address }
+}

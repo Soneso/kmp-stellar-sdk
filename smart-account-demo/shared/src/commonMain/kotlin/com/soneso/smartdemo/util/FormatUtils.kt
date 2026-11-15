@@ -86,6 +86,8 @@ fun formatContextType(contextType: ContextRuleType): String {
             val hashHex = contextType.wasmHash.toHexString()
             "Create Contract: ${hashHex.take(8)}..."
         }
+        is ContextRuleType.CreateContractExternalRef ->
+            "Create Contract from Ref: ${truncateAddress(contextType.owner)} / ${contextType.tag}"
     }
 }
 
