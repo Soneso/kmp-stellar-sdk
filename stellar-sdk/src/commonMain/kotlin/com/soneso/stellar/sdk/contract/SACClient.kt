@@ -50,11 +50,12 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  * ## Writes
  *
- * [transfer] builds and simulates a transfer and returns it unsigned; [transferAndSubmit]
- * sends a transfer from the source account and waits for its result. Both take [ClientOptions]
- * for `baseFee`, `transactionTimeout`, `submitTimeout`, `useUpgradedAuth`, `simulate`, and
- * `restore`; the options keep this client's `sourceAccountKeyPair`, `contractId`, `network`,
- * and `rpcUrl`. A transfer whose `from` is an account other than the source needs that
+ * [transfer] builds a transfer, simulates it with the default options, and returns it unsigned;
+ * with [ClientOptions.simulate] false, call [AssembledTransaction.simulate] before signing.
+ * [transferAndSubmit] sends a transfer from the source account and waits for its result. Both take
+ * [ClientOptions] for `baseFee`, `transactionTimeout`, `submitTimeout`, `useUpgradedAuth`,
+ * `simulate`, and `restore`; the options keep this client's `sourceAccountKeyPair`, `contractId`,
+ * `network`, and `rpcUrl`. A transfer whose `from` is an account other than the source needs that
  * account's authorization: it appears in [AssembledTransaction.needsNonInvokerSigningBy], and
  * [AssembledTransaction.signAuthEntries] signs it with that account's keypair.
  *
@@ -413,7 +414,8 @@ class SACClient private constructor(
          * The amount is decimal digits, optionally followed by a point and 1 to 7 fractional
          * digits: no sign, exponent, grouping, or whitespace. Zero is accepted, nothing is
          * rounded, and the largest amount is 17014118346046923173168730371588.4105727, which is
-         * 2^127 - 1 base units, the largest i128.
+         * 2^127 - 1 base units, the largest i128. The exception for a secret seed, also one with
+         * whitespace around it, names its kind only.
          *
          * @param amount The decimal amount
          * @return The amount in base units
@@ -422,7 +424,9 @@ class SACClient private constructor(
          *   truncated), or exceeds the largest amount
          */
         fun toBaseUnits(amount: String): BigInteger {
-            if (StrKey.isValidEd25519SecretSeed(amount.toCharArray())) {
+            // The trim keeps a seed with surrounding whitespace, such as a pasted line break, out
+            // of the message that quotes a malformed amount.
+            if (StrKey.isValidEd25519SecretSeed(amount.trim().toCharArray())) {
                 throw IllegalArgumentException("Invalid amount: got a secret seed (S...) instead of a decimal amount")
             }
             require(AMOUNT_PATTERN.matches(amount)) {

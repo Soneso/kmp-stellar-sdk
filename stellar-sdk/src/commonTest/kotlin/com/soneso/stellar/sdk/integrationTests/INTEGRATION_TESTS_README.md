@@ -93,8 +93,8 @@ Tests for the Stellar Asset Contract (SAC) client `SACClient` against live testn
 **Protocol 30 gate**: `testTransferToMuxedContract` calls `networkProtocolAtLeast(sorobanServer, 30)`
 before it funds an account. On a network below protocol 30 it prints that muxed contract
 destinations need protocol 30 and returns; a failed `getLatestLedger` request or an answer
-without `protocolVersion` fails the test. `testProtocolGate` checks these outcomes without a
-network.
+without `protocolVersion` fails the test. `testProtocolGate` checks protocol versions 29 and 30
+and a response without `protocolVersion`, without a network.
 
 **Timeout**: 600 seconds per network test, for three funded accounts
 

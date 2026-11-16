@@ -1364,11 +1364,28 @@ class SACClientTest {
     @Test
     fun testToBaseUnitsNamesASecretSeedByItsKindOnly() = runTest {
         val seed = KeyPair.random().getSecretSeed()!!.concatToString()
+        // Whitespace around a seed, such as the line break of a pasted one, leaves it a seed.
+        val inputs = listOf(
+            "the seed" to seed,
+            "the seed and a trailing newline" to seed + "\n",
+            "leading spaces and the seed" to "  " + seed,
+            "a leading tab and the seed" to "\t" + seed,
+            "a space, the seed, and a trailing CRLF" to " " + seed + "\r\n"
+        )
 
-        val failure = assertFailsWith<IllegalArgumentException> { SACClient.toBaseUnits(seed) }
+        for ((label, input) in inputs) {
+            val failure = assertFailsWith<IllegalArgumentException>(label) { SACClient.toBaseUnits(input) }
+            val message = failure.message.orEmpty()
 
-        assertEquals("Invalid amount: got a secret seed (S...) instead of a decimal amount", failure.message)
-        assertFalse(seed in failure.message!!)
+            // Checked before the whole message, so that a failure names an offset and never prints the seed.
+            for (offset in 0..seed.length - 8) {
+                assertFalse(
+                    seed.substring(offset, offset + 8) in message,
+                    "$label: the message holds the seed characters from offset $offset"
+                )
+            }
+            assertEquals("Invalid amount: got a secret seed (S...) instead of a decimal amount", message, label)
+        }
     }
 }
 
