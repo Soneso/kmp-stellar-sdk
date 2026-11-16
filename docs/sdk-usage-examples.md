@@ -1945,7 +1945,7 @@ fromAsset.close()
 fromId.close()
 ```
 
-`forContractId` throws `IllegalArgumentException` for an id that is not a contract (`C...`) address; the message names the kind of address given when it recognises one (a secret seed by its kind only), and for a muxed contract (`W...`) address it asks for its base contract address.
+`forContractId` throws `IllegalArgumentException` for an id that is not a contract (`C...`) address; the message names the kind of address given when it recognizes one (a secret seed by its kind only), and for a muxed contract (`W...`) address it asks for its base contract address.
 
 #### Read-Only Client
 
@@ -2009,7 +2009,7 @@ A muxed account (`M...`) or muxed contract (`W...`) holds its balance at its bas
 
 `SACClient.toBaseUnits` converts a decimal amount to base units: decimal digits, optionally followed by a point and 1 to 7 fractional digits, with no sign, exponent, grouping, or whitespace. It accepts zero, rounds nothing, and its largest amount is `17014118346046923173168730371588.4105727`, which is 2^127 - 1 base units; any other input throws `IllegalArgumentException`.
 
-`transferAndSubmit` sends a transfer from the client's source account: it simulates the transfer, signs it with the client's keypair, submits it, waits for the result, and returns the `GetTransactionResponse` of the successful transaction. `transfer` builds and simulates a transfer and returns the unsigned `AssembledTransaction`, which `signAndSubmit()` signs with the client's keypair and submits. A transfer to a muxed account (`M...`) or muxed contract (`W...`) credits its base address, and the data of the `transfer` event is then a map of `amount` and `to_muxed_id`.
+With the default options, `transfer` returns a simulated, unsigned `AssembledTransaction<SCValXdr>`. `transferAndSubmit` transfers from the source account, signs with the client's keypair, submits, and returns the successful `GetTransactionResponse`. With `options.simulate = false`, call `simulate()` on the transaction returned by `transfer` before signing. On a keyed client, `transferAndSubmit` with this option throws `NotYetSimulatedException`. A transfer to a muxed account (`M...`) or muxed contract (`W...`) credits its base address, and the data of the `transfer` event is then a map of `amount` and `to_muxed_id`.
 
 ```kotlin
 val rpcUrl = "https://soroban-testnet.stellar.org"
@@ -2114,8 +2114,10 @@ if (sent.status == SendTransactionStatus.PENDING) {
     val result = server.pollTransaction(sent.hash!!)
     if (result.status == GetTransactionStatus.SUCCESS) {
         println(result.getCreatedContractId() == asset.getContractId(Network.TESTNET))  // true
-    } else {
+    } else if (result.status == GetTransactionStatus.FAILED) {
         println("Deployment failed: ${result.resultXdr}")
+    } else {
+        println("Deployment not confirmed; poll ${sent.hash} again.")
     }
 } else {
     println("Not accepted: ${sent.errorResultXdr}")
