@@ -109,6 +109,7 @@ class SEPAnalyzer:
         'MuxedAccountXdr.kt',
         'MuxedAccountMed25519Xdr.kt',
         'MuxedEd25519AccountXdr.kt',
+        'MuxedContractXdr.kt',
         'PoolIDXdr.kt',
         'ClaimableBalanceIDXdr.kt',
         'PublicKeyXdr.kt',
@@ -2405,8 +2406,9 @@ class SEPAnalyzer:
         XdrJson.kt runtime. Every requirement is therefore mapped to the symbol that carries
         it, and counts as implemented only while that symbol is present in the source.
         """
-        # field name -> (SDK symbol, file in the xdr/ package, literal proving the mapping)
-        evidence: Dict[str, Dict[str, Tuple[str, str, str]]] = {
+        # field name -> (SDK symbol, file in the xdr/ package, one or more literals that
+        # together prove the mapping)
+        evidence: Dict[str, Dict[str, Tuple[str, ...]]] = {
             'xdr_data_types': {
                 'integer_32': ('XdrJson.int32', 'XdrJson.kt', 'fun int32(value: Int)'),
                 'unsigned_integer_32': ('XdrJson.uint32', 'XdrJson.kt', 'fun uint32(value: UInt)'),
@@ -2425,12 +2427,15 @@ class SEPAnalyzer:
                 'optional_data': ('XdrJson.optional', 'XdrJson.kt', 'fun <T> optional('),
             },
             'address_types': {
-                'sc_address': ('SCAddressXdr.toXdrJsonElement', 'SCAddressXdr.kt', 'MuxedEd25519AccountXdr.fromXdrJsonTree'),
+                'sc_address': ('SCAddressXdr.toXdrJsonElement', 'SCAddressXdr.kt', 'MuxedEd25519AccountXdr.fromXdrJsonTree',
+                               "'W' -> MuxedContract(MuxedContractXdr.fromXdrJsonTree(element))"),
                 'account_id': ('AccountIDXdr.toXdrJsonElement', 'AccountIDXdr.kt', 'PublicKeyXdr.fromXdrJsonTree'),
                 'contract_id': ('ContractIDXdr.toXdrJsonElement', 'ContractIDXdr.kt', 'StrKey.encodeContract'),
                 'muxed_account': ('MuxedAccountXdr.toXdrJsonElement', 'MuxedAccountXdr.kt', 'StrKey.encodeEd25519PublicKey'),
                 'muxed_account_med25519': ('MuxedAccountMed25519Xdr.toXdrJsonElement', 'MuxedAccountMed25519Xdr.kt', 'StrKey.encodeMed25519PublicKey'),
                 'muxed_ed25519_account': ('MuxedEd25519AccountXdr.toXdrJsonElement', 'MuxedEd25519AccountXdr.kt', 'StrKey.encodeMed25519PublicKey'),
+                'muxed_contract': ('MuxedContractXdr.toXdrJsonElement', 'MuxedContractXdr.kt', 'StrKey.encodeMuxedContract',
+                                   'StrKey.decodeMuxedContract'),
                 'pool_id': ('PoolIDXdr.toXdrJsonElement', 'PoolIDXdr.kt', 'StrKey.encodeLiquidityPool'),
                 'claimable_balance_id': ('ClaimableBalanceIDXdr.toXdrJsonElement', 'ClaimableBalanceIDXdr.kt', 'StrKey.encodeClaimableBalance'),
                 'public_key': ('PublicKeyXdr.toXdrJsonElement', 'PublicKeyXdr.kt', 'StrKey.encodeEd25519PublicKey'),
@@ -2476,9 +2481,9 @@ class SEPAnalyzer:
                 if entry is None:
                     section_mappings[field_name] = None
                     continue
-                symbol, file_name, token = entry
+                symbol, file_name, *tokens = entry
                 section_mappings[field_name] = (
-                    symbol if self._xdr_source_contains(file_name, token) else None
+                    symbol if all(self._xdr_source_contains(file_name, token) for token in tokens) else None
                 )
 
             field_mappings[section_key] = section_mappings
