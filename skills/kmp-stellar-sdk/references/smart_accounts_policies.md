@@ -146,12 +146,12 @@ if (!result.success) println("Failed: ${result.error}")
 // CORRECT: credentialId is the raw ByteArray from the WebAuthn ceremony
 ```
 
-### addDelegated — add a Stellar account or contract signer
+### addDelegated: add a Stellar account signer
 
 ```kotlin
 suspend fun addDelegated(
     contextRuleId: UInt,
-    address: String,                      // G-address (account) or C-address (contract)
+    address: String,                      // G-address of an account; a C-address is refused
     selectedSigners: List<SelectedSigner> = emptyList(),
     forceMethod: SubmissionMethod? = null
 ): TransactionResult
@@ -162,12 +162,6 @@ suspend fun addDelegated(
 val accountRes = kit.signerManager.addDelegated(
     contextRuleId = 0u,
     address = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
-)
-
-// Add another contract as a signer (custom account contract)
-val contractRes = kit.signerManager.addDelegated(
-    contextRuleId = 0u,
-    address = "CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5"
 )
 ```
 
@@ -286,6 +280,7 @@ sealed class ContextRuleType {
     object Default : ContextRuleType()
     data class CallContract(val contractAddress: String) : ContextRuleType()
     data class CreateContract(val wasmHash: ByteArray) : ContextRuleType()
+    data class CreateContractExternalRef(val owner: String, val tag: String) : ContextRuleType()
 }
 ```
 
@@ -295,6 +290,7 @@ On-chain SCVal encoding:
 Default         ->  Vec([Symbol("Default")])
 CallContract    ->  Vec([Symbol("CallContract"), Address(contractAddress)])
 CreateContract  ->  Vec([Symbol("CreateContract"), Bytes(wasmHash)])
+CreateContractExternalRef  ->  Vec([Symbol("CreateContractExternalRef"), Address(owner), String(tag)])
 ```
 
 ```kotlin
@@ -316,8 +312,8 @@ The `OZBuilders` helpers wrap construction with validation:
 ```kotlin
 val defaultCtx = OZBuilders.createDefaultContextType()                  // Default
 val callCtx    = OZBuilders.createCallContractContextType("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")    // validates C-address
-val createCtx1 = OZBuilders.createCreateContractContextType("abc123...") // hex String, 64 chars (0x-prefix ok)
-val createCtx2 = OZBuilders.createCreateContractContextType(wasmHash32Bytes) // ByteArray, 32 bytes
+val createCtx  = OZBuilders.createCreateContractContextType("c514d35ea67eaea9bfc1fb3327854c0c06111bc1ddebd4fe217c504c1004b9e1") // hex String, 64 chars (0x-prefix ok); an overload takes the 32-byte ByteArray
+val refCtx     = OZBuilders.createCreateContractExternalRefContextType("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5", "account-v1") // owner C-address, tag of its executable reference
 ```
 
 ### addContextRule
@@ -493,6 +489,8 @@ sha256sum path/to/multisig_account_example.wasm
 stellar contract upload --wasm path/to/multisig_account_example.wasm \
     --network testnet --source <deployer-secret>
 ```
+
+A stellar-accounts 0.8 build whose hash is not `c514d35e...` also needs `OZSmartAccountConfig.authDigestSchemes` to map that hash to `AuthDigestScheme.PREIMAGE_V1`, or the contract rejects every authorization after the signers have signed.
 
 Cross-reference the current values against the network you target; using a testnet address on mainnet (or vice-versa) fails with contract-not-found during simulation.
 
@@ -970,7 +968,7 @@ If the automatic resolver cannot find a unique rule, it throws `ValidationExcept
 - `"Selected signers match multiple context rules: 1, 3, ..."` — use `resolveContextRuleIds` to disambiguate.
 - `"No context rule contains all selected signers."` — the selected signer set crosses rules; either restrict the selection to one rule's signers or pass `resolveContextRuleIds`.
 
-Before matching, the automatic resolver also throws `ValidationException` for a create-contract auth entry whose executable is a CAP-85 external reference or a Stellar Asset Contract (`"CreateContract invocation references ..."`): a `CreateContract` rule is identified by a 32-byte WASM hash only, and neither executable carries one. Such deployments always need explicit rule IDs via `resolveContextRuleIds`.
+A create-contract auth entry whose executable is a CAP-85 external reference matches a `CreateContractExternalRef` rule with the same owner and tag, or a Default rule. Before matching, the automatic resolver throws `ValidationException` for a Stellar Asset Contract executable (`"CreateContract invocation references a Stellar Asset Contract, not a WASM contract"`), which carries neither a WASM hash nor a reference. Such deployments always need explicit rule IDs through `resolveContextRuleIds`.
 
 ### External wallet requirements
 
@@ -1162,7 +1160,7 @@ kit.signerManager.removeSigner(
 
 **Preconditions.** A call like `kit.transactionOperations.transfer(...)`, `kit.signerManager.removeSigner(...)`, or any other kit method throws `TransactionException.SimulationFailed`. The contract rejected the auth check (`__check_auth`) or an enforcement hook on a policy.
 
-**Flow.** The simulation error message contains the host error surfaced by RPC — typically of the form `...Error(Contract, #3004)...` for a smart-account error or `...Error(Contract, #3221)...` for a policy error. Pass the exception's message to `ContractErrorCodes.decodeFromMessage`, which extracts and decodes the first known marker in one step, and act on the result.
+**Flow.** The exception carries the contract error the simulation reports as `reportedContractError`. Its code comes from the host error header, such as `Error(Contract, #3004)`. When the header is a masked `Error(Auth, ...)` or `Error(Context, ...)`, the code comes from the earliest contract error in the diagnostic events. Pass the exception to `ContractErrorCodes.decodeFromSimulationFailure`, which decodes that code, and act on the result.
 
 ```kotlin
 val amount = "100"
@@ -1173,12 +1171,12 @@ try {
         amount        = "10"
     )
 } catch (e: TransactionException.SimulationFailed) {
-    // decodeFromMessage scans the message for "Error(Contract, #NNNN)" markers and
-    // resolves the first known code to its contract + variant name (or null).
-    val decoded = ContractErrorCodes.decodeFromMessage(e.message)
+    // decodeFromSimulationFailure resolves the code in e.reportedContractError
+    // to its contract + variant name (or null).
+    val decoded = ContractErrorCodes.decodeFromSimulationFailure(e)
     // Representative cases and action hints:
     val hint = if (decoded == null) {
-        "No known contract code in message: ${e.message}"
+        "No known contract code: ${e.message}"
     } else when (decoded.code) {
         3004 -> "NoSignersAndPolicies — rule would have 0 signers and 0 policies; add one first"
         3016 -> "UnauthorizedSigner — signer not on resolved rule; pass resolveContextRuleIds or adjust selectedSigners"
@@ -1193,15 +1191,15 @@ try {
 }
 ```
 
-**Why this pattern.** The `TransactionException.SimulationFailed` message wraps the RPC `simulation.error` string, which is where the host error code lives. There is no typed contract-error exception in the SDK; `ContractErrorCodes.decodeFromMessage(e.message)` extracts and decodes the code in one step — no hand-rolled message parsing is needed. It resolves to an `OZContractError(code, contract, name)` across the full on-chain surface — smart account (3000-3016), WebAuthn (3110-3119), and the policy enums (3200-3227) — returning null when the message is null, carries no marker, or carries only unknown codes; the smart-account codes are also exposed as named constants for direct branching (and `ContractErrorCodes.decode(code)` resolves a code you already hold). The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
+**Why this pattern.** `reportedContractError` holds the code from either place, so no message parsing is needed. `ContractErrorCodes.decodeFromSimulationFailure(e)` resolves it to an `OZContractError(code, contract, name)` across the full on-chain surface: smart account (3000-3018), WebAuthn (3110-3119), and the policy enums (3200-3227). It returns null when the exception carries no reported contract error or the code is not a known OZ code. A masked header in a response without diagnostic events reports no code. The smart-account codes are also exposed as named constants for direct branching, and `ContractErrorCodes.decode(code)` resolves a code you already hold. The full enum is in [`packages/accounts/src/smart_account/mod.rs`](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/src/smart_account/mod.rs) and cross-referenced in [Contract Error Codes](#contract-error-codes) below.
 
 ```kotlin
-// WRONG: catch (e: ContractException) { when (e.code) { ... } }  — no such class
-// CORRECT: catch TransactionException.SimulationFailed and decode its message
+// WRONG: catch (e: ContractException) { when (e.code) { ... } }  (not thrown by the kit, and it has no code)
+// CORRECT: catch TransactionException.SimulationFailed and decode its reportedContractError
 
 // WRONG: matching on e.code (which is SmartAccountErrorCode.TRANSACTION_SIMULATION_FAILED)
 //        — that is the SDK error kind, not the on-chain contract code
-// CORRECT: pass e.message to ContractErrorCodes.decodeFromMessage
+// CORRECT: pass e to ContractErrorCodes.decodeFromSimulationFailure
 ```
 
 ---
@@ -1236,6 +1234,8 @@ When the smart account contract rejects a call, the on-chain error code is surfa
 | 3014 | ContextRuleIdsLengthMismatch | SDK-side assembly bug | Report with reproduction — normally resolved by the auto-resolver. |
 | 3015 | NameTooLong | Rule `name` > 20 UTF-8 bytes | Shorten the name. |
 | 3016 | UnauthorizedSigner | A signer in the auth payload is not on the selected rule | Either adjust `selectedSigners` to match the rule, or pass `resolveContextRuleIds` to select a different rule that includes those signers. |
+| 3017 | DelegatedSignerIsContextContract | A Delegated signer's address is the contract of a context being authorized | Remove that signer (`removeSigner`). |
+| 3018 | SelfDelegatedSigner | A Delegated signer's address is the smart account itself | Delegate to a G-address; the kit refuses the wallet as its own delegate before signing. |
 
 ### SimpleThreshold policy errors (3200 range)
 
@@ -1276,7 +1276,7 @@ try {
     val res = kit.policyManager.addSimpleThreshold(0u, policyAddress, threshold = 2u)
     if (!res.success) println("submit failed: ${res.error}")
 } catch (e: TransactionException.SimulationFailed) {
-    // The message contains the contract error code and name
+    // The message can contain the contract error code
     println("simulation failed: ${e.message}")
 } catch (e: ValidationException.InvalidInput) {
     println("client-side validation: ${e.message}")

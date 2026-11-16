@@ -470,8 +470,10 @@ class OZMultiSignerManager internal constructor(
         val authEntries = simulation.results?.firstOrNull()?.parseAuth()
             ?: throw TransactionException.simulationFailed("No auth entries returned from simulation")
 
-        val latestLedger = kit.sorobanServer.getLatestLedger()
-        val expirationLedger = latestLedger.sequence.toUInt() + kit.config.signatureExpirationLedgers.toUInt()
+        // Validate added signers, select the digest scheme and set the expiration once, before
+        // any signer is asked, wallet signers of foreign entries included
+        val signingState = kit.prepareSigningOperation(contractId, authEntries)
+        val expirationLedger = signingState.expirationLedger
 
         val contextRules = kit.contextRuleManager.listContextRules()
         val smartAccountSigners = mapToSmartAccountSigners(selectedSigners)
@@ -508,12 +510,15 @@ class OZMultiSignerManager internal constructor(
                 kit.contextRuleManager.resolveContextRuleIdsForEntry(signedEntry, smartAccountSigners, contextRules)
             }
 
-            val payloadHash = SmartAccountAuth.buildAuthPayloadHash(
+            // prepareSigningOperation sets the scheme whenever an entry belongs to the wallet
+            val entryDigest = SmartAccountAuth.computeEntryAuthDigest(
                 entry = signedEntry,
                 expirationLedger = expirationLedger,
-                networkPassphrase = kit.config.networkPassphrase
+                networkPassphrase = kit.config.networkPassphrase,
+                contextRuleIds = resolvedContextRuleIds,
+                scheme = signingState.schemeForWalletEntry(contractId)
             )
-            val authDigest = SmartAccountAuth.buildAuthDigest(payloadHash, resolvedContextRuleIds)
+            val authDigest = entryDigest.authDigest
 
             for ((signerIndex, selectedSigner) in selectedSigners.withIndex()) {
                 when (selectedSigner) {
@@ -533,7 +538,8 @@ class OZMultiSignerManager internal constructor(
             }
 
             val (updatedEntry, delegatedEntries) = appendDelegatedSignerEntries(
-                signedEntry, contractId, selectedSigners, expirationLedger, authDigest, resolvedContextRuleIds
+                signedEntry, contractId, selectedSigners, expirationLedger, entryDigest.delegatedAuthArgs,
+                resolvedContextRuleIds
             )
             signedAuthEntries.addAll(delegatedEntries)
             signedAuthEntries.add(updatedEntry)
@@ -783,8 +789,10 @@ class OZMultiSignerManager internal constructor(
 
     /**
      * Processes each [SelectedSigner.Wallet] in [selectedSigners]: builds a signed delegated auth
-     * entry via [Auth.authorizeInvocation] and adds an empty-bytes placeholder to the smart
-     * account's signature map on [entry].
+     * entry via [Auth.authorizeInvocation] for `__check_auth(delegatedAuthArgs)` on the smart
+     * account and adds an empty-bytes placeholder to the smart account's signature map on [entry].
+     * [delegatedAuthArgs] are the arguments of the wallet's digest scheme
+     * ([com.soneso.stellar.sdk.smartaccount.core.EntryAuthDigest.delegatedAuthArgs]).
      *
      * Returns the updated entry (with all wallet placeholders applied) and the list of signed
      * delegated auth entries that must be appended before the smart account entry.
@@ -795,7 +803,7 @@ class OZMultiSignerManager internal constructor(
         contractId: String,
         selectedSigners: List<SelectedSigner>,
         expirationLedger: UInt,
-        authDigest: ByteArray,
+        delegatedAuthArgs: List<SCValXdr>,
         contextRuleIds: List<UInt>
     ): Pair<SorobanAuthorizationEntryXdr, List<SorobanAuthorizationEntryXdr>> {
         var signedEntry = entry
@@ -809,7 +817,7 @@ class OZMultiSignerManager internal constructor(
                     InvokeContractArgsXdr(
                         contractAddress = Address(contractId).toSCAddress(),
                         functionName = SCSymbolXdr("__check_auth"),
-                        args = listOf(Scv.toBytes(authDigest))
+                        args = delegatedAuthArgs
                     )
                 ),
                 subInvocations = emptyList()

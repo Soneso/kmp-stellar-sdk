@@ -1989,12 +1989,13 @@ class SEPParser:
         # Address Types
         section = Section(title='Address Types', key='address_types')
         section.fields = [
-            Field(name='sc_address', description='SCAddress maps to a G, C, M, B or L strkey depending on the arm', field_type='stellar_type', required=True),
+            Field(name='sc_address', description='SCAddress maps to a G, C, M, B, L or W strkey depending on the arm', field_type='stellar_type', required=True),
             Field(name='account_id', description='AccountID maps to a G strkey', field_type='stellar_type', required=True),
             Field(name='contract_id', description='ContractID maps to a C strkey', field_type='stellar_type', required=True),
             Field(name='muxed_account', description='MuxedAccount maps to a G strkey for ed25519 and an M strkey for muxed ed25519', field_type='stellar_type', required=True),
             Field(name='muxed_account_med25519', description='MuxedAccountMed25519 maps to an M strkey', field_type='stellar_type', required=True),
             Field(name='muxed_ed25519_account', description='MuxedEd25519Account maps to an M strkey', field_type='stellar_type', required=True),
+            Field(name='muxed_contract', description='MuxedContract maps to a W strkey', field_type='stellar_type', required=True),
             Field(name='pool_id', description='PoolID maps to an L strkey', field_type='stellar_type', required=True),
             Field(name='claimable_balance_id', description='ClaimableBalanceID maps to a B strkey', field_type='stellar_type', required=True),
             Field(name='public_key', description='PublicKey maps to a G strkey', field_type='stellar_type', required=True),

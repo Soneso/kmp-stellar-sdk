@@ -1,10 +1,10 @@
 # SEP-0046 (Contract Meta) Compatibility Matrix
 
-**Generated:** 2026-10-24 16:58:08
+**Generated:** 2026-11-15 23:21:27
 
 **SEP Version:** 1.0.0  
 **SEP Status:** Active  
-**SDK Version:** 1.16.0  
+**SDK Version:** 1.18.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0046.md
 
 ## SEP Summary

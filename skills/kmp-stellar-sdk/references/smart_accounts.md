@@ -40,7 +40,7 @@ A smart account is a Soroban contract whose authorization logic lives on-chain. 
 Supported signer types:
 
 - **WebAuthn passkey** (secp256r1) via an on-chain verifier contract
-- **Delegated** Stellar account (G-address) or contract (C-address) using native `require_auth`
+- **Delegated** Stellar account (G-address) using native `require_auth` (see [DelegatedSigner](#delegatedsigner))
 - **Ed25519** external signer via a verifier contract
 
 Architecture. `OZSmartAccountKit.create(config)` is the single entry point. The kit exposes seven sub-managers as lazy properties: `walletOperations`, `transactionOperations`, `signerManager`, `contextRuleManager`, `policyManager`, `multiSignerManager`, `credentialManager` (plus `events`). The config takes two platform adapters — `WebAuthnProvider` and `StorageAdapter` — plus two optional external-signer adapters: `ExternalWalletAdapter` (`externalWallet`) and `OZExternalEd25519SignerAdapter` (`externalEd25519Adapter`). Internally the kit owns a `SorobanServer` (RPC), `OZRelayerClient` (fee-bump, optional), and `OZIndexerClient` (credential lookup, optional).
@@ -61,7 +61,7 @@ Smart accounts are in the same artifact as the rest of the KMP SDK:
 ```kotlin
 // build.gradle.kts
 dependencies {
-    implementation("com.soneso.stellar:stellar-sdk:1.16.0")
+    implementation("com.soneso.stellar:stellar-sdk:1.18.0")
 }
 ```
 
@@ -117,6 +117,7 @@ import com.soneso.stellar.sdk.smartaccount.core.*
 | `externalWallet` | `ExternalWalletAdapter?` | `null` | Wallet adapter (Freighter/Lobstr-style) backing the adapter custody model for `SelectedSigner.Wallet` signers. Injected into `kit.externalSigners`. |
 | `externalEd25519Adapter` | `OZExternalEd25519SignerAdapter?` | `null` | Ed25519 adapter (hardware wallet, HSM, remote signer) backing the adapter custody model for `SelectedSigner.Ed25519` signers. Injected into `kit.externalSigners`. |
 | `maxContextRuleScanId` | `UInt` | `50u` | Highest context rule ID to scan when listing |
+| `authDigestSchemes` | `Map<String, AuthDigestScheme>` | `emptyMap()` | Account WASM hash (hex) to the digest its `__check_auth` checks. Built in: the stellar-accounts 0.8.0 build `c514d35e...` maps to `PREIMAGE_V1`; configured entries override it, and the kit signs `LEGACY_CONCAT` (0.7) for an unmapped hash. Map each own build that implements `PREIMAGE_V1`, or the contract rejects every authorization after the signers have signed |
 
 ```kotlin
 // WRONG: sessionExpiryMs = 7  — interpreted as 7 milliseconds, expires immediately
@@ -632,7 +633,7 @@ sealed class SmartAccountSigner {
 
 ### DelegatedSigner
 
-A Stellar address (G or C) that authorizes via Soroban's native `require_auth`. No verifier contract.
+A Stellar address that authorizes through Soroban's native `require_auth`. No verifier contract. The type holds a G or C address, so a contract delegate already on a wallet is read as stored. The kit adds only G addresses: `addDelegated`, `addContextRule` and the signing pipelines refuse a contract delegate, because it can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc).
 
 ```kotlin
 data class DelegatedSigner(val address: String) : SmartAccountSigner()
@@ -640,7 +641,6 @@ data class DelegatedSigner(val address: String) : SmartAccountSigner()
 
 ```kotlin
 val accountSigner  = DelegatedSigner("GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ")
-val contractSigner = DelegatedSigner("CCJZ5DGASBWQXR5MPFCJXMBI333XE5U3FSJTNQU7RIKE3P5GN2K2WYD5")
 ```
 
 On-chain SCVal representation:
@@ -1662,7 +1662,7 @@ Wraps a non-SDK throwable into the appropriate `SmartAccountException` subclass.
 
 ### Contract error codes
 
-Contract error codes and their meanings live in [smart_accounts_policies.md — Contract Error Codes](./smart_accounts_policies.md#contract-error-codes). The SDK's `ContractErrorCodes` object (`com.soneso.stellar.sdk.smartaccount.core`) exposes the smart-account error enum (3000-3016) as named constants and `decode(code)`, which resolves any known code — smart account, WebAuthn (3110-3119), or a policy contract (3200-3227) — into an `OZContractError(code, contract, name)`, or null if the code is unknown.
+Contract error codes and their meanings live in [smart_accounts_policies.md: Contract Error Codes](./smart_accounts_policies.md#contract-error-codes). The SDK's `ContractErrorCodes` object (`com.soneso.stellar.sdk.smartaccount.core`) exposes the smart-account error enum (3000-3018) as named constants and `decode(code)`, which resolves any known code of the smart account, WebAuthn (3110-3119), or a policy contract (3200-3227) into an `OZContractError(code, contract, name)`, or null if the code is unknown.
 
 ---
 

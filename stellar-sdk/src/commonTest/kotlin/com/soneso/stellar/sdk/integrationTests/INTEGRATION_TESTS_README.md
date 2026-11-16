@@ -463,6 +463,34 @@ It passes reliably when run individually. This is a testnet timing issue, not a 
 
 **Prerequisites**: Network connectivity to Stellar testnet Horizon server
 
+### OZAuthDigestLiveIntegrationTest.kt
+
+Live gate for signing on OpenZeppelin smart account wallets. The class lives in
+`src/jvmTest/kotlin/com/soneso/stellar/sdk/integrationTests/` and runs on the JVM target only,
+because its software passkey signs with the JVM's P-256 implementation. Every test deploys a
+wallet of its own with one signer on the Default rule and funds it through the XLM Stellar Asset
+Contract; a passing transfer proves that the signer signed the digest the wallet's code checks.
+
+| Test | Wallet's signer | Proves |
+|------|-----------------|--------|
+| `testV080CaseA_passkeyTransfer` | passkey from `createWallet` | the WebAuthn challenge is the 0.8.0 digest |
+| `testV080CaseB_ed25519Transfer_thenCaseF_authDigestView` | Ed25519 External | the Ed25519 digest; the wallet's `auth_digest` view returns the SDK's digest for the signed entry |
+| `testV080CaseC_delegatedTransfer` | Delegated account | the delegated entry authorizes the preimage |
+| `testV080CaseD_ruleWithSpendingLimit` | Ed25519 External | rule creation with a second signer and a spending limit, explicit rule selection, rejection with #3221 |
+| `testV080CaseE_externalRefRuleDeploysByReference` | Ed25519 External | a `CreateContractExternalRef` rule lists owner and tag and authorizes a deployment by that reference |
+| `testV070Case*` | as cases A to D | wallets of the 0.7.0 build keep signing with the 0.7 digest |
+| `testSmoke_relayerDeployAndTransfer_indexerLookups` | passkey and Ed25519 External | a deployment and a transfer through the Soneso relayer proxy; Mercury lists both wallets |
+
+```bash
+./gradlew :stellar-sdk:jvmTest --tests "com.soneso.stellar.sdk.integrationTests.OZAuthDigestLiveIntegrationTest.testV080CaseA*"
+```
+
+Each test prints `RESULT` lines with the wallet and the transaction hash or the error.
+
+**Test Duration**: ~20-60 seconds per test
+
+**Prerequisites**: Network connectivity to Soroban RPC testnet, Friendbot, the relayer proxy, and the Mercury indexer
+
 
 ## Running Integration Tests
 

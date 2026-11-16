@@ -52,7 +52,7 @@ smart-account-demo/
 │   └── src/
 │       ├── commonMain/kotlin/.../
 │       │   ├── App.kt                   # Compose app entry point
-│       │   ├── config/                  # DemoConfig, PolicyInfo, KNOWN_POLICIES
+│       │   ├── config/                  # DemoConfig, PolicyInfo, KNOWN_POLICIES, RECOGNIZED_POLICIES
 │       │   ├── flows/                   # Business logic
 │       │   ├── state/                   # DemoState, ActivityLogState
 │       │   ├── token/                   # DemoTokenService
@@ -226,7 +226,7 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 |---------|-------------|
 | `RPC_URL` | Soroban RPC endpoint |
 | `NETWORK_PASSPHRASE` | Stellar testnet passphrase |
-| `ACCOUNT_WASM_HASH` | Smart account contract WASM hash (OZ stellar-contracts v0.7.0) |
+| `ACCOUNT_WASM_HASH` | Smart account contract WASM hash (OZ stellar-contracts v0.8.0) |
 | `WEBAUTHN_VERIFIER_ADDRESS` | On-chain WebAuthn (secp256r1) signature verifier contract |
 | `ED25519_VERIFIER_ADDRESS` | On-chain Ed25519 signature verifier contract |
 | `NATIVE_TOKEN_CONTRACT` | XLM Stellar Asset Contract (SAC) address on testnet |
@@ -239,7 +239,7 @@ All testnet configuration is centralized in `shared/src/commonMain/kotlin/com/so
 
 DEMO token settings (`DEMO_TOKEN_*`) control the deterministic deployment and minting of a custom Soroban token used for testing transfers.
 
-Known policy contracts (threshold, spending limit, weighted threshold) are defined in `KNOWN_POLICIES`.
+Known policy contracts (threshold, spending limit, weighted threshold) are defined in `KNOWN_POLICIES` (the v0.8.0 deployments offered for new rules) and `RECOGNIZED_POLICIES` (those plus the v0.7.0 deployments that rules on v0.7.0 wallets use).
 
 ## External Wallet Connection
 

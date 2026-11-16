@@ -8,17 +8,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `SimulateTransactionResponse.reportedContractError()` returns the contract error a failed simulation reports, with its code, where it was found and the emitting contract: from an `Error(Contract, #N)` host error header or, after an `Error(Context, ...)` or `Error(Auth, ...)` header, from the earliest contract error in the diagnostic events.
-- `TransactionException.SimulationFailed`, `SimulationFailedException` and `PrepareTransactionException` carry the diagnostic events and the reported contract error through the new interface `SimulationFailureDetails`. `ContractErrorCodes.decodeFromSimulationFailure` names the OZ error.
-- `ContractClient` upload and deployment calls throw `ContractClientSimulationException`, an `IllegalStateException`, for a failed simulation. `RestorationFailureException` carries the failure of the restoration as its cause.
 - `SACClient` opens a Stellar Asset Contract from an `Asset` or a contract id without an RPC request. It has typed `balance`, `transfer`, `transferAndSubmit`, `decimals`, `name` and `symbol`, `toBaseUnits()` for decimal amounts, and a read-only mode without a keypair.
 - `SACSpec` embeds the Stellar Asset Contract spec at upstream commit 4f08d14.
 - `InvokeHostFunctionOperation.createStellarAssetContract` builds the operation that deploys the Stellar Asset Contract of an `Asset`.
 
 ### Changed
+- `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
+
+## [1.18.0] - 2026-11-16
+
+Migration guide: [docs/migration/1.18.0.md](docs/migration/1.18.0.md)
+
+### Added
+- Smart accounts on OpenZeppelin stellar-accounts 0.8. Before it asks the first signer of an operation, the kit reads the WASM hash the wallet runs, with one `getLedgerEntries` request that also sets the signature expiration in place of `getLatestLedger`. It signs the 0.8 digest, `sha256` of the `AuthDigestPreimage` XDR that binds the account address, for the 0.8.0 build `c514d35e...` and for every hash that `OZSmartAccountConfig.authDigestSchemes` maps to `AuthDigestScheme.PREIMAGE_V1`; the map can also map `c514d35e...` to `AuthDigestScheme.LEGACY_CONCAT`. Every other wallet signs the 0.7 digest as before. On 0.8 wallets a Delegated signer authorizes the preimage. Map each own build that implements `PREIMAGE_V1`: without the entry the contract rejects the authorization after the signers have signed, and nothing executes.
+- `SmartAccountAuth.computeEntryAuthDigest` returns the signature payload, the digest and the delegated `__check_auth` arguments of an auth entry for an `AuthDigestScheme`, as `EntryAuthDigest`.
+- `OZBuilders.createCreateContractExternalRefContextType(owner, tag)` builds a rule for contracts deployed from an executable reference (CAP-0085).
+- Automatic context rule resolution matches a contract deploy from an executable reference to a `CreateContractExternalRef` rule with the same owner and tag, or to a Default rule. A Stellar Asset Contract deploy still throws `ValidationException`.
+- `ContractErrorCodes` decodes 3017 `DelegatedSignerIsContextContract` and 3018 `SelfDelegatedSigner`.
+
+### Changed
+- Breaking: `ContextRuleType` has the subtype `CreateContractExternalRef(owner, tag)`. `listContextRules` returns such rules, where it threw "Unknown context_type discriminant", and the kit signs for wallets that hold one. An exhaustive `when` over `ContextRuleType` needs a branch for it.
+- Breaking: `OZSignerManager.addDelegated` and `OZContextRuleManager.addContextRule` refuse a Delegated signer with a contract (`C...`) address, the wallet included, because a contract delegate can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc). `submit` and the multi-signer pipeline refuse the same signers, and a muxed contract address (`W...`) as a Delegated address or an External verifier, in `add_signer`, `batch_add_signer` and `add_context_rule` calls on the wallet before they ask any signer. Contract delegates already on a wallet are read as before; to close the gap, remove such a signer, or upgrade the wallet and every smart account it delegates to.
+- The smart account pages and the agent skill describe the 0.8 authorization digest with its `authDigestSchemes` setting and the `CreateContractExternalRef` rule kind. They state that the kit refuses to add contract delegates and list the error codes 3017 and 3018. A migration guide covers the breaking changes.
+
+### Deprecated
+- `SmartAccountAuth.buildAuthDigest` computes the 0.7 digest only; use `computeEntryAuthDigest` with the wallet's scheme.
+
+### Security
+- `addDelegated`, `addContextRule` and the signing pipelines refuse the shared default deployer as a Delegated signer. Its secret derives from a public string, so anyone could authorize the account through it.
+
+## [1.17.0] - 2026-11-14
+
+### Added
+- `SimulateTransactionResponse.reportedContractError()` returns the contract error a failed simulation reports, with its code, where it was found and the emitting contract: from an `Error(Contract, #N)` host error header or, after an `Error(Context, ...)` or `Error(Auth, ...)` header, from the earliest contract error in the diagnostic events.
+- `TransactionException.SimulationFailed`, `SimulationFailedException` and `PrepareTransactionException` carry the diagnostic events and the reported contract error through the new interface `SimulationFailureDetails`. `ContractErrorCodes.decodeFromSimulationFailure` names the OZ error.
+- `ContractClient` upload and deployment calls throw `ContractClientSimulationException`, an `IllegalStateException`, for a failed simulation. `RestorationFailureException` carries the failure of the restoration as its cause.
+
+### Changed
 - The Android artifact is built with Android Gradle plugin 9 and the Android Kotlin Multiplatform library plugin. Apps keep the requirements of earlier releases: minimum SDK 24 and compile SDK 34 or later.
 - The JVM and Android artifacts no longer depend on Apache Commons Codec (`commons-codec`); every platform writes strkeys with the SDK's own base32 codec.
-- `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
+- The smart account pages and the agent skill describe the contract error a failed simulation reports and its decoding with `ContractErrorCodes.decodeFromSimulationFailure`. The exception tables list the diagnostic events and the reported contract error, and the dependency table lists no Commons Codec.
 
 ### Fixed
 - A failed simulation whose host error masks the contract error as `Error(Context, InvalidAction)` (a failing constructor) or `Error(Auth, InvalidAction)` (a failing `__check_auth`), the form stellar-rpc 30.0.1 returns, names the code: the message ends with ` (contract error in diagnostic events: Error(Contract, #N), contract C...)` when a diagnostic event reports it, so `ContractErrorCodes.decodeFromMessage` finds the code.
@@ -27,7 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Binary XDR decoding throws `IllegalArgumentException` when recursive values, such as `SCValXdr` vectors and maps, claim predicates and contract spec types, nest beyond a shared depth of 500. An `XdrReader` keeps its full depth budget after a failed decode.
 - `ContractSpec` rejects `Int`, `Long` and `ULong` enum values outside the u32 range with `ContractSpecException`. Numeric contract error codes that are fractional, non-finite or outside the u32 range throw it too, and integral codes in that range convert exactly.
 - `ContractSpec.nativeToXdrSCVal`, `scValToNative`, `funcArgsToXdrSCValues` and `funcResToNative` convert a struct, union or enum value when an earlier function, event or error enum has the same name, where they threw `ContractSpecException` ("Unsupported UDT type" or "Failed to parse UDT").
-- `HorizonServer.submitTransaction` and `submitTransactionAsync` run the SEP-29 memo-required check on an envelope string with line breaks (`\r`, `\n`), which Horizon's base64 decoder skips, and post the string as passed.
+- `HorizonServer.submitTransaction` and `submitTransactionAsync` run the SEP-29 memo-required check on an envelope string with line breaks (`\r`, `\n`) and post the string as passed.
 
 ### Security
 - XDR generator: xdrgen resolves activesupport to 8.1.4.1, which fixes GHSA-8474-xrp6-wh69. Build tooling only, generated output is unchanged.

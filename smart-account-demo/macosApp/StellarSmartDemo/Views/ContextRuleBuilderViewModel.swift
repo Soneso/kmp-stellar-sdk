@@ -12,23 +12,26 @@ import shared
 
 /// Context rule type options for the form selector.
 enum ContextTypeOption: String, CaseIterable {
-    case defaultType    = "default"
-    case callContract   = "call_contract"
-    case createContract = "create_contract"
+    case defaultType               = "default"
+    case callContract              = "call_contract"
+    case createContract            = "create_contract"
+    case createContractExternalRef = "create_contract_external_ref"
 
     var displayName: String {
         switch self {
-        case .defaultType:    return "Default (Any Operation)"
-        case .callContract:   return "Call Contract"
-        case .createContract: return "Create Contract"
+        case .defaultType:               return "Default (Any Operation)"
+        case .callContract:              return "Call Contract"
+        case .createContract:            return "Create Contract"
+        case .createContractExternalRef: return "Create Contract from Reference"
         }
     }
 
     var description: String {
         switch self {
-        case .defaultType:    return "Matches any operation that does not match a more specific rule"
-        case .callContract:   return "Matches invocations to a specific contract address"
-        case .createContract: return "Matches contract deployments using a specific WASM hash"
+        case .defaultType:               return "Matches any operation that does not match a more specific rule"
+        case .callContract:              return "Matches invocations to a specific contract address"
+        case .createContract:            return "Matches contract deployments using a specific WASM hash"
+        case .createContractExternalRef: return "Matches contract deployments from the code an owner contract stores under a tag"
         }
     }
 }
@@ -132,6 +135,10 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     @Published var contextTypeOption: ContextTypeOption = .defaultType
     @Published var contractAddress: String = ""
     @Published var wasmHashHex: String = ""
+    /// Executable owner contract (C-address) for a create-contract-from-reference rule.
+    @Published var refOwner: String = ""
+    /// Executable tag for a create-contract-from-reference rule.
+    @Published var refTag: String = ""
     @Published var hasExpiry: Bool = false
     /// Selected ledger offset from the duration dropdown (stored as string).
     @Published var expiryLedger: String = ""
@@ -211,7 +218,10 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     var maxPolicies: Int { Int(OZConstants.shared.MAX_POLICIES) }
     @Published var ledgersPerHour: Int = 720
     @Published var ledgersPerDay: Int = 17280
+    /// Policies offered for new rules.
     @Published var knownPolicies: [PolicyInfoBridge] = []
+    /// Policies the builder can read on an existing rule: the offered ones and earlier deployments.
+    @Published var recognizedPolicies: [PolicyInfoBridge] = []
     @Published var nativeTokenContract: String = ""
     @Published var demoTokenContractId: String? = nil
     @Published var ed25519VerifierAddress: String = ""
@@ -296,6 +306,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         ledgersPerDay = Int(bridge.getLedgersPerDay())
         nativeTokenContract = bridge.getNativeTokenContract()
         knownPolicies = KotlinInterop.toArray(bridge.getKnownPolicies(), as: PolicyInfoBridge.self)
+        recognizedPolicies = KotlinInterop.toArray(bridge.getRecognizedPolicies(), as: PolicyInfoBridge.self)
         ed25519VerifierAddress = bridge.getEd25519VerifierAddress()
         webauthnVerifierAddress = bridge.getWebauthnVerifierAddress()
     }
@@ -321,6 +332,10 @@ final class ContextRuleBuilderViewModel: ObservableObject {
             case "create_contract":
                 contextTypeOption = .createContract
                 wasmHashHex = parsed.contextTypeParam ?? ""
+            case "create_contract_external_ref":
+                contextTypeOption = .createContractExternalRef
+                refOwner = parsed.contextTypeParam ?? ""
+                refTag = parsed.contextTypeTag ?? ""
             default:
                 contextTypeOption = .defaultType
             }
@@ -418,7 +433,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         let loadedPolicyIds = KotlinInterop.toIntArray(parsed.policyIds)
         var policyEntries: [PolicyEntry] = []
         for (index, desc) in loadedPolicies.enumerated() {
-            let known = knownPolicies.first(where: { $0.address == desc.policyAddress })
+            let known = recognizedPolicies.first(where: { $0.address == desc.policyAddress })
             let policyId: Int32? = index < loadedPolicyIds.count ? loadedPolicyIds[index] : nil
             let policyType = known?.type ?? desc.policyType
 
@@ -1033,6 +1048,10 @@ final class ContextRuleBuilderViewModel: ObservableObject {
                 if let hexError = FormValidation.validateHexString(hex, expectedLength: 32) {
                     errors["wasmHash"] = hexError
                 }
+            case .createContractExternalRef:
+                if let ownerError = FormValidation.validateContractId(refOwner) {
+                    errors["refOwner"] = ownerError
+                }
             case .defaultType:
                 break
             }
@@ -1332,16 +1351,24 @@ final class ContextRuleBuilderViewModel: ObservableObject {
     ) async throws {
         let contextTypeName: String
         let contextTypeParam: String?
+        let contextTypeTag: String?
         switch contextTypeOption {
         case .defaultType:
             contextTypeName = "default"
             contextTypeParam = nil
+            contextTypeTag = nil
         case .callContract:
             contextTypeName = "call_contract"
             contextTypeParam = contractAddress.trimmingCharacters(in: .whitespaces)
+            contextTypeTag = nil
         case .createContract:
             contextTypeName = "create_contract"
             contextTypeParam = wasmHashHex.trimmingCharacters(in: .whitespaces).lowercased()
+            contextTypeTag = nil
+        case .createContractExternalRef:
+            contextTypeName = "create_contract_external_ref"
+            contextTypeParam = refOwner.trimmingCharacters(in: .whitespaces)
+            contextTypeTag = refTag
         }
 
         let offsetInt32: KotlinInt?
@@ -1363,6 +1390,7 @@ final class ContextRuleBuilderViewModel: ObservableObject {
         let result = try await bridge.addContextRule(
             contextTypeName: contextTypeName,
             contextTypeParam: contextTypeParam,
+            contextTypeTag: contextTypeTag,
             name: ruleName.trimmingCharacters(in: .whitespaces),
             validUntilOffset: offsetInt32,
             signerDescriptors: signerDescriptors,

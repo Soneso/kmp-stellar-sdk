@@ -22,7 +22,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  *
  * Smart account signers define who can authorize transactions on a smart account.
  * Two types exist:
- * - [DelegatedSigner]: A Soroban address (G or C) using built-in require_auth verification
+ * - [DelegatedSigner]: A Soroban address using built-in require_auth verification
  * - [ExternalSigner]: A verifier contract + public key bytes for custom signature validation
  *
  * Example usage:
@@ -66,17 +66,19 @@ sealed class SmartAccountSigner {
 /**
  * A delegated signer using a Soroban address with built-in require_auth verification.
  *
- * Delegated signers are Stellar accounts (G-address) or smart contracts (C-address)
- * that use the native Soroban authorization mechanism. The smart account will call
+ * Delegated signers use the native Soroban authorization mechanism. The smart account will call
  * `require_auth_for_args()` on the address to verify authorization.
+ *
+ * The type holds a Stellar account (G-address) or a contract (C-address), so signers already on
+ * a wallet are read as stored. The kit adds only G-addresses: `OZSignerManager.addDelegated`,
+ * `OZContextRuleManager.addContextRule` and the signing pipelines refuse a contract, the wallet
+ * itself and the shared default deployer, because a contract delegate can let anyone authorize
+ * the account without a key (GHSA-jpg9-m7w4-c7wc) and the default deployer's secret derives
+ * from a public string.
  *
  * Example:
  * ```kotlin
- * // Account signer
  * val accountSigner = DelegatedSigner(address = "GA7QYNF7SOWQ...")
- *
- * // Contract signer
- * val contractSigner = DelegatedSigner(address = "CBCD1234...")
  * ```
  *
  * @property address The Stellar address of the signer (G-address for accounts, C-address for contracts)

@@ -595,6 +595,11 @@ struct ContextRulesScreen: View {
         } else if let createContract = contextType as? ContextRuleType.CreateContract {
             let hex = KotlinInterop.hexString(from: createContract.wasmHash)
             return "Create Contract: \(hex.prefix(8))..."
+        } else if let externalRef = contextType as? ContextRuleType.CreateContractExternalRef {
+            let truncated = KotlinInterop.truncateAddress(
+                externalRef.owner, prefixLength: 8, suffixLength: 8
+            )
+            return "Create Contract from Ref: \(truncated) / \(externalRef.tag)"
         } else {
             return "Default (Any Operation)"
         }

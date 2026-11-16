@@ -89,15 +89,19 @@ data class PolicyDescriptor(
  *
  * Replaces [com.soneso.stellar.sdk.smartaccount.oz.ParsedContextRule] for Swift interop by
  * converting all Kotlin-specific types to primitives:
- * - [com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType] sealed class -> [contextType] + [contextTypeParam] strings.
+ * - [com.soneso.stellar.sdk.smartaccount.oz.ContextRuleType] sealed class -> [contextType],
+ *   [contextTypeParam] and [contextTypeTag] strings.
  * - [UInt] rule ID and validUntil -> [Long] to avoid Objective-C unsigned integer boxing.
  * - [com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner] sealed class list -> [List<SignerDescriptor>].
  * - Policy addresses -> [List<PolicyDescriptor>] (no SCVal params; they are already on-chain).
  *
  * @property name The rule's human-readable name.
- * @property contextType Context type tag: "default", "call_contract", or "create_contract".
+ * @property contextType Context type name: "default", "call_contract", "create_contract", or
+ *   "create_contract_external_ref".
  * @property contextTypeParam For "call_contract": the contract C-address. For "create_contract":
- *   lowercase hex-encoded WASM hash. Null for "default".
+ *   lowercase hex-encoded WASM hash. For "create_contract_external_ref": the executable owner
+ *   contract C-address. Null for "default".
+ * @property contextTypeTag For "create_contract_external_ref": the executable tag. Null otherwise.
  * @property validUntil Absolute ledger expiry, or null if the rule has no expiry.
  * @property signers Signers registered on the rule, as [SignerDescriptor] instances.
  * @property signerIds On-chain signer IDs, positionally aligned with [signers]. Each value is
@@ -110,6 +114,7 @@ data class ParsedRuleBridge(
     val name: String,
     val contextType: String,
     val contextTypeParam: String?,
+    val contextTypeTag: String?,
     val validUntil: Long?,
     val signers: List<SignerDescriptor>,
     val signerIds: List<Int>,

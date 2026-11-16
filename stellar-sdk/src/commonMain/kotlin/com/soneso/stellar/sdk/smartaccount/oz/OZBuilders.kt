@@ -29,7 +29,7 @@ object OZBuilders {
      * Creates a Default context rule type.
      *
      * Default rules apply to any operation that does not match a more specific
-     * CallContract or CreateContract rule.
+     * CallContract, CreateContract or CreateContractExternalRef rule.
      *
      * @return A [ContextRuleType.Default] for default authorization
      *
@@ -110,6 +110,30 @@ object OZBuilders {
             )
         }
         return ContextRuleType.CreateContract(wasmHash)
+    }
+
+    /**
+     * Creates a CreateContractExternalRef context rule type.
+     *
+     * CreateContractExternalRef rules apply only when deploying contracts from a CAP-0085
+     * executable reference: the WASM hash that the [owner] contract stores under [tag]. The hash
+     * is resolved at deployment time, so the rule trusts the owner contract to keep the
+     * reference pointing at acceptable code. An account build without this rule kind, such as
+     * stellar-accounts 0.7, rejects it during simulation.
+     *
+     * @param owner The contract address that stores the executable reference (C-address)
+     * @param tag The tag the reference is stored under
+     * @return A [ContextRuleType.CreateContractExternalRef] for external-reference contract creation
+     * @throws ValidationException.InvalidAddress if the owner is not a contract address
+     *
+     * Example:
+     * ```kotlin
+     * val contextType = OZBuilders.createCreateContractExternalRefContextType("CDEF5678...", "account-v1")
+     * ```
+     */
+    fun createCreateContractExternalRefContextType(owner: String, tag: String): ContextRuleType {
+        requireContractAddress(owner, "owner")
+        return ContextRuleType.CreateContractExternalRef(owner, tag)
     }
 
     // ========================================================================

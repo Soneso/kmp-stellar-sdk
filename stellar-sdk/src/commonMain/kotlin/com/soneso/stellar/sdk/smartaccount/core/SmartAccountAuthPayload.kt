@@ -183,8 +183,24 @@ object SmartAccountAuthPayloadCodec {
      * @param scVal The ScVal to parse.
      * @return The parsed [SmartAccountSigner].
      * @throws TransactionException.SigningFailed if the ScVal format is unrecognized.
+     * @throws ValidationException if the fields fail the checks of [DelegatedSigner] or
+     *   [ExternalSigner].
      */
-    fun signerFromScVal(scVal: SCValXdr): SmartAccountSigner {
+    fun signerFromScVal(scVal: SCValXdr): SmartAccountSigner = when (val fields = signerFieldsFromScVal(scVal)) {
+        is SignerScValFields.Delegated -> DelegatedSigner(fields.address)
+        is SignerScValFields.External -> ExternalSigner(fields.verifierAddress, fields.keyData)
+    }
+
+    /**
+     * Reads the fields of a signer ScVal without the checks of [DelegatedSigner] and
+     * [ExternalSigner]: the address may be of any kind and the key data may be empty, as the
+     * contract stores them.
+     *
+     * @param scVal The ScVal to read.
+     * @return The signer type and its fields.
+     * @throws TransactionException.SigningFailed if the ScVal is not a signer encoding.
+     */
+    internal fun signerFieldsFromScVal(scVal: SCValXdr): SignerScValFields {
         if (scVal !is SCValXdr.Vec) {
             throw TransactionException.signingFailed(
                 "Signer ScVal is not a Vec"
@@ -218,8 +234,7 @@ object SmartAccountAuthPayloadCodec {
                         "Delegated signer second element is not an Address"
                     )
                 }
-                val addressStr = Address.fromSCAddress(addressScVal.value).getEncodedAddress()
-                DelegatedSigner(addressStr)
+                SignerScValFields.Delegated(Address.fromSCAddress(addressScVal.value).getEncodedAddress())
             }
             "External" -> {
                 if (elements.size < 3) {
@@ -241,12 +256,23 @@ object SmartAccountAuthPayloadCodec {
                         "External signer third element is not Bytes"
                     )
                 }
-                val keyData = keyDataScVal.value.value
-                ExternalSigner(verifierAddressStr, keyData)
+                SignerScValFields.External(verifierAddressStr, keyDataScVal.value.value)
             }
             else -> throw TransactionException.signingFailed(
                 "Unknown signer type tag: '${typeTag.value.value}'"
             )
         }
     }
+}
+
+/**
+ * The fields of a signer ScVal, read by [SmartAccountAuthPayloadCodec.signerFieldsFromScVal]
+ * before any check of [DelegatedSigner] or [ExternalSigner].
+ */
+internal sealed class SignerScValFields {
+    /** A `Delegated` signer and its address (any address kind). */
+    class Delegated(val address: String) : SignerScValFields()
+
+    /** An `External` signer, its verifier address (any address kind) and its key data. */
+    class External(val verifierAddress: String, val keyData: ByteArray) : SignerScValFields()
 }

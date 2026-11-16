@@ -311,8 +311,10 @@ class OZSignerManager internal constructor(
      * Adds a delegated signer to a context rule.
      *
      * Creates a delegated signer that uses built-in Soroban require_auth verification
-     * and adds it to the specified context rule. The address can be either a Stellar
-     * account (G-address) or a smart contract (C-address).
+     * and adds it to the specified context rule. The address must be a Stellar account
+     * (G-address) other than the shared default deployer, whose secret derives from a public
+     * string. A contract address, the wallet included, is refused, because a contract delegate
+     * can let anyone authorize the account (GHSA-jpg9-m7w4-c7wc).
      *
      * Delegated signers authorize transactions using the native Soroban authorization
      * mechanism, which calls `require_auth_for_args()` on the signer's address.
@@ -324,13 +326,15 @@ class OZSignerManager internal constructor(
      * The assigned ID is available via [ParsedContextRule.signerIds] after fetching the context rule.
      *
      * @param contextRuleId The context rule ID to add the signer to (e.g., 0 for Default)
-     * @param address The Stellar address (G-address for accounts, C-address for contracts)
+     * @param address The Stellar account address (G-address) of the signer
      * @param selectedSigners Optional list of signers for multi-signer authorization.
      *   When empty (default), uses single-signer auth with the connected passkey.
      *   When non-empty, coordinates signatures from all listed signers.
      * @param forceMethod Optional submission method override. When null (default), uses the
      *   configured submission method (relayer if available, RPC otherwise).
      * @return TransactionResult indicating success or failure
+     * @throws ValidationException.InvalidAddress if the address is not a G-address
+     * @throws ValidationException.InvalidInput if the address is the shared default deployer
      * @throws SmartAccountException if validation fails or transaction fails
      *
      * Example:
@@ -341,10 +345,10 @@ class OZSignerManager internal constructor(
      *     address = "GA7QYNF7SOWQ..."
      * )
      *
-     * // Add a contract signer (multi-signer)
-     * val contractResult = signerManager.addDelegated(
+     * // Add an account signer to another rule (multi-signer)
+     * val multiResult = signerManager.addDelegated(
      *     contextRuleId = 1u,
-     *     address = "CBCD1234...",
+     *     address = "GBXF4...",
      *     selectedSigners = listOf(
      *         SelectedSigner.Passkey(credentialId = cred1, credentialIdBytes = cred1Bytes, keyData = key1),
      *         SelectedSigner.Wallet("GA7Q...")
@@ -588,7 +592,7 @@ class OZSignerManager internal constructor(
     ): TransactionResult {
         val (_, contractId) = kit.requireConnected()
 
-        requireValidSigners(listOf(signer))
+        requireValidSigners(listOf(signer), contractId)
 
         // Build contract invocation for add_signer
         val signerScVal = signer.toScVal()

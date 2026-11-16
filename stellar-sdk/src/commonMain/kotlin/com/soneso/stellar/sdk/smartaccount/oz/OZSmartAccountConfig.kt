@@ -63,10 +63,12 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  * | maxContextRuleScanId | No | 50 |
  * | useUpgradedAuthForWalletSigners | No | true |
  * | useUpgradedAuth | No | true |
+ * | authDigestSchemes | No | empty |
  *
  * @throws ConfigurationException if required parameters are blank or invalid
- *   (e.g., accountWasmHash is not a 64-character hex string, or webauthnVerifierAddress
- *   is not a valid C-address).
+ *   (e.g., accountWasmHash or an authDigestSchemes key is not a 64-character hex string, two
+ *   authDigestSchemes keys that differ only in case map to different schemes, or
+ *   webauthnVerifierAddress is not a valid C-address).
  */
 data class OZSmartAccountConfig(
     // Required Configuration
@@ -237,8 +239,31 @@ data class OZSmartAccountConfig(
      * software that signs a preimage, this one serves services that parse the submitted
      * auth XDR.
      */
-    val useUpgradedAuth: Boolean = true
+    val useUpgradedAuth: Boolean = true,
+
+    /**
+     * Maps account WASM hashes (64-character hex, any case) to the digest their `__check_auth`
+     * checks.
+     *
+     * Before it asks the first signer of an operation, the kit reads the WASM hash the wallet
+     * runs with one `getLedgerEntries` request, whose latest ledger also sets the signature
+     * expiration, and signs the digest this map gives for it. The built-in table maps the
+     * stellar-accounts 0.8.0 build `c514d35e...` to [AuthDigestScheme.PREIMAGE_V1]. An entry here
+     * takes precedence over it, so it can also map that build to [AuthDigestScheme.LEGACY_CONCAT].
+     * Every other hash signs with [AuthDigestScheme.LEGACY_CONCAT], as do a wallet whose
+     * executable is not a WASM hash, an external reference included, and a wallet whose instance
+     * entry the RPC does not return.
+     *
+     * Map each own build that implements [AuthDigestScheme.PREIMAGE_V1] to it. Without the entry,
+     * or with an entry that names the wrong scheme, the contract rejects the authorization after
+     * the signers have signed, the passkey prompt included, and nothing executes. A wallet whose
+     * executable is an external reference cannot be mapped, because this map keys on WASM hashes.
+     */
+    val authDigestSchemes: Map<String, AuthDigestScheme> = emptyMap()
 ) {
+    /** [authDigestSchemes] with lowercase keys, merged over [OZConstants.KNOWN_AUTH_DIGEST_SCHEMES]. */
+    private val authDigestSchemeTable: Map<String, AuthDigestScheme>
+
     init {
         // Validate required parameters
         if (rpcUrl.isBlank()) throw ConfigurationException.missingConfig("rpcUrl")
@@ -246,16 +271,46 @@ data class OZSmartAccountConfig(
         if (networkPassphrase.isBlank()) throw ConfigurationException.missingConfig("networkPassphrase")
 
         if (accountWasmHash.isBlank()) throw ConfigurationException.missingConfig("accountWasmHash")
-        if (!accountWasmHash.matches(Regex("[0-9a-fA-F]{64}"))) throw ConfigurationException.invalidConfig(
+        if (!accountWasmHash.matches(WASM_HASH_PATTERN)) throw ConfigurationException.invalidConfig(
             "accountWasmHash must be a 64-character hex string (SHA-256 of WASM), got: $accountWasmHash"
         )
 
         if (!StrKey.isValidContract(webauthnVerifierAddress)) throw ConfigurationException.invalidConfig(
             "webauthnVerifierAddress must be a valid contract address (C...), got: $webauthnVerifierAddress"
         )
+
+        authDigestSchemeTable = mergeAuthDigestSchemes(authDigestSchemes)
     }
 
+    /**
+     * Returns the digest scheme of the account build with the WASM hash [wasmHashHex]:
+     * the [authDigestSchemes] entry, else the built-in entry, else [AuthDigestScheme.LEGACY_CONCAT].
+     */
+    internal fun authDigestSchemeFor(wasmHashHex: String): AuthDigestScheme =
+        authDigestSchemeTable[wasmHashHex.lowercase()] ?: AuthDigestScheme.LEGACY_CONCAT
+
     companion object {
+        private val WASM_HASH_PATTERN = Regex("[0-9a-fA-F]{64}")
+
+        private fun mergeAuthDigestSchemes(
+            configured: Map<String, AuthDigestScheme>
+        ): Map<String, AuthDigestScheme> {
+            val table = OZConstants.KNOWN_AUTH_DIGEST_SCHEMES.toMutableMap()
+            val normalizedEntries = mutableMapOf<String, AuthDigestScheme>()
+            for ((wasmHash, scheme) in configured) {
+                if (!wasmHash.matches(WASM_HASH_PATTERN)) throw ConfigurationException.invalidConfig(
+                    "authDigestSchemes key must be a 64-character hex string (SHA-256 of WASM), got: $wasmHash"
+                )
+                val normalizedHash = wasmHash.lowercase()
+                val previous = normalizedEntries.put(normalizedHash, scheme)
+                if (previous != null && previous != scheme) throw ConfigurationException.invalidConfig(
+                    "authDigestSchemes maps $normalizedHash to both $previous and $scheme"
+                )
+                table[normalizedHash] = scheme
+            }
+            return table
+        }
+
         /**
          * Creates a deterministic deployer keypair for smart account deployment.
          *
@@ -377,6 +432,7 @@ data class OZSmartAccountConfig(
         private var defaultPolicies: Map<String, SCValXdr> = emptyMap()
         private var useUpgradedAuthForWalletSigners: Boolean = true
         private var useUpgradedAuth: Boolean = true
+        private var authDigestSchemes: Map<String, AuthDigestScheme> = emptyMap()
 
         /**
          * Sets the deployer keypair.
@@ -532,6 +588,18 @@ data class OZSmartAccountConfig(
         }
 
         /**
+         * Sets the digest scheme of account builds by WASM hash.
+         *
+         * @param value Account WASM hashes (64-character hex, any case) mapped to the digest
+         *   their `__check_auth` checks; see [OZSmartAccountConfig.authDigestSchemes]
+         * @return This builder for chaining
+         */
+        fun authDigestSchemes(value: Map<String, AuthDigestScheme>): Builder {
+            authDigestSchemes = value
+            return this
+        }
+
+        /**
          * Builds the OZSmartAccountConfig.
          *
          * @return A new OZSmartAccountConfig instance
@@ -556,7 +624,8 @@ data class OZSmartAccountConfig(
                 maxContextRuleScanId = maxContextRuleScanId,
                 defaultPolicies = defaultPolicies,
                 useUpgradedAuthForWalletSigners = useUpgradedAuthForWalletSigners,
-                useUpgradedAuth = useUpgradedAuth
+                useUpgradedAuth = useUpgradedAuth,
+                authDigestSchemes = authDigestSchemes
             )
         }
     }

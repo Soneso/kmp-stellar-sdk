@@ -18,7 +18,7 @@ import com.soneso.stellar.sdk.scval.Scv
 A smart account is a Soroban contract that replaces traditional Stellar key management with programmable authorization. Each smart account supports:
 
 - **Passkey authentication**: Users sign transactions with WebAuthn (secp256r1) instead of Ed25519 secret keys
-- **Multiple signers**: Combine passkeys, delegated Stellar addresses (accounts or contracts), and Ed25519 keys on a single account. All three signer types support full multi-signer signing through the `OZMultiSignerManager` pipeline.
+- **Multiple signers**: Combine passkeys, delegated Stellar accounts, and Ed25519 keys on a single account. All three signer types support full multi-signer signing through the `OZMultiSignerManager` pipeline.
 - **Context rules**: Define different authorization requirements for different operation types
 - **Policies**: Enforce authorization constraints such as spending limits and multi-signature thresholds, or add custom policy contracts
 - **Fee sponsoring**: Submit transactions through a relayer so users never pay gas fees
@@ -389,6 +389,7 @@ try {
 | `externalWallet` | `ExternalWalletAdapter?` | `null` | Wallet adapter (e.g., Freighter, Lobstr) backing the adapter custody model for `SelectedSigner.Wallet` signers. The kit injects it into `kit.externalSigners`. |
 | `externalEd25519Adapter` | `OZExternalEd25519SignerAdapter?` | `null` | Ed25519 adapter (hardware wallet, HSM, remote signing service) backing the adapter custody model for `SelectedSigner.Ed25519` signers. The kit injects it into `kit.externalSigners`. |
 | `maxContextRuleScanId` | `UInt` | `50` | Upper bound on the context-rule IDs scanned when listing rules without an explicit scan limit. |
+| `authDigestSchemes` | `Map<String, AuthDigestScheme>` | `emptyMap()` | Account WASM hashes (64 hex characters) mapped to the digest their `__check_auth` checks. Built in, the stellar-accounts 0.8.0 build `c514d35e...` maps to `AuthDigestScheme.PREIMAGE_V1`; configured entries override the built-in mapping, and for an unmapped hash the kit signs the 0.7 digest, `AuthDigestScheme.LEGACY_CONCAT`. See [Uploading Your Own WASM](#uploading-your-own-wasm). |
 
 ### Builder Pattern
 
@@ -435,7 +436,7 @@ stellar contract upload \
   --wasm target/wasm32v1-none/release/multisig_account_example.wasm
 ```
 
-The command prints a hex string. Use it as `accountWasmHash` in your `OZSmartAccountConfig`.
+The command prints a hex string. Use it as `accountWasmHash` in your `OZSmartAccountConfig`. A stellar-accounts 0.8 build whose hash is not `c514d35e...` also needs that hash mapped to `AuthDigestScheme.PREIMAGE_V1` in `authDigestSchemes`, or the contract rejects every authorization after the signers have signed.
 
 ## How Wallet Deployment Works
 

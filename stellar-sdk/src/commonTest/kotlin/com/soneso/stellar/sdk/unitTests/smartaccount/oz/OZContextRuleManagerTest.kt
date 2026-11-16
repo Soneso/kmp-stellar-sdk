@@ -164,10 +164,11 @@ class OZContextRuleManagerTest {
     private val contractZ = StrKey.encodeContract(ByteArray(32) { (it + 3).toByte() })
     private val policyAddress = StrKey.encodeContract(ByteArray(32) { (it + 4).toByte() })
 
-    private val signerA = DelegatedSigner(StrKey.encodeContract(ByteArray(32) { (it + 11).toByte() }))
-    private val signerB = DelegatedSigner(StrKey.encodeContract(ByteArray(32) { (it + 12).toByte() }))
-    private val signerC = DelegatedSigner(StrKey.encodeContract(ByteArray(32) { (it + 13).toByte() }))
-    private val signerD = DelegatedSigner(StrKey.encodeContract(ByteArray(32) { (it + 14).toByte() }))
+    // Delegated signers are Stellar accounts: addContextRule refuses contract delegates.
+    private val signerA = DelegatedSigner(StrKey.encodeEd25519PublicKey(ByteArray(32) { (it + 11).toByte() }))
+    private val signerB = DelegatedSigner(StrKey.encodeEd25519PublicKey(ByteArray(32) { (it + 12).toByte() }))
+    private val signerC = DelegatedSigner(StrKey.encodeEd25519PublicKey(ByteArray(32) { (it + 13).toByte() }))
+    private val signerD = DelegatedSigner(StrKey.encodeEd25519PublicKey(ByteArray(32) { (it + 14).toByte() }))
 
     private val txHash = "a1721e2a61e9a6b3c6c2e5c0d4c0a5f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7"
 
