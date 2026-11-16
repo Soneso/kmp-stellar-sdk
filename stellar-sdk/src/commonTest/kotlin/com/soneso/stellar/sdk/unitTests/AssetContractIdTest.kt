@@ -177,4 +177,40 @@ class AssetContractIdTest {
         assertTrue(StrKey.isValidContract(contractId))
         assertTrue(contractId.startsWith("C"))
     }
+
+    @Test
+    fun testGetContractIdNativeAssetTestnetVector() = runTest {
+        assertEquals(
+            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+            AssetTypeNative.getContractId(Network.TESTNET)
+        )
+    }
+
+    @Test
+    fun testGetContractIdNativeAssetPublicVector() = runTest {
+        assertEquals(
+            "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA",
+            AssetTypeNative.getContractId(Network.PUBLIC)
+        )
+    }
+
+    @Test
+    fun testGetContractIdIssuedAssetAlphaNum12TestnetVector() = runTest {
+        assertEquals(
+            "CBEFNXB7GMEO2PKBCOSKRUQBDWAH4PVA2RIREKPV335KM7MBK2HRLRGB",
+            AssetTypeCreditAlphaNum12("TESTASSET", testIssuer).getContractId(Network.TESTNET)
+        )
+    }
+
+    @Test
+    fun testGetContractIdOfOneAssetDiffersBetweenTestnetAndPublic() = runTest {
+        val asset = AssetTypeCreditAlphaNum12("TESTASSET", testIssuer)
+
+        val testnetContractId = asset.getContractId(Network.TESTNET)
+        val publicContractId = asset.getContractId(Network.PUBLIC)
+
+        assertEquals("CBEFNXB7GMEO2PKBCOSKRUQBDWAH4PVA2RIREKPV335KM7MBK2HRLRGB", testnetContractId)
+        assertTrue(StrKey.isValidContract(publicContractId))
+        assertNotEquals(testnetContractId, publicContractId)
+    }
 }

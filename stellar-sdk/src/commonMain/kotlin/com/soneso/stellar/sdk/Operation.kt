@@ -1822,6 +1822,39 @@ data class InvokeHostFunctionOperation(
                 auth = emptyList()
             )
         }
+
+        /**
+         * Creates an InvokeHostFunctionOperation that deploys the Stellar Asset Contract (SAC)
+         * of an asset.
+         *
+         * The host function creates a contract from the asset preimage with the Stellar asset
+         * executable, and the operation carries no authorization entry. The host derives the
+         * contract id from the asset and the network the transaction runs on, so the deployed
+         * contract has the id [Asset.getContractId] returns for that network.
+         *
+         * @param asset The asset whose contract to deploy, the native asset included
+         * @return An InvokeHostFunctionOperation for deploying the Stellar Asset Contract
+         *
+         * ## Example
+         * ```kotlin
+         * val asset = Asset.createNonNativeAsset("USDC", issuerAccountId)
+         * val deployOp = InvokeHostFunctionOperation.createStellarAssetContract(asset)
+         * val contractId = asset.getContractId(Network.TESTNET)
+         * ```
+         *
+         * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract</a>
+         */
+        fun createStellarAssetContract(asset: Asset): InvokeHostFunctionOperation {
+            return InvokeHostFunctionOperation(
+                hostFunction = HostFunctionXdr.CreateContract(
+                    CreateContractArgsXdr(
+                        contractIdPreimage = ContractIDPreimageXdr.FromAsset(asset.toXdr()),
+                        executable = ContractExecutableXdr.Void
+                    )
+                ),
+                auth = emptyList()
+            )
+        }
     }
 }
 

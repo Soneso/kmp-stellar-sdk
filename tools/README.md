@@ -11,6 +11,7 @@ This directory holds the development tools of the KMP Stellar SDK, one tool per 
 | `skill-generator/` | Generates the API reference of the agent skill. | Python 3 |
 | `coverage/` | Computes the line coverage metric from the Kover report and enforces a minimum. | Python 3 |
 | `p28-owner-fixture/` | Source of the protocol 28 owner contract whose wasm the integration tests deploy. | Rust with the `wasm32v1-none` target, stellar-cli |
+| `sac-spec/` | Embeds the pinned Stellar Asset Contract spec into the SDK as `SACSpec.kt`. | Python 3.9 or later, network access unless the spec file is given with `--source` |
 
 ## xdrgen-kt
 
@@ -74,6 +75,15 @@ cd tools/p28-owner-fixture && stellar contract build
 ```
 
 The build writes `target/wasm32v1-none/release/p28_owner_fixture.wasm`, which is committed as `stellar-sdk/src/commonTest/resources/wasm/p28_owner_fixture.wasm`. Each of the four Soneso Stellar SDK repositories holds a copy of the directory and the wasm, and a rebuild updates all four. Details: `tools/p28-owner-fixture/README.md`.
+
+## sac-spec
+
+```bash
+python3 tools/sac-spec/generate_sac_spec.py                  # download the pinned spec file and regenerate SACSpec.kt
+python3 -m unittest discover -s tools/sac-spec/tests         # run the generator tests
+```
+
+The script reads `tools/sac-spec/pin.json`, checks the downloaded file against the pinned sha256 and writes `stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/contract/SACSpec.kt` from `tools/sac-spec/SACSpec.kt.template`. Details, including the pin bump and the exit codes: `tools/sac-spec/README.md`.
 
 ## Adding a tool
 

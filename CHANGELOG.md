@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `SACClient` opens a Stellar Asset Contract from an `Asset` or a contract id without an RPC request. It has typed `balance`, `transfer`, `transferAndSubmit`, `decimals`, `name` and `symbol`, `toBaseUnits()` for decimal amounts, and a read-only mode without a keypair.
+- `SACSpec` embeds the Stellar Asset Contract spec at upstream commit 4f08d14.
+- `InvokeHostFunctionOperation.createStellarAssetContract` builds the operation that deploys the Stellar Asset Contract of an `Asset`.
+
+### Changed
+- `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
+
 ## [1.18.0] - 2026-11-16
 
 Migration guide: [docs/migration/1.18.0.md](docs/migration/1.18.0.md)
