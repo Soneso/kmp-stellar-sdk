@@ -9,6 +9,9 @@ import com.soneso.stellar.sdk.xdr.*
  * Transaction preconditions allow you to set constraints on when a transaction can be executed.
  * This includes time bounds, ledger bounds, minimum sequence numbers, and required extra signers.
  *
+ * A value read by [fromXdr] keeps the precondition type it was read with. A value from the constructor,
+ * `copy` or the [Builder] gets its type from its property values, as [hasV2] describes.
+ *
  * @property timeBounds The time bounds for the transaction
  * @property ledgerBounds The ledger bounds for the transaction (V2 only)
  * @property minSequenceNumber The minimum source account sequence number this transaction is valid for (V2 only).
@@ -28,6 +31,9 @@ data class TransactionPreconditions(
     val minSequenceLedgerGap: Int = 0,
     val extraSigners: List<SignerKey> = emptyList()
 ) {
+
+    /** True only for a value that [fromXdr] read from a `PRECOND_V2` precondition. */
+    private var decodedAsV2 = false
 
     init {
         require(minSequenceAge >= 0) { "minSequenceAge must be >= 0" }
@@ -51,15 +57,16 @@ data class TransactionPreconditions(
     }
 
     /**
-     * Returns true if the preconditions use V2 features.
+     * Returns true if [toXdr] writes these preconditions as `PRECOND_V2`.
      *
-     * V2 preconditions include ledger bounds, minimum sequence number, minimum sequence age,
-     * minimum sequence ledger gap, or extra signers.
+     * That holds for a value that [fromXdr] read from a `PRECOND_V2` precondition, and for a value with
+     * ledger bounds, a minimum sequence number, a minimum sequence age or ledger gap above 0, or extra signers.
      *
      * @return true if using V2 preconditions, false otherwise
      */
     fun hasV2(): Boolean {
-        return ledgerBounds != null ||
+        return decodedAsV2 ||
+                ledgerBounds != null ||
                 minSequenceLedgerGap > 0 ||
                 minSequenceAge > 0 ||
                 minSequenceNumber != null ||
@@ -68,6 +75,9 @@ data class TransactionPreconditions(
 
     /**
      * Converts this TransactionPreconditions to its XDR representation.
+     *
+     * The type is `PRECOND_V2` when [hasV2] is true, so a value read from a `PRECOND_V2` precondition is
+     * written back as `PRECOND_V2`. Otherwise it is `PRECOND_TIME` with time bounds and `PRECOND_NONE` without.
      *
      * @return The XDR PreconditionsXdr object
      */
@@ -92,6 +102,21 @@ data class TransactionPreconditions(
             }
         }
     }
+
+    /** Compares the six properties and [hasV2], so two equal values encode to the same precondition bytes. */
+    override fun equals(other: Any?): Boolean =
+        other is TransactionPreconditions &&
+            timeBounds == other.timeBounds &&
+            ledgerBounds == other.ledgerBounds &&
+            minSequenceNumber == other.minSequenceNumber &&
+            minSequenceAge == other.minSequenceAge &&
+            minSequenceLedgerGap == other.minSequenceLedgerGap &&
+            extraSigners == other.extraSigners &&
+            hasV2() == other.hasV2()
+
+    override fun hashCode(): Int =
+        listOf(timeBounds, ledgerBounds, minSequenceNumber, minSequenceAge, minSequenceLedgerGap, extraSigners, hasV2())
+            .hashCode()
 
     /**
      * Builder for creating TransactionPreconditions with a fluent API.
@@ -241,7 +266,7 @@ data class TransactionPreconditions(
                         minSequenceAge = v2.minSeqAge.value.value.toLong(),
                         minSequenceLedgerGap = v2.minSeqLedgerGap.value.toInt(),
                         extraSigners = v2.extraSigners.map { SignerKey.fromXdr(it) }
-                    )
+                    ).apply { decodedAsV2 = true }
                 }
             }
         }
