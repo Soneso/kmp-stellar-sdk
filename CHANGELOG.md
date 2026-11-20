@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
 
 ### Fixed
+- `ExtendFootprintTTLOperation` accepts `extendTo = 0`, so `AbstractTransaction.fromEnvelopeXdr` parses applied transactions that use it, such as testnet transaction 21f5b9f42f5166038d3fb0d1bda5d13cc8b1fc1cdffaedb0bd76680c44180dec (#176).
 - Binary XDR decoding and encoding throw `IllegalArgumentException` for an array, string or variable-length opaque value longer than the maximum its XDR definition declares, such as a 29-byte memo text or 101 operations.
 - Binary XDR decoding throws `IllegalArgumentException` when the padding after a string or opaque value is missing or not zero.
 - `CreateClaimableBalanceOperation` throws `IllegalArgumentException` for more than 10 claimants.

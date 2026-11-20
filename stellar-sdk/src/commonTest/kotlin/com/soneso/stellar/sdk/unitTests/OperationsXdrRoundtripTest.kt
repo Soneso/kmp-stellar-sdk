@@ -593,11 +593,26 @@ class OperationsXdrRoundtripTest {
     @Test
     fun testExtendFootprintTTLInvalidValue() {
         assertFailsWith<IllegalArgumentException> {
-            ExtendFootprintTTLOperation(0)
-        }
-        assertFailsWith<IllegalArgumentException> {
             ExtendFootprintTTLOperation(-5)
         }
+    }
+
+    @Test
+    fun testExtendFootprintTTLZeroRoundtrip() {
+        // stellar-core accepts extendTo = 0; it rejects only values above the maximum entry TTL.
+        val op = ExtendFootprintTTLOperation(0)
+        val restored = Operation.fromXdr(op.toXdr())
+        assertEquals(0, (restored as ExtendFootprintTTLOperation).extendTo)
+    }
+
+    @Test
+    fun testExtendFootprintTTLZeroFromAppliedTransaction() {
+        // Testnet transaction 21f5b9f42f5166038d3fb0d1bda5d13cc8b1fc1cdffaedb0bd76680c44180dec
+        // (ledger 3619212), applied with txSUCCESS.
+        val envelope = "AAAAAgAAAADk3ricDJaFupVzD6HMeSxXdKSFjYEhxD+gPzdOckqKAAAALiAANxvsAAAABQAAAAAAAAAAAAAAAQAAAAAAAAAZAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALbwAAAABckqKAAAAAECiDbdEWMvR2egvrPbSUS2u4aiA0/lbN1h6ZjYw9VEscaChGj1SWAwmitqs5UOSF3v9eWSJlzDwPVo8lWbZBvQJ"
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        assertEquals(0, (tx.operations.single() as ExtendFootprintTTLOperation).extendTo)
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
     }
 
     // ========== RestoreFootprint ==========
