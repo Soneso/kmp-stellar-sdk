@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecEventV0Xdr"
 
@@ -75,12 +74,14 @@ data class SCSpecEventV0Xdr(
     dataFormat.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("doc", XdrJson.escapedString(doc))
     put("lib", XdrJson.escapedString(lib))
     put("name", XdrJson.escapedString(name))
-    put("prefix_topics", XdrJson.array(prefixTopics) { it.toXdrJsonElement() })
-    put("params", XdrJson.array(params) { it.toXdrJsonElement() })
+    put("prefix_topics", XdrJson.array(prefixTopics, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("params", XdrJson.array(params, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("data_format", dataFormat.toXdrJsonElement())
   }
 

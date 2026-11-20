@@ -6,7 +6,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * The shared runtime behind the XDR-JSON (SEP-0051) conversion methods on the XDR types.
@@ -44,8 +46,12 @@ import kotlinx.serialization.json.JsonPrimitive
 internal object XdrJson {
 
     /**
-     * Maximum JSON nesting depth accepted when decoding. The limit bounds the
-     * call-stack traversal of the document.
+     * The deepest XDR-JSON nesting this SDK reads or writes: 128 levels. Each object and each
+     * array is one level, the outermost being level 1; a string, number, boolean or null adds
+     * none. The parser, the generated readers and writers and the serialiser traverse the
+     * document recursively, so the limit bounds the call stack they use, which matters on
+     * threads with a small stack. Reading refuses a deeper document, and writing refuses a
+     * value whose XDR-JSON would nest deeper.
      */
     const val RECURSION_CAP: Int = 128
 
@@ -134,8 +140,24 @@ internal object XdrJson {
      */
     fun name(value: String): JsonElement = JsonPrimitive(value)
 
-    fun <T> array(values: List<T>, encode: (T) -> JsonElement): JsonElement =
-        JsonArray(values.map(encode))
+    /**
+     * Builds the object a value opens at nesting [depth]. A depth past [RECURSION_CAP] is
+     * refused before [build] writes a member, so the writer stops before descending past it.
+     */
+    inline fun obj(depth: Int, type: String, build: JsonObjectBuilder.() -> Unit): JsonElement {
+        checkWriteDepth(depth, type)
+        return buildJsonObject(build)
+    }
+
+    /** Builds the array a value opens at nesting [depth], refused like [obj] past [RECURSION_CAP]. */
+    fun <T> array(values: List<T>, depth: Int, type: String, encode: (T) -> JsonElement): JsonElement {
+        checkWriteDepth(depth, type)
+        return JsonArray(values.map(encode))
+    }
+
+    fun checkWriteDepth(depth: Int, type: String) {
+        if (depth > RECURSION_CAP) fail(type, "value nests deeper than the limit of $RECURSION_CAP")
+    }
 
     fun <T> optional(value: T?, encode: (T) -> JsonElement): JsonElement =
         if (value == null) JsonNull else encode(value)

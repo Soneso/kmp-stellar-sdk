@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecTypeDefXdr"
 
@@ -230,15 +229,17 @@ sealed class SCSpecTypeDefXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name(discriminant.xdrJsonName)
-    is Option -> buildJsonObject { put("option", value.toXdrJsonElement()) }
-    is Result -> buildJsonObject { put("result", value.toXdrJsonElement()) }
-    is Vec -> buildJsonObject { put("vec", value.toXdrJsonElement()) }
-    is Map -> buildJsonObject { put("map", value.toXdrJsonElement()) }
-    is Tuple -> buildJsonObject { put("tuple", value.toXdrJsonElement()) }
-    is BytesN -> buildJsonObject { put("bytes_n", value.toXdrJsonElement()) }
-    is Udt -> buildJsonObject { put("udt", value.toXdrJsonElement()) }
+    is Option -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("option", value.toXdrJsonElement(depth + 1)) }
+    is Result -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("result", value.toXdrJsonElement(depth + 1)) }
+    is Vec -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("vec", value.toXdrJsonElement(depth + 1)) }
+    is Map -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("map", value.toXdrJsonElement(depth + 1)) }
+    is Tuple -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("tuple", value.toXdrJsonElement(depth + 1)) }
+    is BytesN -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("bytes_n", value.toXdrJsonElement(depth + 1)) }
+    is Udt -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("udt", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionMetaXdr"
 
@@ -127,12 +126,14 @@ sealed class TransactionMetaXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Operations -> buildJsonObject { put("v0", XdrJson.array(value) { it.toXdrJsonElement() }) }
-    is V1 -> buildJsonObject { put("v1", value.toXdrJsonElement()) }
-    is V2 -> buildJsonObject { put("v2", value.toXdrJsonElement()) }
-    is V3 -> buildJsonObject { put("v3", value.toXdrJsonElement()) }
-    is V4 -> buildJsonObject { put("v4", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Operations -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", XdrJson.array(value, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) }) }
+    is V1 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v1", value.toXdrJsonElement(depth + 1)) }
+    is V2 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v2", value.toXdrJsonElement(depth + 1)) }
+    is V3 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v3", value.toXdrJsonElement(depth + 1)) }
+    is V4 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v4", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

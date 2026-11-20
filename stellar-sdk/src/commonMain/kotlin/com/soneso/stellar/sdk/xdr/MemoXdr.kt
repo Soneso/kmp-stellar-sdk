@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "MemoXdr"
 
@@ -123,12 +122,14 @@ sealed class MemoXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name("none")
-    is Text -> buildJsonObject { put("text", XdrJson.escapedString(value)) }
-    is Id -> buildJsonObject { put("id", value.toXdrJsonElement()) }
-    is Hash -> buildJsonObject { put("hash", value.toXdrJsonElement()) }
-    is RetHash -> buildJsonObject { put("return", value.toXdrJsonElement()) }
+    is Text -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("text", XdrJson.escapedString(value)) }
+    is Id -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("id", value.toXdrJsonElement(depth + 1)) }
+    is Hash -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("hash", value.toXdrJsonElement(depth + 1)) }
+    is RetHash -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("return", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

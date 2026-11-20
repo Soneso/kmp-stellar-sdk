@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreateClaimableBalanceResultXdr"
 
@@ -88,8 +87,10 @@ sealed class CreateClaimableBalanceResultXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is BalanceID -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is BalanceID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("success", value.toXdrJsonElement()) }
     is Void -> XdrJson.name(discriminant.xdrJsonName)
   }
 

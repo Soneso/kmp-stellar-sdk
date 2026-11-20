@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerKeyContractDataXdr"
 
@@ -53,9 +52,11 @@ data class LedgerKeyContractDataXdr(
     durability.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("contract", contract.toXdrJsonElement())
-    put("key", key.toXdrJsonElement())
+    put("key", key.toXdrJsonElement(depth + 1))
     put("durability", durability.toXdrJsonElement())
   }
 

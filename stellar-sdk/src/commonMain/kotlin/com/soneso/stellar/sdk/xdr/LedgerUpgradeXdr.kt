@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerUpgradeXdr"
 
@@ -161,14 +160,16 @@ sealed class LedgerUpgradeXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is NewLedgerVersion -> buildJsonObject { put("version", value.toXdrJsonElement()) }
-    is NewBaseFee -> buildJsonObject { put("base_fee", value.toXdrJsonElement()) }
-    is NewMaxTxSetSize -> buildJsonObject { put("max_tx_set_size", value.toXdrJsonElement()) }
-    is NewBaseReserve -> buildJsonObject { put("base_reserve", value.toXdrJsonElement()) }
-    is NewFlags -> buildJsonObject { put("flags", value.toXdrJsonElement()) }
-    is NewConfig -> buildJsonObject { put("config", value.toXdrJsonElement()) }
-    is NewMaxSorobanTxSetSize -> buildJsonObject { put("max_soroban_tx_set_size", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is NewLedgerVersion -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("version", value.toXdrJsonElement(depth + 1)) }
+    is NewBaseFee -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("base_fee", value.toXdrJsonElement(depth + 1)) }
+    is NewMaxTxSetSize -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("max_tx_set_size", value.toXdrJsonElement(depth + 1)) }
+    is NewBaseReserve -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("base_reserve", value.toXdrJsonElement(depth + 1)) }
+    is NewFlags -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("flags", value.toXdrJsonElement(depth + 1)) }
+    is NewConfig -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("config", value.toXdrJsonElement(depth + 1)) }
+    is NewMaxSorobanTxSetSize -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("max_soroban_tx_set_size", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

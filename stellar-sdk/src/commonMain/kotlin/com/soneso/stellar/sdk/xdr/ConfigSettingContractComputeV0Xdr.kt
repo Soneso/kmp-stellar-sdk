@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractComputeV0Xdr"
 
@@ -71,11 +70,13 @@ data class ConfigSettingContractComputeV0Xdr(
     txMemoryLimit.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ledger_max_instructions", ledgerMaxInstructions.toXdrJsonElement())
-    put("tx_max_instructions", txMaxInstructions.toXdrJsonElement())
-    put("fee_rate_per_instructions_increment", feeRatePerInstructionsIncrement.toXdrJsonElement())
-    put("tx_memory_limit", txMemoryLimit.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ledger_max_instructions", ledgerMaxInstructions.toXdrJsonElement(depth + 1))
+    put("tx_max_instructions", txMaxInstructions.toXdrJsonElement(depth + 1))
+    put("fee_rate_per_instructions_increment", feeRatePerInstructionsIncrement.toXdrJsonElement(depth + 1))
+    put("tx_memory_limit", txMemoryLimit.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

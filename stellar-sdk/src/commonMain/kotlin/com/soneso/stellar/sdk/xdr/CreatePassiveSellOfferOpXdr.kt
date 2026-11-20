@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreatePassiveSellOfferOpXdr"
 
@@ -62,11 +61,13 @@ data class CreatePassiveSellOfferOpXdr(
     price.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("selling", selling.toXdrJsonElement())
-    put("buying", buying.toXdrJsonElement())
-    put("amount", amount.toXdrJsonElement())
-    put("price", price.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("selling", selling.toXdrJsonElement(depth + 1))
+    put("buying", buying.toXdrJsonElement(depth + 1))
+    put("amount", amount.toXdrJsonElement(depth + 1))
+    put("price", price.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

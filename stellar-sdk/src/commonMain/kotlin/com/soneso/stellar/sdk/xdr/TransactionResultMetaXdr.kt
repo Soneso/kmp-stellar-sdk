@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionResultMetaXdr"
 
@@ -53,10 +52,12 @@ data class TransactionResultMetaXdr(
     txApplyProcessing.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("result", result.toXdrJsonElement())
-    put("fee_processing", feeProcessing.toXdrJsonElement())
-    put("tx_apply_processing", txApplyProcessing.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("result", result.toXdrJsonElement(depth + 1))
+    put("fee_processing", feeProcessing.toXdrJsonElement(depth + 1))
+    put("tx_apply_processing", txApplyProcessing.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ContractExecutableXdr"
 
@@ -91,10 +90,12 @@ sealed class ContractExecutableXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is WasmHash -> buildJsonObject { put("wasm", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is WasmHash -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("wasm", value.toXdrJsonElement(depth + 1)) }
     is Void -> XdrJson.name("stellar_asset")
-    is ExternalRef -> buildJsonObject { put("external_ref", value.toXdrJsonElement()) }
+    is ExternalRef -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("external_ref", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

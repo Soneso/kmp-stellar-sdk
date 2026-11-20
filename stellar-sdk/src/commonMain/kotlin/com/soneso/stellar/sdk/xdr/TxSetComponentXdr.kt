@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TxSetComponentXdr"
 
@@ -64,8 +63,10 @@ sealed class TxSetComponentXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is TxsMaybeDiscountedFee -> buildJsonObject { put("txset_comp_txs_maybe_discounted_fee", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is TxsMaybeDiscountedFee -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("txset_comp_txs_maybe_discounted_fee", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

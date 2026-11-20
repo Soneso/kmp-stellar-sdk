@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SorobanTransactionMetaExtV1Xdr"
 
@@ -114,11 +113,13 @@ data class SorobanTransactionMetaExtV1Xdr(
     rentFeeCharged.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ext", ext.toXdrJsonElement())
-    put("total_non_refundable_resource_fee_charged", totalNonRefundableResourceFeeCharged.toXdrJsonElement())
-    put("total_refundable_resource_fee_charged", totalRefundableResourceFeeCharged.toXdrJsonElement())
-    put("rent_fee_charged", rentFeeCharged.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ext", ext.toXdrJsonElement(depth + 1))
+    put("total_non_refundable_resource_fee_charged", totalNonRefundableResourceFeeCharged.toXdrJsonElement(depth + 1))
+    put("total_refundable_resource_fee_charged", totalRefundableResourceFeeCharged.toXdrJsonElement(depth + 1))
+    put("rent_fee_charged", rentFeeCharged.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

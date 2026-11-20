@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PreconditionsV2Xdr"
 
@@ -132,13 +131,15 @@ data class PreconditionsV2Xdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement() })
-    put("ledger_bounds", XdrJson.optional(ledgerBounds) { it.toXdrJsonElement() })
-    put("min_seq_num", XdrJson.optional(minSeqNum) { it.toXdrJsonElement() })
-    put("min_seq_age", minSeqAge.toXdrJsonElement())
-    put("min_seq_ledger_gap", minSeqLedgerGap.toXdrJsonElement())
-    put("extra_signers", XdrJson.array(extraSigners) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement(depth + 1) })
+    put("ledger_bounds", XdrJson.optional(ledgerBounds) { it.toXdrJsonElement(depth + 1) })
+    put("min_seq_num", XdrJson.optional(minSeqNum) { it.toXdrJsonElement(depth + 1) })
+    put("min_seq_age", minSeqAge.toXdrJsonElement(depth + 1))
+    put("min_seq_ledger_gap", minSeqLedgerGap.toXdrJsonElement(depth + 1))
+    put("extra_signers", XdrJson.array(extraSigners, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

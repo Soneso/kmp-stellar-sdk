@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "BucketEntryXdr"
 
@@ -98,10 +97,12 @@ sealed class BucketEntryXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is LiveEntry -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
-    is DeadEntry -> buildJsonObject { put("deadentry", value.toXdrJsonElement()) }
-    is MetaEntry -> buildJsonObject { put("metaentry", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is LiveEntry -> XdrJson.obj(depth, XDR_JSON_TYPE) { put(discriminant.xdrJsonName, value.toXdrJsonElement(depth + 1)) }
+    is DeadEntry -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("deadentry", value.toXdrJsonElement(depth + 1)) }
+    is MetaEntry -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("metaentry", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

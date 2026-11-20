@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractLedgerCostV0Xdr"
 
@@ -148,22 +147,24 @@ data class ConfigSettingContractLedgerCostV0Xdr(
     sorobanStateRentFeeGrowthFactor.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ledger_max_disk_read_entries", ledgerMaxDiskReadEntries.toXdrJsonElement())
-    put("ledger_max_disk_read_bytes", ledgerMaxDiskReadBytes.toXdrJsonElement())
-    put("ledger_max_write_ledger_entries", ledgerMaxWriteLedgerEntries.toXdrJsonElement())
-    put("ledger_max_write_bytes", ledgerMaxWriteBytes.toXdrJsonElement())
-    put("tx_max_disk_read_entries", txMaxDiskReadEntries.toXdrJsonElement())
-    put("tx_max_disk_read_bytes", txMaxDiskReadBytes.toXdrJsonElement())
-    put("tx_max_write_ledger_entries", txMaxWriteLedgerEntries.toXdrJsonElement())
-    put("tx_max_write_bytes", txMaxWriteBytes.toXdrJsonElement())
-    put("fee_disk_read_ledger_entry", feeDiskReadLedgerEntry.toXdrJsonElement())
-    put("fee_write_ledger_entry", feeWriteLedgerEntry.toXdrJsonElement())
-    put("fee_disk_read1_kb", feeDiskRead1Kb.toXdrJsonElement())
-    put("soroban_state_target_size_bytes", sorobanStateTargetSizeBytes.toXdrJsonElement())
-    put("rent_fee1_kb_soroban_state_size_low", rentFee1KbSorobanStateSizeLow.toXdrJsonElement())
-    put("rent_fee1_kb_soroban_state_size_high", rentFee1KbSorobanStateSizeHigh.toXdrJsonElement())
-    put("soroban_state_rent_fee_growth_factor", sorobanStateRentFeeGrowthFactor.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ledger_max_disk_read_entries", ledgerMaxDiskReadEntries.toXdrJsonElement(depth + 1))
+    put("ledger_max_disk_read_bytes", ledgerMaxDiskReadBytes.toXdrJsonElement(depth + 1))
+    put("ledger_max_write_ledger_entries", ledgerMaxWriteLedgerEntries.toXdrJsonElement(depth + 1))
+    put("ledger_max_write_bytes", ledgerMaxWriteBytes.toXdrJsonElement(depth + 1))
+    put("tx_max_disk_read_entries", txMaxDiskReadEntries.toXdrJsonElement(depth + 1))
+    put("tx_max_disk_read_bytes", txMaxDiskReadBytes.toXdrJsonElement(depth + 1))
+    put("tx_max_write_ledger_entries", txMaxWriteLedgerEntries.toXdrJsonElement(depth + 1))
+    put("tx_max_write_bytes", txMaxWriteBytes.toXdrJsonElement(depth + 1))
+    put("fee_disk_read_ledger_entry", feeDiskReadLedgerEntry.toXdrJsonElement(depth + 1))
+    put("fee_write_ledger_entry", feeWriteLedgerEntry.toXdrJsonElement(depth + 1))
+    put("fee_disk_read1_kb", feeDiskRead1Kb.toXdrJsonElement(depth + 1))
+    put("soroban_state_target_size_bytes", sorobanStateTargetSizeBytes.toXdrJsonElement(depth + 1))
+    put("rent_fee1_kb_soroban_state_size_low", rentFee1KbSorobanStateSizeLow.toXdrJsonElement(depth + 1))
+    put("rent_fee1_kb_soroban_state_size_high", rentFee1KbSorobanStateSizeHigh.toXdrJsonElement(depth + 1))
+    put("soroban_state_rent_fee_growth_factor", sorobanStateRentFeeGrowthFactor.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

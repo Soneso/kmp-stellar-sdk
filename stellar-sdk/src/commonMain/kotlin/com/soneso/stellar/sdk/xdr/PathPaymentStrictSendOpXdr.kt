@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PathPaymentStrictSendOpXdr"
 
@@ -81,13 +80,15 @@ data class PathPaymentStrictSendOpXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("send_asset", sendAsset.toXdrJsonElement())
-    put("send_amount", sendAmount.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("send_asset", sendAsset.toXdrJsonElement(depth + 1))
+    put("send_amount", sendAmount.toXdrJsonElement(depth + 1))
     put("destination", destination.toXdrJsonElement())
-    put("dest_asset", destAsset.toXdrJsonElement())
-    put("dest_min", destMin.toXdrJsonElement())
-    put("path", XdrJson.array(path) { it.toXdrJsonElement() })
+    put("dest_asset", destAsset.toXdrJsonElement(depth + 1))
+    put("dest_min", destMin.toXdrJsonElement(depth + 1))
+    put("path", XdrJson.array(path, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

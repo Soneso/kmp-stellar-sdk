@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerHeaderXdr"
 
@@ -152,22 +151,24 @@ data class LedgerHeaderXdr(
     ext.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ledger_version", ledgerVersion.toXdrJsonElement())
-    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement())
-    put("scp_value", scpValue.toXdrJsonElement())
-    put("tx_set_result_hash", txSetResultHash.toXdrJsonElement())
-    put("bucket_list_hash", bucketListHash.toXdrJsonElement())
-    put("ledger_seq", ledgerSeq.toXdrJsonElement())
-    put("total_coins", totalCoins.toXdrJsonElement())
-    put("fee_pool", feePool.toXdrJsonElement())
-    put("inflation_seq", inflationSeq.toXdrJsonElement())
-    put("id_pool", idPool.toXdrJsonElement())
-    put("base_fee", baseFee.toXdrJsonElement())
-    put("base_reserve", baseReserve.toXdrJsonElement())
-    put("max_tx_set_size", maxTxSetSize.toXdrJsonElement())
-    put("skip_list", XdrJson.array(skipList.asList()) { it.toXdrJsonElement() })
-    put("ext", ext.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ledger_version", ledgerVersion.toXdrJsonElement(depth + 1))
+    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement(depth + 1))
+    put("scp_value", scpValue.toXdrJsonElement(depth + 1))
+    put("tx_set_result_hash", txSetResultHash.toXdrJsonElement(depth + 1))
+    put("bucket_list_hash", bucketListHash.toXdrJsonElement(depth + 1))
+    put("ledger_seq", ledgerSeq.toXdrJsonElement(depth + 1))
+    put("total_coins", totalCoins.toXdrJsonElement(depth + 1))
+    put("fee_pool", feePool.toXdrJsonElement(depth + 1))
+    put("inflation_seq", inflationSeq.toXdrJsonElement(depth + 1))
+    put("id_pool", idPool.toXdrJsonElement(depth + 1))
+    put("base_fee", baseFee.toXdrJsonElement(depth + 1))
+    put("base_reserve", baseReserve.toXdrJsonElement(depth + 1))
+    put("max_tx_set_size", maxTxSetSize.toXdrJsonElement(depth + 1))
+    put("skip_list", XdrJson.array(skipList.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("ext", ext.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

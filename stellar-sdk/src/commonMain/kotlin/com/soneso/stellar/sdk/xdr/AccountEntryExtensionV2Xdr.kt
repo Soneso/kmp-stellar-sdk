@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "AccountEntryExtensionV2Xdr"
 
@@ -70,11 +69,13 @@ data class AccountEntryExtensionV2Xdr(
     ext.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("num_sponsored", numSponsored.toXdrJsonElement())
-    put("num_sponsoring", numSponsoring.toXdrJsonElement())
-    put("signer_sponsoring_i_ds", XdrJson.array(signerSponsoringIDs) { it.toXdrJsonElement() })
-    put("ext", ext.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("num_sponsored", numSponsored.toXdrJsonElement(depth + 1))
+    put("num_sponsoring", numSponsoring.toXdrJsonElement(depth + 1))
+    put("signer_sponsoring_i_ds", XdrJson.array(signerSponsoringIDs, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("ext", ext.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

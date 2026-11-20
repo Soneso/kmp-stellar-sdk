@@ -36,7 +36,9 @@ value class SponsorshipDescriptorXdr(val value: AccountIDXdr?) {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.optional(value) { it.toXdrJsonElement() }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.optional(value) { it.toXdrJsonElement(depth) }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

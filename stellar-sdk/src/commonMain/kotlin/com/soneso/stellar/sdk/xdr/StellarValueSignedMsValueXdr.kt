@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StellarValueSignedMsValueXdr"
 
@@ -49,9 +48,11 @@ data class StellarValueSignedMsValueXdr(
     lcValueSignature.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("close_time_ms", closeTimeMs.toXdrJsonElement())
-    put("lc_value_signature", lcValueSignature.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("close_time_ms", closeTimeMs.toXdrJsonElement(depth + 1))
+    put("lc_value_signature", lcValueSignature.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerKeyXdr"
 
@@ -245,17 +244,19 @@ sealed class LedgerKeyXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Account -> buildJsonObject { put("account", value.toXdrJsonElement()) }
-    is TrustLine -> buildJsonObject { put("trustline", value.toXdrJsonElement()) }
-    is Offer -> buildJsonObject { put("offer", value.toXdrJsonElement()) }
-    is Data -> buildJsonObject { put("data", value.toXdrJsonElement()) }
-    is ClaimableBalance -> buildJsonObject { put("claimable_balance", value.toXdrJsonElement()) }
-    is LiquidityPool -> buildJsonObject { put("liquidity_pool", value.toXdrJsonElement()) }
-    is ContractData -> buildJsonObject { put("contract_data", value.toXdrJsonElement()) }
-    is ContractCode -> buildJsonObject { put("contract_code", value.toXdrJsonElement()) }
-    is ConfigSetting -> buildJsonObject { put("config_setting", value.toXdrJsonElement()) }
-    is Ttl -> buildJsonObject { put("ttl", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Account -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("account", value.toXdrJsonElement(depth + 1)) }
+    is TrustLine -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("trustline", value.toXdrJsonElement(depth + 1)) }
+    is Offer -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("offer", value.toXdrJsonElement(depth + 1)) }
+    is Data -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("data", value.toXdrJsonElement(depth + 1)) }
+    is ClaimableBalance -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("claimable_balance", value.toXdrJsonElement(depth + 1)) }
+    is LiquidityPool -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("liquidity_pool", value.toXdrJsonElement(depth + 1)) }
+    is ContractData -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_data", value.toXdrJsonElement(depth + 1)) }
+    is ContractCode -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_code", value.toXdrJsonElement(depth + 1)) }
+    is ConfigSetting -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("config_setting", value.toXdrJsonElement(depth + 1)) }
+    is Ttl -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("ttl", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

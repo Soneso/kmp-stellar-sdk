@@ -31,7 +31,9 @@ value class Int32Xdr(val value: Int) {
     writer.writeInt(value)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.int32(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.int32(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }
