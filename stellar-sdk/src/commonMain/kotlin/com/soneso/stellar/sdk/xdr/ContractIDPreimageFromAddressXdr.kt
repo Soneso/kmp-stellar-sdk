@@ -50,7 +50,7 @@ data class ContractIDPreimageFromAddressXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("address", address.toXdrJsonElement(depth + 1))
+    put("address", address.toXdrJsonElement())
     put("salt", salt.toXdrJsonElement(depth + 1))
   }
 

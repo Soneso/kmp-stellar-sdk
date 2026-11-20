@@ -45,7 +45,7 @@ data class ClaimClaimableBalanceOpXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("balance_id", balanceId.toXdrJsonElement(depth + 1))
+    put("balance_id", balanceId.toXdrJsonElement())
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

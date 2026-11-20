@@ -24,7 +24,7 @@ class Sep51WriteDepthStackTest {
         var failure: Throwable? = null
         val thread = Thread(null, {
             failure = runCatching {
-                refusesWrite { LCM.write(witness) }
+                refusesWrite("AssetXdr") { LCM.write(witness) }
                 json = LCM.write(atLimit)
                 readBack = LCM.read(json)
             }.exceptionOrNull()

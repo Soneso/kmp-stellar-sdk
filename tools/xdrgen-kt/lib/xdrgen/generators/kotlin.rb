@@ -979,15 +979,14 @@ module Xdrgen
         out.puts
       end
 
-      # The two public encode entry points and the internal writer every nested value goes
-      # through. The internal writer takes the nesting depth of the value, the root counting as
+      # The two public encode entry points and the internal depth-taking writer used by non-leaf
+      # types. The internal writer takes the nesting depth of the value, the root counting as
       # 1, and XdrJson refuses each object and array opened past its limit before writing into
-      # it. A value written as a JSON string opens no level, so its writer ignores the depth.
+      # it. A leaf writes a single JSON string and opens no level, so it has only the public
+      # writer, which the writers around it call.
       def render_json_writer(out, leaf: nil)
         if leaf
           out.puts leaf
-          out.puts
-          out.puts 'internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()'
         else
           out.puts 'fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)'
           out.puts
@@ -1136,8 +1135,20 @@ module Xdrgen
         when AST::Typespecs::Opaque
           "XdrJson.hex(#{value_expr})"
         else
-          "#{value_expr}.toXdrJsonElement(#{json_depth(offset)})"
+          depth = json_leaf?(typespec) ? '' : json_depth(offset)
+          "#{value_expr}.toXdrJsonElement(#{depth})"
         end
+      end
+
+      # Whether the type a value is declared with is a leaf, whose only writer is the public one:
+      # an override decides before the underlying type is looked at, and an enum without one is a
+      # leaf. A typedef without an override is none, whatever it wraps, because its own writer
+      # takes the depth.
+      def json_leaf?(typespec)
+        defn = typespec.is_a?(AST::Typespecs::Simple) ? typespec.resolved_type : typespec
+        return true if JSON_OVERRIDES.for_type(name(defn))&.dig(:to)
+
+        defn.is_a?(AST::Definitions::Enum)
       end
 
       # The Kotlin value read out of a JSON element, as an expression. Declared lengths and

@@ -139,7 +139,7 @@ data class PreconditionsV2Xdr(
     put("min_seq_num", XdrJson.optional(minSeqNum) { it.toXdrJsonElement(depth + 1) })
     put("min_seq_age", minSeqAge.toXdrJsonElement(depth + 1))
     put("min_seq_ledger_gap", minSeqLedgerGap.toXdrJsonElement(depth + 1))
-    put("extra_signers", XdrJson.array(extraSigners, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("extra_signers", XdrJson.array(extraSigners, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

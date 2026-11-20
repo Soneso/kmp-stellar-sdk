@@ -68,7 +68,7 @@ data class HashIDPreimageRevokeIDXdr(
     put("source_account", sourceAccount.toXdrJsonElement(depth + 1))
     put("seq_num", seqNum.toXdrJsonElement(depth + 1))
     put("op_num", opNum.toXdrJsonElement(depth + 1))
-    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement(depth + 1))
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
     put("asset", asset.toXdrJsonElement(depth + 1))
   }
 

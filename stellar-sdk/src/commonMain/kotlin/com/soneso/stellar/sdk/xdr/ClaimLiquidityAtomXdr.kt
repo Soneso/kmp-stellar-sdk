@@ -71,7 +71,7 @@ data class ClaimLiquidityAtomXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement(depth + 1))
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
     put("asset_sold", assetSold.toXdrJsonElement(depth + 1))
     put("amount_sold", amountSold.toXdrJsonElement(depth + 1))
     put("asset_bought", assetBought.toXdrJsonElement(depth + 1))

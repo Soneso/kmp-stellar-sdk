@@ -465,15 +465,90 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_includes content, 'expectedLength = 32'
   end
 
-  # A nested value goes through the depth-taking writer, never through the public entry that
-  # restarts the count; only an override, which writes a string, delegates to another string.
-  def test_nested_writers_pass_the_depth_in_the_committed_output
-    generated_sdk_files.each do |file|
-      name = File.basename(file, '.kt')
-      next if Xdrgen::Generators::KotlinJsonOverrides.type_names.include?(name)
+  # A leaf, an enum or an override type, writes one JSON string and has only the public writer,
+  # which every position holding a leaf calls; an array around a leaf still opens a level. Any
+  # other type takes the depth, a typedef of a leaf included, and the positions holding it pass
+  # the depth on.
+  def test_leaf_positions_call_the_public_writer_and_container_positions_pass_the_depth
+    Dir.mktmpdir('xdr_json_leaves_') do |dir|
+      source = File.join(dir, 'leaves.x')
+      File.write(source, <<~XDR)
+        enum Shade { LIGHT = 0, DARK = 1 };
+        typedef Shade ShadeAlias;
+        typedef ShadeAlias ShadeChain;
+        typedef Shade ShadeList<4>;
+        typedef opaque AssetCode4[4];
+        typedef AssetCode4 CodeAlias;
+        struct Box { int size; };
+        struct Holder {
+          ShadeChain chain; Shade pair[2]; Shade shades<3>; Shade* maybeShade; AssetCode4 code; CodeAlias aliasCode;
+          Box box; Box boxPair[2]; Box boxes<3>; Box* maybeBox;
+        };
+        union Pick switch (int kind) { case 0: Shade shade; case 1: Box box; };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      read = ->(type) { File.read(File.join(dir, "#{type}Xdr.kt")) }
 
-      refute_match(/\w\.toXdrJsonElement\(\)/, File.read(file), "#{name} restarts the depth of a nested value")
+      %w[Shade AssetCode4].each { |leaf| refute_includes read.(leaf), 'toXdrJsonElement(depth: Int)', leaf }
+      assert_includes read.('AssetCode4'), 'fun toXdrJsonElement(): JsonElement = XdrJson.escapedString('
+      {
+        'ShadeAlias' => 'value.toXdrJsonElement()',
+        'ShadeChain' => 'value.toXdrJsonElement(depth)',
+        'ShadeList' => 'XdrJson.array(value, depth, XDR_JSON_TYPE) { it.toXdrJsonElement() }',
+        'CodeAlias' => 'value.toXdrJsonElement()',
+        'Box' => 'XdrJson.obj(depth, XDR_JSON_TYPE) {'
+      }.each do |type, body|
+        assert_includes read.(type), "  internal fun toXdrJsonElement(depth: Int): JsonElement = #{body}\n", type
+      end
+      [
+        'put("chain", chain.toXdrJsonElement(depth + 1))',
+        'put("pair", XdrJson.array(pair.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })',
+        'put("shades", XdrJson.array(shades, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })',
+        'put("maybe_shade", XdrJson.optional(maybeShade) { it.toXdrJsonElement() })',
+        'put("code", code.toXdrJsonElement())',
+        'put("alias_code", aliasCode.toXdrJsonElement(depth + 1))',
+        'put("box", box.toXdrJsonElement(depth + 1))',
+        'put("box_pair", XdrJson.array(boxPair.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })',
+        'put("boxes", XdrJson.array(boxes, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })',
+        'put("maybe_box", XdrJson.optional(maybeBox) { it.toXdrJsonElement(depth + 1) })'
+      ].each { |line| assert_includes read.('Holder'), "    #{line}\n" }
+      [
+        'is Shade -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", value.toXdrJsonElement()) }',
+        'is Box -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v1", value.toXdrJsonElement(depth + 1)) }'
+      ].each { |line| assert_includes read.('Pick'), "    #{line}\n" }
     end
+  end
+
+  # The committed output holds the same rule: the leaves are exactly the enums and the override
+  # types, and each position calls the writer of the type it declares with the depth exactly
+  # when that type is not a leaf. A position names its value as a struct field, a union arm or
+  # the value of a typedef, and the declaration of that name gives the type.
+  def test_committed_positions_call_leaves_without_and_containers_with_the_depth
+    overrides = Xdrgen::Generators::KotlinJsonOverrides.type_names
+    files = generated_sdk_files.to_h { |file| [File.basename(file, '.kt'), File.read(file)] }
+    files.select! { |_, content| content.include?('fun toXdrJsonElement(): JsonElement') }
+    leaves = files.keys.reject { |type| files[type].include?('fun toXdrJsonElement(depth: Int)') }
+    enums = files.keys.select { |type| files[type].include?("enum class #{type}(") }
+    assert_equal (enums + overrides).sort, leaves.sort
+
+    arm = / +data class (\w+)\(\n(?: +override val discriminant: \w+,\n)? */
+    calls = Hash.new(0)
+    files.each do |type, content|
+      next if overrides.include?(type)
+
+      declared = content.scan(/^(?:#{arm}|value class \w+\(| *)val `?(\w+)`?: ([^,)\n]+)/)
+                        .to_h { |arm_name, field, kotlin| [arm_name || field, kotlin[/\w+Xdr/]] }
+      content.each_line.grep(/\.toXdrJsonElement\(/) do |line|
+        subject = line[/is (\w+) ->/, 1] || line[/put\("[^"]+", (?:XdrJson\.\w+\()?`?(\w+)/, 1] || 'value'
+        written = declared.fetch(subject) { flunk("#{type}: no declaration for #{subject} in #{line}") }
+        depth = line[/\.toXdrJsonElement\(([^)]*)\)/, 1]
+        leaf = leaves.include?(written)
+        assert_match(leaf ? /\A\z/ : /\Adepth( \+ \d)?\z/, depth, "#{type} writes #{written}: #{line}")
+        calls[leaf] += 1
+      end
+    end
+    assert calls[true].positive? && calls[false].positive?, "positions found: #{calls}"
   end
 
   # -- Bytes-backed string fields ---------------------------------------------

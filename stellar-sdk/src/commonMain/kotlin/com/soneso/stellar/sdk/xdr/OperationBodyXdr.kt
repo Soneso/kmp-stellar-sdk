@@ -473,7 +473,7 @@ sealed class OperationBodyXdr {
     is SetOptionsOp -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("set_options", value.toXdrJsonElement(depth + 1)) }
     is ChangeTrustOp -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("change_trust", value.toXdrJsonElement(depth + 1)) }
     is AllowTrustOp -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("allow_trust", value.toXdrJsonElement(depth + 1)) }
-    is Destination -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("account_merge", value.toXdrJsonElement(depth + 1)) }
+    is Destination -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("account_merge", value.toXdrJsonElement()) }
     is Void -> XdrJson.name(discriminant.xdrJsonName)
     is ManageDataOp -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("manage_data", value.toXdrJsonElement(depth + 1)) }
     is BumpSequenceOp -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("bump_sequence", value.toXdrJsonElement(depth + 1)) }

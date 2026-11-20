@@ -126,7 +126,7 @@ sealed class SCErrorXdr {
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is ContractCode -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract", value.toXdrJsonElement(depth + 1)) }
-    is Code -> XdrJson.obj(depth, XDR_JSON_TYPE) { put(discriminant.xdrJsonName, value.toXdrJsonElement(depth + 1)) }
+    is Code -> XdrJson.obj(depth, XDR_JSON_TYPE) { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

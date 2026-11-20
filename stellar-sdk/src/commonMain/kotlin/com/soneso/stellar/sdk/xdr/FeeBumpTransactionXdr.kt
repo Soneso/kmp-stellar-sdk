@@ -70,7 +70,7 @@ data class FeeBumpTransactionXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("fee_source", feeSource.toXdrJsonElement(depth + 1))
+    put("fee_source", feeSource.toXdrJsonElement())
     put("fee", fee.toXdrJsonElement(depth + 1))
     put("inner_tx", innerTx.toXdrJsonElement(depth + 1))
     put("ext", ext.toXdrJsonElement(depth + 1))

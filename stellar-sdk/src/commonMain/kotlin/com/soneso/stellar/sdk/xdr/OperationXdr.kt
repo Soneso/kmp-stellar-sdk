@@ -121,7 +121,7 @@ data class OperationXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("source_account", XdrJson.optional(sourceAccount) { it.toXdrJsonElement(depth + 1) })
+    put("source_account", XdrJson.optional(sourceAccount) { it.toXdrJsonElement() })
     put("body", body.toXdrJsonElement(depth + 1))
   }
 

@@ -78,7 +78,7 @@ sealed class BucketMetadataExtXdr {
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name("v0")
-    is BucketListType -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v1", value.toXdrJsonElement(depth + 1)) }
+    is BucketListType -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v1", value.toXdrJsonElement()) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

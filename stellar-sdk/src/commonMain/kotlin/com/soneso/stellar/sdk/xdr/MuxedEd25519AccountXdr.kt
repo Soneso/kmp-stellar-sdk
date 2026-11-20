@@ -45,7 +45,5 @@ data class MuxedEd25519AccountXdr(
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeMed25519PublicKey(XdrJson.muxedPayload(ed25519.value, id.value)))
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

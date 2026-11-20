@@ -68,7 +68,7 @@ data class HashIDPreimageSorobanAuthorizationWithAddressXdr(
     put("network_id", networkId.toXdrJsonElement(depth + 1))
     put("nonce", nonce.toXdrJsonElement(depth + 1))
     put("signature_expiration_ledger", signatureExpirationLedger.toXdrJsonElement(depth + 1))
-    put("address", address.toXdrJsonElement(depth + 1))
+    put("address", address.toXdrJsonElement())
     put("invocation", invocation.toXdrJsonElement(depth + 1))
   }
 

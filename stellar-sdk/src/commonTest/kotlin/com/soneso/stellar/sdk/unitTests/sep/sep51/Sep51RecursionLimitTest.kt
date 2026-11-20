@@ -64,8 +64,8 @@ class Sep51RecursionLimitTest {
             assertTrue(error.message!!.contains("input nests deeper than the limit of 128"), error.message!!)
         }
         val pastLimitValue = vecNest(DEEPEST_ACCEPTED, SCValXdr.U32(Uint32Xdr(1u)))
-        refusesWrite { pastLimitValue.toXdrJson() }
-        refusesWrite { pastLimitValue.toXdrJsonElement() }
+        refusesWrite("SCValXdr") { pastLimitValue.toXdrJson() }
+        refusesWrite("SCValXdr") { pastLimitValue.toXdrJsonElement() }
     }
 
     @Test

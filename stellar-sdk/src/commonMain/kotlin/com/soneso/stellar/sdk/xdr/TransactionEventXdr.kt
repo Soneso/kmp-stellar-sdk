@@ -51,7 +51,7 @@ data class TransactionEventXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("stage", stage.toXdrJsonElement(depth + 1))
+    put("stage", stage.toXdrJsonElement())
     put("event", event.toXdrJsonElement(depth + 1))
   }
 

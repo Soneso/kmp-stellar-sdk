@@ -69,7 +69,7 @@ data class LiquidityPoolDepositOpXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement(depth + 1))
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
     put("max_amount_a", maxAmountA.toXdrJsonElement(depth + 1))
     put("max_amount_b", maxAmountB.toXdrJsonElement(depth + 1))
     put("min_price", minPrice.toXdrJsonElement(depth + 1))

@@ -51,7 +51,7 @@ data class RevokeSponsorshipOpSignerXdr(
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("account_id", accountId.toXdrJsonElement(depth + 1))
-    put("signer_key", signerKey.toXdrJsonElement(depth + 1))
+    put("signer_key", signerKey.toXdrJsonElement())
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

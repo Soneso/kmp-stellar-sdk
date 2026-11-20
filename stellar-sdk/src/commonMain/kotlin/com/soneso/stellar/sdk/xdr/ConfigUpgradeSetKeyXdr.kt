@@ -49,7 +49,7 @@ data class ConfigUpgradeSetKeyXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("contract_id", contractId.toXdrJsonElement(depth + 1))
+    put("contract_id", contractId.toXdrJsonElement())
     put("content_hash", contentHash.toXdrJsonElement(depth + 1))
   }
 

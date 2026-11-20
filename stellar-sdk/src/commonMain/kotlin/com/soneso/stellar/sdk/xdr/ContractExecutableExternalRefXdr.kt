@@ -49,7 +49,7 @@ data class ContractExecutableExternalRefXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("executable_owner", executableOwner.toXdrJsonElement(depth + 1))
+    put("executable_owner", executableOwner.toXdrJsonElement())
     put("tag", XdrJson.escapedString(tag))
   }
 

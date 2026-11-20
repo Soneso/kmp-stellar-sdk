@@ -66,9 +66,9 @@ data class ContractDataEntryXdr(
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("ext", ext.toXdrJsonElement(depth + 1))
-    put("contract", contract.toXdrJsonElement(depth + 1))
+    put("contract", contract.toXdrJsonElement())
     put("key", key.toXdrJsonElement(depth + 1))
-    put("durability", durability.toXdrJsonElement(depth + 1))
+    put("durability", durability.toXdrJsonElement())
     put("val", `val`.toXdrJsonElement(depth + 1))
   }
 

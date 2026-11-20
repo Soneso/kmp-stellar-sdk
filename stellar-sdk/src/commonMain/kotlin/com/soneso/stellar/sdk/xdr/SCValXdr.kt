@@ -447,16 +447,16 @@ sealed class SCValXdr {
     is I64 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i64", value.toXdrJsonElement(depth + 1)) }
     is Timepoint -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("timepoint", value.toXdrJsonElement(depth + 1)) }
     is Duration -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("duration", value.toXdrJsonElement(depth + 1)) }
-    is U128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u128", value.toXdrJsonElement(depth + 1)) }
-    is I128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i128", value.toXdrJsonElement(depth + 1)) }
-    is U256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u256", value.toXdrJsonElement(depth + 1)) }
-    is I256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i256", value.toXdrJsonElement(depth + 1)) }
+    is U128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u128", value.toXdrJsonElement()) }
+    is I128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i128", value.toXdrJsonElement()) }
+    is U256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u256", value.toXdrJsonElement()) }
+    is I256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i256", value.toXdrJsonElement()) }
     is Bytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("bytes", value.toXdrJsonElement(depth + 1)) }
     is Str -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("string", value.toXdrJsonElement(depth + 1)) }
     is Sym -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("symbol", value.toXdrJsonElement(depth + 1)) }
     is Vec -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("vec", XdrJson.optional(value) { it.toXdrJsonElement(depth + 1) }) }
     is Map -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("map", XdrJson.optional(value) { it.toXdrJsonElement(depth + 1) }) }
-    is Address -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("address", value.toXdrJsonElement(depth + 1)) }
+    is Address -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("address", value.toXdrJsonElement()) }
     is Instance -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_instance", value.toXdrJsonElement(depth + 1)) }
     is NonceKey -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("ledger_key_nonce", value.toXdrJsonElement(depth + 1)) }
     is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }

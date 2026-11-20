@@ -59,7 +59,7 @@ data class AllowTrustOpXdr(
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("trustor", trustor.toXdrJsonElement(depth + 1))
-    put("asset", asset.toXdrJsonElement(depth + 1))
+    put("asset", asset.toXdrJsonElement())
     put("authorize", authorize.toXdrJsonElement(depth + 1))
   }
 

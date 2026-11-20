@@ -51,7 +51,7 @@ data class SignerXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("key", key.toXdrJsonElement(depth + 1))
+    put("key", key.toXdrJsonElement())
     put("weight", weight.toXdrJsonElement(depth + 1))
   }
 

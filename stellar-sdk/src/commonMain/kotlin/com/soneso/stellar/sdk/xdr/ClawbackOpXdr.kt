@@ -56,7 +56,7 @@ data class ClawbackOpXdr(
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("asset", asset.toXdrJsonElement(depth + 1))
-    put("from", from.toXdrJsonElement(depth + 1))
+    put("from", from.toXdrJsonElement())
     put("amount", amount.toXdrJsonElement(depth + 1))
   }
 

@@ -50,7 +50,7 @@ data class AlphaNum12Xdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("asset_code", assetCode.toXdrJsonElement(depth + 1))
+    put("asset_code", assetCode.toXdrJsonElement())
     put("issuer", issuer.toXdrJsonElement(depth + 1))
   }
 

@@ -6,7 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 /**
  * The XDR-JSON writer stops at the 128 levels the reader accepts, for every recursive XDR type.
@@ -31,11 +30,15 @@ class Sep51WriteDepthTest {
         val maps = sample(::sampleInvokeHostFunctionOpXdr)
             .copy(hostFunction = HostFunctionXdr.InvokeContract(args), auth = emptyList())
         val auth = SorobanAuthorizationEntryXdr(SorobanCredentialsXdr.Void, authTree(244))
-        listOf(OperationBodyXdr.InvokeHostFunctionOp(maps), invokeBody(auth)).forEach { body ->
+        val bodies = listOf(
+            OperationBodyXdr.InvokeHostFunctionOp(maps) to "SCMapXdr",
+            invokeBody(auth) to "AlphaNum4Xdr",
+        )
+        bodies.forEach { (body, refusedBy) ->
             val envelope = TransactionEnvelopeXdr.V1(v1Envelope(body))
             val base64 = envelope.toXdrBase64()
             assertEquals(base64, TransactionEnvelopeXdr.fromXdrBase64(base64).toXdrBase64())
-            refusesWrite { envelope.toXdrJson() }
+            refusesWrite(refusedBy) { envelope.toXdrJson() }
         }
     }
 }
@@ -70,9 +73,10 @@ private class Family<T>(
         val json = codec.write(codec.decode(XdrReader(bytes)))
         assertEquals(depth, textDepth(json), name)
         assertContentEquals(bytes, codec.bytes(codec.read(json)), name)
-        refusesWrite(name) { codec.write(value(deepest + 1)) }
+        val (pastDeepest, atGuard) = REFUSED_BY.getValue(name)
+        refusesWrite(pastDeepest, name) { codec.write(value(deepest + 1)) }
         val witness = codec.decode(XdrReader(codec.bytes(value(guard))))
-        refusesWrite(name) { codec.write(witness) }
+        refusesWrite(atGuard, name) { codec.write(witness) }
     }
 }
 
@@ -91,10 +95,23 @@ private val FAMILIES: List<Family<*>> = listOf(
     Family("quorum sets", LCM, 60, 128, 499) { n -> lcmQuorum(chain(n, quorum(emptyList())) { quorum(listOf(it)) }) },
 )
 
-/** Refuses [write] with the writer's depth message. */
-internal fun refusesWrite(context: String = "", write: () -> Any) {
+/** Per family, the type that opens level 129 in the value one wrapping past the deepest, and in the witness. */
+private val REFUSED_BY: Map<String, Pair<String, String>> = mapOf(
+    "SCVal vectors" to ("SCErrorXdr" to "SCVecXdr"),
+    "SCVal maps" to ("SCMapXdr" to "SCMapXdr"),
+    "contract instances" to ("ContractExecutableExternalRefXdr" to "SCMapEntryXdr"),
+    "maps of vectors" to ("SCErrorXdr" to "SCValXdr"),
+    "claim predicates" to ("ClaimPredicateXdr" to "ClaimPredicateXdr"),
+    "spec types" to ("SCSpecTypeTupleXdr" to "SCSpecTypeTupleXdr"),
+    "authorized invocations" to ("AssetXdr" to "AssetXdr"),
+    "delegates" to ("SCValXdr" to "SCValXdr"),
+    "quorum sets" to ("SCPQuorumSetXdr" to "SCPQuorumSetXdr"),
+)
+
+/** Refuses [write] with the writer's depth message, naming [type], whose object or array would open level 129. */
+internal fun refusesWrite(type: String, context: String = "", write: () -> Any) {
     val error = assertFailsWith<IllegalArgumentException>(context) { write() }
-    assertTrue(error.message!!.contains("value nests deeper than the limit of 128"), "$context: ${error.message}")
+    assertEquals("$type: value nests deeper than the limit of 128", error.message, context)
 }
 
 /** Container nesting depth of JSON text, counted without parsing it; a primitive is not a level. */

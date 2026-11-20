@@ -82,7 +82,7 @@ data class SCSpecEventV0Xdr(
     put("name", XdrJson.escapedString(name))
     put("prefix_topics", XdrJson.array(prefixTopics, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("params", XdrJson.array(params, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
-    put("data_format", dataFormat.toXdrJsonElement(depth + 1))
+    put("data_format", dataFormat.toXdrJsonElement())
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

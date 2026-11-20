@@ -89,7 +89,7 @@ data class PathPaymentStrictReceiveOpXdr(
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("send_asset", sendAsset.toXdrJsonElement(depth + 1))
     put("send_max", sendMax.toXdrJsonElement(depth + 1))
-    put("destination", destination.toXdrJsonElement(depth + 1))
+    put("destination", destination.toXdrJsonElement())
     put("dest_asset", destAsset.toXdrJsonElement(depth + 1))
     put("dest_amount", destAmount.toXdrJsonElement(depth + 1))
     put("path", XdrJson.array(path, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })

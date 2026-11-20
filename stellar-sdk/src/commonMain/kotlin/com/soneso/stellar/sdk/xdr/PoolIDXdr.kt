@@ -35,7 +35,5 @@ value class PoolIDXdr(val value: HashXdr) {
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeLiquidityPool(value.value))
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

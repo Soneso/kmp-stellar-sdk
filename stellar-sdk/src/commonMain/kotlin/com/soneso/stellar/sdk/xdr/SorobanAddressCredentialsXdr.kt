@@ -60,7 +60,7 @@ data class SorobanAddressCredentialsXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("address", address.toXdrJsonElement(depth + 1))
+    put("address", address.toXdrJsonElement())
     put("nonce", nonce.toXdrJsonElement(depth + 1))
     put("signature_expiration_ledger", signatureExpirationLedger.toXdrJsonElement(depth + 1))
     put("signature", signature.toXdrJsonElement(depth + 1))

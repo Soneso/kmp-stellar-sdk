@@ -33,7 +33,7 @@ value class NodeIDXdr(val value: PublicKeyXdr) {
 
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = value.toXdrJsonElement(depth)
+  internal fun toXdrJsonElement(depth: Int): JsonElement = value.toXdrJsonElement()
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

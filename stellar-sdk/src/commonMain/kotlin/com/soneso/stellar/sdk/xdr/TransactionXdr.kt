@@ -100,7 +100,7 @@ data class TransactionXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("source_account", sourceAccount.toXdrJsonElement(depth + 1))
+    put("source_account", sourceAccount.toXdrJsonElement())
     put("fee", fee.toXdrJsonElement(depth + 1))
     put("seq_num", seqNum.toXdrJsonElement(depth + 1))
     put("cond", cond.toXdrJsonElement(depth + 1))

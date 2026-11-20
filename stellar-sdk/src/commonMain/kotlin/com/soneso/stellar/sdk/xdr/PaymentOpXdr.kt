@@ -58,7 +58,7 @@ data class PaymentOpXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("destination", destination.toXdrJsonElement(depth + 1))
+    put("destination", destination.toXdrJsonElement())
     put("asset", asset.toXdrJsonElement(depth + 1))
     put("amount", amount.toXdrJsonElement(depth + 1))
   }

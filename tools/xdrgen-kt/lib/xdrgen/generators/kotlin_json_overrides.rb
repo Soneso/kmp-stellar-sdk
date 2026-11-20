@@ -9,7 +9,7 @@ module Xdrgen
     # toXdrJsonElement and of the internal fromXdrJsonTree that the generic entry points
     # delegate to. Bodies are written against the generated Kotlin shape of the type, so a
     # renamed arm or field surfaces as a compile error rather than as wrong output. Every
-    # entry writes a single JSON string, so the generated depth-taking writer ignores the depth.
+    # entry writes a single JSON string, so the generated type has no depth-taking writer.
     #
     # AccountID and NodeID are absent deliberately. Both are typedefs of PublicKey, and the
     # generated value class delegates its JSON form to the type it wraps, so both already

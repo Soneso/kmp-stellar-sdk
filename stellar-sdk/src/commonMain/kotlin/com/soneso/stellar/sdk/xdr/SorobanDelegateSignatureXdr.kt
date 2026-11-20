@@ -63,7 +63,7 @@ data class SorobanDelegateSignatureXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("address", address.toXdrJsonElement(depth + 1))
+    put("address", address.toXdrJsonElement())
     put("signature", signature.toXdrJsonElement(depth + 1))
     put("nested_delegates", XdrJson.array(nestedDelegates, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }

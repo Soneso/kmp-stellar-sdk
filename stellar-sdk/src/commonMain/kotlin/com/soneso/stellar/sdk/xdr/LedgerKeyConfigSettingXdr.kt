@@ -45,7 +45,7 @@ data class LedgerKeyConfigSettingXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("config_setting_id", configSettingId.toXdrJsonElement(depth + 1))
+    put("config_setting_id", configSettingId.toXdrJsonElement())
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

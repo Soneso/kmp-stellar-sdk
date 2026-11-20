@@ -123,7 +123,5 @@ sealed class SignerKeyXdr {
     is Ed25519SignedPayload -> value.toXdrJsonElement()
   }
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

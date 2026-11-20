@@ -51,7 +51,5 @@ data class UInt256PartsXdr(
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(XdrJson.uint256ToDecimalString(hiHi.value, hiLo.value, loHi.value, loLo.value))
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

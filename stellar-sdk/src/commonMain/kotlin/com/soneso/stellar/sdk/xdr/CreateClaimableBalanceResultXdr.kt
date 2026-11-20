@@ -90,7 +90,7 @@ sealed class CreateClaimableBalanceResultXdr {
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
-    is BalanceID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("success", value.toXdrJsonElement(depth + 1)) }
+    is BalanceID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("success", value.toXdrJsonElement()) }
     is Void -> XdrJson.name(discriminant.xdrJsonName)
   }
 

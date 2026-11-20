@@ -94,7 +94,7 @@ data class SerializedBinaryFuseFilterXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("type", type.toXdrJsonElement(depth + 1))
+    put("type", type.toXdrJsonElement())
     put("input_hash_seed", inputHashSeed.toXdrJsonElement(depth + 1))
     put("filter_seed", filterSeed.toXdrJsonElement(depth + 1))
     put("segment_length", segmentLength.toXdrJsonElement(depth + 1))

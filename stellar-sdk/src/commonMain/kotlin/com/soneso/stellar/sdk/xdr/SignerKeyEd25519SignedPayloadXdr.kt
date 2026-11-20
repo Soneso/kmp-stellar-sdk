@@ -53,7 +53,5 @@ data class SignerKeyEd25519SignedPayloadXdr(
    */
   fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeSignedPayload(XdrJson.signedPayloadKey(ed25519.value, payload, XDR_JSON_TYPE)))
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

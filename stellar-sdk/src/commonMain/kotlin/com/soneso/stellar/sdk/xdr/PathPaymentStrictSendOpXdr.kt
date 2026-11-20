@@ -85,7 +85,7 @@ data class PathPaymentStrictSendOpXdr(
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("send_asset", sendAsset.toXdrJsonElement(depth + 1))
     put("send_amount", sendAmount.toXdrJsonElement(depth + 1))
-    put("destination", destination.toXdrJsonElement(depth + 1))
+    put("destination", destination.toXdrJsonElement())
     put("dest_asset", destAsset.toXdrJsonElement(depth + 1))
     put("dest_min", destMin.toXdrJsonElement(depth + 1))
     put("path", XdrJson.array(path, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })

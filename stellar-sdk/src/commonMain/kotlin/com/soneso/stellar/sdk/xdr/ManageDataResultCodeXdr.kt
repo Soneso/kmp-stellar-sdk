@@ -59,7 +59,5 @@ enum class ManageDataResultCodeXdr(val value: Int, internal val xdrJsonName: Str
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

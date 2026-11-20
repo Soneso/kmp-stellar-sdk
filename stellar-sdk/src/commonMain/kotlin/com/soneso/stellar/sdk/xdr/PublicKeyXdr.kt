@@ -59,7 +59,5 @@ sealed class PublicKeyXdr {
     is Ed25519 -> XdrJson.name(StrKey.encodeEd25519PublicKey(value.value))
   }
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -43,7 +43,5 @@ data class UInt128PartsXdr(
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(XdrJson.uint128ToDecimalString(hi.value, lo.value))
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
-
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

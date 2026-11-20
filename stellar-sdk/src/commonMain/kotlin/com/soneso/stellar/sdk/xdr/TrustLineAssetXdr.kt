@@ -118,7 +118,7 @@ sealed class TrustLineAssetXdr {
     is Void -> XdrJson.name("native")
     is AlphaNum4 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("credit_alphanum4", value.toXdrJsonElement(depth + 1)) }
     is AlphaNum12 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("credit_alphanum12", value.toXdrJsonElement(depth + 1)) }
-    is LiquidityPoolID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("pool_share", value.toXdrJsonElement(depth + 1)) }
+    is LiquidityPoolID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("pool_share", value.toXdrJsonElement()) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
