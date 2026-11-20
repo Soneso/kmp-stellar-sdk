@@ -28,7 +28,7 @@ value class IntListXdr(val value: List<Int>) {
   }
 
   fun encode(writer: XdrWriter) {
-    require(value.size <= 100) { "XDR array count ${value.size} exceeds maximum ${100}" }
+    require(value.size <= 100) { "XDR array count ${value.size} exceeds maximum 100" }
     writer.writeInt(value.size)
     value.forEach { item ->
       writer.writeInt(item)

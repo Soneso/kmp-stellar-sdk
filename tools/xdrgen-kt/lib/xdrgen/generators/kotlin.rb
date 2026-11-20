@@ -1468,7 +1468,8 @@ module Xdrgen
               out.puts "#{writer_var}.writeVariableOpaque(#{value_expr}#{binary_max_length(decl.size)})"
             else
               unless decl.size.blank?
-                out.puts "require(#{value_expr}.size <= #{decl.size}) { \"XDR array count ${#{value_expr}.size} exceeds maximum ${#{decl.size}}\" }"
+                maximum = decl.size_spec.named? ? "$#{decl.size}" : decl.size
+                out.puts "require(#{value_expr}.size <= #{decl.size}) { \"XDR array count ${#{value_expr}.size} exceeds maximum #{maximum}\" }"
               end
               out.puts "#{writer_var}.writeInt(#{value_expr}.size)"
               out.puts "#{value_expr}.forEach { item ->"

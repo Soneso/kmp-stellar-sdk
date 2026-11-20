@@ -374,6 +374,9 @@ class GeneratorSnapshotTest < Minitest::Test
   end
 
   def test_binary_declared_maxima_are_emitted
+    content = File.read(File.join(@output_dir, 'IntListXdr.kt'))
+    assert_includes content, 'XDR array count ${value.size} exceeds maximum 100'
+
     binary_length_fixture do |dir|
       %w[BoundedXdr TextXdr TextAliasXdr BlobXdr BlobAliasXdr ItemsXdr ItemsAliasXdr ChoiceXdr].each do |type|
         content = File.read(File.join(dir, "#{type}.kt"))
@@ -394,7 +397,7 @@ class GeneratorSnapshotTest < Minitest::Test
         if %w[BoundedXdr ItemsXdr ChoiceXdr].include?(type)
           assert_includes content, 'reader.readArrayLength(LIMIT)'
           assert_match(/require\(\w+.size <= LIMIT\)/, content)
-          assert_match(/XDR array count \$\{\w+.size\} exceeds maximum \$\{LIMIT\}/, content)
+          assert_match(/XDR array count \$\{\w+.size\} exceeds maximum \$LIMIT/, content)
         end
       end
     end

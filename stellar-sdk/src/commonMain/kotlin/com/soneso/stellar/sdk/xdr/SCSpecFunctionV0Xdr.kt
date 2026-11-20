@@ -58,7 +58,7 @@ data class SCSpecFunctionV0Xdr(
     inputs.forEach { item ->
       item.encode(writer)
     }
-    require(outputs.size <= 1) { "XDR array count ${outputs.size} exceeds maximum ${1}" }
+    require(outputs.size <= 1) { "XDR array count ${outputs.size} exceeds maximum 1" }
     writer.writeInt(outputs.size)
     outputs.forEach { item ->
       item.encode(writer)

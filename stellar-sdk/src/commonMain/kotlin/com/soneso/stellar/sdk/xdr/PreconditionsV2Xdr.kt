@@ -125,7 +125,7 @@ data class PreconditionsV2Xdr(
     }
     minSeqAge.encode(writer)
     minSeqLedgerGap.encode(writer)
-    require(extraSigners.size <= 2) { "XDR array count ${extraSigners.size} exceeds maximum ${2}" }
+    require(extraSigners.size <= 2) { "XDR array count ${extraSigners.size} exceeds maximum 2" }
     writer.writeInt(extraSigners.size)
     extraSigners.forEach { item ->
       item.encode(writer)

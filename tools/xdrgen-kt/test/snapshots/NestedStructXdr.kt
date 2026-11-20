@@ -71,7 +71,7 @@ data class NestedStructXdr(
     } else {
       writer.writeBoolean(false)
     }
-    require(items.size <= 10) { "XDR array count ${items.size} exceeds maximum ${10}" }
+    require(items.size <= 10) { "XDR array count ${items.size} exceeds maximum 10" }
     writer.writeInt(items.size)
     items.forEach { item ->
       item.encode(writer)

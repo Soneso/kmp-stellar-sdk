@@ -62,7 +62,7 @@ data class AccountEntryExtensionV2Xdr(
   fun encode(writer: XdrWriter) {
     numSponsored.encode(writer)
     numSponsoring.encode(writer)
-    require(signerSponsoringIDs.size <= MAX_SIGNERS) { "XDR array count ${signerSponsoringIDs.size} exceeds maximum ${MAX_SIGNERS}" }
+    require(signerSponsoringIDs.size <= MAX_SIGNERS) { "XDR array count ${signerSponsoringIDs.size} exceeds maximum $MAX_SIGNERS" }
     writer.writeInt(signerSponsoringIDs.size)
     signerSponsoringIDs.forEach { item ->
       item.encode(writer)

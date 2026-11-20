@@ -63,7 +63,7 @@ data class SCSpecEventV0Xdr(
     writer.writeString(doc, SC_SPEC_DOC_LIMIT)
     writer.writeString(lib, 80)
     writer.writeString(name, SC_SPEC_TYPE_NAME_LIMIT)
-    require(prefixTopics.size <= 2) { "XDR array count ${prefixTopics.size} exceeds maximum ${2}" }
+    require(prefixTopics.size <= 2) { "XDR array count ${prefixTopics.size} exceeds maximum 2" }
     writer.writeInt(prefixTopics.size)
     prefixTopics.forEach { item ->
       item.encode(writer)

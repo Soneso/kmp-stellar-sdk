@@ -47,7 +47,7 @@ data class TransactionV0EnvelopeXdr(
 
   fun encode(writer: XdrWriter) {
     tx.encode(writer)
-    require(signatures.size <= 20) { "XDR array count ${signatures.size} exceeds maximum ${20}" }
+    require(signatures.size <= 20) { "XDR array count ${signatures.size} exceeds maximum 20" }
     writer.writeInt(signatures.size)
     signatures.forEach { item ->
       item.encode(writer)

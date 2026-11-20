@@ -45,7 +45,7 @@ data class SCSpecTypeTupleXdr(
   }
 
   fun encode(writer: XdrWriter) {
-    require(valueTypes.size <= 12) { "XDR array count ${valueTypes.size} exceeds maximum ${12}" }
+    require(valueTypes.size <= 12) { "XDR array count ${valueTypes.size} exceeds maximum 12" }
     writer.writeInt(valueTypes.size)
     valueTypes.forEach { item ->
       item.encode(writer)

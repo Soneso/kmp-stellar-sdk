@@ -50,7 +50,7 @@ data class CreateClaimableBalanceOpXdr(
   fun encode(writer: XdrWriter) {
     asset.encode(writer)
     amount.encode(writer)
-    require(claimants.size <= 10) { "XDR array count ${claimants.size} exceeds maximum ${10}" }
+    require(claimants.size <= 10) { "XDR array count ${claimants.size} exceeds maximum 10" }
     writer.writeInt(claimants.size)
     claimants.forEach { item ->
       item.encode(writer)

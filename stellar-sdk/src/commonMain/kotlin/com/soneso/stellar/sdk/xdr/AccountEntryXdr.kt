@@ -118,7 +118,7 @@ data class AccountEntryXdr(
     flags.encode(writer)
     homeDomain.encode(writer)
     thresholds.encode(writer)
-    require(signers.size <= MAX_SIGNERS) { "XDR array count ${signers.size} exceeds maximum ${MAX_SIGNERS}" }
+    require(signers.size <= MAX_SIGNERS) { "XDR array count ${signers.size} exceeds maximum $MAX_SIGNERS" }
     writer.writeInt(signers.size)
     signers.forEach { item ->
       item.encode(writer)

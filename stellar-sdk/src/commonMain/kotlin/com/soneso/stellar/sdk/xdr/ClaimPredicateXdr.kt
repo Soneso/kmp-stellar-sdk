@@ -128,14 +128,14 @@ sealed class ClaimPredicateXdr {
     when (this) {
       is Void -> {}
       is AndPredicates -> {
-        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum ${2}" }
+        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum 2" }
         writer.writeInt(value.size)
         value.forEach { item ->
           item.encode(writer)
         }
       }
       is OrPredicates -> {
-        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum ${2}" }
+        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum 2" }
         writer.writeInt(value.size)
         value.forEach { item ->
           item.encode(writer)

@@ -28,7 +28,7 @@ value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
   }
 
   fun encode(writer: XdrWriter) {
-    require(value.size <= CONTRACT_COST_COUNT_LIMIT) { "XDR array count ${value.size} exceeds maximum ${CONTRACT_COST_COUNT_LIMIT}" }
+    require(value.size <= CONTRACT_COST_COUNT_LIMIT) { "XDR array count ${value.size} exceeds maximum $CONTRACT_COST_COUNT_LIMIT" }
     writer.writeInt(value.size)
     value.forEach { item ->
       item.encode(writer)

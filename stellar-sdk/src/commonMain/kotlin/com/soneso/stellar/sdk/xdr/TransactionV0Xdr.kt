@@ -79,7 +79,7 @@ data class TransactionV0Xdr(
       writer.writeBoolean(false)
     }
     memo.encode(writer)
-    require(operations.size <= MAX_OPS_PER_TX) { "XDR array count ${operations.size} exceeds maximum ${MAX_OPS_PER_TX}" }
+    require(operations.size <= MAX_OPS_PER_TX) { "XDR array count ${operations.size} exceeds maximum $MAX_OPS_PER_TX" }
     writer.writeInt(operations.size)
     operations.forEach { item ->
       item.encode(writer)

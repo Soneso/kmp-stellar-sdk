@@ -94,7 +94,7 @@ data class StellarValueXdr(
   fun encode(writer: XdrWriter) {
     txSetHash.encode(writer)
     closeTime.encode(writer)
-    require(upgrades.size <= 6) { "XDR array count ${upgrades.size} exceeds maximum ${6}" }
+    require(upgrades.size <= 6) { "XDR array count ${upgrades.size} exceeds maximum 6" }
     writer.writeInt(upgrades.size)
     upgrades.forEach { item ->
       item.encode(writer)

@@ -1005,8 +1005,8 @@ data class CreateClaimableBalanceOperation(
         require(claimants.isNotEmpty()) {
             "Claimants list cannot be empty"
         }
-        require(claimants.size <= 10) {
-            "Claimant count ${claimants.size} exceeds maximum 10"
+        require(claimants.size <= MAX_CLAIMANTS) {
+            "Claimant count ${claimants.size} exceeds maximum $MAX_CLAIMANTS"
         }
     }
 
@@ -1028,6 +1028,9 @@ data class CreateClaimableBalanceOperation(
     }
 
     companion object {
+        /** Maximum from the XDR declaration `Claimant claimants<10>;` in `CreateClaimableBalanceOp`. */
+        private const val MAX_CLAIMANTS = 10
+
         fun fromXdr(op: CreateClaimableBalanceOpXdr): CreateClaimableBalanceOperation {
             val asset = Asset.fromXdr(op.asset)
             val amount = fromXdrAmount(op.amount.value)

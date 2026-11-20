@@ -74,7 +74,7 @@ data class PathPaymentStrictSendOpXdr(
     destination.encode(writer)
     destAsset.encode(writer)
     destMin.encode(writer)
-    require(path.size <= 5) { "XDR array count ${path.size} exceeds maximum ${5}" }
+    require(path.size <= 5) { "XDR array count ${path.size} exceeds maximum 5" }
     writer.writeInt(path.size)
     path.forEach { item ->
       item.encode(writer)
