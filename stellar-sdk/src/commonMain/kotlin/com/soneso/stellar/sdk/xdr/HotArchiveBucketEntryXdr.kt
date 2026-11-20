@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HotArchiveBucketEntryXdr"
 
@@ -93,10 +92,12 @@ sealed class HotArchiveBucketEntryXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is ArchivedEntry -> buildJsonObject { put("archived", value.toXdrJsonElement()) }
-    is Key -> buildJsonObject { put("live", value.toXdrJsonElement()) }
-    is MetaEntry -> buildJsonObject { put("metaentry", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is ArchivedEntry -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("archived", value.toXdrJsonElement(depth + 1)) }
+    is Key -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("live", value.toXdrJsonElement(depth + 1)) }
+    is MetaEntry -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("metaentry", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

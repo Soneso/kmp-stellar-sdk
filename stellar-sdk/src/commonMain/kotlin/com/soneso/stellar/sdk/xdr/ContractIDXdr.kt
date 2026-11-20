@@ -35,5 +35,7 @@ value class ContractIDXdr(val value: HashXdr) {
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(StrKey.encodeContract(value.value))
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

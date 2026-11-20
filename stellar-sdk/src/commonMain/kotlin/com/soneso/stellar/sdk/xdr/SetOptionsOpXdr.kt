@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SetOptionsOpXdr"
 
@@ -147,16 +146,18 @@ data class SetOptionsOpXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement() })
-    put("clear_flags", XdrJson.optional(clearFlags) { it.toXdrJsonElement() })
-    put("set_flags", XdrJson.optional(setFlags) { it.toXdrJsonElement() })
-    put("master_weight", XdrJson.optional(masterWeight) { it.toXdrJsonElement() })
-    put("low_threshold", XdrJson.optional(lowThreshold) { it.toXdrJsonElement() })
-    put("med_threshold", XdrJson.optional(medThreshold) { it.toXdrJsonElement() })
-    put("high_threshold", XdrJson.optional(highThreshold) { it.toXdrJsonElement() })
-    put("home_domain", XdrJson.optional(homeDomain) { it.toXdrJsonElement() })
-    put("signer", XdrJson.optional(signer) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement(depth + 1) })
+    put("clear_flags", XdrJson.optional(clearFlags) { it.toXdrJsonElement(depth + 1) })
+    put("set_flags", XdrJson.optional(setFlags) { it.toXdrJsonElement(depth + 1) })
+    put("master_weight", XdrJson.optional(masterWeight) { it.toXdrJsonElement(depth + 1) })
+    put("low_threshold", XdrJson.optional(lowThreshold) { it.toXdrJsonElement(depth + 1) })
+    put("med_threshold", XdrJson.optional(medThreshold) { it.toXdrJsonElement(depth + 1) })
+    put("high_threshold", XdrJson.optional(highThreshold) { it.toXdrJsonElement(depth + 1) })
+    put("home_domain", XdrJson.optional(homeDomain) { it.toXdrJsonElement(depth + 1) })
+    put("signer", XdrJson.optional(signer) { it.toXdrJsonElement(depth + 1) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

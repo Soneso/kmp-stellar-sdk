@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementExternalizeXdr"
 
@@ -56,10 +55,12 @@ data class SCPStatementExternalizeXdr(
     commitQuorumSetHash.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("commit", commit.toXdrJsonElement())
-    put("n_h", nH.toXdrJsonElement())
-    put("commit_quorum_set_hash", commitQuorumSetHash.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("commit", commit.toXdrJsonElement(depth + 1))
+    put("n_h", nH.toXdrJsonElement(depth + 1))
+    put("commit_quorum_set_hash", commitQuorumSetHash.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

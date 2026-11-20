@@ -31,7 +31,9 @@ value class Uint64Xdr(val value: ULong) {
     writer.writeUnsignedLong(value)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.uint64(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.uint64(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

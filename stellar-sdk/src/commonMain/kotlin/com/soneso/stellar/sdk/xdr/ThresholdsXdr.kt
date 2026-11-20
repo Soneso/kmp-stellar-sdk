@@ -31,7 +31,9 @@ value class ThresholdsXdr(val value: ByteArray) {
     writer.writeFixedOpaque(value, 4)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingContractBandwidthV0Xdr"
 
@@ -60,10 +59,12 @@ data class ConfigSettingContractBandwidthV0Xdr(
     feeTxSize1Kb.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ledger_max_txs_size_bytes", ledgerMaxTxsSizeBytes.toXdrJsonElement())
-    put("tx_max_size_bytes", txMaxSizeBytes.toXdrJsonElement())
-    put("fee_tx_size1_kb", feeTxSize1Kb.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ledger_max_txs_size_bytes", ledgerMaxTxsSizeBytes.toXdrJsonElement(depth + 1))
+    put("tx_max_size_bytes", txMaxSizeBytes.toXdrJsonElement(depth + 1))
+    put("fee_tx_size1_kb", feeTxSize1Kb.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

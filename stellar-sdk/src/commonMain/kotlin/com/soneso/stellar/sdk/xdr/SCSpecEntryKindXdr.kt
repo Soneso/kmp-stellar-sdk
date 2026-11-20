@@ -53,5 +53,7 @@ enum class SCSpecEntryKindXdr(val value: Int, internal val xdrJsonName: String) 
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StellarValueProposedValueXdr"
 
@@ -58,11 +57,13 @@ data class StellarValueProposedValueXdr(
     lcValueSignature.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("tx_set_hash", txSetHash.toXdrJsonElement())
-    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement())
-    put("previous_ledger_version", previousLedgerVersion.toXdrJsonElement())
-    put("lc_value_signature", lcValueSignature.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("tx_set_hash", txSetHash.toXdrJsonElement(depth + 1))
+    put("previous_ledger_hash", previousLedgerHash.toXdrJsonElement(depth + 1))
+    put("previous_ledger_version", previousLedgerVersion.toXdrJsonElement(depth + 1))
+    put("lc_value_signature", lcValueSignature.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "NestedStructXdr"
 
@@ -84,14 +83,16 @@ data class NestedStructXdr(
     hash.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("inner", inner.toXdrJsonElement())
-    put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })
-    put("items", XdrJson.array(items) { it.toXdrJsonElement() })
-    put("fixed_items", XdrJson.array(fixedItems.asList()) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("inner", inner.toXdrJsonElement(depth + 1))
+    put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement(depth + 1) })
+    put("items", XdrJson.array(items, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("fixed_items", XdrJson.array(fixedItems.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("raw_data", XdrJson.hex(rawData))
     put("fixed_data", XdrJson.hex(fixedData))
-    put("hash", hash.toXdrJsonElement())
+    put("hash", hash.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

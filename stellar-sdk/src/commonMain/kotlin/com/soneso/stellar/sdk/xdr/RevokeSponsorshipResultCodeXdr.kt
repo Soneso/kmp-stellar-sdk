@@ -58,5 +58,7 @@ enum class RevokeSponsorshipResultCodeXdr(val value: Int, internal val xdrJsonNa
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

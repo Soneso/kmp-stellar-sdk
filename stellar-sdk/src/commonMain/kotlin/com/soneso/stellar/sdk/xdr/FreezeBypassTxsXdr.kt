@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "FreezeBypassTxsXdr"
 
@@ -45,8 +44,10 @@ data class FreezeBypassTxsXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("tx_hashes", XdrJson.array(txHashes) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("tx_hashes", XdrJson.array(txHashes, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

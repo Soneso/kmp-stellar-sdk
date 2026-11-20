@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HostFunctionXdr"
 
@@ -108,11 +107,13 @@ sealed class HostFunctionXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is InvokeContract -> buildJsonObject { put("invoke_contract", value.toXdrJsonElement()) }
-    is CreateContract -> buildJsonObject { put("create_contract", value.toXdrJsonElement()) }
-    is Wasm -> buildJsonObject { put("upload_contract_wasm", XdrJson.hex(value)) }
-    is CreateContractV2 -> buildJsonObject { put("create_contract_v2", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is InvokeContract -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("invoke_contract", value.toXdrJsonElement(depth + 1)) }
+    is CreateContract -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("create_contract", value.toXdrJsonElement(depth + 1)) }
+    is Wasm -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("upload_contract_wasm", XdrJson.hex(value)) }
+    is CreateContractV2 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("create_contract_v2", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

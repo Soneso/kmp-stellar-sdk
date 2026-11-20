@@ -105,5 +105,7 @@ enum class TransactionResultCodeXdr(val value: Int, internal val xdrJsonName: St
 
   fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

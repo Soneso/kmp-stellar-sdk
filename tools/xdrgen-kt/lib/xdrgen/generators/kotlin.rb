@@ -43,7 +43,6 @@ module Xdrgen
 
       JSON_ELEMENT_IMPORT = 'kotlinx.serialization.json.JsonElement'
       JSON_OBJECT_IMPORT = 'kotlinx.serialization.json.JsonObject'
-      JSON_BUILDER_IMPORT = 'kotlinx.serialization.json.buildJsonObject'
 
       # Every generated file names its own type once, in a file-private constant, and the
       # XDR-JSON methods refer to that constant wherever the name would otherwise be repeated
@@ -185,9 +184,7 @@ module Xdrgen
           out.puts "}"
 
           out.puts
-          out.puts "fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)"
-          out.puts
-          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
+          render_json_writer(out, leaf: 'fun toXdrJsonElement(): JsonElement = XdrJson.name(xdrJsonName)')
         end
         out.puts "}"
 
@@ -238,13 +235,9 @@ module Xdrgen
           out.puts "}"
 
           out.puts
-          if override
-            out.puts override[:to]
-          else
-            out.puts "fun toXdrJsonElement(): JsonElement = #{json_to_expression(typedef.declaration, 'value')}"
+          render_json_writer(out, leaf: override&.dig(:to)) do
+            out.puts "internal fun toXdrJsonElement(depth: Int): JsonElement = #{json_to_expression(typedef.declaration, 'value', 0)}"
           end
-          out.puts
-          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
@@ -257,8 +250,7 @@ module Xdrgen
         out = @output.open(file_name)
 
         override = json_override(struct_name)
-        default_imports = override ? [JSON_ELEMENT_IMPORT] : [JSON_ELEMENT_IMPORT, JSON_BUILDER_IMPORT]
-        render_file_header(out, json_imports(override, default_imports), struct_name)
+        render_file_header(out, json_imports(override, [JSON_ELEMENT_IMPORT]), struct_name)
         render_declared_json_keys(out, struct) unless override
         render_source_comment(out, struct)
 
@@ -317,21 +309,17 @@ module Xdrgen
           out.puts "}"
 
           out.puts
-          if override
-            out.puts override[:to]
-          else
-            out.puts "fun toXdrJsonElement(): JsonElement = buildJsonObject {"
+          render_json_writer(out, leaf: override&.dig(:to)) do
+            out.puts "internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, #{JSON_TYPE_CONSTANT}) {"
             out.indent do
               struct.members.each do |member|
                 member_name = escape_kotlin_keyword(member.name.underscore.camelize(:lower))
                 key = JSON_NAMES.struct_field_json_name(member.name)
-                out.puts "put(\"#{key}\", #{member_json_to_expression(struct, member, member_name)})"
+                out.puts "put(\"#{key}\", #{member_json_to_expression(struct, member, member_name, 1)})"
               end
             end
             out.puts "}"
           end
-          out.puts
-          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
         end
         out.puts "}"
 
@@ -594,13 +582,7 @@ module Xdrgen
           out.puts "}"
 
           out.puts
-          if override
-            out.puts override[:to]
-          else
-            render_union_to_json(out, union)
-          end
-          out.puts
-          out.puts "fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())"
+          render_json_writer(out, leaf: override&.dig(:to)) { render_union_to_json(out, union) }
         end
         out.puts "}"
 
@@ -611,7 +593,7 @@ module Xdrgen
       # that one key. An arm class covering more than one case, or the default arm, reads its
       # key from the discriminant it carries rather than from a name fixed here.
       def render_union_to_json(out, union)
-        out.puts "fun toXdrJsonElement(): JsonElement = when (this) {"
+        out.puts "internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {"
         out.indent do
           union_json_classes(union).each do |entry|
             key = entry[:dynamic] ? union_json_dynamic_key(union) : "\"#{entry[:key]}\""
@@ -619,8 +601,8 @@ module Xdrgen
               out.puts "is #{entry[:name]} -> XdrJson.name(#{key})"
             else
               arm = union.arms.find { |a| a.name.camelize == entry[:name] }
-              value = member_json_to_expression(union, arm, 'value')
-              out.puts "is #{entry[:name]} -> buildJsonObject { put(#{key}, #{value}) }"
+              value = member_json_to_expression(union, arm, 'value', 1)
+              out.puts "is #{entry[:name]} -> XdrJson.obj(depth, #{JSON_TYPE_CONSTANT}) { put(#{key}, #{value}) }"
             end
           end
         end
@@ -755,7 +737,6 @@ module Xdrgen
         imports = [JSON_ELEMENT_IMPORT]
         default = union_default_arm(union)
         if union.normal_arms.any? { |arm| !arm.void? } || (default && !default.void?)
-          imports << JSON_BUILDER_IMPORT
           imports << JSON_OBJECT_IMPORT if union.normal_arms.any?(&:void?) || (default && default.void?)
         end
         imports
@@ -998,6 +979,24 @@ module Xdrgen
         out.puts
       end
 
+      # The two public encode entry points and the internal writer every nested value goes
+      # through. The internal writer takes the nesting depth of the value, the root counting as
+      # 1, and XdrJson refuses each object and array opened past its limit before writing into
+      # it. A value written as a JSON string opens no level, so its writer ignores the depth.
+      def render_json_writer(out, leaf: nil)
+        if leaf
+          out.puts leaf
+          out.puts
+          out.puts 'internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()'
+        else
+          out.puts 'fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)'
+          out.puts
+          yield
+        end
+        out.puts
+        out.puts 'fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())'
+      end
+
       def json_override(type_name)
         override = JSON_OVERRIDES.for_type(type_name)
         @json_overrides_used << type_name if override
@@ -1085,10 +1084,10 @@ module Xdrgen
         end
       end
 
-      def member_json_to_expression(defn, member, value_expr)
+      def member_json_to_expression(defn, member, value_expr, offset)
         return "XdrJson.escapedString(#{value_expr})" if bytes_backed_string_field?(defn, member)
 
-        json_to_expression(member.declaration, value_expr)
+        json_to_expression(member.declaration, value_expr, offset)
       end
 
       def member_json_from_expression(defn, member, element_expr, key)
@@ -1100,20 +1099,25 @@ module Xdrgen
         "XdrJson.unescapeStringBytes(#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\"#{json_max_length(size)})"
       end
 
-      # The JSON form of a value, as an expression yielding a JsonElement.
-      def json_to_expression(decl, value_expr)
+      # The JSON form of a value, as an expression yielding a JsonElement. The value sits
+      # offset levels below the depth of the enclosing writer; an array opens a level of its
+      # own, an optional does not.
+      def json_to_expression(decl, value_expr, offset)
         case decl
         when AST::Declarations::Optional
-          "XdrJson.optional(#{value_expr}) { #{json_to_typespec(decl.type, 'it')} }"
+          "XdrJson.optional(#{value_expr}) { #{json_to_typespec(decl.type, 'it', offset)} }"
         when AST::Declarations::Array
           values = decl.fixed? ? "#{value_expr}.asList()" : value_expr
-          "XdrJson.array(#{values}) { #{json_to_typespec(decl.type, 'it')} }"
+          "XdrJson.array(#{values}, #{json_depth(offset)}, #{JSON_TYPE_CONSTANT}) " \
+            "{ #{json_to_typespec(decl.type, 'it', offset + 1)} }"
         else
-          json_to_typespec(decl.type, value_expr)
+          json_to_typespec(decl.type, value_expr, offset)
         end
       end
 
-      def json_to_typespec(typespec, value_expr)
+      def json_depth(offset) = offset.zero? ? 'depth' : "depth + #{offset}"
+
+      def json_to_typespec(typespec, value_expr, offset)
         case typespec
         when AST::Typespecs::Int
           "XdrJson.int32(#{value_expr})"
@@ -1132,7 +1136,7 @@ module Xdrgen
         when AST::Typespecs::Opaque
           "XdrJson.hex(#{value_expr})"
         else
-          "#{value_expr}.toXdrJsonElement()"
+          "#{value_expr}.toXdrJsonElement(#{json_depth(offset)})"
         end
       end
 

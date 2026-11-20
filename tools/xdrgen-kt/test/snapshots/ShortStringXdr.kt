@@ -31,7 +31,9 @@ value class ShortStringXdr(val value: String) {
     writer.writeString(value, 64)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

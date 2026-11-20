@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingSCPTimingXdr"
 
@@ -62,12 +61,14 @@ data class ConfigSettingSCPTimingXdr(
     ballotTimeoutIncrementMilliseconds.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ledger_target_close_time_milliseconds", ledgerTargetCloseTimeMilliseconds.toXdrJsonElement())
-    put("nomination_timeout_initial_milliseconds", nominationTimeoutInitialMilliseconds.toXdrJsonElement())
-    put("nomination_timeout_increment_milliseconds", nominationTimeoutIncrementMilliseconds.toXdrJsonElement())
-    put("ballot_timeout_initial_milliseconds", ballotTimeoutInitialMilliseconds.toXdrJsonElement())
-    put("ballot_timeout_increment_milliseconds", ballotTimeoutIncrementMilliseconds.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ledger_target_close_time_milliseconds", ledgerTargetCloseTimeMilliseconds.toXdrJsonElement(depth + 1))
+    put("nomination_timeout_initial_milliseconds", nominationTimeoutInitialMilliseconds.toXdrJsonElement(depth + 1))
+    put("nomination_timeout_increment_milliseconds", nominationTimeoutIncrementMilliseconds.toXdrJsonElement(depth + 1))
+    put("ballot_timeout_initial_milliseconds", ballotTimeoutInitialMilliseconds.toXdrJsonElement(depth + 1))
+    put("ballot_timeout_increment_milliseconds", ballotTimeoutIncrementMilliseconds.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

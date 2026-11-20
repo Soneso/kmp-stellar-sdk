@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Binary XDR decoding and encoding throw `IllegalArgumentException` for an array, string or variable-length opaque value longer than the maximum its XDR definition declares, such as a 29-byte memo text or 101 operations.
 - Binary XDR decoding throws `IllegalArgumentException` when the padding after a string or opaque value is missing or not zero.
 - `CreateClaimableBalanceOperation` throws `IllegalArgumentException` for more than 10 claimants.
+- `toXdrJson()` and `toXdrJsonElement()` throw `IllegalArgumentException` for a value nested deeper than the 128 levels XDR-JSON reading accepts. Before this change, they wrote such values as JSON that `fromXdrJson()` refused, or overflowed the stack.
 
 ## [1.18.0] - 2026-11-16
 

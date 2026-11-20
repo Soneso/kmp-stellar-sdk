@@ -83,5 +83,7 @@ sealed class AssetCodeXdr {
     is AssetCode12 -> value.toXdrJsonElement()
   }
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

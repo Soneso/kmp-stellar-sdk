@@ -31,7 +31,9 @@ value class SCStringXdr(val value: String) {
     writer.writeString(value)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

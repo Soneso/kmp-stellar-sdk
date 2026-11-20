@@ -64,7 +64,9 @@ sealed class ClawbackResultXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name(discriminant.xdrJsonName)
   }
 

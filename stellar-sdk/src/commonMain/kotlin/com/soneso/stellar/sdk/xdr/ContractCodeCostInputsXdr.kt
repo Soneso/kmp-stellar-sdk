@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ContractCodeCostInputsXdr"
 
@@ -92,18 +91,20 @@ data class ContractCodeCostInputsXdr(
     nDataSegmentBytes.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ext", ext.toXdrJsonElement())
-    put("n_instructions", nInstructions.toXdrJsonElement())
-    put("n_functions", nFunctions.toXdrJsonElement())
-    put("n_globals", nGlobals.toXdrJsonElement())
-    put("n_table_entries", nTableEntries.toXdrJsonElement())
-    put("n_types", nTypes.toXdrJsonElement())
-    put("n_data_segments", nDataSegments.toXdrJsonElement())
-    put("n_elem_segments", nElemSegments.toXdrJsonElement())
-    put("n_imports", nImports.toXdrJsonElement())
-    put("n_exports", nExports.toXdrJsonElement())
-    put("n_data_segment_bytes", nDataSegmentBytes.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ext", ext.toXdrJsonElement(depth + 1))
+    put("n_instructions", nInstructions.toXdrJsonElement(depth + 1))
+    put("n_functions", nFunctions.toXdrJsonElement(depth + 1))
+    put("n_globals", nGlobals.toXdrJsonElement(depth + 1))
+    put("n_table_entries", nTableEntries.toXdrJsonElement(depth + 1))
+    put("n_types", nTypes.toXdrJsonElement(depth + 1))
+    put("n_data_segments", nDataSegments.toXdrJsonElement(depth + 1))
+    put("n_elem_segments", nElemSegments.toXdrJsonElement(depth + 1))
+    put("n_imports", nImports.toXdrJsonElement(depth + 1))
+    put("n_exports", nExports.toXdrJsonElement(depth + 1))
+    put("n_data_segment_bytes", nDataSegmentBytes.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

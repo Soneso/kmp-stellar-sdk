@@ -34,5 +34,7 @@ value class AssetCode12Xdr(val value: ByteArray) {
 
   fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(value, 5))
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

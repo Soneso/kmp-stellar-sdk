@@ -2,6 +2,8 @@ package com.soneso.stellar.sdk.unitTests.sep.sep51
 
 import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.SCVecXdr
+import com.soneso.stellar.sdk.xdr.Uint32Xdr
 import com.soneso.stellar.sdk.xdr.XdrJson
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -13,9 +15,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 /**
- * The XDR-JSON (SEP-0051) decoder walks a document with the call stack, so an arbitrarily
- * nested document would exhaust it. Decoding therefore refuses a document nested deeper than
- * the limit the binary decoder applies to recursive types.
+ * XDR-JSON (SEP-0051) reading and writing walk a document with the call stack, so an
+ * arbitrarily nested document would exhaust it. Both stop at 128 levels: reading refuses a
+ * deeper document, and writing refuses a value whose document would nest deeper.
  *
  * `SCVal` is the type that can nest without bound: its `vec` arm holds a list of `SCVal`, so
  * each level of the value adds an object and an array to the document.
@@ -29,6 +31,41 @@ class Sep51RecursionLimitTest {
             element = buildJsonObject { put("vec", buildJsonArray { add(element) }) }
         }
         return element
+    }
+
+    /** The value [nest] stands for, built from the generated classes rather than decoded. */
+    private fun vecNest(depth: Int, inner: SCValXdr = SCValXdr.Void(SCValTypeXdr.SCV_VOID)): SCValXdr {
+        var value = inner
+        repeat(depth) { value = SCValXdr.Vec(SCVecXdr(listOf(value))) }
+        return value
+    }
+
+    /**
+     * Reading and writing hold the same boundary: a document of 128 levels reads and its value
+     * writes it back through both entries, and at 129 levels the readers refuse the document and
+     * both writers refuse the value.
+     */
+    @Test
+    fun theLimitIs128LevelsInBothDirections() {
+        val atLimit = nest(DEEPEST_ACCEPTED)
+        val atLimitText = XdrJson.encodeToString(atLimit)
+        assertEquals(128, textDepth(atLimitText))
+        val value = vecNest(DEEPEST_ACCEPTED)
+        assertEquals(value, SCValXdr.fromXdrJson(atLimitText))
+        assertEquals(value, SCValXdr.fromXdrJsonElement(atLimit))
+        assertEquals(atLimitText, value.toXdrJson())
+        assertEquals(atLimit, value.toXdrJsonElement())
+
+        val pastLimit = nest(DEEPEST_ACCEPTED, buildJsonObject { put("u32", JsonPrimitive(1)) })
+        val pastLimitText = XdrJson.encodeToString(pastLimit)
+        assertEquals(129, textDepth(pastLimitText))
+        listOf({ SCValXdr.fromXdrJson(pastLimitText) }, { SCValXdr.fromXdrJsonElement(pastLimit) }).forEach { read ->
+            val error = assertFailsWith<IllegalArgumentException> { read() }
+            assertTrue(error.message!!.contains("input nests deeper than the limit of 128"), error.message!!)
+        }
+        val pastLimitValue = vecNest(DEEPEST_ACCEPTED, SCValXdr.U32(Uint32Xdr(1u)))
+        refusesWrite { pastLimitValue.toXdrJson() }
+        refusesWrite { pastLimitValue.toXdrJsonElement() }
     }
 
     @Test
@@ -101,10 +138,10 @@ class Sep51RecursionLimitTest {
 
     private companion object {
         /**
-         * The most wrappings a value can carry and still decode. Each wrapping adds an object and
-         * an array, so a value wrapped `n` times nests `2n` containers deep; the innermost value
-         * is a primitive and costs no nesting.
+         * The most wrappings a value can carry and still decode: 64, for 128 levels. Each wrapping
+         * adds an object and an array, so a value wrapped `n` times nests `2n` containers deep;
+         * the innermost value is a primitive and costs no nesting.
          */
-        val DEEPEST_ACCEPTED: Int = XdrJson.RECURSION_CAP / 2
+        const val DEEPEST_ACCEPTED: Int = 64
     }
 }

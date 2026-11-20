@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "InflationResultXdr"
 
@@ -78,8 +77,10 @@ sealed class InflationResultXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Payouts -> buildJsonObject { put("success", XdrJson.array(value) { it.toXdrJsonElement() }) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Payouts -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("success", XdrJson.array(value, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) }) }
     is Void -> XdrJson.name("not_time")
   }
 

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementPledgesXdr"
 
@@ -128,11 +127,13 @@ sealed class SCPStatementPledgesXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Prepare -> buildJsonObject { put("prepare", value.toXdrJsonElement()) }
-    is Confirm -> buildJsonObject { put("confirm", value.toXdrJsonElement()) }
-    is Externalize -> buildJsonObject { put("externalize", value.toXdrJsonElement()) }
-    is Nominate -> buildJsonObject { put("nominate", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Prepare -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("prepare", value.toXdrJsonElement(depth + 1)) }
+    is Confirm -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("confirm", value.toXdrJsonElement(depth + 1)) }
+    is Externalize -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("externalize", value.toXdrJsonElement(depth + 1)) }
+    is Nominate -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("nominate", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

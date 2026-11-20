@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerEntryChangeXdr"
 
@@ -124,12 +123,14 @@ sealed class LedgerEntryChangeXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Created -> buildJsonObject { put("created", value.toXdrJsonElement()) }
-    is Updated -> buildJsonObject { put("updated", value.toXdrJsonElement()) }
-    is Removed -> buildJsonObject { put("removed", value.toXdrJsonElement()) }
-    is State -> buildJsonObject { put("state", value.toXdrJsonElement()) }
-    is Restored -> buildJsonObject { put("restored", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Created -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("created", value.toXdrJsonElement(depth + 1)) }
+    is Updated -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("updated", value.toXdrJsonElement(depth + 1)) }
+    is Removed -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("removed", value.toXdrJsonElement(depth + 1)) }
+    is State -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("state", value.toXdrJsonElement(depth + 1)) }
+    is Restored -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("restored", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

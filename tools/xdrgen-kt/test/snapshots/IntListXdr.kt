@@ -35,7 +35,9 @@ value class IntListXdr(val value: List<Int>) {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { XdrJson.int32(it) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.array(value, depth, XDR_JSON_TYPE) { XdrJson.int32(it) }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

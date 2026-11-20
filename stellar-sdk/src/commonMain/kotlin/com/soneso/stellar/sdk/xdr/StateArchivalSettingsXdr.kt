@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StateArchivalSettingsXdr"
 
@@ -105,17 +104,19 @@ data class StateArchivalSettingsXdr(
     startingEvictionScanLevel.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("max_entry_ttl", maxEntryTtl.toXdrJsonElement())
-    put("min_temporary_ttl", minTemporaryTtl.toXdrJsonElement())
-    put("min_persistent_ttl", minPersistentTtl.toXdrJsonElement())
-    put("persistent_rent_rate_denominator", persistentRentRateDenominator.toXdrJsonElement())
-    put("temp_rent_rate_denominator", tempRentRateDenominator.toXdrJsonElement())
-    put("max_entries_to_archive", maxEntriesToArchive.toXdrJsonElement())
-    put("live_soroban_state_size_window_sample_size", liveSorobanStateSizeWindowSampleSize.toXdrJsonElement())
-    put("live_soroban_state_size_window_sample_period", liveSorobanStateSizeWindowSamplePeriod.toXdrJsonElement())
-    put("eviction_scan_size", evictionScanSize.toXdrJsonElement())
-    put("starting_eviction_scan_level", startingEvictionScanLevel.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("max_entry_ttl", maxEntryTtl.toXdrJsonElement(depth + 1))
+    put("min_temporary_ttl", minTemporaryTtl.toXdrJsonElement(depth + 1))
+    put("min_persistent_ttl", minPersistentTtl.toXdrJsonElement(depth + 1))
+    put("persistent_rent_rate_denominator", persistentRentRateDenominator.toXdrJsonElement(depth + 1))
+    put("temp_rent_rate_denominator", tempRentRateDenominator.toXdrJsonElement(depth + 1))
+    put("max_entries_to_archive", maxEntriesToArchive.toXdrJsonElement(depth + 1))
+    put("live_soroban_state_size_window_sample_size", liveSorobanStateSizeWindowSampleSize.toXdrJsonElement(depth + 1))
+    put("live_soroban_state_size_window_sample_period", liveSorobanStateSizeWindowSamplePeriod.toXdrJsonElement(depth + 1))
+    put("eviction_scan_size", evictionScanSize.toXdrJsonElement(depth + 1))
+    put("starting_eviction_scan_level", startingEvictionScanLevel.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

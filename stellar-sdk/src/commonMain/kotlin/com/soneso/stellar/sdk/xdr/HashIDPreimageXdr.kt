@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HashIDPreimageXdr"
 
@@ -153,12 +152,14 @@ sealed class HashIDPreimageXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is OperationID -> buildJsonObject { put("op_id", value.toXdrJsonElement()) }
-    is RevokeID -> buildJsonObject { put("pool_revoke_op_id", value.toXdrJsonElement()) }
-    is ContractID -> buildJsonObject { put("contract_id", value.toXdrJsonElement()) }
-    is SorobanAuthorization -> buildJsonObject { put("soroban_authorization", value.toXdrJsonElement()) }
-    is SorobanAuthorizationWithAddress -> buildJsonObject { put("soroban_authorization_with_address", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is OperationID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("op_id", value.toXdrJsonElement(depth + 1)) }
+    is RevokeID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("pool_revoke_op_id", value.toXdrJsonElement(depth + 1)) }
+    is ContractID -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_id", value.toXdrJsonElement(depth + 1)) }
+    is SorobanAuthorization -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("soroban_authorization", value.toXdrJsonElement(depth + 1)) }
+    is SorobanAuthorizationWithAddress -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("soroban_authorization_with_address", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCValXdr"
 
@@ -81,9 +80,11 @@ sealed class SCValXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Str -> buildJsonObject { put("string", value.toXdrJsonElement()) }
-    is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Str -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("string", value.toXdrJsonElement(depth + 1)) }
+    is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

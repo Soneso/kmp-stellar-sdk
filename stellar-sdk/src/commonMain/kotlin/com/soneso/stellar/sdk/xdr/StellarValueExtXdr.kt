@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "StellarValueExtXdr"
 
@@ -140,12 +139,14 @@ sealed class StellarValueExtXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name("basic")
-    is LcValueSignature -> buildJsonObject { put("signed", value.toXdrJsonElement()) }
-    is ProposedValue -> buildJsonObject { put("empty_tx_set", value.toXdrJsonElement()) }
-    is SignedMsValue -> buildJsonObject { put("signed_ms", value.toXdrJsonElement()) }
-    is ProposedMsValue -> buildJsonObject { put("empty_tx_set_ms", value.toXdrJsonElement()) }
+    is LcValueSignature -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("signed", value.toXdrJsonElement(depth + 1)) }
+    is ProposedValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("empty_tx_set", value.toXdrJsonElement(depth + 1)) }
+    is SignedMsValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("signed_ms", value.toXdrJsonElement(depth + 1)) }
+    is ProposedMsValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("empty_tx_set_ms", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

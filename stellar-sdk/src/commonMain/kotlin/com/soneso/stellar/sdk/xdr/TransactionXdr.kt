@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionXdr"
 
@@ -98,14 +97,16 @@ data class TransactionXdr(
     ext.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("source_account", sourceAccount.toXdrJsonElement())
-    put("fee", fee.toXdrJsonElement())
-    put("seq_num", seqNum.toXdrJsonElement())
-    put("cond", cond.toXdrJsonElement())
-    put("memo", memo.toXdrJsonElement())
-    put("operations", XdrJson.array(operations) { it.toXdrJsonElement() })
-    put("ext", ext.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("source_account", sourceAccount.toXdrJsonElement(depth + 1))
+    put("fee", fee.toXdrJsonElement(depth + 1))
+    put("seq_num", seqNum.toXdrJsonElement(depth + 1))
+    put("cond", cond.toXdrJsonElement(depth + 1))
+    put("memo", memo.toXdrJsonElement(depth + 1))
+    put("operations", XdrJson.array(operations, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("ext", ext.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

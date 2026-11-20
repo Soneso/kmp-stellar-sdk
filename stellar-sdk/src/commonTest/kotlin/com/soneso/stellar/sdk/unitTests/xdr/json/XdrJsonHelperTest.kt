@@ -509,12 +509,12 @@ class XdrJsonHelperTest {
 
     @Test
     fun arrayEncodesEmptyAsEmptyArray() {
-        assertEquals("[]", XdrJson.encodeToString(XdrJson.array(emptyList<Int>()) { XdrJson.int32(it) }))
+        assertEquals("[]", XdrJson.encodeToString(XdrJson.array(emptyList<Int>(), 1, type) { XdrJson.int32(it) }))
     }
 
     @Test
     fun arrayEncodesElementsInOrder() {
-        val encoded = XdrJson.array(listOf(1, 2, 3)) { XdrJson.int32(it) }
+        val encoded = XdrJson.array(listOf(1, 2, 3), 1, type) { XdrJson.int32(it) }
         assertEquals("[1,2,3]", XdrJson.encodeToString(encoded))
     }
 

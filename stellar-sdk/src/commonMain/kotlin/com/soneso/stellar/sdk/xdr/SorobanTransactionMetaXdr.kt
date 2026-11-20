@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SorobanTransactionMetaXdr"
 
@@ -74,11 +73,13 @@ data class SorobanTransactionMetaXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ext", ext.toXdrJsonElement())
-    put("events", XdrJson.array(events) { it.toXdrJsonElement() })
-    put("return_value", returnValue.toXdrJsonElement())
-    put("diagnostic_events", XdrJson.array(diagnosticEvents) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ext", ext.toXdrJsonElement(depth + 1))
+    put("events", XdrJson.array(events, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("return_value", returnValue.toXdrJsonElement(depth + 1))
+    put("diagnostic_events", XdrJson.array(diagnosticEvents, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

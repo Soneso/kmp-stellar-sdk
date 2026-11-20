@@ -64,5 +64,7 @@ sealed class ClaimableBalanceIDXdr {
     is V0 -> XdrJson.name(StrKey.encodeClaimableBalance(byteArrayOf(discriminant.value.toByte()) + value.value))
   }
 
+  internal fun toXdrJsonElement(depth: Int): JsonElement = toXdrJsonElement()
+
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "FrozenLedgerKeysDeltaXdr"
 
@@ -53,9 +52,11 @@ data class FrozenLedgerKeysDeltaXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("keys_to_freeze", XdrJson.array(keysToFreeze) { it.toXdrJsonElement() })
-    put("keys_to_unfreeze", XdrJson.array(keysToUnfreeze) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("keys_to_freeze", XdrJson.array(keysToFreeze, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("keys_to_unfreeze", XdrJson.array(keysToUnfreeze, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

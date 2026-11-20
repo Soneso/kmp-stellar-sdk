@@ -343,7 +343,7 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_struct_emits_keys_in_declaration_order
     content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
-    body = content[/fun toXdrJsonElement\(\): JsonElement = buildJsonObject \{\n(.*?)^  \}$/m, 1]
+    body = content[/fun toXdrJsonElement\(depth: Int\): JsonElement = XdrJson\.obj\(depth, XDR_JSON_TYPE\) \{\n(.*?)^  \}$/m, 1]
     keys = body.scan(/put\("([^"]+)"/).flatten
     assert_equal %w[count flags big_number unsigned_big active label], keys
   end
@@ -416,13 +416,13 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_optional_field_round_trips_through_null
     content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
-    assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })'
+    assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement(depth + 1) })'
     assert_includes content, 'XdrJson.optional(XdrJson.field(json, "optional_inner", XDR_JSON_TYPE))?.let'
   end
 
   def test_void_union_arm_is_a_bare_string_and_a_value_arm_is_an_object
     content = File.read(File.join(@output_dir, 'ResultXdr.kt'))
-    assert_includes content, 'is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }'
+    assert_includes content, 'is Error -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("error", value.toXdrJsonElement(depth + 1)) }'
     assert_includes content, 'is Void -> XdrJson.name(discriminant.xdrJsonName)'
     assert_includes content, '"ok" -> Void(ResultTypeXdr.RESULT_OK)'
     assert_includes content, '"error" -> Error(ErrorDetailXdr.fromXdrJsonTree(value))'
@@ -440,7 +440,7 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_integer_discriminated_union_keys_its_arms_with_v
     content = File.read(File.join(@output_dir, 'MultiCaseUnionXdr.kt'))
-    assert_includes content, 'is SimpleValue -> buildJsonObject { put("v0", XdrJson.int32(value)) }'
+    assert_includes content, 'is SimpleValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", XdrJson.int32(value)) }'
     assert_includes content, '"v1" -> TextValue(1,'
     assert_includes content, 'put("v$discriminant"'
     assert_includes content, 'XdrJson.intArm(XDR_JSON_TYPE, arm)'
@@ -448,21 +448,32 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_sixty_four_bit_values_are_strings_and_thirty_two_bit_values_are_numbers
     content = File.read(File.join(@output_dir, 'Int64Xdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int64(value)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.int64(value)'
     content = File.read(File.join(@output_dir, 'Int32Xdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int32(value)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.int32(value)'
   end
 
   def test_typedef_delegates_to_the_type_it_wraps
     content = File.read(File.join(@output_dir, 'MyCounterXdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = value.toXdrJsonElement(depth)'
     assert_includes content, 'SignedCountXdr.fromXdrJsonTree(element)'
   end
 
   def test_opaque_is_hexadecimal
     content = File.read(File.join(@output_dir, 'HashXdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(value)'
     assert_includes content, 'expectedLength = 32'
+  end
+
+  # A nested value goes through the depth-taking writer, never through the public entry that
+  # restarts the count; only an override, which writes a string, delegates to another string.
+  def test_nested_writers_pass_the_depth_in_the_committed_output
+    generated_sdk_files.each do |file|
+      name = File.basename(file, '.kt')
+      next if Xdrgen::Generators::KotlinJsonOverrides.type_names.include?(name)
+
+      refute_match(/\w\.toXdrJsonElement\(\)/, File.read(file), "#{name} restarts the depth of a nested value")
+    end
   end
 
   # -- Bytes-backed string fields ---------------------------------------------
@@ -482,7 +493,7 @@ class GeneratorSnapshotTest < Minitest::Test
     tag_arm = union[/data class ExecutableTag\(\n(.*?)\n  \)/m, 1]
     assert_equal '    val value: ByteArray', tag_arm
     assert_includes union, 'ExecutableTag(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "executable_tag"))'
-    assert_includes union, 'is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }'
+    assert_includes union, 'is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }'
   end
 
   def test_a_string_position_beside_a_bytes_backed_one_keeps_the_wrapper_type
@@ -534,7 +545,7 @@ class GeneratorSnapshotTest < Minitest::Test
 
     both_branches = File.read(File.join(@output_dir, 'ResultXdr.kt'))
     assert_includes both_branches, 'import kotlinx.serialization.json.JsonObject'
-    assert_includes both_branches, 'import kotlinx.serialization.json.buildJsonObject'
+    refute_includes both_branches, 'import kotlinx.serialization.json.buildJsonObject'
 
     value_arms_only = File.read(File.join(@output_dir, 'SimpleResultXdr.kt'))
     refute_includes value_arms_only, 'import kotlinx.serialization.json.JsonObject'

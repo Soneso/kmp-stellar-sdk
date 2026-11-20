@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPStatementPrepareXdr"
 
@@ -84,13 +83,15 @@ data class SCPStatementPrepareXdr(
     nH.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("quorum_set_hash", quorumSetHash.toXdrJsonElement())
-    put("ballot", ballot.toXdrJsonElement())
-    put("prepared", XdrJson.optional(prepared) { it.toXdrJsonElement() })
-    put("prepared_prime", XdrJson.optional(preparedPrime) { it.toXdrJsonElement() })
-    put("n_c", nC.toXdrJsonElement())
-    put("n_h", nH.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("quorum_set_hash", quorumSetHash.toXdrJsonElement(depth + 1))
+    put("ballot", ballot.toXdrJsonElement(depth + 1))
+    put("prepared", XdrJson.optional(prepared) { it.toXdrJsonElement(depth + 1) })
+    put("prepared_prime", XdrJson.optional(preparedPrime) { it.toXdrJsonElement(depth + 1) })
+    put("n_c", nC.toXdrJsonElement(depth + 1))
+    put("n_h", nH.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

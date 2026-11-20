@@ -37,7 +37,7 @@ OVERRIDDEN = Xdrgen::Generators::KotlinJsonOverrides.type_names.to_set
 # An enum member declaration carries its wire name beside its numeric value.
 ENUM_MEMBER = /^  ([A-Za-z_]\w*)\(-?\d+, "([^"]+)"\)[,;]$/
 # The object an emitting struct builds, in emission order.
-STRUCT_BODY = /fun toXdrJsonElement\(\): JsonElement = buildJsonObject \{\n(.*?)^  \}$/m
+STRUCT_BODY = /fun toXdrJsonElement\(depth: Int\): JsonElement = XdrJson\.obj\(depth, XDR_JSON_TYPE\) \{\n(.*?)^  \}$/m
 STRUCT_KEY = /^    put\("([^"]+)",/
 # The arm keys a union dispatches on when decoding.
 UNION_BODY = /internal fun fromXdrJsonTree\(element: JsonElement\).*?\n(?=  \}\n)/m

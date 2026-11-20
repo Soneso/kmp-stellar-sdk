@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LiquidityPoolDepositOpXdr"
 
@@ -67,12 +66,14 @@ data class LiquidityPoolDepositOpXdr(
     maxPrice.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
-    put("max_amount_a", maxAmountA.toXdrJsonElement())
-    put("max_amount_b", maxAmountB.toXdrJsonElement())
-    put("min_price", minPrice.toXdrJsonElement())
-    put("max_price", maxPrice.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement(depth + 1))
+    put("max_amount_a", maxAmountA.toXdrJsonElement(depth + 1))
+    put("max_amount_b", maxAmountB.toXdrJsonElement(depth + 1))
+    put("min_price", minPrice.toXdrJsonElement(depth + 1))
+    put("max_price", maxPrice.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
