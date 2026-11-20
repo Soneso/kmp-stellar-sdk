@@ -83,7 +83,7 @@ data class PreconditionsV2Xdr(
       val minSeqNum = if (reader.readBoolean()) SequenceNumberXdr.decode(reader) else null
       val minSeqAge = DurationXdr.decode(reader)
       val minSeqLedgerGap = Uint32Xdr.decode(reader)
-      val extraSigners = List(reader.readArrayLength()) { SignerKeyXdr.decode(reader) }
+      val extraSigners = List(reader.readArrayLength(2)) { SignerKeyXdr.decode(reader) }
       return PreconditionsV2Xdr(timeBounds, ledgerBounds, minSeqNum, minSeqAge, minSeqLedgerGap, extraSigners)
     }
 
@@ -125,6 +125,7 @@ data class PreconditionsV2Xdr(
     }
     minSeqAge.encode(writer)
     minSeqLedgerGap.encode(writer)
+    require(extraSigners.size <= 2) { "XDR array count ${extraSigners.size} exceeds maximum ${2}" }
     writer.writeInt(extraSigners.size)
     extraSigners.forEach { item ->
       item.encode(writer)

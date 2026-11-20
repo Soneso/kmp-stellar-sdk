@@ -1005,6 +1005,9 @@ data class CreateClaimableBalanceOperation(
         require(claimants.isNotEmpty()) {
             "Claimants list cannot be empty"
         }
+        require(claimants.size <= 10) {
+            "Claimant count ${claimants.size} exceeds maximum 10"
+        }
     }
 
     override fun toOperationBody(): OperationBodyXdr {

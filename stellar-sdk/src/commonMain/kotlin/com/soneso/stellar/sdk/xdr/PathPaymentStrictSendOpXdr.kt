@@ -47,7 +47,7 @@ data class PathPaymentStrictSendOpXdr(
       val destination = MuxedAccountXdr.decode(reader)
       val destAsset = AssetXdr.decode(reader)
       val destMin = Int64Xdr.decode(reader)
-      val path = List(reader.readArrayLength()) { AssetXdr.decode(reader) }
+      val path = List(reader.readArrayLength(5)) { AssetXdr.decode(reader) }
       return PathPaymentStrictSendOpXdr(sendAsset, sendAmount, destination, destAsset, destMin, path)
     }
 
@@ -74,6 +74,7 @@ data class PathPaymentStrictSendOpXdr(
     destination.encode(writer)
     destAsset.encode(writer)
     destMin.encode(writer)
+    require(path.size <= 5) { "XDR array count ${path.size} exceeds maximum ${5}" }
     writer.writeInt(path.size)
     path.forEach { item ->
       item.encode(writer)

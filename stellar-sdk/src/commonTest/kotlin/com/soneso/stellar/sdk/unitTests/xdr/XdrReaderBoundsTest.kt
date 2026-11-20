@@ -159,17 +159,14 @@ class XdrReaderBoundsTest {
 
     @Test
     fun testValueEndingOnBufferEndWithoutPaddingIsRead() {
-        // Trailing padding is skipped but is not required to be present: a 4-byte value that
-        // ends exactly on the buffer end needs no padding and must read cleanly.
+        // A value whose length is a multiple of four needs no trailing padding.
         val reader = XdrReader(intBytes(4) + byteArrayOf(1, 2, 3, 4))
         assertContentEquals(byteArrayOf(1, 2, 3, 4), reader.readVariableOpaque())
     }
 
     @Test
-    fun testUnpaddedShortValueAtBufferEndIsRead() {
-        // A 3-byte value would be followed by one padding byte in a full stream; ending the
-        // buffer immediately after the data must still yield the value.
+    fun testUnpaddedShortValueAtBufferEndIsRejected() {
         val reader = XdrReader(intBytes(3) + byteArrayOf(1, 2, 3))
-        assertContentEquals(byteArrayOf(1, 2, 3), reader.readVariableOpaque())
+        assertFailsWith<IllegalArgumentException> { reader.readVariableOpaque() }
     }
 }

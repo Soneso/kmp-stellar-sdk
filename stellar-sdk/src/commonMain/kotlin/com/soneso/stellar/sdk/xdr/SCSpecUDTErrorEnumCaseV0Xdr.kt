@@ -27,8 +27,8 @@ data class SCSpecUDTErrorEnumCaseV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTErrorEnumCaseV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(60)
       val value = Uint32Xdr.decode(reader)
       return SCSpecUDTErrorEnumCaseV0Xdr(doc, name, value)
     }
@@ -48,8 +48,8 @@ data class SCSpecUDTErrorEnumCaseV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 60)
     value.encode(writer)
   }
 

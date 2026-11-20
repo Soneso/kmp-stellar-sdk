@@ -27,8 +27,8 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTUnionCaseTupleV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(60)
       val type = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecUDTUnionCaseTupleV0Xdr(doc, name, type)
     }
@@ -48,8 +48,8 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 60)
     writer.writeInt(type.size)
     type.forEach { item ->
       item.encode(writer)

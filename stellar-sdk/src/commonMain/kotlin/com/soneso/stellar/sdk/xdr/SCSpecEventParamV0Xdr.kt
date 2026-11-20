@@ -29,8 +29,8 @@ data class SCSpecEventParamV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecEventParamV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(30)
       val type = SCSpecTypeDefXdr.decode(reader)
       val location = SCSpecEventParamLocationV0Xdr.decode(reader)
       return SCSpecEventParamV0Xdr(doc, name, type, location)
@@ -52,8 +52,8 @@ data class SCSpecEventParamV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 30)
     type.encode(writer)
     location.encode(writer)
   }

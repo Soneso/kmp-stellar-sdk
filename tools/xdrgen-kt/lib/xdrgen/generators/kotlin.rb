@@ -1069,13 +1069,17 @@ module Xdrgen
       end
 
       def member_decode_expression(defn, member, reader_var)
-        return "#{reader_var}.readVariableOpaque()" if bytes_backed_string_field?(defn, member)
+        if bytes_backed_string_field?(defn, member)
+          size = resolve_typedef_declaration(member.declaration).type.size
+          return "#{reader_var}.readVariableOpaque(#{size})"
+        end
         decode_expression(member.declaration, reader_var)
       end
 
       def member_encode_statement(defn, member, value_expr, writer_var, out)
         if bytes_backed_string_field?(defn, member)
-          out.puts "#{writer_var}.writeVariableOpaque(#{value_expr})"
+          size = resolve_typedef_declaration(member.declaration).type.size
+          out.puts "#{writer_var}.writeVariableOpaque(#{value_expr}#{binary_max_length(size)})"
         else
           encode_statement(member.declaration, value_expr, writer_var, out)
         end
@@ -1389,9 +1393,9 @@ module Xdrgen
             inner_decode = decode_expression_for_typespec(decl.type, reader_var)
 
             if kotlin_type_for_typespec(decl.type) == 'Byte'
-              "#{reader_var}.readVariableOpaque()"
+              "#{reader_var}.readVariableOpaque(#{decl.size})"
             else
-              "List(#{reader_var}.readArrayLength()) { #{inner_decode} }"
+              "List(#{reader_var}.readArrayLength(#{decl.size})) { #{inner_decode} }"
             end
           end
         else
@@ -1416,12 +1420,12 @@ module Xdrgen
         when AST::Typespecs::Bool
           "#{reader_var}.readBoolean()"
         when AST::Typespecs::String
-          "#{reader_var}.readString()"
+          "#{reader_var}.readString(#{typespec.size})"
         when AST::Typespecs::Opaque
           if typespec.fixed?
             "#{reader_var}.readFixedOpaque(#{typespec.size})"
           else
-            "#{reader_var}.readVariableOpaque()"
+            "#{reader_var}.readVariableOpaque(#{typespec.size})"
           end
         when AST::Typespecs::Simple
           type_name = name(typespec.resolved_type)
@@ -1461,8 +1465,11 @@ module Xdrgen
             end
           else
             if kotlin_type_for_typespec(decl.type) == 'Byte'
-              out.puts "#{writer_var}.writeVariableOpaque(#{value_expr})"
+              out.puts "#{writer_var}.writeVariableOpaque(#{value_expr}#{binary_max_length(decl.size)})"
             else
+              unless decl.size.blank?
+                out.puts "require(#{value_expr}.size <= #{decl.size}) { \"XDR array count ${#{value_expr}.size} exceeds maximum ${#{decl.size}}\" }"
+              end
               out.puts "#{writer_var}.writeInt(#{value_expr}.size)"
               out.puts "#{value_expr}.forEach { item ->"
               out.indent do
@@ -1493,18 +1500,22 @@ module Xdrgen
         when AST::Typespecs::Bool
           out.puts "#{writer_var}.writeBoolean(#{value_expr})"
         when AST::Typespecs::String
-          out.puts "#{writer_var}.writeString(#{value_expr})"
+          out.puts "#{writer_var}.writeString(#{value_expr}#{binary_max_length(typespec.size)})"
         when AST::Typespecs::Opaque
           if typespec.fixed?
             out.puts "#{writer_var}.writeFixedOpaque(#{value_expr}, #{typespec.size})"
           else
-            out.puts "#{writer_var}.writeVariableOpaque(#{value_expr})"
+            out.puts "#{writer_var}.writeVariableOpaque(#{value_expr}#{binary_max_length(typespec.size)})"
           end
         when AST::Typespecs::Simple
           out.puts "#{value_expr}.encode(#{writer_var})"
         else
           out.puts "#{value_expr}.encode(#{writer_var})"
         end
+      end
+
+      def binary_max_length(size)
+        size.blank? ? '' : ", #{size}"
       end
 
       def arm_discriminant_value(arm, discriminant)

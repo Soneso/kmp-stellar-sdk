@@ -33,10 +33,10 @@ data class SCSpecEventV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecEventV0Xdr {
-      val doc = reader.readString()
-      val lib = reader.readString()
-      val name = reader.readString()
-      val prefixTopics = List(reader.readArrayLength()) { SCSymbolXdr.decode(reader) }
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val lib = reader.readString(80)
+      val name = reader.readString(SC_SPEC_TYPE_NAME_LIMIT)
+      val prefixTopics = List(reader.readArrayLength(2)) { SCSymbolXdr.decode(reader) }
       val params = List(reader.readArrayLength()) { SCSpecEventParamV0Xdr.decode(reader) }
       val dataFormat = SCSpecEventDataFormatXdr.decode(reader)
       return SCSpecEventV0Xdr(doc, lib, name, prefixTopics, params, dataFormat)
@@ -60,9 +60,10 @@ data class SCSpecEventV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(lib)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(lib, 80)
+    writer.writeString(name, SC_SPEC_TYPE_NAME_LIMIT)
+    require(prefixTopics.size <= 2) { "XDR array count ${prefixTopics.size} exceeds maximum ${2}" }
     writer.writeInt(prefixTopics.size)
     prefixTopics.forEach { item ->
       item.encode(writer)

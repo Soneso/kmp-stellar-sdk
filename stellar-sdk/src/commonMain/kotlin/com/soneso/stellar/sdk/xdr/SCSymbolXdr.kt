@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "SCSymbolXdr"
 value class SCSymbolXdr(val value: String) {
   companion object {
     fun decode(reader: XdrReader): SCSymbolXdr {
-      val value = reader.readString()
+      val value = reader.readString(SCSYMBOL_LIMIT)
       return SCSymbolXdr(value)
     }
 
@@ -28,7 +28,7 @@ value class SCSymbolXdr(val value: String) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(value)
+    writer.writeString(value, SCSYMBOL_LIMIT)
   }
 
   fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)

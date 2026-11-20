@@ -43,7 +43,7 @@ sealed class SimpleResultXdr {
           SuccessCode(value)
         }
         SimpleStatusXdr.INACTIVE -> {
-          val value = reader.readString()
+          val value = reader.readString(256)
           ErrorMessage(value)
         }
         else -> throw IllegalArgumentException("Unknown SimpleResultXdr discriminant: $discriminant")
@@ -71,7 +71,7 @@ sealed class SimpleResultXdr {
         writer.writeInt(value)
       }
       is ErrorMessage -> {
-        writer.writeString(value)
+        writer.writeString(value, 256)
       }
     }
   }

@@ -51,7 +51,7 @@ data class ClaimableBalanceEntryXdr(
 
     fun decode(reader: XdrReader): ClaimableBalanceEntryXdr {
       val balanceId = ClaimableBalanceIDXdr.decode(reader)
-      val claimants = List(reader.readArrayLength()) { ClaimantXdr.decode(reader) }
+      val claimants = List(reader.readArrayLength(10)) { ClaimantXdr.decode(reader) }
       val asset = AssetXdr.decode(reader)
       val amount = Int64Xdr.decode(reader)
       val ext = ClaimableBalanceEntryExtXdr.decode(reader)
@@ -76,6 +76,7 @@ data class ClaimableBalanceEntryXdr(
 
   fun encode(writer: XdrWriter) {
     balanceId.encode(writer)
+    require(claimants.size <= 10) { "XDR array count ${claimants.size} exceeds maximum ${10}" }
     writer.writeInt(claimants.size)
     claimants.forEach { item ->
       item.encode(writer)

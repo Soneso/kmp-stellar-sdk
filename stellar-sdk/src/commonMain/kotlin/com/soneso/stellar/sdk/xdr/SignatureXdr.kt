@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "SignatureXdr"
 value class SignatureXdr(val value: ByteArray) {
   companion object {
     fun decode(reader: XdrReader): SignatureXdr {
-      val value = reader.readVariableOpaque()
+      val value = reader.readVariableOpaque(64)
       return SignatureXdr(value)
     }
 
@@ -28,7 +28,7 @@ value class SignatureXdr(val value: ByteArray) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeVariableOpaque(value)
+    writer.writeVariableOpaque(value, 64)
   }
 
   fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)

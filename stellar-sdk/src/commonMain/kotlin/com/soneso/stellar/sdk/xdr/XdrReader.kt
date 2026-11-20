@@ -45,3 +45,24 @@ expect class XdrReader(input: ByteArray) {
      */
     fun exitRecursion()
 }
+
+/** Reads a string whose UTF-8 byte length does not exceed [maxLength]. */
+internal fun XdrReader.readString(maxLength: Int): String {
+    val length = readInt()
+    require(length <= maxLength) { "XDR string length $length exceeds maximum $maxLength" }
+    return readFixedOpaque(length).decodeToString()
+}
+
+/** Reads an opaque value whose byte length does not exceed [maxLength]. */
+internal fun XdrReader.readVariableOpaque(maxLength: Int): ByteArray {
+    val length = readInt()
+    require(length <= maxLength) { "XDR opaque length $length exceeds maximum $maxLength" }
+    return readFixedOpaque(length)
+}
+
+/** Reads an array count bounded by [maxCount] and the remaining bytes. */
+internal fun XdrReader.readArrayLength(maxCount: Int): Int {
+    val count = readArrayLength()
+    require(count <= maxCount) { "XDR array count $count exceeds maximum $maxCount" }
+    return count
+}

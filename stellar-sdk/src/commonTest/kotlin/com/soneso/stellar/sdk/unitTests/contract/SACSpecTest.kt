@@ -165,7 +165,28 @@ class SACSpecTest {
     }
 
     @Test
-    fun testANonZeroPaddingByteFailsTheReencoding() = runTest {
+    fun testInvalidUtf8InEmbeddedDocFailsReencodingAtEntryOffset() = runTest {
+        val entries = SACClient.specEntries()
+        val index = entries.indexOfFirst { it is SCSpecEntryXdr.FunctionV0 && it.value.name.value == "balance" }
+        assertTrue(index > 0)
+        assertTrue(assertIs<SCSpecEntryXdr.FunctionV0>(entries[index]).value.doc.isNotEmpty())
+        val entryOffset = entries.take(index).sumOf { encode(it).size }
+        val bytes = Base64.Default.decode(SACSpec.XDR_BASE64)
+        // The doc bytes follow the entry discriminant and the doc length.
+        bytes[entryOffset + 8] = 0xFF.toByte()
+
+        val failure = assertFailsWith<IllegalStateException> {
+            SACClient.decodeSpec(Base64.Default.encode(bytes), sha256Hex(bytes))
+        }
+
+        assertEquals(
+            "The embedded SAC spec does not decode at byte offset $entryOffset: the entry re-encodes to different bytes",
+            failure.message
+        )
+    }
+
+    @Test
+    fun testANonZeroPaddingByteFailsDecoding() = runTest {
         val bytes = encode(
             SCSpecEntryXdr.FunctionV0(
                 SCSpecFunctionV0Xdr(doc = "", name = SCSymbolXdr("abc"), inputs = emptyList(), outputs = emptyList())
@@ -181,7 +202,7 @@ class SACSpecTest {
         }
 
         assertEquals(
-            "The embedded SAC spec does not decode at byte offset 0: the entry re-encodes to different bytes",
+            "The embedded SAC spec does not decode at byte offset 0: XDR padding at offset 15 must be zero, got 1",
             failure.message
         )
     }
