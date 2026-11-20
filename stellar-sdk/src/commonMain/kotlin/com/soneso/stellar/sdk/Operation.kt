@@ -1869,15 +1869,16 @@ data class InvokeHostFunctionOperation(
  *
  * This operation extends the expiration of Soroban contract storage.
  *
- * @property extendTo Number of ledgers to extend the TTL
+ * @property extendTo Number of ledgers to extend the TTL. 0 is valid: stellar-core rejects only a
+ * value above the network's maximum entry TTL.
  */
 data class ExtendFootprintTTLOperation(
     val extendTo: Int
 ) : Operation() {
 
     init {
-        require(extendTo > 0) {
-            "extendTo must be positive, got $extendTo"
+        require(extendTo >= 0) {
+            "extendTo must not be negative, got $extendTo"
         }
     }
 
