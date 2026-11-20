@@ -28,7 +28,7 @@ data class FeeBumpTransactionEnvelopeXdr(
 
     fun decode(reader: XdrReader): FeeBumpTransactionEnvelopeXdr {
       val tx = FeeBumpTransactionXdr.decode(reader)
-      val signatures = List(reader.readArrayLength()) { DecoratedSignatureXdr.decode(reader) }
+      val signatures = List(reader.readArrayLength(20)) { DecoratedSignatureXdr.decode(reader) }
       return FeeBumpTransactionEnvelopeXdr(tx, signatures)
     }
 
@@ -47,6 +47,7 @@ data class FeeBumpTransactionEnvelopeXdr(
 
   fun encode(writer: XdrWriter) {
     tx.encode(writer)
+    require(signatures.size <= 20) { "XDR array count ${signatures.size} exceeds maximum 20" }
     writer.writeInt(signatures.size)
     signatures.forEach { item ->
       item.encode(writer)

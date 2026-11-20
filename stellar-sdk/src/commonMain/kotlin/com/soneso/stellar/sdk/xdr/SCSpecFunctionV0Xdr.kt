@@ -29,10 +29,10 @@ data class SCSpecFunctionV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecFunctionV0Xdr {
-      val doc = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
       val name = SCSymbolXdr.decode(reader)
       val inputs = List(reader.readArrayLength()) { SCSpecFunctionInputV0Xdr.decode(reader) }
-      val outputs = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
+      val outputs = List(reader.readArrayLength(1)) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecFunctionV0Xdr(doc, name, inputs, outputs)
     }
 
@@ -52,12 +52,13 @@ data class SCSpecFunctionV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
     name.encode(writer)
     writer.writeInt(inputs.size)
     inputs.forEach { item ->
       item.encode(writer)
     }
+    require(outputs.size <= 1) { "XDR array count ${outputs.size} exceeds maximum 1" }
     writer.writeInt(outputs.size)
     outputs.forEach { item ->
       item.encode(writer)

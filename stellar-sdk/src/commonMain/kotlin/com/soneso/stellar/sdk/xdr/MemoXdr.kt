@@ -63,7 +63,7 @@ sealed class MemoXdr {
       return when (discriminant) {
         MemoTypeXdr.MEMO_NONE -> Void
         MemoTypeXdr.MEMO_TEXT -> {
-          val value = reader.readString()
+          val value = reader.readString(28)
           Text(value)
         }
         MemoTypeXdr.MEMO_ID -> {
@@ -109,7 +109,7 @@ sealed class MemoXdr {
     when (this) {
       is Void -> {}
       is Text -> {
-        writer.writeString(value)
+        writer.writeString(value, 28)
       }
       is Id -> {
         value.encode(writer)

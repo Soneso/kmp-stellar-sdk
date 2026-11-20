@@ -78,7 +78,7 @@ data class AccountEntryXdr(
       val flags = Uint32Xdr.decode(reader)
       val homeDomain = String32Xdr.decode(reader)
       val thresholds = ThresholdsXdr.decode(reader)
-      val signers = List(reader.readArrayLength()) { SignerXdr.decode(reader) }
+      val signers = List(reader.readArrayLength(MAX_SIGNERS)) { SignerXdr.decode(reader) }
       val ext = AccountEntryExtXdr.decode(reader)
       return AccountEntryXdr(accountId, balance, seqNum, numSubEntries, inflationDest, flags, homeDomain, thresholds, signers, ext)
     }
@@ -118,6 +118,7 @@ data class AccountEntryXdr(
     flags.encode(writer)
     homeDomain.encode(writer)
     thresholds.encode(writer)
+    require(signers.size <= MAX_SIGNERS) { "XDR array count ${signers.size} exceeds maximum $MAX_SIGNERS" }
     writer.writeInt(signers.size)
     signers.forEach { item ->
       item.encode(writer)

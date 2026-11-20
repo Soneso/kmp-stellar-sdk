@@ -23,7 +23,7 @@ data class SCSpecTypeUDTXdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecTypeUDTXdr {
-      val name = reader.readString()
+      val name = reader.readString(SC_SPEC_TYPE_NAME_LIMIT)
       return SCSpecTypeUDTXdr(name)
     }
 
@@ -40,7 +40,7 @@ data class SCSpecTypeUDTXdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(name)
+    writer.writeString(name, SC_SPEC_TYPE_NAME_LIMIT)
   }
 
   fun toXdrJsonElement(): JsonElement = buildJsonObject {

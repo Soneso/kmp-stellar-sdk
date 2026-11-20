@@ -39,7 +39,7 @@ data class AccountEntryExtensionV2Xdr(
     fun decode(reader: XdrReader): AccountEntryExtensionV2Xdr {
       val numSponsored = Uint32Xdr.decode(reader)
       val numSponsoring = Uint32Xdr.decode(reader)
-      val signerSponsoringIDs = List(reader.readArrayLength()) { SponsorshipDescriptorXdr.decode(reader) }
+      val signerSponsoringIDs = List(reader.readArrayLength(MAX_SIGNERS)) { SponsorshipDescriptorXdr.decode(reader) }
       val ext = AccountEntryExtensionV2ExtXdr.decode(reader)
       return AccountEntryExtensionV2Xdr(numSponsored, numSponsoring, signerSponsoringIDs, ext)
     }
@@ -62,6 +62,7 @@ data class AccountEntryExtensionV2Xdr(
   fun encode(writer: XdrWriter) {
     numSponsored.encode(writer)
     numSponsoring.encode(writer)
+    require(signerSponsoringIDs.size <= MAX_SIGNERS) { "XDR array count ${signerSponsoringIDs.size} exceeds maximum $MAX_SIGNERS" }
     writer.writeInt(signerSponsoringIDs.size)
     signerSponsoringIDs.forEach { item ->
       item.encode(writer)

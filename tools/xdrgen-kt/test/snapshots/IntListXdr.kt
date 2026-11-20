@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "IntListXdr"
 value class IntListXdr(val value: List<Int>) {
   companion object {
     fun decode(reader: XdrReader): IntListXdr {
-      val value = List(reader.readArrayLength()) { reader.readInt() }
+      val value = List(reader.readArrayLength(100)) { reader.readInt() }
       return IntListXdr(value)
     }
 
@@ -28,6 +28,7 @@ value class IntListXdr(val value: List<Int>) {
   }
 
   fun encode(writer: XdrWriter) {
+    require(value.size <= 100) { "XDR array count ${value.size} exceeds maximum 100" }
     writer.writeInt(value.size)
     value.forEach { item ->
       writer.writeInt(item)

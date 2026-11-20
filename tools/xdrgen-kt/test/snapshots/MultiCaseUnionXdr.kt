@@ -50,11 +50,11 @@ sealed class MultiCaseUnionXdr {
           SimpleValue(value)
         }
         1 -> {
-          val value = reader.readString()
+          val value = reader.readString(128)
           TextValue(discriminant, value)
         }
         2 -> {
-          val value = reader.readString()
+          val value = reader.readString(128)
           TextValue(discriminant, value)
         }
         else -> {
@@ -86,7 +86,7 @@ sealed class MultiCaseUnionXdr {
         writer.writeInt(value)
       }
       is TextValue -> {
-        writer.writeString(value)
+        writer.writeString(value, 128)
       }
       is RawValue -> {
         writer.writeVariableOpaque(value)

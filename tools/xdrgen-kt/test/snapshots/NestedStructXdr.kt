@@ -37,7 +37,7 @@ data class NestedStructXdr(
     fun decode(reader: XdrReader): NestedStructXdr {
       val inner = SimpleStructXdr.decode(reader)
       val optionalInner = if (reader.readBoolean()) SimpleStructXdr.decode(reader) else null
-      val items = List(reader.readArrayLength()) { SimpleStructXdr.decode(reader) }
+      val items = List(reader.readArrayLength(10)) { SimpleStructXdr.decode(reader) }
       val fixedItems = Array(3) { SimpleStructXdr.decode(reader) }
       val rawData = reader.readVariableOpaque()
       val fixedData = reader.readFixedOpaque(4)
@@ -71,6 +71,7 @@ data class NestedStructXdr(
     } else {
       writer.writeBoolean(false)
     }
+    require(items.size <= 10) { "XDR array count ${items.size} exceeds maximum 10" }
     writer.writeInt(items.size)
     items.forEach { item ->
       item.encode(writer)

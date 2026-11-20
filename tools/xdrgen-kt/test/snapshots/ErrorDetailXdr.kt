@@ -26,7 +26,7 @@ data class ErrorDetailXdr(
 
     fun decode(reader: XdrReader): ErrorDetailXdr {
       val code = reader.readInt()
-      val message = reader.readString()
+      val message = reader.readString(256)
       return ErrorDetailXdr(code, message)
     }
 
@@ -45,7 +45,7 @@ data class ErrorDetailXdr(
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(code)
-    writer.writeString(message)
+    writer.writeString(message, 256)
   }
 
   fun toXdrJsonElement(): JsonElement = buildJsonObject {

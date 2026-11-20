@@ -61,7 +61,7 @@ data class TransactionXdr(
       val seqNum = SequenceNumberXdr.decode(reader)
       val cond = PreconditionsXdr.decode(reader)
       val memo = MemoXdr.decode(reader)
-      val operations = List(reader.readArrayLength()) { OperationXdr.decode(reader) }
+      val operations = List(reader.readArrayLength(MAX_OPS_PER_TX)) { OperationXdr.decode(reader) }
       val ext = TransactionExtXdr.decode(reader)
       return TransactionXdr(sourceAccount, fee, seqNum, cond, memo, operations, ext)
     }
@@ -90,6 +90,7 @@ data class TransactionXdr(
     seqNum.encode(writer)
     cond.encode(writer)
     memo.encode(writer)
+    require(operations.size <= MAX_OPS_PER_TX) { "XDR array count ${operations.size} exceeds maximum $MAX_OPS_PER_TX" }
     writer.writeInt(operations.size)
     operations.forEach { item ->
       item.encode(writer)

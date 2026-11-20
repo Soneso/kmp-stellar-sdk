@@ -25,7 +25,7 @@ data class SCSpecTypeTupleXdr(
     fun decode(reader: XdrReader): SCSpecTypeTupleXdr {
       reader.enterRecursion(500)
       try {
-        val valueTypes = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
+        val valueTypes = List(reader.readArrayLength(12)) { SCSpecTypeDefXdr.decode(reader) }
         return SCSpecTypeTupleXdr(valueTypes)
       } finally {
         reader.exitRecursion()
@@ -45,6 +45,7 @@ data class SCSpecTypeTupleXdr(
   }
 
   fun encode(writer: XdrWriter) {
+    require(valueTypes.size <= 12) { "XDR array count ${valueTypes.size} exceeds maximum 12" }
     writer.writeInt(valueTypes.size)
     valueTypes.forEach { item ->
       item.encode(writer)

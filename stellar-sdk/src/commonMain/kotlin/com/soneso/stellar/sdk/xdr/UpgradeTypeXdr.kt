@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "UpgradeTypeXdr"
 value class UpgradeTypeXdr(val value: ByteArray) {
   companion object {
     fun decode(reader: XdrReader): UpgradeTypeXdr {
-      val value = reader.readVariableOpaque()
+      val value = reader.readVariableOpaque(128)
       return UpgradeTypeXdr(value)
     }
 
@@ -28,7 +28,7 @@ value class UpgradeTypeXdr(val value: ByteArray) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeVariableOpaque(value)
+    writer.writeVariableOpaque(value, 128)
   }
 
   fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)

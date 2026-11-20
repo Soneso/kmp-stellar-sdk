@@ -737,6 +737,25 @@ class OperationsXdrRoundtripTest {
         }
     }
 
+    @Test
+    fun testCreateClaimableBalanceMaximumClaimants() {
+        // Stellar-transaction.x: Claimant claimants<10>;
+        val claimants = List(10) { Claimant(ACCOUNT_B, ClaimPredicate.Unconditional) }
+        val op = CreateClaimableBalanceOperation(ASSET_NATIVE, "100.0000000", claimants)
+        assertEquals(claimants, op.claimants)
+        assertEquals(10, (op.toOperationBody() as OperationBodyXdr.CreateClaimableBalanceOp).value.claimants.size)
+    }
+
+    @Test
+    fun testCreateClaimableBalanceTooManyClaimants() {
+        // Stellar-transaction.x: Claimant claimants<10>;
+        val error = assertFailsWith<IllegalArgumentException> {
+            CreateClaimableBalanceOperation(ASSET_NATIVE, "100.0000000",
+                List(11) { Claimant(ACCOUNT_B, ClaimPredicate.Unconditional) })
+        }
+        assertEquals("Claimant count 11 exceeds maximum 10", error.message)
+    }
+
     // ========== ClaimClaimableBalance ==========
     @Test
     fun testClaimClaimableBalanceRoundtrip() {

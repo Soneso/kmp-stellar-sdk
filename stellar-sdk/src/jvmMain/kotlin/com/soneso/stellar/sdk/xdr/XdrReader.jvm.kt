@@ -56,25 +56,20 @@ actual class XdrReader actual constructor(input: ByteArray) {
 
     actual fun readBoolean(): Boolean = readInt() != 0
 
-    actual fun readString(): String {
-        val length = readInt()
-        requireAvailable(length)
-        val bytes = data.copyOfRange(offset, offset + length)
-        offset += length
-        // Trailing padding is skipped but not required to be present; a buffer ending on the
-        // last data byte then fails at the next read instead of here.
-        val padding = (4 - (length % 4)) % 4
-        offset += padding
-        return bytes.decodeToString()
-    }
+    actual fun readString(): String = readFixedOpaque(readInt()).decodeToString()
 
     actual fun readFixedOpaque(length: Int): ByteArray {
         requireAvailable(length)
         val bytes = data.copyOfRange(offset, offset + length)
         offset += length
-        // Trailing padding is skipped but not required to be present.
+        // Padding is required and every padding byte must be zero.
         val padding = (4 - (length % 4)) % 4
-        offset += padding
+        requireAvailable(padding)
+        repeat(padding) {
+            val index = offset++
+            val value = data[index].toInt() and 0xFF
+            require(value == 0) { "XDR padding at offset $index must be zero, got $value" }
+        }
         return bytes
     }
 

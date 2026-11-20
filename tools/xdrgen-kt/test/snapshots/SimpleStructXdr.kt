@@ -38,7 +38,7 @@ data class SimpleStructXdr(
       val bigNumber = reader.readLong()
       val unsignedBig = reader.readUnsignedLong()
       val active = reader.readBoolean()
-      val label = reader.readString()
+      val label = reader.readString(64)
       return SimpleStructXdr(count, flags, bigNumber, unsignedBig, active, label)
     }
 
@@ -65,7 +65,7 @@ data class SimpleStructXdr(
     writer.writeLong(bigNumber)
     writer.writeUnsignedLong(unsignedBig)
     writer.writeBoolean(active)
-    writer.writeString(label)
+    writer.writeString(label, 64)
   }
 
   fun toXdrJsonElement(): JsonElement = buildJsonObject {

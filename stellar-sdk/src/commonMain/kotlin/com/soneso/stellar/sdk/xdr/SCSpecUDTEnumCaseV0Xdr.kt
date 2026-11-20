@@ -27,8 +27,8 @@ data class SCSpecUDTEnumCaseV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTEnumCaseV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(60)
       val value = Uint32Xdr.decode(reader)
       return SCSpecUDTEnumCaseV0Xdr(doc, name, value)
     }
@@ -48,8 +48,8 @@ data class SCSpecUDTEnumCaseV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 60)
     value.encode(writer)
   }
 

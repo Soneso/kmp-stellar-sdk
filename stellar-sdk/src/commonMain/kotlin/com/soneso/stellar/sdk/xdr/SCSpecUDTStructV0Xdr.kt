@@ -29,9 +29,9 @@ data class SCSpecUDTStructV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTStructV0Xdr {
-      val doc = reader.readString()
-      val lib = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val lib = reader.readString(80)
+      val name = reader.readString(SC_SPEC_TYPE_NAME_LIMIT)
       val fields = List(reader.readArrayLength()) { SCSpecUDTStructFieldV0Xdr.decode(reader) }
       return SCSpecUDTStructV0Xdr(doc, lib, name, fields)
     }
@@ -52,9 +52,9 @@ data class SCSpecUDTStructV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(lib)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(lib, 80)
+    writer.writeString(name, SC_SPEC_TYPE_NAME_LIMIT)
     writer.writeInt(fields.size)
     fields.forEach { item ->
       item.encode(writer)

@@ -373,6 +373,47 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_includes content, '"fixed_data", expectedLength = 4'
   end
 
+  def test_binary_declared_maxima_are_emitted
+    content = File.read(File.join(@output_dir, 'IntListXdr.kt'))
+    assert_includes content, 'XDR array count ${value.size} exceeds maximum 100'
+
+    binary_length_fixture do |dir|
+      %w[BoundedXdr TextXdr TextAliasXdr BlobXdr BlobAliasXdr ItemsXdr ItemsAliasXdr ChoiceXdr].each do |type|
+        content = File.read(File.join(dir, "#{type}.kt"))
+        if type.include?('Alias')
+          wrapped = type.sub('Alias', '')
+          assert_includes content, "#{wrapped}.decode(reader)"
+          assert_includes content, 'value.encode(writer)'
+          next
+        end
+        if %w[BoundedXdr TextXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readString(3)'
+          assert_match(/writer.writeString\(\w+, 3\)/, content)
+        end
+        if %w[BoundedXdr BlobXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readVariableOpaque(4)'
+          assert_match(/writer.writeVariableOpaque\(\w+, 4\)/, content)
+        end
+        if %w[BoundedXdr ItemsXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readArrayLength(LIMIT)'
+          assert_match(/require\(\w+.size <= LIMIT\)/, content)
+          assert_match(/XDR array count \$\{\w+.size\} exceeds maximum \$LIMIT/, content)
+        end
+      end
+    end
+  end
+
+  def test_binary_unbounded_declarations_emit_no_maximum
+    binary_length_fixture do |dir|
+      content = File.read(File.join(dir, 'UnboundedXdr.kt'))
+      %w[readString readVariableOpaque readArrayLength].each { |method| assert_includes content, "reader.#{method}()" }
+      assert_includes content, 'writer.writeString(text)'
+      assert_includes content, 'writer.writeVariableOpaque(blob)'
+      assert_includes content, 'writer.writeInt(items.size)'
+      refute_includes content, 'require('
+    end
+  end
+
   def test_optional_field_round_trips_through_null
     content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
     assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })'
@@ -451,6 +492,23 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_includes union, '"string" -> Str(SCStringXdr.fromXdrJsonTree(value))'
   end
 
+  def test_bounded_bytes_backed_string_emits_binary_maximum
+    Dir.mktmpdir('xdr_bounded_bytes_string_') do |dir|
+      source = File.join(dir, 'bounded.x')
+      File.write(source, <<~XDR)
+        typedef string BoundedString<7>;
+        typedef BoundedString StringAlias;
+        struct ContractExecutableExternalRef { StringAlias tag; };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      content = File.read(File.join(dir, 'ContractExecutableExternalRefXdr.kt'))
+      assert_includes content, 'val tag: ByteArray'
+      assert_includes content, 'val tag = reader.readVariableOpaque(7)'
+      assert_includes content, 'writer.writeVariableOpaque(tag, 7)'
+    end
+  end
+
   # A table entry naming a field no processed type declares is a stale entry; when the
   # caller opts in (the full-set run does), it raises instead of silently no-opping.
   def test_a_stale_bytes_backed_entry_raises_when_verification_is_requested
@@ -483,6 +541,31 @@ class GeneratorSnapshotTest < Minitest::Test
   end
 
   private
+
+  def binary_length_fixture
+    Dir.mktmpdir('xdr_binary_lengths_') do |dir|
+      source = File.join(dir, 'lengths.x')
+      File.write(source, <<~XDR)
+        const LIMIT = 2;
+        typedef string Text<3>;
+        typedef opaque Blob<4>;
+        typedef int Items<LIMIT>;
+        typedef Text TextAlias;
+        typedef Blob BlobAlias;
+        typedef Items ItemsAlias;
+        struct Bounded { string text<3>; opaque blob<4>; int items<LIMIT>; };
+        struct Unbounded { string text<>; opaque blob<>; int items<>; };
+        union Choice switch (int kind) {
+          case 0: string text<3>;
+          case 1: opaque blob<4>;
+          case 2: int items<LIMIT>;
+        };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      yield dir
+    end
+  end
 
   SDK_XDR_DIR = File.expand_path(
     '../../../stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr', __dir__

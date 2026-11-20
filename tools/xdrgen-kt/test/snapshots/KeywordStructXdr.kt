@@ -26,7 +26,7 @@ data class KeywordStructXdr(
 
     fun decode(reader: XdrReader): KeywordStructXdr {
       val `val` = reader.readInt()
-      val `when` = reader.readString()
+      val `when` = reader.readString(32)
       return KeywordStructXdr(`val`, `when`)
     }
 
@@ -45,7 +45,7 @@ data class KeywordStructXdr(
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(`val`)
-    writer.writeString(`when`)
+    writer.writeString(`when`, 32)
   }
 
   fun toXdrJsonElement(): JsonElement = buildJsonObject {

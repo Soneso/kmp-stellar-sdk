@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "ShortStringXdr"
 value class ShortStringXdr(val value: String) {
   companion object {
     fun decode(reader: XdrReader): ShortStringXdr {
-      val value = reader.readString()
+      val value = reader.readString(64)
       return ShortStringXdr(value)
     }
 
@@ -28,7 +28,7 @@ value class ShortStringXdr(val value: String) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(value)
+    writer.writeString(value, 64)
   }
 
   fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
