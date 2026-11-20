@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `toXdrJson()` and `toXdrJsonElement()` throw `IllegalArgumentException` for a value nested deeper than the 128 levels XDR-JSON reading accepts. Before this change, they wrote such values as JSON that `fromXdrJson()` refused, or overflowed the stack.
 - Reading a transaction from XDR and writing it back keeps a `PRECOND_V2` precondition as V2, also for the inner transaction of a fee bump, and two `TransactionPreconditions` are equal only when they encode to the same type. Before this change, a V2 whose fields other than the time bounds had their default values was written back as `PRECOND_TIME` or `PRECOND_NONE`, so the transaction had a different hash.
 - Reading a transaction from XDR keeps a muxed (`M...`) source account, so `Transaction.sourceAccount` holds the `M...` address and the transaction keeps its hash. Before this change, the source lost its muxed id and became the `G...` account, so the transaction had a different hash and its signatures did not match.
+- `ManageDataOperation` accepts a data name of spaces only, such as `" "`, so `AbstractTransaction.fromEnvelopeXdr` parses applied transactions that use it, such as testnet transaction b6ffe005434126d1afec562da2e7b0d78bd2e06a6c86b786ce7e4da1fb1b51a0.
+- `ClaimPredicate.Not` accepts a nested `Not`, so `AbstractTransaction.fromEnvelopeXdr` parses applied transactions that use it, such as testnet transaction c2123aaec96c3b0215f8b9b770ab9b16164339affa2ee4ea2d7ba5fcf128ff67.
 
 ## [1.18.0] - 2026-11-16
 

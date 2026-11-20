@@ -874,7 +874,7 @@ data class ManageDataOperation(
 ) : Operation() {
 
     init {
-        require(name.isNotBlank()) { "Data entry name cannot be blank" }
+        require(name.isNotEmpty()) { "Data entry name cannot be empty" }
         require(name.encodeToByteArray().size <= 64) {
             "Data entry name cannot exceed 64 bytes"
         }
@@ -1984,11 +1984,6 @@ sealed class ClaimPredicate {
      * @property predicate The predicate to negate
      */
     data class Not(val predicate: ClaimPredicate) : ClaimPredicate() {
-        init {
-            require(predicate !is Not) {
-                "Cannot nest NOT predicates"
-            }
-        }
         override fun toXdr(): ClaimPredicateXdr {
             return ClaimPredicateXdr.NotPredicate(predicate.toXdr())
         }
