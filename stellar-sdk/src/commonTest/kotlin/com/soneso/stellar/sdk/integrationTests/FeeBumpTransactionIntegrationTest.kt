@@ -2,6 +2,7 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.unitTests.MuxedSourceAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
@@ -370,5 +371,63 @@ class FeeBumpTransactionIntegrationTest {
         assertTrue(effectsPage.records.isNotEmpty(), "Payer account should have effects")
 
         println("Operations and effects verified")
+    }
+
+    /**
+     * Test submitting a fee bump read back from its envelope, around an inner transaction whose
+     * transaction source is a muxed account.
+     *
+     * This test:
+     * 1. Creates and funds the source and payer accounts
+     * 2. Builds and signs an inner CreateAccount transaction with the muxed address of the source
+     *    account as the transaction source, and a fee bump around it paid by the payer
+     * 3. Reads the fee bump envelope back and verifies the inner source, the inner hash, the fee
+     *    bump hash and the envelope bytes are unchanged
+     * 4. Submits the decoded fee bump and verifies the network reports both original hashes
+     */
+    @Test
+    fun testSubmitDecodedFeeBumpWithMuxedInnerTransactionSource() = runTest(timeout = 300.seconds) {
+        val sourceKeyPair = KeyPair.random()
+        val sourceId = sourceKeyPair.getAccountId()
+        val destinationId = KeyPair.random().getAccountId()
+        val payerKeyPair = KeyPair.random()
+        val payerId = payerKeyPair.getAccountId()
+
+        fundTestAccountAndAwaitVisibility(sourceId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        fundTestAccountAndAwaitVisibility(payerId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+
+        val sourceAccount = horizonServer.accounts().account(sourceId)
+        val muxedSource = MuxedAccount(sourceId, 1020304050607080UL).address
+
+        val innerTx = TransactionBuilder(
+            sourceAccount = MuxedSourceAccount(muxedSource, sourceAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(CreateAccountOperation(destination = destinationId, startingBalance = "10"))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        innerTx.sign(sourceKeyPair)
+
+        val feeBump = FeeBumpTransactionBuilder(innerTx)
+            .setBaseFee(200)
+            .setFeeSource(payerId)
+            .build()
+        feeBump.sign(payerKeyPair)
+
+        val envelope = feeBump.toEnvelopeXdrBase64()
+        val innerHash = innerTx.hashHex()
+        val feeBumpHash = feeBump.hashHex()
+
+        val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network) as FeeBumpTransaction
+        assertEquals(muxedSource, decoded.innerTransaction.sourceAccount, "Decoded inner source should stay muxed")
+        assertEquals(innerHash, decoded.innerTransaction.hashHex(), "Decoded inner transaction should keep its hash")
+        assertEquals(feeBumpHash, decoded.hashHex(), "Decoded fee bump should keep its hash")
+        assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "Decoded fee bump should keep its envelope bytes")
+
+        val response = horizonServer.submitTransaction(decoded.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Decoded fee bump with muxed inner source should succeed")
+        assertEquals(feeBumpHash, response.hash, "Network should report the original fee bump hash")
+        assertEquals(innerHash, response.innerTransaction?.hash, "Network should report the original inner hash")
     }
 }

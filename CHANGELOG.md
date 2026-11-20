@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CreateClaimableBalanceOperation` throws `IllegalArgumentException` for more than 10 claimants.
 - `toXdrJson()` and `toXdrJsonElement()` throw `IllegalArgumentException` for a value nested deeper than the 128 levels XDR-JSON reading accepts. Before this change, they wrote such values as JSON that `fromXdrJson()` refused, or overflowed the stack.
 - Reading a transaction from XDR and writing it back keeps a `PRECOND_V2` precondition as V2, also for the inner transaction of a fee bump, and two `TransactionPreconditions` are equal only when they encode to the same type. Before this change, a V2 whose fields other than the time bounds had their default values was written back as `PRECOND_TIME` or `PRECOND_NONE`, so the transaction had a different hash.
+- Reading a transaction from XDR keeps a muxed (`M...`) source account, so `Transaction.sourceAccount` holds the `M...` address and the transaction keeps its hash. Before this change, the source lost its muxed id and became the `G...` account, so the transaction had a different hash and its signatures did not match.
 
 ## [1.18.0] - 2026-11-16
 

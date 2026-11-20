@@ -4,6 +4,7 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+import com.soneso.stellar.sdk.unitTests.MuxedSourceAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -394,6 +395,50 @@ class PaymentsIntegrationTest {
 
         val effectsPage = horizonServer.effects().forAccount(accountAId).execute()
         assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+    }
+
+    /**
+     * Test submitting a payment whose transaction source is a muxed account, read back from its envelope.
+     *
+     * This test:
+     * 1. Creates and funds accounts A and C
+     * 2. Builds and signs a payment from A to C with the muxed address of A as the transaction source
+     * 3. Reads the envelope back and verifies the source, the hash and the envelope bytes are unchanged
+     * 4. Submits the decoded transaction and verifies the network reports the original hash
+     */
+    @Test
+    fun testSendNativePaymentFromDecodedMuxedTransactionSource() = runTest(timeout = 180.seconds) {
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountCId = KeyPair.random().getAccountId()
+
+        fundTestAccountAndAwaitVisibility(accountAId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        fundTestAccountAndAwaitVisibility(accountCId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+
+        val accountA = horizonServer.accounts().account(accountAId)
+        val muxedSource = MuxedAccount(accountAId, 8070605040302010UL).address
+
+        val transaction = TransactionBuilder(
+            sourceAccount = MuxedSourceAccount(muxedSource, accountA.sequenceNumber),
+            network = network
+        )
+            .addOperation(PaymentOperation(destination = accountCId, asset = AssetTypeNative, amount = "100"))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        transaction.sign(keyPairA)
+
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val hash = transaction.hashHex()
+
+        val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network) as Transaction
+        assertEquals(muxedSource, decoded.sourceAccount, "Decoded transaction source should stay muxed")
+        assertEquals(hash, decoded.hashHex(), "Decoded transaction should keep its hash")
+        assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "Decoded transaction should keep its envelope bytes")
+
+        val response = horizonServer.submitTransaction(decoded.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Decoded payment with muxed transaction source should succeed")
+        assertEquals(hash, response.hash, "Network should report the original transaction hash")
     }
 
     /**
