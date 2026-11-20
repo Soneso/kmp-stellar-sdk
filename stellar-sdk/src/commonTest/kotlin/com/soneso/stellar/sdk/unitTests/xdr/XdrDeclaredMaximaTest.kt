@@ -3,6 +3,7 @@ package com.soneso.stellar.sdk.unitTests.xdr
 import com.soneso.stellar.sdk.xdr.*
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
@@ -18,11 +19,16 @@ class XdrDeclaredMaximaTest {
     private val account = MuxedAccountXdr.Ed25519(key)
     private val claimant = ClaimantXdr.V0(ClaimantV0Xdr(AccountIDXdr(PublicKeyXdr.Ed25519(key)), ClaimPredicateXdr.Void))
     private val operation = OperationXdr(null, OperationBodyXdr.Void(OperationTypeXdr.INFLATION))
+    private val decoratedSignature = DecoratedSignatureXdr(SignatureHintXdr(ByteArray(4)), SignatureXdr(ByteArray(0)))
 
     private fun transaction(
         ops: List<OperationXdr> = emptyList(), memo: MemoXdr = MemoXdr.Void,
         cond: PreconditionsXdr = PreconditionsXdr.Void
     ) = TransactionXdr(account, Uint32Xdr(0u), SequenceNumberXdr(Int64Xdr(0)), cond, memo, ops, TransactionExtXdr.Void)
+
+    private fun transactionV0(ops: List<OperationXdr> = emptyList()) =
+        TransactionV0Xdr(key, Uint32Xdr(0u), SequenceNumberXdr(Int64Xdr(0)), null,
+            MemoXdr.Void, ops, TransactionV0ExtXdr.Void)
 
     private fun envelope(tx: TransactionXdr, signatures: List<DecoratedSignatureXdr> = emptyList()) =
         TransactionEnvelopeXdr.V1(TransactionV1EnvelopeXdr(tx, signatures)).toXdrBase64()
@@ -137,6 +143,105 @@ class XdrDeclaredMaximaTest {
     @Test fun predicatesDecodeRejects() = rejectsDecode(predicates)
     @Test fun predicatesEncodeRejects() = rejectsEncode(predicates)
     @Test fun predicatesBase64Rejects() = rejectsBase64(predicates)
+
+    private fun rejectsArrayEncode(maximum: Int, encode: (XdrWriter) -> Unit) {
+        val error = assertFailsWith<IllegalArgumentException> { encoded(encode) }
+        assertEquals("XDR array count ${maximum + 1} exceeds maximum $maximum", error.message)
+    }
+
+    @Test fun v1EnvelopeSignaturesEncodeRejects() {
+        val maximum = 20 // DecoratedSignature signatures<20>;
+        val value = TransactionV1EnvelopeXdr(transaction(), List(maximum + 1) { decoratedSignature })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun v0EnvelopeSignaturesEncodeRejects() {
+        val maximum = 20 // DecoratedSignature signatures<20>;
+        val value = TransactionV0EnvelopeXdr(transactionV0(), List(maximum + 1) { decoratedSignature })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun feeBumpEnvelopeSignaturesEncodeRejects() {
+        val maximum = 20 // DecoratedSignature signatures<20>;
+        val tx = FeeBumpTransactionXdr(account, Int64Xdr(0),
+            FeeBumpTransactionInnerTxXdr.V1(TransactionV1EnvelopeXdr(transaction(), emptyList())),
+            FeeBumpTransactionExtXdr.Void)
+        val value = FeeBumpTransactionEnvelopeXdr(tx, List(maximum + 1) { decoratedSignature })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun v0OperationsEncodeRejects() {
+        val value = transactionV0(List(MAX_OPS_PER_TX + 1) { operation })
+        rejectsArrayEncode(MAX_OPS_PER_TX, value::encode)
+    }
+
+    @Test fun accountSignersEncodeRejects() {
+        val value = AccountEntryXdr(AccountIDXdr(PublicKeyXdr.Ed25519(key)), Int64Xdr(0),
+            SequenceNumberXdr(Int64Xdr(0)), Uint32Xdr(0u), null, Uint32Xdr(0u), String32Xdr(""),
+            ThresholdsXdr(ByteArray(4)), List(MAX_SIGNERS + 1) { SignerXdr(SignerKeyXdr.Ed25519(key), Uint32Xdr(1u)) },
+            AccountEntryExtXdr.Void)
+        rejectsArrayEncode(MAX_SIGNERS, value::encode)
+    }
+
+    @Test fun signerSponsoringIDsEncodeRejects() {
+        val value = AccountEntryExtensionV2Xdr(Uint32Xdr(0u), Uint32Xdr(0u),
+            List(MAX_SIGNERS + 1) { SponsorshipDescriptorXdr(null) }, AccountEntryExtensionV2ExtXdr.Void)
+        rejectsArrayEncode(MAX_SIGNERS, value::encode)
+    }
+
+    @Test fun contractCostParamsEncodeRejects() {
+        val value = ContractCostParamsXdr(List(CONTRACT_COST_COUNT_LIMIT + 1) {
+            ContractCostParamEntryXdr(ExtensionPointXdr.Void, Int64Xdr(0), Int64Xdr(0))
+        })
+        rejectsArrayEncode(CONTRACT_COST_COUNT_LIMIT, value::encode)
+    }
+
+    @Test fun strictSendPathEncodeRejects() {
+        val maximum = 5 // Asset path<5>;
+        val value = PathPaymentStrictSendOpXdr(AssetXdr.Void, Int64Xdr(0), account, AssetXdr.Void,
+            Int64Xdr(0), List(maximum + 1) { AssetXdr.Void })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun balanceClaimantsEncodeRejects() {
+        val maximum = 10 // Claimant claimants<10>;
+        val value = ClaimableBalanceEntryXdr(ClaimableBalanceIDXdr.V0(HashXdr(ByteArray(32))),
+            List(maximum + 1) { claimant }, AssetXdr.Void, Int64Xdr(0), ClaimableBalanceEntryExtXdr.Void)
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun orPredicatesEncodeRejects() {
+        val maximum = 2 // ClaimPredicate orPredicates<2>;
+        val value = ClaimPredicateXdr.OrPredicates(List(maximum + 1) { ClaimPredicateXdr.Void })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun stellarValueUpgradesEncodeRejects() {
+        val maximum = 6 // UpgradeType upgrades<6>;
+        val value = StellarValueXdr(HashXdr(ByteArray(32)), TimePointXdr(Uint64Xdr(0u)),
+            List(maximum + 1) { UpgradeTypeXdr(ByteArray(0)) }, StellarValueExtXdr.Void)
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun tupleValueTypesEncodeRejects() {
+        val maximum = 12 // SCSpecTypeDef valueTypes<12>;
+        val value = SCSpecTypeTupleXdr(List(maximum + 1) { SCSpecTypeDefXdr.Void(SCSpecTypeXdr.SC_SPEC_TYPE_U32) })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun functionOutputsEncodeRejects() {
+        val maximum = 1 // SCSpecTypeDef outputs<1>;
+        val value = SCSpecFunctionV0Xdr("", SCSymbolXdr("f"), emptyList(),
+            List(maximum + 1) { SCSpecTypeDefXdr.Void(SCSpecTypeXdr.SC_SPEC_TYPE_U32) })
+        rejectsArrayEncode(maximum, value::encode)
+    }
+
+    @Test fun eventPrefixTopicsEncodeRejects() {
+        val maximum = 2 // SCSymbol prefixTopics<2>;
+        val value = SCSpecEventV0Xdr("", "", "event", List(maximum + 1) { SCSymbolXdr("topic") },
+            emptyList(), SCSpecEventDataFormatXdr.SC_SPEC_EVENT_DATA_FORMAT_SINGLE_VALUE)
+        rejectsArrayEncode(maximum, value::encode)
+    }
 
     private fun padding(raw: ByteArray, decode: (ByteArray) -> ByteArray, reject: Boolean) {
         if (reject) {
