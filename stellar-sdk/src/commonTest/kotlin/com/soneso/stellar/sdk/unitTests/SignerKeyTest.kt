@@ -166,12 +166,19 @@ class SignerKeyTest {
     }
 
     @Test
-    fun testEd25519SignedPayloadInvalidPayloadSize() {
-        // Empty payload should fail
-        assertFails {
-            SignerKey.ed25519SignedPayload(testPublicKey, ByteArray(0))
-        }
+    fun testEd25519SignedPayloadEmptyPayload() {
+        // An empty payload is valid XDR and has no strkey form.
+        val signer = SignerKey.ed25519SignedPayload(testPublicKey, ByteArray(0))
+        assertEquals(signer, SignerKey.fromXdr(signer.toXdr()))
+        assertFailsWith<IllegalArgumentException> { signer.encodeSignerKey() }
+        assertEquals(
+            "SignerKey.Ed25519SignedPayload(${StrKey.encodeEd25519PublicKey(testPublicKey)}, empty payload)",
+            signer.toString()
+        )
+    }
 
+    @Test
+    fun testEd25519SignedPayloadInvalidPayloadSize() {
         // Payload too large should fail (max is 64 bytes)
         assertFails {
             SignerKey.ed25519SignedPayload(testPublicKey, ByteArray(65))

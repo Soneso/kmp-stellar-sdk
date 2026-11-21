@@ -12,37 +12,81 @@ import com.soneso.stellar.sdk.xdr.*
  * A value read by [fromXdr] keeps the precondition type it was read with. A value from the constructor,
  * `copy` or the [Builder] gets its type from its property values, as [hasV2] describes.
  *
+ * The minimum sequence age and ledger gap are XDR `uint64` and `uint32` values and are stored exactly. The
+ * constructor and `copy` take values from 0 to `Long.MAX_VALUE` and `Int.MAX_VALUE`; [ofUnsigned] and [fromXdr]
+ * take the full range. [minSequenceAge], [minSequenceLedgerGap], `copy`, `component4` and `component5` throw
+ * [IllegalStateException] above that range; [minSequenceAgeExact] and [minSequenceLedgerGapExact] return every
+ * value.
+ *
  * @property timeBounds The time bounds for the transaction
  * @property ledgerBounds The ledger bounds for the transaction (V2 only)
  * @property minSequenceNumber The minimum source account sequence number this transaction is valid for (V2 only).
- *                             If null, the transaction is valid when source account's sequence number == tx.sequence - 1
- * @property minSequenceAge The minimum amount of time (in seconds) between source account sequence time and
- *                          the ledger time when this transaction will become valid (V2 only). 0 means unrestricted
- * @property minSequenceLedgerGap The minimum number of ledgers between source account sequence and the ledger
- *                                number when this transaction will become valid (V2 only). 0 means unrestricted
- * @property extraSigners Required extra signers (V2 only). Maximum of 2 extra signers
+ *                             If null, the transaction is valid when source account's sequence number == tx.sequence - 1.
+ *                             Any `int64` value is accepted, as the XDR allows
+ * @property minSequenceAgeExact The minimum amount of time (in seconds) between source account sequence time
+ *                               and the ledger time when this transaction will become valid (V2 only). 0 means
+ *                               unrestricted
+ * @property minSequenceLedgerGapExact The minimum number of ledgers between source account sequence and the
+ *                                     ledger number when this transaction will become valid (V2 only). 0 means
+ *                                     unrestricted
+ * @property minSequenceAge [minSequenceAgeExact] as a `Long`
+ * @property minSequenceLedgerGap [minSequenceLedgerGapExact] as an `Int`
+ * @property extraSigners Required extra signers (V2 only). Maximum of 2 extra signers. A signed payload signer
+ *                        needs a payload of 1 to 64 bytes, because the network refuses an empty one
  * @see <a href="https://developers.stellar.org/docs/learn/fundamentals/transactions/operations-and-transactions#preconditions">Transaction Preconditions</a>
  */
-data class TransactionPreconditions(
-    val timeBounds: TimeBounds? = null,
-    val ledgerBounds: LedgerBounds? = null,
-    val minSequenceNumber: Long? = null,
-    val minSequenceAge: Long = 0,
-    val minSequenceLedgerGap: Int = 0,
-    val extraSigners: List<SignerKey> = emptyList()
+class TransactionPreconditions private constructor(
+    val timeBounds: TimeBounds?,
+    val ledgerBounds: LedgerBounds?,
+    val minSequenceNumber: Long?,
+    val minSequenceAgeExact: ULong,
+    val minSequenceLedgerGapExact: UInt,
+    val extraSigners: List<SignerKey>,
+    // Sets this constructor apart from the public one, which has the same JVM signature.
+    @Suppress("UNUSED_PARAMETER") exact: Unit
 ) {
+    /** @throws IllegalArgumentException if a value is out of its range or an extra signer is invalid */
+    constructor(
+        timeBounds: TimeBounds? = null,
+        ledgerBounds: LedgerBounds? = null,
+        minSequenceNumber: Long? = null,
+        minSequenceAge: Long = 0,
+        minSequenceLedgerGap: Int = 0,
+        extraSigners: List<SignerKey> = emptyList()
+    ) : this(
+        timeBounds, ledgerBounds, minSequenceNumber,
+        minSequenceAge.also { require(it >= 0) { "minSequenceAge must be >= 0" } }.toULong(),
+        minSequenceLedgerGap.also { require(it >= 0) { "minSequenceLedgerGap must be >= 0" } }.toUInt(),
+        extraSigners, Unit
+    )
+
+    /** Creates empty preconditions; Java calls it as `new TransactionPreconditions()`. */
+    constructor() : this(null, null, null, 0uL, 0u, emptyList(), Unit)
 
     /** True only for a value that [fromXdr] read from a `PRECOND_V2` precondition. */
     private var decodedAsV2 = false
 
+    val minSequenceAge: Long
+        get() = minSequenceAgeExact.also {
+            check(it <= Long.MAX_VALUE.toULong()) {
+                "minSequenceAge $it exceeds Long.MAX_VALUE; read minSequenceAgeExact"
+            }
+        }.toLong()
+
+    val minSequenceLedgerGap: Int
+        get() = minSequenceLedgerGapExact.also {
+            check(it <= Int.MAX_VALUE.toUInt()) {
+                "minSequenceLedgerGap $it exceeds Int.MAX_VALUE; read minSequenceLedgerGapExact"
+            }
+        }.toInt()
+
     init {
-        require(minSequenceAge >= 0) { "minSequenceAge must be >= 0" }
-        require(minSequenceLedgerGap >= 0) { "minSequenceLedgerGap must be >= 0" }
         require(extraSigners.size <= MAX_EXTRA_SIGNERS_COUNT) {
             "Invalid preconditions, too many extra signers, can only have up to $MAX_EXTRA_SIGNERS_COUNT, got ${extraSigners.size}"
         }
-        if (minSequenceNumber != null) {
-            require(minSequenceNumber >= 0) { "minSequenceNumber must be >= 0" }
+        require(extraSigners.none { it is SignerKey.Ed25519SignedPayload && it.payload.isEmpty() }) {
+            "Invalid preconditions, an extra signed payload signer needs a payload of 1 to " +
+                "${SignerKey.SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH} bytes, got an empty one"
         }
     }
 
@@ -67,8 +111,8 @@ data class TransactionPreconditions(
     fun hasV2(): Boolean {
         return decodedAsV2 ||
                 ledgerBounds != null ||
-                minSequenceLedgerGap > 0 ||
-                minSequenceAge > 0 ||
+                minSequenceLedgerGapExact > 0u ||
+                minSequenceAgeExact > 0uL ||
                 minSequenceNumber != null ||
                 extraSigners.isNotEmpty()
     }
@@ -88,8 +132,8 @@ data class TransactionPreconditions(
                 timeBounds = timeBounds?.toXdr(),
                 ledgerBounds = ledgerBounds?.toXdr(),
                 minSeqNum = minSequenceNumber?.let { SequenceNumberXdr(Int64Xdr(it)) },
-                minSeqAge = DurationXdr(Uint64Xdr(minSequenceAge.toULong())),
-                minSeqLedgerGap = Uint32Xdr(minSequenceLedgerGap.toUInt()),
+                minSeqAge = DurationXdr(Uint64Xdr(minSequenceAgeExact)),
+                minSeqLedgerGap = Uint32Xdr(minSequenceLedgerGapExact),
                 extraSigners = extraSigners.map { it.toXdr() }
             )
             PreconditionsXdr.V2(v2)
@@ -109,14 +153,39 @@ data class TransactionPreconditions(
             timeBounds == other.timeBounds &&
             ledgerBounds == other.ledgerBounds &&
             minSequenceNumber == other.minSequenceNumber &&
-            minSequenceAge == other.minSequenceAge &&
-            minSequenceLedgerGap == other.minSequenceLedgerGap &&
+            minSequenceAgeExact == other.minSequenceAgeExact &&
+            minSequenceLedgerGapExact == other.minSequenceLedgerGapExact &&
             extraSigners == other.extraSigners &&
             hasV2() == other.hasV2()
 
     override fun hashCode(): Int =
-        listOf(timeBounds, ledgerBounds, minSequenceNumber, minSequenceAge, minSequenceLedgerGap, extraSigners, hasV2())
-            .hashCode()
+        listOf(
+            timeBounds, ledgerBounds, minSequenceNumber, minSequenceAgeExact, minSequenceLedgerGapExact, extraSigners,
+            hasV2()
+        ).hashCode()
+
+    override fun toString(): String =
+        "TransactionPreconditions(timeBounds=$timeBounds, ledgerBounds=$ledgerBounds, " +
+            "minSequenceNumber=$minSequenceNumber, minSequenceAge=$minSequenceAgeExact, " +
+            "minSequenceLedgerGap=$minSequenceLedgerGapExact, extraSigners=$extraSigners)"
+
+    operator fun component1(): TimeBounds? = timeBounds
+    operator fun component2(): LedgerBounds? = ledgerBounds
+    operator fun component3(): Long? = minSequenceNumber
+    operator fun component4(): Long = minSequenceAge
+    operator fun component5(): Int = minSequenceLedgerGap
+    operator fun component6(): List<SignerKey> = extraSigners
+
+    fun copy(
+        timeBounds: TimeBounds? = this.timeBounds,
+        ledgerBounds: LedgerBounds? = this.ledgerBounds,
+        minSequenceNumber: Long? = this.minSequenceNumber,
+        minSequenceAge: Long = this.minSequenceAge,
+        minSequenceLedgerGap: Int = this.minSequenceLedgerGap,
+        extraSigners: List<SignerKey> = this.extraSigners
+    ): TransactionPreconditions = TransactionPreconditions(
+        timeBounds, ledgerBounds, minSequenceNumber, minSequenceAge, minSequenceLedgerGap, extraSigners
+    )
 
     /**
      * Builder for creating TransactionPreconditions with a fluent API.
@@ -242,6 +311,22 @@ data class TransactionPreconditions(
         fun builder(): Builder = Builder()
 
         /**
+         * Creates preconditions with the exact `uint64` minimum sequence age and `uint32` minimum sequence ledger gap.
+         *
+         * @throws IllegalArgumentException if an extra signer is invalid
+         */
+        fun ofUnsigned(
+            timeBounds: TimeBounds? = null,
+            ledgerBounds: LedgerBounds? = null,
+            minSequenceNumber: Long? = null,
+            minSequenceAge: ULong = 0uL,
+            minSequenceLedgerGap: UInt = 0u,
+            extraSigners: List<SignerKey> = emptyList()
+        ): TransactionPreconditions = TransactionPreconditions(
+            timeBounds, ledgerBounds, minSequenceNumber, minSequenceAge, minSequenceLedgerGap, extraSigners, Unit
+        )
+
+        /**
          * Creates a new TransactionPreconditions object from a PreconditionsXdr XDR object.
          *
          * @param preconditions The XDR PreconditionsXdr object to convert
@@ -259,12 +344,12 @@ data class TransactionPreconditions(
                 }
                 is PreconditionsXdr.V2 -> {
                     val v2 = preconditions.value
-                    TransactionPreconditions(
+                    ofUnsigned(
                         timeBounds = v2.timeBounds?.let { TimeBounds.fromXdr(it) },
                         ledgerBounds = v2.ledgerBounds?.let { LedgerBounds.fromXdr(it) },
                         minSequenceNumber = v2.minSeqNum?.value?.value,
-                        minSequenceAge = v2.minSeqAge.value.value.toLong(),
-                        minSequenceLedgerGap = v2.minSeqLedgerGap.value.toInt(),
+                        minSequenceAge = v2.minSeqAge.value.value,
+                        minSequenceLedgerGap = v2.minSeqLedgerGap.value,
                         extraSigners = v2.extraSigners.map { SignerKey.fromXdr(it) }
                     ).apply { decodedAsV2 = true }
                 }

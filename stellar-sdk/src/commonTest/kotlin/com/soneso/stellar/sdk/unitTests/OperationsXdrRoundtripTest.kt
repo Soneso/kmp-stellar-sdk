@@ -28,6 +28,9 @@ class OperationsXdrRoundtripTest {
 
         val BALANCE_SPELLINGS = ClaimableBalanceVectors.spellings
 
+        /** The pool of testnet transaction 25e65885d13542f523597f9f46844cd80eb1fd9b87fc6b1a3c8811487b625053. */
+        const val POOL_ID = "74b85a9c1802cc0b3882858ab907b4678bc05209768088b8bc713f41442ff090"
+
         /**
          * Ids naming no claimable balance, beyond [ClaimableBalanceVectors.rejections]: lengths
          * no spelling has, and an XDR form carrying its discriminant in the last byte.
@@ -343,6 +346,83 @@ class OperationsXdrRoundtripTest {
         assertFailsWith<IllegalArgumentException> {
             SetOptionsOperation(signerWeight = 5)
         }
+    }
+
+    @Test
+    fun testSetOptionsSignerWeightAboveRangeFromV0Envelope() = runTest {
+        // A V0 envelope encoded by the reference XDR tool, with time bounds {0, 2^64-1} and three signer
+        // weights above 255, which the network accepted before protocol 10; the hash was computed from
+        // the envelope bytes without the SDK.
+        val envelope = "AAAAAGfCkKADrIUPUvc+CgLveti1zPocODhBQUZ9T6Rp6ARfAAABLAAAAEAAAAACAAAAAQAAAAAAAAAA//////////8AAAAAAAAAAwAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAFcDGhVgMTQUM2bhKpDZboi2XN1axvAEogNuScrpNRNpAAABAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAFcDGhVgMTQUM2bhKpDZboi2XN1axvAEogNuScrpNRNpgAAAAAAAAAAAAAAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAFcDGhVgMTQUM2bhKpDZboi2XN1axvAEogNuScrpNRNp/////wAAAAAAAAAA"
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        assertEquals(TimeBounds.ofUnsigned(0uL, ULong.MAX_VALUE), tx.preconditions.timeBounds)
+        val weights = tx.operations.map { (it as SetOptionsOperation).signerWeightExact }
+        assertEquals(listOf(256u, 2147483648u, UInt.MAX_VALUE), weights)
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("5cf83e9fc1b9985c5bcd1b04bda669b14aa5d439d06792062bdc5597f1044725", tx.hashHex())
+    }
+
+    @Test
+    fun testSetOptionsReadSignerWeightAboveRange() {
+        val signer = SignerKey.Ed25519PublicKey(StrKey.decodeEd25519PublicKey(ACCOUNT_B))
+        fun read(weight: UInt) = SetOptionsOperation.fromXdr(
+            SetOptionsOpXdr(
+                inflationDest = null, clearFlags = null, setFlags = null, masterWeight = null, lowThreshold = null,
+                medThreshold = null, highThreshold = null, homeDomain = null,
+                signer = SignerXdr(signer.toXdr(), Uint32Xdr(weight))
+            )
+        )
+        val max = read(UInt.MAX_VALUE)
+        assertFailsWith<IllegalStateException> { max.signerWeight }
+        assertFailsWith<IllegalStateException> { max.component10() }
+        assertFailsWith<IllegalStateException> { max.copy() }
+        assertEquals(
+            "SetOptionsOperation(inflationDestination=null, clearFlags=null, setFlags=null, masterKeyWeight=null, " +
+                "lowThreshold=null, mediumThreshold=null, highThreshold=null, homeDomain=null, signer=$signer, " +
+                "signerWeight=4294967295)",
+            max.toString()
+        )
+        assertEquals(256, read(256u).signerWeight)
+        assertFailsWith<IllegalArgumentException> { read(256u).copy() }
+        assertNotEquals(read(256u), read(257u))
+        val built = SetOptionsOperation(signer = signer, signerWeight = 255)
+        assertEquals(built, read(255u))
+        assertEquals(built.hashCode(), read(255u).hashCode())
+        assertEquals(built, read(255u).copy())
+    }
+
+    @Test
+    fun testSetOptionsDestructuringAndEqualityCoverEveryProperty() {
+        val signer = SignerKey.Ed25519PublicKey(StrKey.decodeEd25519PublicKey(ACCOUNT_B))
+        val op = SetOptionsOperation(ACCOUNT_B, 1, 2, 3, 4, 5, 6, "example.com", signer, 7)
+        val (inflationDestination, clearFlags, setFlags, masterKeyWeight, lowThreshold, mediumThreshold,
+            highThreshold, homeDomain, signerKey, signerWeight) = op
+        assertEquals(
+            listOf<Any?>(ACCOUNT_B, 1, 2, 3, 4, 5, 6, "example.com", signer, 7),
+            listOf(inflationDestination, clearFlags, setFlags, masterKeyWeight, lowThreshold, mediumThreshold,
+                highThreshold, homeDomain, signerKey, signerWeight)
+        )
+        val otherSigner = SignerKey.Ed25519PublicKey(StrKey.decodeEd25519PublicKey(ACCOUNT_C))
+        val variants = listOf(
+            op.copy(inflationDestination = ACCOUNT_A), op.copy(clearFlags = 9), op.copy(setFlags = 9),
+            op.copy(masterKeyWeight = 9), op.copy(lowThreshold = 9), op.copy(mediumThreshold = 9),
+            op.copy(highThreshold = 9), op.copy(homeDomain = "other.com"), op.copy(signer = otherSigner),
+            op.copy(signerWeight = 8)
+        )
+        variants.forEach { assertNotEquals(op, it) }
+        assertNotEquals<Any>(op, InflationOperation())
+    }
+
+    @Test
+    fun testSetOptionsSignerWithEmptyPayloadFails() {
+        val empty = SignerKey.ed25519SignedPayload(StrKey.decodeEd25519PublicKey(ACCOUNT_B), ByteArray(0))
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation(signer = empty, signerWeight = 1) }
+        val body = SetOptionsOpXdr(
+            inflationDest = null, clearFlags = null, setFlags = null, masterWeight = null, lowThreshold = null,
+            medThreshold = null, highThreshold = null, homeDomain = null,
+            signer = SignerXdr(empty.toXdr(), Uint32Xdr(1u))
+        )
+        assertFailsWith<IllegalArgumentException> { SetOptionsOperation.fromXdr(body) }
     }
 
     @Test
@@ -1287,6 +1367,21 @@ class OperationsXdrRoundtripTest {
         assertEquals(ACCOUNT_A, s.accountId)
     }
 
+    @Test
+    fun testRevokeSponsorshipSignerWithEmptyPayloadFromEnvelope() = runTest {
+        // A V1 envelope built byte by byte without the SDK: the revoke of a signed payload signer with
+        // an empty payload, which the network includes in a ledger as a failed operation.
+        val envelope = "AAAAAgAAAABnwpCgA6yFD1L3PgoC73rYtcz6HDg4QUFGfU+kaegEXwAAAGQAAABAAAAAAwAAAAAAAAAAAAAAAQAAAAAAAAASAAAAAQAAAADuNWWO3rX2RzlCu6U+/qrXObnsLObpsei7i3Z2iQ+c1AAAAANXAxoVYDE0FDNm4SqQ2W6ItlzdWsbwBKIDbknK6TUTaQAAAAAAAAAAAAAAAA=="
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        val op = tx.operations.single() as RevokeSponsorshipOperation
+        val signer = (op.sponsorship as Sponsorship.Signer).signerKey as SignerKey.Ed25519SignedPayload
+        assertEquals(0, signer.payload.size)
+        assertEquals("GBLQGGQVMAYTIFBTM3QSVEGZN2ELMXG5LLDPABFCANXETSXJGUJWT46I", signer.encodedEd25519PublicKey())
+        assertTrue(op.toString().contains("empty payload"))
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("8a872fd86630c1f88203dc5329b1535e6942ae269a7c0e71981da34c278218c7", tx.hashHex())
+    }
+
     // ========== Operation.fromXdr full integration ==========
     @Test
     fun testOperationFromXdrEndSponsoring() {
@@ -1866,10 +1961,24 @@ class OperationsXdrRoundtripTest {
     }
 
     @Test
-    fun testManageSellOfferNegativeOfferIdThrows() {
-        assertFailsWith<IllegalArgumentException> {
-            ManageSellOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = -1)
+    fun testManageSellOfferNegativeOfferIdRoundtrip() {
+        // offerID is int64; the network refuses a negative id as malformed from protocol 15 on.
+        for (offerId in listOf(-1L, Long.MIN_VALUE)) {
+            val op = ManageSellOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = offerId)
+            val xdr = op.toOperationBody() as OperationBodyXdr.ManageSellOfferOp
+            assertEquals(offerId, xdr.value.offerId.value)
+            assertEquals(op, ManageSellOfferOperation.fromXdr(xdr.value))
         }
+    }
+
+    @Test
+    fun testManageSellOfferNegativeOfferIdFromV0Envelope() = runTest {
+        // A V0 envelope with offer id -1; the hash was computed from the envelope bytes without the SDK.
+        val envelope = "AAAAAGfCkKADrIUPUvc+CgLveti1zPocODhBQUZ9T6Rp6ARfAAAAZAAAAEAAAAABAAAAAAAAAAAAAAABAAAAAAAAAAMAAAACTE9OR0FTU0VUMTIAAAAAAGfCkKADrIUPUvc+CgLveti1zPocODhBQUZ9T6Rp6ARfAAAAAAAAAOjUpRAAAAAAAQAAAAH//////////wAAAAAAAAABaegEXwAAAEAJhNSpNHRocZ2Ukgm5MOvYB9uPDfE3ScHZw7qLEfwSQCrLH5cnecYdP938XXAjWbjmSGRJ9k99M9yY7nMKJGoM"
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        assertEquals(-1L, (tx.operations.single() as ManageSellOfferOperation).offerId)
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("b6753b14c03b8bbbbd6fad75bfd26b5a97169fcf7b04ba596dc2205560b7cf7f", tx.hashHex())
     }
 
     @Test
@@ -1881,9 +1990,12 @@ class OperationsXdrRoundtripTest {
     }
 
     @Test
-    fun testManageBuyOfferNegativeOfferIdThrows() {
-        assertFailsWith<IllegalArgumentException> {
-            ManageBuyOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = -1)
+    fun testManageBuyOfferNegativeOfferIdRoundtrip() {
+        for (offerId in listOf(-1L, Long.MIN_VALUE)) {
+            val op = ManageBuyOfferOperation(ASSET_USD, ASSET_NATIVE, "1.0000000", Price(1, 1), offerId = offerId)
+            val xdr = op.toOperationBody() as OperationBodyXdr.ManageBuyOfferOp
+            assertEquals(offerId, xdr.value.offerId.value)
+            assertEquals(op, ManageBuyOfferOperation.fromXdr(xdr.value))
         }
     }
 
@@ -2004,17 +2116,54 @@ class OperationsXdrRoundtripTest {
     // ========== RevokeSponsorship: decode-only edge cases (manual XDR) ==========
 
     @Test
-    fun testRevokeSponsorshipTrustLinePoolShareThrows() {
-        val ledgerKey = RevokeSponsorshipOpXdr.LedgerKey(
-            LedgerKeyXdr.TrustLine(
-                LedgerKeyTrustLineXdr(
-                    accountId = KeyPair.fromAccountId(ACCOUNT_B).getXdrAccountId(),
-                    asset = TrustLineAssetXdr.LiquidityPoolID(PoolIDXdr(HashXdr(ByteArray(32))))
-                )
-            )
-        )
-        assertFailsWith<UnsupportedOperationException> {
-            RevokeSponsorshipOperation.fromXdr(ledgerKey)
+    fun testRevokeSponsorshipPoolShareTrustLineFromAppliedTransaction() = runTest {
+        // A testnet transaction applied with txSUCCESS in ledger 5829133.
+        val envelope = "AAAAAgAAAAAkns0kPl6G+DY63Bb7+24+SWf4l79qWyuv1/dZxJzwlAAAA+gAWPIAAAAABQAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAEgAAAAAAAAABAAAAAD3xC/lKAd+zFQkshKZmfBlmQZ8WRLUYtF/gLk/y58BAAAAAA3S4WpwYAswLOIKFirkHtGeLwFIJdoCIuLxxP0FEL/CQAAAAAAAAAAHEnPCUAAAAQC86K+u8RD2h+a17q4IrBTQNBlUEISLJgOUHSAhHh3rrA4yAIJndPBpkQajyNfsi61zyHZWFkCRs7n3H4ayf9gI="
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        val trustLine = (tx.operations.single() as RevokeSponsorshipOperation).sponsorship as Sponsorship.TrustLine
+        assertEquals("GA67CC7ZJIA57MYVBEWIJJTGPQMWMQM7CZCLKGFUL7QC4T7S47AEBQL3", trustLine.accountId)
+        assertEquals(POOL_ID, trustLine.liquidityPoolId)
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("25e65885d13542f523597f9f46844cd80eb1fd9b87fc6b1a3c8811487b625053", tx.hashHex())
+    }
+
+    @Test
+    fun testRevokeSponsorshipPoolShareTrustLineUppercaseId() {
+        val upper = Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID.uppercase())
+        val body = RevokeSponsorshipOperation(upper).toOperationBody() as OperationBodyXdr.RevokeSponsorshipOp
+        val decoded = RevokeSponsorshipOperation.fromXdr(body.value).sponsorship
+        assertEquals(POOL_ID, upper.liquidityPoolId)
+        for (same in listOf(Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID), decoded)) {
+            assertEquals(same to same.hashCode(), upper to upper.hashCode())
+        }
+    }
+
+    @Test
+    fun testRevokeSponsorshipPoolShareTrustLine() {
+        val trustLine = Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID)
+        val body = RevokeSponsorshipOperation(trustLine).toOperationBody() as OperationBodyXdr.RevokeSponsorshipOp
+        val key = ((body.value as RevokeSponsorshipOpXdr.LedgerKey).value as LedgerKeyXdr.TrustLine).value
+        assertEquals(POOL_ID, Util.bytesToHex((key.asset as TrustLineAssetXdr.LiquidityPoolID).value.value.value))
+        assertEquals(trustLine, RevokeSponsorshipOperation.fromXdr(body.value).sponsorship)
+        assertEquals(Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID).hashCode(), trustLine.hashCode())
+        val assetLine = Sponsorship.TrustLine(ACCOUNT_B, ASSET_USD)
+        assertNotEquals(assetLine, trustLine)
+        assertNotEquals(Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_A, POOL_ID), trustLine)
+        assertNotEquals(Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID.reversed()), trustLine)
+        assertNotEquals<Sponsorship>(trustLine, Sponsorship.Account(ACCOUNT_B))
+        assertEquals(Sponsorship.TrustLine(ACCOUNT_B, ASSET_USD).hashCode(), assetLine.hashCode())
+        val (accountId, asset) = assetLine
+        assertEquals(ACCOUNT_B to ASSET_USD, accountId to asset)
+        assertEquals(ACCOUNT_B, trustLine.component1())
+        assertFailsWith<UnsupportedOperationException> { trustLine.component2() }
+        assertNull(assetLine.liquidityPoolId)
+        assertEquals("TrustLine(accountId=$ACCOUNT_B, asset=$ASSET_USD)", assetLine.toString())
+        assertEquals("TrustLine(accountId=$ACCOUNT_B, liquidityPoolId=$POOL_ID)", trustLine.toString())
+        assertFailsWith<UnsupportedOperationException> { trustLine.asset }
+        assertFailsWith<UnsupportedOperationException> { trustLine.copy() }
+        assertFailsWith<IllegalArgumentException> { Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, POOL_ID.drop(2)) }
+        assertFailsWith<IllegalArgumentException> {
+            Sponsorship.TrustLine.forLiquidityPool(ACCOUNT_B, "zz" + POOL_ID.drop(2))
         }
     }
 

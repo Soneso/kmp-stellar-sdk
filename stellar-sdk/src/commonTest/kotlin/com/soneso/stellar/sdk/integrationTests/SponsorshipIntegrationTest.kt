@@ -2,6 +2,9 @@ package com.soneso.stellar.sdk.integrationTests
 
 import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
+import com.soneso.stellar.sdk.horizon.exceptions.BadRequestException
+import com.soneso.stellar.sdk.horizon.responses.TransactionResponse
+import com.soneso.stellar.sdk.xdr.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
@@ -285,5 +288,99 @@ class SponsorshipIntegrationTest {
         println("Effects page has ${effectsPage.records.size} effects")
 
         println("Test completed successfully")
+    }
+
+    /**
+     * Test revoking the sponsorship of a liquidity pool share trustline.
+     *
+     * The master account sponsors account A's trustlines to RICH and to the native/RICH pool share,
+     * then revokes the sponsorship of the pool share trustline. The revoke is read back from Horizon
+     * and names the pool.
+     */
+    @Test
+    fun testRevokePoolShareTrustLineSponsorship() = runTest(timeout = 180.seconds) {
+        val masterKeyPair = KeyPair.random()
+        val masterId = masterKeyPair.getAccountId()
+        fundTestAccountAndAwaitVisibility(masterId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        val master = Account(masterId, horizonServer.accounts().account(masterId).sequenceNumber)
+        val accountAKeyPair = KeyPair.random()
+        val accountAId = accountAKeyPair.getAccountId()
+        val richAsset = AssetTypeCreditAlphaNum4("RICH", masterId)
+        val pool = LiquidityPool(AssetTypeNative, richAsset)
+
+        val setup = TransactionBuilder(sourceAccount = master, network = network)
+            .addOperations(
+                listOf(
+                    BeginSponsoringFutureReservesOperation(sponsoredId = accountAId).apply { sourceAccount = masterId },
+                    CreateAccountOperation(destination = accountAId, startingBalance = "100"),
+                    ChangeTrustOperation(asset = richAsset, limit = "100000").apply { sourceAccount = accountAId },
+                    ChangeTrustOperation(liquidityPool = pool).apply { sourceAccount = accountAId },
+                    EndSponsoringFutureReservesOperation().apply { sourceAccount = accountAId }
+                )
+            )
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        setup.sign(masterKeyPair)
+        setup.sign(accountAKeyPair)
+        assertTrue(horizonServer.submitTransaction(setup.toEnvelopeXdrBase64()).successful, "Setup should succeed")
+
+        val poolId = pool.getLiquidityPoolId()
+        val revoke = TransactionBuilder(sourceAccount = master, network = network)
+            .addOperation(RevokeSponsorshipOperation(Sponsorship.TrustLine.forLiquidityPool(accountAId, poolId)))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        revoke.sign(masterKeyPair)
+        val response = horizonServer.submitTransaction(revoke.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Revoking the pool share trustline sponsorship should succeed")
+        realDelay(3000)
+
+        val decoded = readBack(horizonServer.transactions().transaction(response.hash))
+        val trustLine = (decoded.operations.single() as RevokeSponsorshipOperation).sponsorship as Sponsorship.TrustLine
+        assertEquals(accountAId, trustLine.accountId)
+        assertEquals(poolId, trustLine.liquidityPoolId)
+    }
+
+    /**
+     * Test revoking the sponsorship of a signer with an empty signed payload.
+     *
+     * No account can hold such a signer, so the network includes the transaction in a ledger with
+     * the operation failed. The failed transaction is read back from Horizon by its hash.
+     */
+    @Test
+    fun testRevokeSignerSponsorshipWithEmptyPayloadFails() = runTest(timeout = 180.seconds) {
+        val masterKeyPair = KeyPair.random()
+        val masterId = masterKeyPair.getAccountId()
+        fundTestAccountAndAwaitVisibility(masterId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        val master = Account(masterId, horizonServer.accounts().account(masterId).sequenceNumber)
+        val signerKey = SignerKey.ed25519SignedPayload(masterId, ByteArray(0))
+
+        val transaction = TransactionBuilder(sourceAccount = master, network = network)
+            .addOperation(RevokeSponsorshipOperation(Sponsorship.Signer(masterId, signerKey)))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        transaction.sign(masterKeyPair)
+        assertFailsWith<BadRequestException> { horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64()) }
+        realDelay(3000)
+
+        val trx = horizonServer.transactions().transaction(transaction.hashHex())
+        assertTrue(trx.ledger > 0, "The failed transaction should be in a ledger")
+        assertFalse(trx.successful)
+        val result = TransactionResultXdr.fromXdrBase64(trx.resultXdr!!).result as TransactionResultResultXdr.Results
+        assertEquals(TransactionResultCodeXdr.txFAILED, result.discriminant)
+        val opResult = (result.value.single() as OperationResultXdr.Tr).value as OperationResultTrXdr.RevokeSponsorshipResult
+        assertEquals(RevokeSponsorshipResultCodeXdr.REVOKE_SPONSORSHIP_DOES_NOT_EXIST, opResult.value.discriminant)
+        val signer = (readBack(trx).operations.single() as RevokeSponsorshipOperation).sponsorship as Sponsorship.Signer
+        assertEquals(signerKey, signer.signerKey)
+    }
+
+    /** Decodes the envelope of [trx] and checks that it encodes to the same bytes and keeps Horizon's hash. */
+    private suspend fun readBack(trx: TransactionResponse): Transaction {
+        val decoded = AbstractTransaction.fromEnvelopeXdr(trx.envelopeXdr!!, network) as Transaction
+        assertEquals(trx.envelopeXdr, decoded.toEnvelopeXdrBase64())
+        assertEquals(trx.hash, decoded.hashHex())
+        return decoded
     }
 }
