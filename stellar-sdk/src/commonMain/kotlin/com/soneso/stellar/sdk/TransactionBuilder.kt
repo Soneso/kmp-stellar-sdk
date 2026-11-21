@@ -181,12 +181,12 @@ class TransactionBuilder(
      * @return This builder for method chaining
      */
     fun addTimeBounds(timeBounds: TimeBounds): TransactionBuilder {
-        this.preconditions = TransactionPreconditions(
+        this.preconditions = TransactionPreconditions.ofUnsigned(
             timeBounds = timeBounds,
             ledgerBounds = preconditions.ledgerBounds,
             minSequenceNumber = preconditions.minSequenceNumber,
-            minSequenceAge = preconditions.minSequenceAge,
-            minSequenceLedgerGap = preconditions.minSequenceLedgerGap,
+            minSequenceAge = preconditions.minSequenceAgeExact,
+            minSequenceLedgerGap = preconditions.minSequenceLedgerGapExact,
             extraSigners = preconditions.extraSigners
         )
         return this
@@ -242,12 +242,12 @@ class TransactionBuilder(
                 currentTimeSeconds + txTimeout!!
             }
 
-            TransactionPreconditions(
+            TransactionPreconditions.ofUnsigned(
                 timeBounds = TimeBounds(minTime = 0L, maxTime = maxTime),
                 ledgerBounds = preconditions.ledgerBounds,
                 minSequenceNumber = preconditions.minSequenceNumber,
-                minSequenceAge = preconditions.minSequenceAge,
-                minSequenceLedgerGap = preconditions.minSequenceLedgerGap,
+                minSequenceAge = preconditions.minSequenceAgeExact,
+                minSequenceLedgerGap = preconditions.minSequenceLedgerGapExact,
                 extraSigners = preconditions.extraSigners
             )
         } else {

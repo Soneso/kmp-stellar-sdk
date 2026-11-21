@@ -37,6 +37,8 @@ sealed class SignerKey {
      * Gets the encoded string representation of this signer key.
      *
      * @return The StrKey-encoded representation of this signer key
+     * @throws IllegalArgumentException for an [Ed25519SignedPayload] with an empty payload, which has
+     * no strkey form
      */
     abstract fun encodeSignerKey(): String
 
@@ -147,7 +149,9 @@ sealed class SignerKey {
      * transactions to be authorized.
      *
      * @property ed25519PublicKey The 32-byte Ed25519 public key that must sign the payload
-     * @property payload The payload to be signed (up to 64 bytes)
+     * @property payload The payload to be signed (0 to 64 bytes). [SetOptionsOperation] refuses an empty
+     * payload for its signer and [TransactionPreconditions] for an extra signer, as the network does; a
+     * [RevokeSponsorshipOperation] of a signer can carry one. An empty payload has no strkey form.
      */
     data class Ed25519SignedPayload(
         val ed25519PublicKey: ByteArray,
@@ -157,8 +161,8 @@ sealed class SignerKey {
             require(ed25519PublicKey.size == 32) {
                 "Ed25519 public key must be 32 bytes, got ${ed25519PublicKey.size}"
             }
-            require(payload.size in 1..SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH) {
-                "Payload must be between 1 and $SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH bytes, got ${payload.size}"
+            require(payload.size <= SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH) {
+                "Payload must be at most $SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH bytes, got ${payload.size}"
             }
         }
 
@@ -169,7 +173,12 @@ sealed class SignerKey {
          */
         fun encodedEd25519PublicKey(): String = StrKey.encodeEd25519PublicKey(ed25519PublicKey)
 
+        /**
+         * @throws IllegalArgumentException if [payload] is empty, because a signed payload strkey
+         * holds 1 to 64 payload bytes
+         */
         override fun encodeSignerKey(): String {
+            require(payload.isNotEmpty()) { "An empty payload has no signed payload strkey" }
             // A signed payload strkey carries the 32-byte ed25519 public key, the payload length
             // as a big-endian four-byte value, and the payload padded with zeros to a four-byte
             // boundary.
@@ -210,7 +219,9 @@ sealed class SignerKey {
             return result
         }
 
-        override fun toString(): String = "SignerKey.Ed25519SignedPayload(${encodeSignerKey()})"
+        override fun toString(): String =
+            if (payload.isEmpty()) "SignerKey.Ed25519SignedPayload(${encodedEd25519PublicKey()}, empty payload)"
+            else "SignerKey.Ed25519SignedPayload(${encodeSignerKey()})"
     }
 
     companion object {

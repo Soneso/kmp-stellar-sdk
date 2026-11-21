@@ -4,6 +4,9 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.unitTests.MuxedSourceAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -49,6 +52,11 @@ class PaymentsIntegrationTest {
         Network.TESTNET
     } else {
         Network.FUTURENET
+    }
+    private val rpcUrl = if (testOn == "testnet") {
+        "https://soroban-testnet.stellar.org"
+    } else {
+        "https://rpc-futurenet.stellar.org"
     }
 
     /**
@@ -146,6 +154,60 @@ class PaymentsIntegrationTest {
 
         val effectsPage = horizonServer.effects().forAccount(accountAId).execute()
         assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+    }
+
+    /**
+     * Test native payments whose preconditions hold values at the limits of their XDR types:
+     * time bounds {0, 2^64-1}, ledger bounds {0, 2^32-1} and a minimum sequence number of -1.
+     *
+     * Horizon refuses a negative minimum sequence number itself, so that payment is sent through RPC.
+     * Each payment is read back from Horizon: its envelope decodes, encodes to the same bytes,
+     * keeps Horizon's hash and holds the submitted preconditions.
+     */
+    @Test
+    fun testSendNativePaymentWithPreconditionsAtXdrLimits() = runTest(timeout = 240.seconds) {
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountBId = KeyPair.random().getAccountId()
+        for (accountId in listOf(accountAId, accountBId)) {
+            fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        }
+        val accountA = Account(accountAId, horizonServer.accounts().account(accountAId).sequenceNumber)
+
+        val preconditions = listOf(
+            TransactionPreconditions(timeBounds = TimeBounds.ofUnsigned(0uL, ULong.MAX_VALUE)),
+            TransactionPreconditions(ledgerBounds = LedgerBounds.ofUnsigned(0u, UInt.MAX_VALUE)),
+            TransactionPreconditions(minSequenceNumber = -1)
+        )
+        for (precond in preconditions) {
+            val transaction = TransactionBuilder(sourceAccount = accountA, network = network)
+                .addOperation(PaymentOperation(destination = accountBId, asset = AssetTypeNative, amount = "1"))
+                .addPreconditions(precond)
+                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+                .build()
+            transaction.sign(keyPairA)
+            if (precond.minSequenceNumber == null) {
+                val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+                assertTrue(response.successful, "Payment with $precond should succeed")
+            } else {
+                SorobanServer(rpcUrl).use { rpc ->
+                    val sent = rpc.sendTransaction(transaction)
+                    assertEquals(SendTransactionStatus.PENDING, sent.status, "RPC result: ${sent.errorResultXdr}")
+                    assertEquals(GetTransactionStatus.SUCCESS, rpc.pollTransaction(transaction.hashHex()).status)
+                }
+            }
+            realDelay(3000)
+
+            val trx = horizonServer.transactions().transaction(transaction.hashHex())
+            assertTrue(trx.successful)
+            val decoded = AbstractTransaction.fromEnvelopeXdr(trx.envelopeXdr!!, network) as Transaction
+            assertEquals(trx.envelopeXdr, decoded.toEnvelopeXdrBase64())
+            assertEquals(trx.hash, decoded.hashHex())
+            assertEquals(precond, decoded.preconditions)
+            // Horizon reports a max_time above 2^63-1 as 2^63-1, so only its ledger bounds are compared.
+            precond.ledgerBounds?.let { assertEquals(it.maxLedgerExact.toLong(), trx.preconditions?.ledgerBounds?.maxLedger) }
+            precond.minSequenceNumber?.let { assertEquals(it, trx.preconditions?.minAccountSequence) }
+        }
     }
 
     /**
