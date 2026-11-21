@@ -13,6 +13,7 @@ import com.soneso.stellar.sdk.KeyPair
 import com.soneso.stellar.sdk.Network
 import com.soneso.stellar.sdk.StrKey
 import com.soneso.stellar.sdk.contract.ContractClient
+import com.soneso.stellar.sdk.contract.SorobanContractParserException
 import com.soneso.stellar.sdk.rpc.SorobanServer
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.util.TestResourceUtil
@@ -56,7 +57,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -81,6 +81,7 @@ class ContractClientExternalRefDeployTest {
     private val createdContractId = StrKey.encodeContract(createdContractHash)
     private val fixedSalt = ByteArray(32) { 0x11 }
     private val helloWasm = TestResourceUtil.readWasmFile("soroban_hello_world_contract.wasm")
+    private val unroutable = "http://127.0.0.1:1"
 
     private fun tagKeyB64(tag: ByteArray = executableTag.encodeToByteArray()): String {
         val key = LedgerKeyXdr.ContractData(
@@ -133,7 +134,8 @@ class ContractClientExternalRefDeployTest {
      * A [SorobanServer] over a MockEngine serving the full external-ref deploy
      * flow. getLedgerEntries requests are dispatched on the exact ledger key
      * they carry: the owner's executable tag key, the code key under the
-     * resolved hash, or the source account fetch. When [tagEntryExists] is
+     * resolved hash (answered with [code] on every read), or the source
+     * account fetch. When [tagEntryExists] is
      * false the tag request is answered with no entries. Every request body is
      * appended to [capturedBodies].
      */
@@ -141,7 +143,7 @@ class ContractClientExternalRefDeployTest {
         sourceAccount: String,
         capturedBodies: MutableList<String>,
         tagEntryExists: Boolean = true,
-        codeParseable: Boolean = true,
+        code: ByteArray = helloWasm,
         simulateError: Boolean = false,
         sendHashMissing: Boolean = false,
         getTxNotFoundFirst: Boolean = false,
@@ -159,9 +161,7 @@ class ContractClientExternalRefDeployTest {
             val resultJson = when {
                 "\"getLedgerEntries\"" in body && tagKey in body ->
                     if (tagEntryExists) entriesResultJson(tagEntryB64(tag)) else emptyEntriesResultJson
-                "\"getLedgerEntries\"" in body && codeKey in body ->
-                    entriesResultJson(codeEntryB64(
-                        if (codeParseable) helloWasm else "not wasm".encodeToByteArray()))
+                "\"getLedgerEntries\"" in body && codeKey in body -> entriesResultJson(codeEntryB64(code))
                 "\"getLedgerEntries\"" in body -> ledgerEntriesResultJson(sourceAccount)
                 "\"simulateTransaction\"" in body ->
                     if (simulateError) """{ "error": "host function failed", "latestLedger": 14245 }"""
@@ -464,35 +464,37 @@ class ContractClientExternalRefDeployTest {
     }
 
     @Test
-    fun testDeployProceedsWhenResolvedCodeHasNoParseableSpec() = runTest {
+    fun testDeployFailsBeforeSubmissionWhenResolvedCodeCannotBeParsed() = runTest {
         val signer = KeyPair.random()
-        val source = signer.getAccountId()
         val captured = mutableListOf<String>()
+        val server = externalRefDeployMockServer(signer.getAccountId(), captured, code = undecodableSpecModule())
 
-        // The unparseable code makes the spec preload throw and get caught,
-        // and the deployment still submits. The client is then built through
-        // the forContract fallback, which contacts the rpc url with its own
-        // connection; the unroutable url turns that into the failure asserted
-        // here, after the submission already proved the deploy went through.
-        assertFails {
-            ContractClient.deployFromExternalRefInternal(
-                executableOwner = ownerContractId,
-                tag = executableTag,
-                constructorArgs = emptyList(),
-                source = source,
-                signer = signer,
-                network = Network.TESTNET,
-                rpcUrl = "http://127.0.0.1:1",
-                salt = fixedSalt,
-                loadSpec = true,
-                server = externalRefDeployMockServer(source, captured, codeParseable = false)
-            )
-        }
-        assertTrue(captured.any { "\"sendTransaction\"" in it },
-            "the parser failure must not abort the deployment")
+        val e = assertFailsWith<SorobanContractParserException> { deployWithMockServer(server, signer, unroutable) }
+
+        assertEquals(UNDECODABLE_SPEC_ERROR, e.message)
+        assertEquals(listOf("getLedgerEntries", "getLedgerEntries"), captured.map { methodOf(it) })
+        assertTrue(codeKeyB64() in captured[1])
     }
 
-    private suspend fun deployWithMockServer(server: SorobanServer, signer: KeyPair): ContractClient =
+    @Test
+    fun testDeployFailsBeforeSubmissionWhenResolvedCodeHasNoSpecEntries() = runTest {
+        val signer = KeyPair.random()
+        val captured = mutableListOf<String>()
+        val server = externalRefDeployMockServer(signer.getAccountId(), captured, code = moduleWithSpec(ByteArray(0)))
+
+        val e = assertFailsWith<IllegalStateException> { deployWithMockServer(server, signer, unroutable) }
+
+        assertEquals("Contract spec not found in the code of wasm id ${"03".repeat(32)}.", e.message)
+        assertEquals(listOf("getLedgerEntries", "getLedgerEntries"), captured.map { methodOf(it) })
+        assertTrue(codeKeyB64() in captured[1])
+    }
+
+    /** Deploys over [server]; a [ContractClient.forContract] fallback opens its own server for [rpcUrl]. */
+    private suspend fun deployWithMockServer(
+        server: SorobanServer,
+        signer: KeyPair,
+        rpcUrl: String = MOCK_RPC_SERVER_URL
+    ): ContractClient =
         ContractClient.deployFromExternalRefInternal(
             executableOwner = ownerContractId,
             tag = executableTag,
@@ -500,7 +502,7 @@ class ContractClientExternalRefDeployTest {
             source = signer.getAccountId(),
             signer = signer,
             network = Network.TESTNET,
-            rpcUrl = MOCK_RPC_SERVER_URL,
+            rpcUrl = rpcUrl,
             salt = fixedSalt,
             loadSpec = true,
             server = server
