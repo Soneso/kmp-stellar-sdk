@@ -404,14 +404,44 @@ class OperationsXdrRoundtripTest {
             ManageDataOperation("", ByteArray(0))
         }
         assertFailsWith<IllegalArgumentException> {
-            ManageDataOperation("  ", ByteArray(0))
-        }
-        assertFailsWith<IllegalArgumentException> {
             ManageDataOperation("a".repeat(65), ByteArray(0))
         }
         assertFailsWith<IllegalArgumentException> {
             ManageDataOperation("key", ByteArray(65))
         }
+    }
+
+    @Test
+    fun testManageDataEmptyNameThrows() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            ManageDataOperation("", null)
+        }
+        assertEquals("Data entry name cannot be empty", exception.message)
+    }
+
+    @Test
+    fun testManageDataNameOfSpacesRoundtrip() {
+        // stellar-core accepts a name of 1 to 64 printable ASCII bytes, and a space is printable.
+        // The body is type 10 (MANAGE_DATA), the name as string64 (length, bytes, zero padding)
+        // and the present value "v".
+        val encodedNames = mapOf(" " to "0000000120000000", "  " to "0000000220200000")
+        for ((name, encodedName) in encodedNames) {
+            val op = ManageDataOperation(name, "v".encodeToByteArray())
+            val bytes = encodedBody(op.toOperationBody())
+            assertEquals("0000000a${encodedName}000000010000000176000000", Util.bytesToHex(bytes))
+            val decoded = OperationBodyXdr.decode(XdrReader(bytes)) as OperationBodyXdr.ManageDataOp
+            assertEquals(op, ManageDataOperation.fromXdr(decoded.value), "\"$name\" must read back equal")
+        }
+    }
+
+    @Test
+    fun testManageDataNameOfSpaceFromAppliedTransaction() = runTest {
+        // A testnet transaction applied with txSUCCESS in ledger 5829124.
+        val envelope = "AAAAAgAAAAAkns0kPl6G+DY63Bb7+24+SWf4l79qWyuv1/dZxJzwlAAAA+gAWPIAAAAAAQAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAACgAAAAEgAAAAAAAAAQAAAAF2AAAAAAAAAAAAAAHEnPCUAAAAQA8R0mGR0d8fsDaUYNour6JNcAWPRau5UE4Z7ECVp36iPJcjoVLKduTZvq2qIBnmQ1fQouMB9bZRGpkbV0troAY="
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        assertEquals(ManageDataOperation(" ", "v".encodeToByteArray()), tx.operations.single())
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("b6ffe005434126d1afec562da2e7b0d78bd2e06a6c86b786ce7e4da1fb1b51a0", tx.hashHex())
     }
 
     @Test
@@ -1311,12 +1341,29 @@ class OperationsXdrRoundtripTest {
     }
 
     @Test
-    fun testClaimPredicateNotCannotNest() {
-        val inner = ClaimPredicate.BeforeAbsoluteTime(1700000000L)
-        val notPred = ClaimPredicate.Not(inner)
-        assertFailsWith<IllegalArgumentException> {
-            ClaimPredicate.Not(notPred)
-        }
+    fun testClaimPredicateNestedNotRoundtrip() {
+        // stellar-core accepts a NOT predicate inside a NOT predicate.
+        val p = ClaimPredicate.Not(ClaimPredicate.Not(ClaimPredicate.Unconditional))
+        val writer = XdrWriter()
+        p.toXdr().encode(writer)
+        val bytes = writer.toByteArray()
+        // NOT (3) with a present inner predicate (1), twice, then UNCONDITIONAL (0).
+        assertEquals("0000000300000001000000030000000100000000", Util.bytesToHex(bytes))
+        assertEquals(p, ClaimPredicate.fromXdr(ClaimPredicateXdr.decode(XdrReader(bytes))))
+    }
+
+    @Test
+    fun testClaimPredicateNestedNotFromAppliedTransaction() = runTest {
+        // A testnet transaction applied with txSUCCESS in ledger 5829126.
+        val envelope = "AAAAAgAAAAAkns0kPl6G+DY63Bb7+24+SWf4l79qWyuv1/dZxJzwlAAAA+gAWPIAAAAAAgAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAADgAAAAAAAAAAAJiWgAAAAAEAAAAAAAAAAD3xC/lKAd+zFQkshKZmfBlmQZ8WRLUYtF/gLk/y58BAAAAAAwAAAAEAAAADAAAAAQAAAAAAAAAAAAAAAcSc8JQAAABAjysNG4nraKjECsvzWi2TreQi0Fru4UMeaoL6eJB0XPYyrRh8nG7kcUgon8bFdpS5UFlM4vuNTMqJEnsdvex7CQ=="
+        val tx = AbstractTransaction.fromEnvelopeXdr(envelope, Network.TESTNET) as Transaction
+        val op = tx.operations.single() as CreateClaimableBalanceOperation
+        assertEquals(
+            ClaimPredicate.Not(ClaimPredicate.Not(ClaimPredicate.Unconditional)),
+            op.claimants.single().predicate
+        )
+        assertEquals(envelope, tx.toEnvelopeXdrBase64())
+        assertEquals("c2123aaec96c3b0215f8b9b770ab9b16164339affa2ee4ea2d7ba5fcf128ff67", tx.hashHex())
     }
 
     @Test
