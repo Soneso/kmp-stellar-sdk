@@ -27,7 +27,8 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  *   (`com.ionspin.kotlin.bignum.integer.BigInteger`, as returned by [Scv.fromUint128],
  *   [Scv.fromInt128], [Scv.fromUint256] and [Scv.fromInt256])
  * - `SCV_BYTES` → `ByteArray`
- * - `SCV_STRING`, `SCV_SYMBOL` → `String`
+ * - `SCV_STRING`, `SCV_SYMBOL` → `String` when the bytes are valid UTF-8, every leading byte
+ *   order mark kept; other bytes → the [SCValXdr] itself, whose payload holds them
  * - `SCV_ADDRESS` → strkey `String` (`G...`, `C...`, `M...`, `B...` or `L...`)
  * - `SCV_VEC` → `List<Any?>` with each element converted recursively, in order; an
  *   absent payload yields an empty list
@@ -45,7 +46,7 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  * Map keys need value-based equality, which `ByteArray` and the generated XDR types do
  * not provide, so keys use a narrower conversion than values:
  *
- * - `SCV_SYMBOL`, `SCV_STRING` → `String`
+ * - `SCV_SYMBOL`, `SCV_STRING` → `String` when the bytes are valid UTF-8
  * - `SCV_U32` → `UInt`; `SCV_I32` → `Int`
  * - `SCV_U64`, `SCV_TIMEPOINT`, `SCV_DURATION` → `ULong`; `SCV_I64` → `Long`
  * - `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` → `BigInteger`
@@ -55,7 +56,8 @@ import com.soneso.stellar.sdk.xdr.SCValXdr
  *   tables, since a bytes value stays a `ByteArray`
  * - `SCV_ADDRESS` → strkey `String`, the same representation as for a value
  *
- * Every other key arm is unrepresentable. A map with an unrepresentable key, or with two
+ * Every other key arm is unrepresentable, and so is a symbol or string key whose bytes are
+ * not valid UTF-8. A map with an unrepresentable key, or with two
  * entries whose converted keys are equal, converts to the [SCValXdr] itself as a whole.
  * A nested map that falls back is contained: the enclosing vec or map still converts,
  * with that map left as an [SCValXdr] element.
@@ -124,8 +126,8 @@ public fun SCValXdr.toNative(): Any? = when (this) {
     is SCValXdr.U256 -> Scv.fromUint256(this)
     is SCValXdr.I256 -> Scv.fromInt256(this)
     is SCValXdr.Bytes -> value.value
-    is SCValXdr.Str -> value.value
-    is SCValXdr.Sym -> value.value
+    is SCValXdr.Str -> Util.utf8OrNull(value.bytes) ?: this
+    is SCValXdr.Sym -> Util.utf8OrNull(value.bytes) ?: this
     is SCValXdr.Vec -> value?.value?.map { it.toNative() } ?: emptyList<Any?>()
     is SCValXdr.Map -> mapToNative(value?.value ?: emptyList()) ?: this
     is SCValXdr.Address -> try {
@@ -202,8 +204,8 @@ private fun primitiveIntegerValue(key: Any?): BigInteger? = when (key) {
  * [unrepresentableKey] when the key arm has no such representation.
  */
 private fun mapKeyToNative(key: SCValXdr): Any? = when (key) {
-    is SCValXdr.Sym -> key.value.value
-    is SCValXdr.Str -> key.value.value
+    is SCValXdr.Sym -> Util.utf8OrNull(key.value.bytes) ?: unrepresentableKey
+    is SCValXdr.Str -> Util.utf8OrNull(key.value.bytes) ?: unrepresentableKey
     is SCValXdr.U32 -> key.value.value
     is SCValXdr.I32 -> key.value.value
     is SCValXdr.U64 -> key.value.value

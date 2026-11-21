@@ -8,10 +8,12 @@
 package com.soneso.stellar.sdk.smartaccount.core
 
 import com.soneso.stellar.sdk.Address
+import com.soneso.stellar.sdk.Util
 import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.scval.compareScValHostOrder
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
+import com.soneso.stellar.sdk.xdr.XdrJson
 
 /**
  * Represents the v0.7.0 AuthPayload format used by the OZ smart account contract.
@@ -74,8 +76,10 @@ object SmartAccountAuthPayloadCodec {
         for (entry in mapEntries) {
             val key = entry.key
             if (key !is SCValXdr.Sym) continue
+            // A key that is not valid UTF-8 names no field.
+            val keyName = Util.utf8OrNull(key.value.bytes) ?: continue
 
-            when (key.value.value) {
+            when (keyName) {
                 "context_rule_ids" -> {
                     val vec = entry.`val`
                     if (vec is SCValXdr.Vec) {
@@ -221,7 +225,8 @@ object SmartAccountAuthPayloadCodec {
             )
         }
 
-        return when (typeTag.value.value) {
+        // A tag that is not valid UTF-8 matches no signer type.
+        return when (Util.utf8OrNull(typeTag.value.bytes)) {
             "Delegated" -> {
                 if (elements.size < 2) {
                     throw TransactionException.signingFailed(
@@ -259,7 +264,7 @@ object SmartAccountAuthPayloadCodec {
                 SignerScValFields.External(verifierAddressStr, keyDataScVal.value.value)
             }
             else -> throw TransactionException.signingFailed(
-                "Unknown signer type tag: '${typeTag.value.value}'"
+                "Unknown signer type tag: '${XdrJson.displayText(typeTag.value.bytes)}'"
             )
         }
     }

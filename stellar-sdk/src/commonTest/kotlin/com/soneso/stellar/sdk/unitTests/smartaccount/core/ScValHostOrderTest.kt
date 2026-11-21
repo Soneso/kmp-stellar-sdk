@@ -181,6 +181,24 @@ class ScValHostOrderTest {
         assertEquals(0, compareScValHostOrder(a, Scv.toString("apple")))
     }
 
+    // String and Symbol comparands compare their stored bytes unsigned, also bytes that are not
+    // valid UTF-8 and read as the same replacement text.
+    @Test
+    fun testStringAndSymbolComparands_unsignedStoredBytes() {
+        val low = byteArrayOf(0xC0.toByte())
+        val high = byteArrayOf(0xFF.toByte())
+        val pairs = listOf(
+            SCValXdr.Str(SCStringXdr(low)) to SCValXdr.Str(SCStringXdr(high)),
+            SCValXdr.Sym(SCSymbolXdr(low)) to SCValXdr.Sym(SCSymbolXdr(high))
+        )
+        for ((a, b) in pairs) {
+            assertTrue(compareScValHostOrder(a, b) < 0, "0xC0 sorts below 0xFF unsigned")
+            assertTrue(compareScValHostOrder(b, a) > 0)
+            assertEquals(0, compareScValHostOrder(a, a))
+        }
+        assertTrue(compareScValHostOrder(Scv.toString("\u007F"), SCValXdr.Str(SCStringXdr(low))) < 0, "a high byte is not negative")
+    }
+
     // ExecutableTag comparands carry raw tag bytes and compare by content, byte for byte,
     // with the shorter value first on a prefix tie.
     @Test

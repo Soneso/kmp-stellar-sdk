@@ -159,6 +159,17 @@ object Util {
     }
 
     /**
+     * Decodes [bytes] as strict UTF-8, every leading byte order mark kept.
+     *
+     * @return the text, or `null` when [bytes] are not valid UTF-8
+     */
+    internal fun utf8OrNull(bytes: ByteArray): String? = try {
+        bytes.decodeToString(throwOnInvalidSequence = true)
+    } catch (_: CharacterCodingException) {
+        null
+    }
+
+    /**
      * Returns SHA-256 hash of the input data.
      *
      * Note: This is an internal utility function and should not be used directly by

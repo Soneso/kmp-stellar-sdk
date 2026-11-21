@@ -520,10 +520,10 @@ class OZContextRuleManager internal constructor(
         val mapEntries = (scVal as? SCValXdr.Map)?.value?.value
             ?: throw ValidationException.invalidInput("contextRule", "Expected Map ScVal for context rule")
 
-        // Build a lookup by symbol key
+        // Build a lookup by symbol key; a key that is not valid UTF-8 names no field
         val fields = mutableMapOf<String, SCValXdr>()
         for (entry in mapEntries) {
-            val key = (entry.key as? SCValXdr.Sym)?.value?.value ?: continue
+            val key = (entry.key as? SCValXdr.Sym)?.let { Util.utf8OrNull(it.value.bytes) } ?: continue
             fields[key] = entry.`val`
         }
 

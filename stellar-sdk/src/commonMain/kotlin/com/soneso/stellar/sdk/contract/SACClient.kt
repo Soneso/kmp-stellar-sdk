@@ -496,8 +496,7 @@ class SACClient private constructor(
                 val writer = XdrWriter()
                 entry.encode(writer)
                 val encoded = writer.toByteArray()
-                // Strings decode invalid UTF-8 to replacement characters, so the re-encoding is the check
-                // that the entry is the exact bytes it was read from.
+                // The re-encoding is the check that the entry is the exact bytes it was read from.
                 val read = bytes.copyOfRange(offset, minOf(offset + encoded.size, bytes.size))
                 check(read.contentEquals(encoded)) {
                     "The embedded SAC spec does not decode at byte offset $offset: the entry re-encodes to different bytes"

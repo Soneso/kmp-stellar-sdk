@@ -507,6 +507,7 @@ object Scv {
      * @param scVal [SCValXdr] to convert
      * @return the string value
      * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_STRING]
+     * @throws CharacterCodingException if the string bytes are not valid UTF-8; [SCStringXdr.bytes] holds them
      */
     fun fromString(scVal: SCValXdr): String {
         require(scVal is SCValXdr.Str) {
@@ -535,6 +536,7 @@ object Scv {
      * @param scVal [SCValXdr] to convert
      * @return the symbol
      * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_SYMBOL]
+     * @throws CharacterCodingException if the symbol bytes are not valid UTF-8; [SCSymbolXdr.bytes] holds them
      */
     fun fromSymbol(scVal: SCValXdr): String {
         require(scVal is SCValXdr.Sym) {

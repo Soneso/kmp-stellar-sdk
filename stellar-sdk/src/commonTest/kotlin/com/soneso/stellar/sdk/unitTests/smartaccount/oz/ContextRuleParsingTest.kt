@@ -27,6 +27,7 @@ import com.soneso.stellar.sdk.xdr.ContractIDPreimageXdr
 import com.soneso.stellar.sdk.xdr.CreateContractArgsXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
+import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
@@ -304,6 +305,24 @@ class ContextRuleParsingTest {
         val result = manager.parseContextRule(ruleMap)
 
         assertNull(result.validUntil)
+    }
+
+    @Test
+    fun testParseContextRule_keyWhoseBytesAreNotUtf8_isSkipped() = runTest {
+        val kit = OZSmartAccountKit.create(buildConfig())
+        val manager = kit.contextRuleManager
+
+        val rule = assertIs<SCValXdr.Map>(buildFullRuleMap(id = 7u, name = "Rule"))
+        val notUtf8Key = SCMapEntryXdr(
+            key = SCValXdr.Sym(SCSymbolXdr(byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61))),
+            `val` = Scv.toUint32(1u)
+        )
+        val ruleMap = SCValXdr.Map(SCMapXdr(listOf(notUtf8Key) + rule.value!!.value))
+
+        val result = manager.parseContextRule(ruleMap)
+
+        assertEquals(7u, result.id)
+        assertEquals("Rule", result.name)
     }
 
     // ========================================================================

@@ -3,6 +3,7 @@
 
 package com.soneso.stellar.sdk.xdr
 
+const val SCSYMBOL_LIMIT: Int = 32
 const val MAX_SIZE: Int = 100
 const val VERSION: Int = 1
 const val BUFFER_LENGTH: Int = 4096

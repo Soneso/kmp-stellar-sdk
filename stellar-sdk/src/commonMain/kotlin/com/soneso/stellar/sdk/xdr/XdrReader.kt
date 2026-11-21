@@ -11,6 +11,13 @@ expect class XdrReader(input: ByteArray) {
     fun readFloat(): Float
     fun readDouble(): Double
     fun readBoolean(): Boolean
+
+    /**
+     * Reads a string of any length and decodes its bytes as strict UTF-8, every leading byte
+     * order mark kept.
+     *
+     * @throws CharacterCodingException if the bytes are not valid UTF-8
+     */
     fun readString(): String
     fun readFixedOpaque(length: Int): ByteArray
     fun readVariableOpaque(): ByteArray
@@ -49,11 +56,20 @@ expect class XdrReader(input: ByteArray) {
     fun exitRecursion()
 }
 
-/** Reads a string whose UTF-8 byte length does not exceed [maxLength]. */
-internal fun XdrReader.readString(maxLength: Int): String {
+/**
+ * Reads a string whose byte length does not exceed [maxLength] and decodes its bytes as strict
+ * UTF-8, every leading byte order mark kept.
+ *
+ * @throws CharacterCodingException if the bytes are not valid UTF-8
+ */
+internal fun XdrReader.readString(maxLength: Int): String =
+    readStringBytes(maxLength).decodeToString(throwOnInvalidSequence = true)
+
+/** Reads the bytes of a string whose byte length does not exceed [maxLength]. */
+internal fun XdrReader.readStringBytes(maxLength: Int): ByteArray {
     val length = readInt()
     require(length <= maxLength) { "XDR string length $length exceeds maximum $maxLength" }
-    return readFixedOpaque(length).decodeToString()
+    return readFixedOpaque(length)
 }
 
 /** Reads an opaque value whose byte length does not exceed [maxLength]. */

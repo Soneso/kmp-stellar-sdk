@@ -27,10 +27,38 @@ private const val XDR_JSON_TYPE = "MemoXdr"
 sealed class MemoXdr {
   abstract val discriminant: MemoTypeXdr
 
-  data class Text(
+  /**
+   * Stores the bytes of the string as the XDR carries them, so bytes that are not valid UTF-8
+   * and leading byte order marks survive a decode and encode unchanged. [value] is the strict
+   * UTF-8 text of the bytes; equality, hashing and both encodings use the bytes.
+   *
+   * @param bytes The bytes of the string; the instance keeps a copy.
+   */
+  class Text(bytes: ByteArray) : MemoXdr() {
+    private val storedBytes: ByteArray = bytes.copyOf()
+
+    /** Holds the UTF-8 encoding of [value]. */
+    constructor(value: String) : this(value.encodeToByteArray())
+
+    /**
+     * The stored bytes decoded as UTF-8, every leading byte order mark kept.
+     *
+     * @throws CharacterCodingException if the bytes are not valid UTF-8; [bytes] holds them.
+     */
     val value: String
-  ) : MemoXdr() {
+      get() = storedBytes.decodeToString(throwOnInvalidSequence = true)
+
+    /** A copy of the stored bytes; changing it leaves this instance unchanged. */
+    val bytes: ByteArray
+      get() = storedBytes.copyOf()
+
     override val discriminant: MemoTypeXdr = MemoTypeXdr.MEMO_TEXT
+
+    override fun equals(other: Any?): Boolean = other is Text && storedBytes.contentEquals(other.storedBytes)
+
+    override fun hashCode(): Int = storedBytes.contentHashCode()
+
+    override fun toString(): String = "Text(value=${XdrJson.displayText(storedBytes)})"
   }
 
   data class Id(
@@ -62,7 +90,7 @@ sealed class MemoXdr {
       return when (discriminant) {
         MemoTypeXdr.MEMO_NONE -> Void
         MemoTypeXdr.MEMO_TEXT -> {
-          val value = reader.readString(28)
+          val value = reader.readStringBytes(28)
           Text(value)
         }
         MemoTypeXdr.MEMO_ID -> {
@@ -89,7 +117,7 @@ sealed class MemoXdr {
       if (element is JsonObject) {
         val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
         return when (arm) {
-          "text" -> Text(XdrJson.unescapeString(value, XDR_JSON_TYPE, "text", maxLength = 28))
+          "text" -> Text(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "text", maxLength = 28))
           "id" -> Id(Uint64Xdr.fromXdrJsonTree(value))
           "hash" -> Hash(HashXdr.fromXdrJsonTree(value))
           "return" -> RetHash(HashXdr.fromXdrJsonTree(value))
@@ -108,7 +136,7 @@ sealed class MemoXdr {
     when (this) {
       is Void -> {}
       is Text -> {
-        writer.writeString(value, 28)
+        writer.writeStringBytes(bytes, 28)
       }
       is Id -> {
         value.encode(writer)
@@ -126,7 +154,7 @@ sealed class MemoXdr {
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name("none")
-    is Text -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("text", XdrJson.escapedString(value)) }
+    is Text -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("text", XdrJson.escapedString(bytes)) }
     is Id -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("id", value.toXdrJsonElement(depth + 1)) }
     is Hash -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("hash", value.toXdrJsonElement(depth + 1)) }
     is RetHash -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("return", value.toXdrJsonElement(depth + 1)) }

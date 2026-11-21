@@ -35,6 +35,7 @@ class WebAuthValidationTest {
         sequenceNumber: Long = -1L,
         memo: Long? = null,
         memoType: String = "MEMO_ID",
+        memoTextBytes: ByteArray? = null,
         useMuxedAccount: Boolean = false,
         operationType: String = "ManageData",
         firstOpSourceAccount: String? = null,
@@ -83,7 +84,7 @@ class WebAuthValidationTest {
         // Add memo based on type
         when (memoType) {
             "MEMO_ID" -> memo?.let { builder.addMemo(MemoId(it.toULong())) }
-            "MEMO_TEXT" -> builder.addMemo(MemoText("test memo text"))
+            "MEMO_TEXT" -> builder.addMemo(memoTextBytes?.let { MemoText(it) } ?: MemoText("test memo text"))
             "MEMO_HASH" -> builder.addMemo(MemoHash("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"))
             "MEMO_RETURN" -> builder.addMemo(MemoReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"))
         }
@@ -354,6 +355,29 @@ class WebAuthValidationTest {
                 challengeXdr = challengeXdr,
                 clientAccountId = clientKeyPair.getAccountId()
             )
+        }
+    }
+
+    @Test
+    fun testValidationTextMemoWhoseBytesAreNotUtf8FailsWithTheMemoTypeError() = runTest {
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val clientKeyPair = KeyPair.random()
+        val webAuth = WebAuth(
+            authEndpoint = testAuthEndpoint,
+            network = network,
+            serverSigningKey = serverKeyPair.getAccountId(),
+            serverHomeDomain = testHomeDomain
+        )
+        val memos = listOf(
+            byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63),
+            // 28 bytes whose last two-byte sequence is cut after its first byte
+            ByteArray(27) { 0x61 } + byteArrayOf(0xc3.toByte())
+        )
+        for (memo in memos) {
+            val challengeXdr = createValidChallengeXdr(clientKeyPair = clientKeyPair, memoType = "MEMO_TEXT", memoTextBytes = memo)
+            assertFailsWith<InvalidMemoTypeException> {
+                webAuth.validateChallenge(challengeXdr = challengeXdr, clientAccountId = clientKeyPair.getAccountId())
+            }
         }
     }
 

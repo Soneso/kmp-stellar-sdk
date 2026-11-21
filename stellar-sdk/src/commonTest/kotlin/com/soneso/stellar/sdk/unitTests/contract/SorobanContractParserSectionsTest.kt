@@ -72,6 +72,39 @@ class SorobanContractParserSectionsTest {
     }
 
     @Test
+    fun aDocOrMetaValueThatIsNotUtf8FailsWithItsEntryOffset() {
+        val notUtf8 = bytes(0xFF, 0x61)
+        val cause = assertFailsWith<CharacterCodingException> { notUtf8.decodeToString(throwOnInvalidSequence = true) }.message
+
+        // A function entry: kind, doc length, then the two doc bytes, which become ff 61.
+        val function = SCSpecEntryXdr.FunctionV0(SCSpecFunctionV0Xdr("aa", SCSymbolXdr("f"), emptyList(), emptyList()))
+        val badDoc = xdrBytes { function.encode(it) }.also { it[8] = 0xFF.toByte() }
+        val first = xdrBytes { expectedToken.specEntries[0].encode(it) }
+        val specModule = token(spec = first + badDoc + specContent.copyOfRange(first.size, specContent.size))
+        val specOffset = sectionOf(specModule, SPEC).contentOffset + first.size
+        assertInvalid(specModule, "the $SPEC entry at byte offset $specOffset does not decode: $cause")
+
+        // A meta entry: kind, key length, key k and its padding, value length, then the value ff 61.
+        val badValue = metaEntryBytes("k", "aa").also { it[16] = 0xFF.toByte() }
+        val metaModule = token(meta = metaContent + badValue)
+        val metaOffset = sectionOf(metaModule, META).contentOffset + metaContent.size
+        assertInvalid(metaModule, "the $META entry at byte offset $metaOffset does not decode: $cause")
+    }
+
+    @Test
+    fun aDocAndAMetaValueKeepALeadingByteOrderMark() {
+        val function = SCSpecFunctionV0Xdr("\uFEFFdoc", SCSymbolXdr("f"), emptyList(), emptyList())
+        val module = token(
+            spec = specContent + xdrBytes { SCSpecEntryXdr.FunctionV0(function).encode(it) },
+            meta = metaContent + metaEntryBytes("k", "\uFEFFv")
+        )
+        val info = parse(module)
+        assertEquals(expectedInfo(module), info)
+        assertEquals("\uFEFFdoc", assertIs<SCSpecEntryXdr.FunctionV0>(info.specEntries.last()).value.doc)
+        assertEquals("\uFEFFv", info.metaEntries["k"])
+    }
+
+    @Test
     fun malformedFramingBeforeOrOfTheSpecSectionFails() {
         val prefix = wasmModule(*codeSections)
         val at = prefix.size
@@ -188,6 +221,8 @@ class SorobanContractParserSectionsTest {
     private fun metaEntry(key: String, value: String) = SCMetaEntryXdr.V0(SCMetaV0Xdr(key, value))
 
     private fun sepEntry(value: String) = xdrBytes { metaEntry("sep", value).encode(it) }
+
+    private fun metaEntryBytes(key: String, value: String) = xdrBytes { metaEntry(key, value).encode(it) }
 
     /** [module] holds the `sep` values "41" and then "45, 46"; they are joined with a comma, without a space. */
     private fun assertSepJoined(module: ByteArray) {

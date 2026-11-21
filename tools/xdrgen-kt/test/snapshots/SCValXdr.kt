@@ -13,6 +13,8 @@ private const val XDR_JSON_TYPE = "SCValXdr"
  * {
  * case SCV_STRING:
  *     SCString str;
+ * case SCV_SYMBOL:
+ *     SCSymbol sym;
  * case SCV_EXECUTABLE_TAG:
  *     SCString executable_tag;
  * };
@@ -24,6 +26,12 @@ sealed class SCValXdr {
     val value: SCStringXdr
   ) : SCValXdr() {
     override val discriminant: SCValTypeXdr = SCValTypeXdr.SCV_STRING
+  }
+
+  data class Sym(
+    val value: SCSymbolXdr
+  ) : SCValXdr() {
+    override val discriminant: SCValTypeXdr = SCValTypeXdr.SCV_SYMBOL
   }
 
   data class ExecutableTag(
@@ -42,6 +50,10 @@ sealed class SCValXdr {
           SCValTypeXdr.SCV_STRING -> {
             val value = SCStringXdr.decode(reader)
             Str(value)
+          }
+          SCValTypeXdr.SCV_SYMBOL -> {
+            val value = SCSymbolXdr.decode(reader)
+            Sym(value)
           }
           SCValTypeXdr.SCV_EXECUTABLE_TAG -> {
             val value = reader.readVariableOpaque()
@@ -62,6 +74,7 @@ sealed class SCValXdr {
       val (arm, value) = XdrJson.singleKeyObject(element, XDR_JSON_TYPE)
       return when (arm) {
         "string" -> Str(SCStringXdr.fromXdrJsonTree(value))
+        "symbol" -> Sym(SCSymbolXdr.fromXdrJsonTree(value))
         "executable_tag" -> ExecutableTag(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "executable_tag"))
         else -> XdrJson.unknownArm(XDR_JSON_TYPE, arm)
       }
@@ -74,6 +87,9 @@ sealed class SCValXdr {
       is Str -> {
         value.encode(writer)
       }
+      is Sym -> {
+        value.encode(writer)
+      }
       is ExecutableTag -> {
         writer.writeVariableOpaque(value)
       }
@@ -84,6 +100,7 @@ sealed class SCValXdr {
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Str -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("string", value.toXdrJsonElement(depth + 1)) }
+    is Sym -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("symbol", value.toXdrJsonElement(depth + 1)) }
     is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }
   }
 

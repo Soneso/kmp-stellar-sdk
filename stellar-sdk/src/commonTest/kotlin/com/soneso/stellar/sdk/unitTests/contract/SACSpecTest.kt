@@ -165,7 +165,7 @@ class SACSpecTest {
     }
 
     @Test
-    fun testInvalidUtf8InEmbeddedDocFailsReencodingAtEntryOffset() = runTest {
+    fun testInvalidUtf8InEmbeddedDocFailsDecodingAtEntryOffset() = runTest {
         val entries = SACClient.specEntries()
         val index = entries.indexOfFirst { it is SCSpecEntryXdr.FunctionV0 && it.value.name.value == "balance" }
         // A later entry exercises reporting an offset beyond the beginning of the spec.
@@ -174,15 +174,16 @@ class SACSpecTest {
         val entryOffset = entries.take(index).sumOf { encode(it).size }
         val bytes = Base64.Default.decode(SACSpec.XDR_BASE64)
         // The doc starts after the four-byte entry discriminant and four-byte doc length.
-        // 0xFF cannot occur in valid UTF-8 and forces a different re-encoding.
+        // 0xFF cannot occur in valid UTF-8, so the strict decoder refuses the doc.
         bytes[entryOffset + 8] = 0xFF.toByte()
 
         val failure = assertFailsWith<IllegalStateException> {
             SACClient.decodeSpec(Base64.Default.encode(bytes), sha256Hex(bytes))
         }
 
+        val cause = assertIs<CharacterCodingException>(failure.cause)
         assertEquals(
-            "The embedded SAC spec does not decode at byte offset $entryOffset: the entry re-encodes to different bytes",
+            "The embedded SAC spec does not decode at byte offset $entryOffset: ${cause.message}",
             failure.message
         )
     }

@@ -26,17 +26,43 @@ module Xdrgen
       # so the root delegate enters at depth 0 and 129 entries are the root plus 128 nested delegates.
       DELEGATE_RECURSION_CAP = 129
 
-      # XDR string positions that carry arbitrary bytes rather than text: the CAP-85
-      # executable tag, which the ledger matches byte for byte. Each entry maps an XDR
-      # type name from the .x source to the string fields (struct) or arms (union) at
-      # that type that are emitted as ByteArray, bypassing the string wrapper type, so
-      # content that is not valid UTF-8 survives a decode/encode round trip exactly.
-      # Only the named positions change; every other use of the same string typedef
-      # keeps the generic emission.
+      # XDR string positions that store their exact bytes, so content that is not valid UTF-8,
+      # or that starts with a byte order mark, survives a decode/encode round trip exactly.
+      # Each entry maps an XDR type name from the .x source to its positions and the emission
+      # each takes. A struct field or union arm is named by its .x member name; the string a
+      # typedef declares is named "value", the property its Kotlin class exposes.
+      #
+      # - :bytes emits the position as ByteArray, bypassing the string wrapper type. This is
+      #   the CAP-85 executable tag, which the ledger matches byte for byte.
+      # - :text keeps the String API over stored bytes: the String constructor and `value`
+      #   stay, `value` decodes the bytes as strict UTF-8, a ByteArray constructor and a
+      #   copying `bytes` accessor are added, and equality, hashing and both encodings use the
+      #   bytes. A typedef becomes a class, a union arm an arm class. These are the positions
+      #   the network accepts with arbitrary bytes and that feed a hash, a signature payload or
+      #   a re-encoded envelope: the text memo, SCString and SCSymbol.
+      #
+      # Only the named positions change; every other use of the same string typedef keeps the
+      # emission of that typedef.
       BYTES_BACKED_STRING_FIELDS = {
-        'ContractExecutableExternalRef' => %w[tag].freeze,
-        'SCVal' => %w[executable_tag].freeze
+        'ContractExecutableExternalRef' => { 'tag' => :bytes }.freeze,
+        'SCVal' => { 'executable_tag' => :bytes }.freeze,
+        'Memo' => { 'text' => :text }.freeze,
+        'SCString' => { 'value' => :text }.freeze,
+        'SCSymbol' => { 'value' => :text }.freeze
       }.freeze
+
+      # The name a typedef's own string goes by in BYTES_BACKED_STRING_FIELDS.
+      TYPEDEF_STRING_POSITION = 'value'
+
+      # The class documentation of a :text position, below the XDR source or the arm comment.
+      TEXT_BACKED_DOC = [
+        '',
+        'Stores the bytes of the string as the XDR carries them, so bytes that are not valid UTF-8',
+        'and leading byte order marks survive a decode and encode unchanged. [value] is the strict',
+        'UTF-8 text of the bytes; equality, hashing and both encodings use the bytes.',
+        '',
+        '@param bytes The bytes of the string; the instance keeps a copy.'
+      ].freeze
 
       JSON_NAMES = KotlinJsonNames
       JSON_OVERRIDES = KotlinJsonOverrides
@@ -192,6 +218,8 @@ module Xdrgen
       end
 
       def render_typedef(typedef)
+        return render_text_backed_typedef(typedef) if text_backed_string_typedef?(typedef)
+
         typedef_name = name(typedef)
         file_name = "#{typedef_name}.kt"
         out = @output.open(file_name)
@@ -242,6 +270,103 @@ module Xdrgen
         out.puts "}"
 
         out.close
+      end
+
+      # A string typedef BYTES_BACKED_STRING_FIELDS lists as :text: a class over the stored
+      # bytes that keeps the String constructor and the `value` property of a value class.
+      def render_text_backed_typedef(typedef)
+        typedef_name = name(typedef)
+        if JSON_OVERRIDES.for_type(typedef_name)
+          raise "#{typedef_name} has a SEP-0051 override and a :text entry in BYTES_BACKED_STRING_FIELDS"
+        end
+
+        size = typedef.declaration.type.size
+        out = @output.open("#{typedef_name}.kt")
+        render_file_header(out, [JSON_ELEMENT_IMPORT], typedef_name)
+        render_source_comment(out, typedef, TEXT_BACKED_DOC)
+
+        out.puts "class #{typedef_name}(bytes: ByteArray) {"
+        out.indent do
+          render_text_backed_members(out)
+          out.puts
+          out.puts 'companion object {'
+          out.indent do
+            out.puts "fun decode(reader: XdrReader): #{typedef_name} {"
+            out.indent do
+              out.puts "val value = #{string_bytes_read('reader', size)}"
+              out.puts "return #{typedef_name}(value)"
+            end
+            out.puts '}'
+
+            out.puts
+            render_json_entry_points(out, typedef_name)
+            out.puts "internal fun fromXdrJsonTree(element: JsonElement): #{typedef_name} = " \
+                     "#{typedef_name}(#{string_bytes_from_json('element', 'value', size)})"
+          end
+          out.puts '}'
+
+          out.puts
+          out.puts 'fun encode(writer: XdrWriter) {'
+          out.indent { out.puts string_bytes_write('writer', 'storedBytes', size) }
+          out.puts '}'
+
+          out.puts
+          render_json_writer(out) do
+            out.puts 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(storedBytes)'
+          end
+
+          out.puts
+          render_text_backed_identity(out, typedef_name)
+        end
+        out.puts '}'
+
+        out.close
+      end
+
+      # A union arm BYTES_BACKED_STRING_FIELDS lists as :text: an arm class over the stored
+      # bytes that keeps the String constructor and the `value` property of a data class arm.
+      def render_text_backed_arm(out, union, arm, union_name, discriminant_type)
+        class_name = arm.name.camelize
+        comments = extract_union_arm_comment(union.text_value, arm)
+        out.puts '/**'
+        (comments + TEXT_BACKED_DOC).drop(comments.empty? ? 1 : 0).each { |line| out.puts " * #{line}".rstrip }
+        out.puts ' */'
+        out.puts "class #{class_name}(bytes: ByteArray) : #{union_name}() {"
+        out.indent do
+          render_text_backed_members(out)
+          out.puts
+          out.puts "override val discriminant: #{discriminant_type} = #{arm_discriminant_value(arm, union.discriminant)}"
+          out.puts
+          render_text_backed_identity(out, class_name)
+        end
+        out.puts '}'
+      end
+
+      def render_text_backed_members(out)
+        out.puts 'private val storedBytes: ByteArray = bytes.copyOf()'
+        out.puts
+        out.puts '/** Holds the UTF-8 encoding of [value]. */'
+        out.puts 'constructor(value: String) : this(value.encodeToByteArray())'
+        out.puts
+        out.puts '/**'
+        out.puts ' * The stored bytes decoded as UTF-8, every leading byte order mark kept.'
+        out.puts ' *'
+        out.puts ' * @throws CharacterCodingException if the bytes are not valid UTF-8; [bytes] holds them.'
+        out.puts ' */'
+        out.puts 'val value: String'
+        out.indent { out.puts 'get() = storedBytes.decodeToString(throwOnInvalidSequence = true)' }
+        out.puts
+        out.puts '/** A copy of the stored bytes; changing it leaves this instance unchanged. */'
+        out.puts 'val bytes: ByteArray'
+        out.indent { out.puts 'get() = storedBytes.copyOf()' }
+      end
+
+      def render_text_backed_identity(out, class_name)
+        out.puts "override fun equals(other: Any?): Boolean = other is #{class_name} && storedBytes.contentEquals(other.storedBytes)"
+        out.puts
+        out.puts 'override fun hashCode(): Int = storedBytes.contentHashCode()'
+        out.puts
+        out.puts "override fun toString(): String = \"#{class_name}(value=${XdrJson.displayText(storedBytes)})\""
       end
 
       def render_struct(struct)
@@ -389,6 +514,12 @@ module Xdrgen
           # Generate a subclass for each arm
           union.arms.each do |arm|
             next if arm.void?
+
+            if text_backed_string_arm?(union, arm)
+              render_text_backed_arm(out, union, arm, union_name, discriminant_type)
+              out.puts
+              next
+            end
 
             # Extract and render comments for this arm
             comments = extract_union_arm_comment(union.text_value, arm)
@@ -1029,8 +1160,8 @@ module Xdrgen
       def verify_bytes_backed_string_fields_consumed
         return unless @options[:verify_bytes_backed_fields]
 
-        registered = BYTES_BACKED_STRING_FIELDS.flat_map do |type, fields|
-          fields.map { |field| "#{type}.#{field}" }
+        registered = BYTES_BACKED_STRING_FIELDS.flat_map do |type, positions|
+          positions.keys.map { |position| "#{type}.#{position}" }
         end
         missing = registered - @bytes_backed_string_fields_used
         return if missing.empty?
@@ -1038,27 +1169,67 @@ module Xdrgen
         raise "Bytes-backed string fields registered for positions this run did not generate: #{missing.join(', ')}"
       end
 
-      # Whether BYTES_BACKED_STRING_FIELDS names this struct field or union arm. A listed
-      # position that is not an XDR string is a table mistake and raises rather than
-      # emitting ByteArray code for a type the reader and writer calls do not fit.
-      def bytes_backed_string_field?(defn, member)
-        fields = BYTES_BACKED_STRING_FIELDS[defn.name]
-        return false unless fields&.include?(member.name)
+      # The emission BYTES_BACKED_STRING_FIELDS gives this struct field or union arm: :bytes,
+      # :text, or nil for a position it does not list. A listed position that is not an XDR
+      # string, or a :text entry on a struct field or on an arm covering more than one case,
+      # is a table mistake and raises rather than emitting code the reader and writer calls
+      # or the arm class shape do not fit.
+      def bytes_backed_string_mode(defn, member)
+        mode = BYTES_BACKED_STRING_FIELDS[defn.name]&.[](member.name)
+        return nil if mode.nil?
 
-        resolved = resolve_typedef_declaration(member.declaration)
-        unless resolved.type.is_a?(AST::Typespecs::String)
-          raise "BYTES_BACKED_STRING_FIELDS names #{defn.name}.#{member.name}, which is not an XDR string"
+        position = "#{defn.name}.#{member.name}"
+        unless resolve_typedef_declaration(member.declaration).type.is_a?(AST::Typespecs::String)
+          raise "BYTES_BACKED_STRING_FIELDS names #{position}, which is not an XDR string"
+        end
+        unless %i[bytes text].include?(mode)
+          raise "BYTES_BACKED_STRING_FIELDS lists #{position} as #{mode.inspect}; the emissions are :bytes and :text"
+        end
+        if mode == :text && !defn.is_a?(AST::Definitions::Union)
+          raise "BYTES_BACKED_STRING_FIELDS lists #{position} as :text, which only union arms and string typedefs take"
+        end
+        if mode == :text && (member.is_a?(AST::Definitions::UnionDefaultArm) || member.cases.length > 1)
+          raise "BYTES_BACKED_STRING_FIELDS lists #{position} as :text, which only an arm of a single case takes"
         end
 
-        (@bytes_backed_string_fields_used ||= []) << "#{defn.name}.#{member.name}"
+        (@bytes_backed_string_fields_used ||= []) << position
+        mode
+      end
+
+      # Whether BYTES_BACKED_STRING_FIELDS emits this struct field or union arm as ByteArray.
+      def bytes_backed_string_field?(defn, member)
+        bytes_backed_string_mode(defn, member) == :bytes
+      end
+
+      # Whether this union arm is an arm class over stored bytes with a String view.
+      def text_backed_string_arm?(defn, member)
+        bytes_backed_string_mode(defn, member) == :text
+      end
+
+      # Whether BYTES_BACKED_STRING_FIELDS lists this typedef, which then has to declare a
+      # string directly and take the :text emission.
+      def text_backed_string_typedef?(typedef)
+        mode = BYTES_BACKED_STRING_FIELDS[typedef.name]&.[](TYPEDEF_STRING_POSITION)
+        return false if mode.nil?
+
+        position = "#{typedef.name}.#{TYPEDEF_STRING_POSITION}"
+        unless mode == :text
+          raise "BYTES_BACKED_STRING_FIELDS lists the typedef #{position} as #{mode.inspect}; a typedef takes :text"
+        end
+        unless typedef.declaration.is_a?(AST::Declarations::String)
+          raise "BYTES_BACKED_STRING_FIELDS names #{position}, but #{typedef.name} does not declare an XDR string"
+        end
+
+        (@bytes_backed_string_fields_used ||= []) << position
         true
       end
 
-      # The five positions a struct field or union arm is rendered at, each answering with
-      # the ByteArray emission when BYTES_BACKED_STRING_FIELDS names the member and with
-      # the generic one otherwise. The binary form of a string and of variable opaque is
-      # identical (length prefix, bytes, padding), and the JSON form goes through the same
-      # SEP-0051 escape ladder either way, so only the Kotlin representation differs.
+      # The five positions a struct field or union arm is rendered at, each answering with the
+      # emission BYTES_BACKED_STRING_FIELDS gives the member and with the generic one otherwise.
+      # The binary form of a string and of variable opaque is identical (length prefix, bytes,
+      # padding), and the JSON form goes through the same SEP-0051 escape ladder either way, so
+      # only the Kotlin representation differs. A :text arm class reads and writes its stored
+      # bytes through its `bytes` accessor, where a generic arm uses its `value`.
 
       def member_kotlin_type(defn, member)
         return 'ByteArray' if bytes_backed_string_field?(defn, member)
@@ -1067,34 +1238,58 @@ module Xdrgen
       end
 
       def member_decode_expression(defn, member, reader_var)
-        if bytes_backed_string_field?(defn, member)
+        case bytes_backed_string_mode(defn, member)
+        when :bytes
           size = resolve_typedef_declaration(member.declaration).type.size
-          return "#{reader_var}.readVariableOpaque(#{size})"
+          "#{reader_var}.readVariableOpaque(#{size})"
+        when :text
+          string_bytes_read(reader_var, resolve_typedef_declaration(member.declaration).type.size)
+        else
+          decode_expression(member.declaration, reader_var)
         end
-        decode_expression(member.declaration, reader_var)
       end
 
       def member_encode_statement(defn, member, value_expr, writer_var, out)
-        if bytes_backed_string_field?(defn, member)
+        case bytes_backed_string_mode(defn, member)
+        when :bytes
           size = resolve_typedef_declaration(member.declaration).type.size
           out.puts "#{writer_var}.writeVariableOpaque(#{value_expr}#{binary_max_length(size)})"
+        when :text
+          size = resolve_typedef_declaration(member.declaration).type.size
+          out.puts string_bytes_write(writer_var, 'bytes', size)
         else
           encode_statement(member.declaration, value_expr, writer_var, out)
         end
       end
 
       def member_json_to_expression(defn, member, value_expr, offset)
-        return "XdrJson.escapedString(#{value_expr})" if bytes_backed_string_field?(defn, member)
-
-        json_to_expression(member.declaration, value_expr, offset)
+        case bytes_backed_string_mode(defn, member)
+        when :bytes
+          "XdrJson.escapedString(#{value_expr})"
+        when :text
+          'XdrJson.escapedString(bytes)'
+        else
+          json_to_expression(member.declaration, value_expr, offset)
+        end
       end
 
       def member_json_from_expression(defn, member, element_expr, key)
-        unless bytes_backed_string_field?(defn, member)
-          return json_from_expression(member.declaration, element_expr, key)
-        end
+        return json_from_expression(member.declaration, element_expr, key) if bytes_backed_string_mode(defn, member).nil?
 
-        size = resolve_typedef_declaration(member.declaration).type.size
+        string_bytes_from_json(element_expr, key, resolve_typedef_declaration(member.declaration).type.size)
+      end
+
+      # The reader call for the bytes of a string with the declared maximum [size], blank for
+      # an unbounded string.
+      def string_bytes_read(reader_var, size)
+        size.blank? ? "#{reader_var}.readVariableOpaque()" : "#{reader_var}.readStringBytes(#{size})"
+      end
+
+      def string_bytes_write(writer_var, bytes_expr, size)
+        size.blank? ? "#{writer_var}.writeVariableOpaque(#{bytes_expr})" : "#{writer_var}.writeStringBytes(#{bytes_expr}, #{size})"
+      end
+
+      def string_bytes_from_json(element_expr, key, size)
         "XdrJson.unescapeStringBytes(#{element_expr}, #{JSON_TYPE_CONSTANT}, \"#{key}\"#{json_max_length(size)})"
       end
 
@@ -1211,7 +1406,7 @@ module Xdrgen
         raise "SEP-0051 defines no JSON form for XDR #{kind}, which the Stellar .x files do not use"
       end
 
-      def render_source_comment(out, defn)
+      def render_source_comment(out, defn, extra_lines = [])
         return if defn.is_a?(AST::Definitions::Namespace)
 
         out.puts "/**"
@@ -1219,6 +1414,7 @@ module Xdrgen
         defn.text_value.each_line do |line|
           out.puts " * #{line.rstrip}"
         end
+        extra_lines.each { |line| out.puts " * #{line}".rstrip }
         out.puts " */"
       end
 

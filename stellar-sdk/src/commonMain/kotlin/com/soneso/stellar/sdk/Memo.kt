@@ -61,7 +61,7 @@ sealed class Memo {
         fun fromXdr(xdr: MemoXdr): Memo {
             return when (xdr) {
                 is MemoXdr.Void -> MemoNone
-                is MemoXdr.Text -> MemoText(xdr.value)
+                is MemoXdr.Text -> MemoText(xdr.bytes)
                 is MemoXdr.Id -> MemoId(xdr.value.value)
                 is MemoXdr.Hash -> MemoHash(xdr.value.value)
                 is MemoXdr.RetHash -> MemoReturn(xdr.value.value)
@@ -80,14 +80,22 @@ data object MemoNone : Memo() {
 }
 
 /**
- * Represents MEMO_TEXT - a UTF-8 string up to 28 bytes long.
+ * Represents MEMO_TEXT - up to 28 bytes, usually UTF-8 text.
  *
- * @property text The text content of the memo
+ * The memo is its bytes: [toXdr], equality and hashing use them, so a memo read from a
+ * transaction re-encodes exactly, also when its bytes are not valid UTF-8.
+ *
+ * @property text The memo as text. For bytes that are not valid UTF-8 each malformed sequence
+ *   reads as U+FFFD, so the text is for display; [bytes] holds the memo.
  * @throws IllegalArgumentException if the text is longer than 28 bytes when UTF-8 encoded
  */
 class MemoText : Memo {
     val text: String
+    private val storedBytes: ByteArray
+
+    /** A copy of the memo bytes; changing it leaves this memo unchanged. */
     val bytes: ByteArray
+        get() = storedBytes.copyOf()
 
     /**
      * Creates a MEMO_TEXT from a string.
@@ -101,24 +109,24 @@ class MemoText : Memo {
             "Text memo cannot be more than 28 bytes. The provided text is ${encodedBytes.size} bytes when UTF-8 encoded."
         }
         this.text = text
-        this.bytes = encodedBytes
+        this.storedBytes = encodedBytes
     }
 
     /**
-     * Creates a MEMO_TEXT from raw bytes.
+     * Creates a MEMO_TEXT from raw bytes, which need not be valid UTF-8.
      *
-     * @param bytes The raw bytes (max 28 bytes)
+     * @param bytes The raw bytes (max 28 bytes); the memo keeps a copy
      * @throws IllegalArgumentException if bytes array is longer than 28 bytes
      */
     constructor(bytes: ByteArray) {
         require(bytes.size <= 28) {
             "Text memo cannot be more than 28 bytes. The provided bytes array has ${bytes.size} bytes."
         }
-        this.bytes = bytes
-        this.text = bytes.decodeToString()
+        this.storedBytes = bytes.copyOf()
+        this.text = storedBytes.decodeToString()
     }
 
-    override fun toXdr(): MemoXdr = MemoXdr.Text(text)
+    override fun toXdr(): MemoXdr = MemoXdr.Text(storedBytes)
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -126,11 +134,11 @@ class MemoText : Memo {
 
         other as MemoText
 
-        return bytes.contentEquals(other.bytes)
+        return storedBytes.contentEquals(other.storedBytes)
     }
 
     override fun hashCode(): Int {
-        return bytes.contentHashCode()
+        return storedBytes.contentHashCode()
     }
 
     override fun toString(): String = text

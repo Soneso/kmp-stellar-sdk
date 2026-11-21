@@ -10,6 +10,7 @@ import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.unitTests.MuxedSourceAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
+import kotlin.io.encoding.Base64
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -208,6 +209,47 @@ class PaymentsIntegrationTest {
             precond.ledgerBounds?.let { assertEquals(it.maxLedgerExact.toLong(), trx.preconditions?.ledgerBounds?.maxLedger) }
             precond.minSequenceNumber?.let { assertEquals(it, trx.preconditions?.minAccountSequence) }
         }
+    }
+
+    /**
+     * Test a native payment whose text memo is the bytes ff fe 20 61 62 63, which are not valid
+     * UTF-8. The payment is read back from Horizon by hash: its envelope is the submitted one,
+     * decodes and encodes to the same bytes and keeps Horizon's hash, and Horizon's memo bytes are
+     * the memo bytes.
+     */
+    @Test
+    fun testSendNativePaymentWithATextMemoThatIsNotUtf8() = runTest(timeout = 180.seconds) {
+        val memoBytes = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63)
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountBId = KeyPair.random().getAccountId()
+        for (accountId in listOf(accountAId, accountBId)) {
+            fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        }
+        val accountA = Account(accountAId, horizonServer.accounts().account(accountAId).sequenceNumber)
+
+        val transaction = TransactionBuilder(sourceAccount = accountA, network = network)
+            .addOperation(PaymentOperation(destination = accountBId, asset = AssetTypeNative, amount = "1"))
+            .addMemo(MemoText(memoBytes))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        transaction.sign(keyPairA)
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Payment with a text memo that is not UTF-8 should succeed")
+        assertEquals(transaction.hashHex(), response.hash)
+
+        realDelay(3000)
+
+        val trx = horizonServer.transactions().transaction(transaction.hashHex())
+        assertEquals(envelope, trx.envelopeXdr)
+        val decoded = AbstractTransaction.fromEnvelopeXdr(trx.envelopeXdr!!, network) as Transaction
+        assertEquals(envelope, decoded.toEnvelopeXdrBase64())
+        assertEquals(trx.hash, decoded.hashHex())
+        assertContentEquals(memoBytes, assertIs<MemoText>(decoded.memo).bytes)
+        assertEquals("text", trx.memoType)
+        assertContentEquals(memoBytes, Base64.decode(assertNotNull(trx.memoBytes)))
     }
 
     /**

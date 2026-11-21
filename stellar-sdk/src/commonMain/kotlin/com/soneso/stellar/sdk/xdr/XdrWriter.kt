@@ -17,9 +17,13 @@ expect class XdrWriter() {
 
 /** Writes [value] after checking its UTF-8 byte length against [maxLength]. */
 internal fun XdrWriter.writeString(value: String, maxLength: Int) {
-    val bytes = value.encodeToByteArray()
-    require(bytes.size <= maxLength) { "XDR string length ${bytes.size} exceeds maximum $maxLength" }
-    writeVariableOpaque(bytes)
+    writeStringBytes(value.encodeToByteArray(), maxLength)
+}
+
+/** Writes the bytes [value] of a string after checking their length against [maxLength]. */
+internal fun XdrWriter.writeStringBytes(value: ByteArray, maxLength: Int) {
+    require(value.size <= maxLength) { "XDR string length ${value.size} exceeds maximum $maxLength" }
+    writeVariableOpaque(value)
 }
 
 /** Writes [value] after checking its byte length against [maxLength]. */

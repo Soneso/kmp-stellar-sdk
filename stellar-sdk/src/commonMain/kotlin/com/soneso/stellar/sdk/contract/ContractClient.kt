@@ -120,10 +120,11 @@ class ContractClient private constructor(
 
     /**
      * Get available method names from contract spec.
-     * Returns empty set if spec not loaded.
+     * Returns empty set if spec not loaded. A function whose name is not valid UTF-8 has no
+     * name to call it by and is left out.
      */
     fun getMethodNames(): Set<String> {
-        return contractSpec?.funcs()?.map { it.name.value }?.toSet() ?: emptySet()
+        return contractSpec?.funcs()?.mapNotNull { Util.utf8OrNull(it.name.bytes) }?.toSet() ?: emptySet()
     }
 
     /**
@@ -216,7 +217,7 @@ class ContractClient private constructor(
         spec.getFunc(functionName)
             ?: throw IllegalArgumentException(
                 "Method '$functionName' not found in contract spec. " +
-                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
+                "Available methods: ${spec.funcs().joinToString(", ") { XdrJson.displayText(it.name.bytes) }}"
             )
 
         // Convert arguments using ContractSpec
@@ -381,7 +382,7 @@ class ContractClient private constructor(
         spec.getFunc(functionName)
             ?: throw IllegalArgumentException(
                 "Method '$functionName' not found in contract spec. " +
-                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
+                "Available methods: ${spec.funcs().joinToString(", ") { XdrJson.displayText(it.name.bytes) }}"
             )
 
         // Convert arguments using ContractSpec
