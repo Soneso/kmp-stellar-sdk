@@ -2421,7 +2421,7 @@ class SEPAnalyzer:
                 'array_fixed_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
                 'array_variable_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
                 'enum': ('SCValTypeXdr.xdrJsonName', 'SCValTypeXdr.kt', 'xdrJsonName'),
-                'struct': ('TimeBoundsXdr.toXdrJsonElement', 'TimeBoundsXdr.kt', 'buildJsonObject'),
+                'struct': ('TimeBoundsXdr.toXdrJsonElement', 'TimeBoundsXdr.kt', 'XdrJson.obj(depth, XDR_JSON_TYPE)'),
                 'discriminated_union': ('AssetXdr.toXdrJsonElement', 'AssetXdr.kt', 'XdrJson.singleKeyObject'),
                 'void': ('AssetXdr.Void', 'AssetXdr.kt', 'XdrJson.name("native")'),
                 'optional_data': ('XdrJson.optional', 'XdrJson.kt', 'fun <T> optional('),
