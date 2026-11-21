@@ -21,6 +21,8 @@ import com.soneso.stellar.sdk.xdr.SCErrorXdr
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
 import com.soneso.stellar.sdk.xdr.SCNonceKeyXdr
+import com.soneso.stellar.sdk.xdr.SCStringXdr
+import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValTypeXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.fromXdrBase64
@@ -223,6 +225,22 @@ class ScValToNativeTest {
         val result = Scv.toSymbol("transfer").toNative()
         assertIs<String>(result)
         assertEquals("transfer", result)
+    }
+
+    @Test
+    fun testStringAndSymbolWhoseBytesAreNotUtf8StayValues() {
+        val bytes = byteArrayOf(0xff.toByte(), 0x61)
+        val string = SCValXdr.Str(SCStringXdr(bytes))
+        assertSame(string, string.toNative())
+        val symbol = SCValXdr.Sym(SCSymbolXdr(bytes))
+        assertSame(symbol, symbol.toNative())
+    }
+
+    @Test
+    fun testStringAndSymbolKeepALeadingByteOrderMark() {
+        val bytes = byteArrayOf(0xef.toByte(), 0xbb.toByte(), 0xbf.toByte(), 0x61)
+        assertEquals("\uFEFFa", SCValXdr.Str(SCStringXdr(bytes)).toNative())
+        assertEquals("\uFEFFa", SCValXdr.Sym(SCSymbolXdr(bytes)).toNative())
     }
 
     // ------------------------------------------------------------------
@@ -679,6 +697,29 @@ class ScValToNativeTest {
             val scVal = scMap(Scv.toSymbol("first") to Scv.toUint32(1u), key to Scv.toUint32(2u))
             assertSame(scVal, scVal.toNative(), "map with a $name key")
         }
+    }
+
+    @Test
+    fun testMapWithAKeyWhoseBytesAreNotUtf8FallsBack() {
+        val ffA = byteArrayOf(0xff.toByte(), 0x61)
+        val feA = byteArrayOf(0xfe.toByte(), 0x61)
+        for (key in listOf(SCValXdr.Str(SCStringXdr(ffA)), SCValXdr.Sym(SCSymbolXdr(ffA)))) {
+            val scVal = scMap(key to Scv.toUint32(1u))
+            assertSame(scVal, scVal.toNative())
+        }
+        assertMapFallsBackInEitherOrder(
+            SCValXdr.Str(SCStringXdr(ffA)) to Scv.toUint32(1u),
+            SCValXdr.Str(SCStringXdr(feA)) to Scv.toUint32(2u)
+        )
+    }
+
+    @Test
+    fun testMapWithValidMultiByteKeysConverts() {
+        val scVal = scMap(
+            SCValXdr.Str(SCStringXdr(byteArrayOf(0xc3.toByte(), 0xa9.toByte()))) to Scv.toUint32(1u),
+            SCValXdr.Str(SCStringXdr(byteArrayOf(0x61))) to Scv.toUint32(2u)
+        )
+        assertEquals(mapOf("\u00e9" to 1u, "a" to 2u), nativeMap(scVal))
     }
 
     @Test

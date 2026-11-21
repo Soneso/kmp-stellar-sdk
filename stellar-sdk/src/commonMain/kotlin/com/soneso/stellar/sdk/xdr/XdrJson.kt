@@ -1,6 +1,7 @@
 package com.soneso.stellar.sdk.xdr
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.Util
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -124,12 +125,10 @@ internal object XdrJson {
     /**
      * Escapes text using its XDR byte representation, so the JSON and binary forms agree.
      *
-     * A `String`-typed member carries text, not arbitrary bytes: its value is the UTF-8 decoding
-     * of the wire bytes. Text that is valid UTF-8 therefore survives unchanged, and text that is
-     * not was already replaced with the Unicode replacement character before it reached this
-     * point, so the escape is applied to the replacement rather than to the original byte. A
-     * member that must preserve arbitrary bytes exactly is typed `ByteArray` and uses
-     * [escapedString] with that argument instead.
+     * A `String`-typed member carries text: the binary reader decodes its wire bytes as strict
+     * UTF-8 and refuses bytes that are not, so the UTF-8 encoding of the text is the wire
+     * bytes. A member that carries arbitrary bytes stores them and uses [escapedString] with
+     * those bytes instead.
      */
     fun escapedString(value: String): JsonElement = escapedString(value.encodeToByteArray())
 
@@ -389,17 +388,30 @@ internal object XdrJson {
     /**
      * Reverses the [escapedString] ladder, returning text in the SDK's string representation.
      *
-     * The unescaped bytes are decoded as UTF-8, matching how a `String`-typed member is read from
-     * the binary form. Bytes that are not valid UTF-8 become the Unicode replacement character,
-     * so this path is lossless for text and lossy for arbitrary bytes; use [unescapeStringBytes]
-     * where the exact bytes matter.
+     * The unescaped bytes are decoded as strict UTF-8 with every leading byte order mark kept,
+     * matching how a `String`-typed member is read from the binary form. Bytes that are not
+     * valid UTF-8 are refused; [unescapeStringBytes] returns them for a member that carries
+     * arbitrary bytes.
+     *
+     * @throws IllegalArgumentException if the bytes are not valid UTF-8, with the
+     *   [CharacterCodingException] as the cause
      */
     fun unescapeString(
         element: JsonElement,
         type: String,
         key: String,
         maxLength: Int? = null
-    ): String = unescapeStringBytes(element, type, key, maxLength).decodeToString()
+    ): String {
+        val bytes = unescapeStringBytes(element, type, key, maxLength)
+        return try {
+            bytes.decodeToString(throwOnInvalidSequence = true)
+        } catch (e: CharacterCodingException) {
+            throw IllegalArgumentException(
+                "$type: key \"$key\" resolves to bytes that are not valid UTF-8: ${preview(element)}",
+                e
+            )
+        }
+    }
 
     /**
      * Reads an array.
@@ -660,6 +672,12 @@ internal object XdrJson {
      * so arbitrary bytes cannot inject line breaks or terminal control sequences into a log.
      */
     fun displayString(bytes: ByteArray): String = escape(bytes)
+
+    /**
+     * Renders the bytes of a string or symbol for `toString` and error messages: their text
+     * when they are valid UTF-8, otherwise their [displayString] form.
+     */
+    fun displayText(bytes: ByteArray): String = Util.utf8OrNull(bytes) ?: displayString(bytes)
 
     /**
      * Renders an untrusted value for an error message: truncated, with control bytes escaped so

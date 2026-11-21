@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.SmartAccountSigner
 import com.soneso.stellar.sdk.smartaccount.core.ValidationException
 import com.soneso.stellar.sdk.xdr.SCAddressTypeXdr
+import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizationEntryXdr
 import com.soneso.stellar.sdk.xdr.SorobanAuthorizedFunctionXdr
@@ -181,12 +182,13 @@ private fun requireValidDelegatedSigner(address: String, walletContractId: Strin
  * Wallet functions that add signers, with the index of the argument that holds them and
  * whether that argument is a `Vec` of signers (stellar-accounts 0.8.0 signatures:
  * `add_signer(context_rule_id, signer)`, `batch_add_signer(context_rule_id, signers)`,
- * `add_context_rule(context_type, name, valid_until, signers, policies)`).
+ * `add_context_rule(context_type, name, valid_until, signers, policies)`). The function name
+ * of a call is looked up by its bytes, so a name that is not valid UTF-8 matches none.
  */
-private val SIGNER_ADDING_FUNCTIONS: Map<String, Pair<Int, Boolean>> = mapOf(
-    "add_signer" to (1 to false),
-    "batch_add_signer" to (1 to true),
-    "add_context_rule" to (3 to true)
+private val SIGNER_ADDING_FUNCTIONS: Map<SCSymbolXdr, Pair<Int, Boolean>> = mapOf(
+    SCSymbolXdr("add_signer") to (1 to false),
+    SCSymbolXdr("batch_add_signer") to (1 to true),
+    SCSymbolXdr("add_context_rule") to (3 to true)
 )
 
 /**
@@ -218,8 +220,8 @@ internal suspend fun requireValidAddedSigners(entry: SorobanAuthorizationEntryXd
         pending.addAll(invocation.subInvocations)
         val contractFn = invocation.function as? SorobanAuthorizedFunctionXdr.ContractFn ?: continue
         val call = contractFn.value
+        val (argumentIndex, isList) = SIGNER_ADDING_FUNCTIONS[call.functionName] ?: continue
         val functionName = call.functionName.value
-        val (argumentIndex, isList) = SIGNER_ADDING_FUNCTIONS[functionName] ?: continue
         val target = try { Address.fromSCAddress(call.contractAddress).toString() } catch (_: Exception) { null }
         if (target != walletContractId) continue
         val argument = call.args.getOrNull(argumentIndex) ?: continue

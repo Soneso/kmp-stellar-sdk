@@ -1905,6 +1905,47 @@ class TransactionOperationsValidationTest {
 
     @Test
     fun contractCall_credentialMissingFromStorage_resolvesKeyDataFromContextRules() = runTest {
+        // The on-chain rule holds the connected passkey as an External signer whose key data
+        // is the public key followed by the credential ID.
+        val rule = defaultContextRuleScVal(
+            id = 0u,
+            signers = listOf(externalSignerScVal(validContractAddress, storedPublicKey + credentialIdBytes))
+        )
+        assertContractCallResolvesKeyDataFrom(rule)
+    }
+
+    @Test
+    fun contractCall_ruleKeysAndSignerTagsThatAreNotUtf8Symbols_areSkippedWhenResolvingKeyData() = runTest {
+        val notUtf8 = SCValXdr.Sym(SCSymbolXdr(byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61)))
+        val notSymbol = Scv.toUint32(1u)
+        val signerAddress = Scv.toAddress(Address(validContractAddress).toSCAddress())
+        val rule = assertIs<SCValXdr.Map>(
+            defaultContextRuleScVal(
+                id = 0u,
+                signers = listOf(
+                    Scv.toVec(listOf(notUtf8, signerAddress)),
+                    Scv.toVec(listOf(notSymbol, signerAddress)),
+                    externalSignerScVal(validContractAddress, storedPublicKey + credentialIdBytes)
+                )
+            )
+        )
+        val ruleWithKeysThatNameNoField = SCValXdr.Map(
+            SCMapXdr(
+                listOf(
+                    SCMapEntryXdr(key = notUtf8, `val` = Scv.toVoid()),
+                    SCMapEntryXdr(key = notSymbol, `val` = Scv.toVoid())
+                ) + rule.value!!.value
+            )
+        )
+        assertContractCallResolvesKeyDataFrom(ruleWithKeysThatNameNoField)
+    }
+
+    /**
+     * Runs a contract call whose credential is missing from storage, with [rule] as the only
+     * on-chain context rule, and asserts that the key data of the connected passkey is
+     * resolved from it and the call is submitted.
+     */
+    private suspend fun assertContractCallResolvesKeyDataFrom(rule: SCValXdr) {
         val deployer = KeyPair.random()
         val accountJson = ledgerEntriesResponseJson(buildAccountEntryXdr(deployer).toXdrBase64())
         val sorobanData = buildMinimalSorobanData().toXdrBase64()
@@ -1914,17 +1955,7 @@ class TransactionOperationsValidationTest {
         )
         val countZero = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(0u)).toXdrBase64(), sorobanData)
         val countOne = simulateValueResponseJson(SCValXdr.U32(Uint32Xdr(1u)).toXdrBase64(), sorobanData)
-
-        // The on-chain rule holds the connected passkey as an External signer whose key data
-        // is the public key followed by the credential ID.
-        val onChainKeyData = storedPublicKey + credentialIdBytes
-        val ruleJson = simulateValueResponseJson(
-            defaultContextRuleScVal(
-                id = 0u,
-                signers = listOf(externalSignerScVal(validContractAddress, onChainKeyData))
-            ).toXdrBase64(),
-            sorobanData
-        )
+        val ruleJson = simulateValueResponseJson(rule.toXdrBase64(), sorobanData)
         val txHash = "b1b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0"
 
         val provider = passkeyProvider()

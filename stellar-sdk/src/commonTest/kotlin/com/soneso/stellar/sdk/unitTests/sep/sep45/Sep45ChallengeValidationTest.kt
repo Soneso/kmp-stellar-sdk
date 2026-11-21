@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -41,6 +42,9 @@ class Sep45ChallengeValidationTest {
 
     // Standard nonce for testing
     private val testNonce = "test_nonce_12345"
+
+    /** Bytes that are not valid UTF-8: ff fe 20 61 62 63. */
+    private val notUtf8 = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63)
 
     /**
      * Helper function to create a WebAuthForContracts instance for testing.
@@ -86,7 +90,8 @@ class Sep45ChallengeValidationTest {
         webAuthDomainAccount: String,
         nonce: String,
         clientDomain: String? = null,
-        clientDomainAccount: String? = null
+        clientDomainAccount: String? = null,
+        extraArgs: List<SCMapEntryXdr> = emptyList()
     ): SCValXdr {
         val entries = mutableListOf<SCMapEntryXdr>()
 
@@ -125,6 +130,7 @@ class Sep45ChallengeValidationTest {
             ))
         }
 
+        entries.addAll(extraArgs)
         return SCValXdr.Map(SCMapXdr(entries))
     }
 
@@ -172,12 +178,13 @@ class Sep45ChallengeValidationTest {
         subInvocations: List<SorobanAuthorizedInvocationXdr> = emptyList(),
         functionArgs: List<SCValXdr>? = null,
         contractAddressOverride: SCAddressXdr? = null,
-        signature: SCValXdr = SCValXdr.Vec(SCVecXdr(emptyList()))
+        signature: SCValXdr = SCValXdr.Vec(SCVecXdr(emptyList())),
+        functionNameSymbol: SCSymbolXdr = SCSymbolXdr(functionName)
     ): SorobanAuthorizationEntryXdr {
         val contractAddress = contractAddressOverride ?: createContractAddress(contractId)
         val invokeArgs = InvokeContractArgsXdr(
             contractAddress = contractAddress,
-            functionName = SCSymbolXdr(functionName),
+            functionName = functionNameSymbol,
             args = functionArgs ?: listOf(argsMap)
         )
 
@@ -242,7 +249,8 @@ class Sep45ChallengeValidationTest {
         nonce: String = testNonce,
         signServerEntry: Boolean = true,
         clientDomain: String? = null,
-        clientDomainAccount: String? = null
+        clientDomainAccount: String? = null,
+        extraArgs: List<SCMapEntryXdr> = emptyList()
     ): List<SorobanAuthorizationEntryXdr> {
         val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
         val entries = mutableListOf<SorobanAuthorizationEntryXdr>()
@@ -255,7 +263,8 @@ class Sep45ChallengeValidationTest {
             webAuthDomainAccount = serverKeyPair.getAccountId(),
             nonce = nonce,
             clientDomain = clientDomain,
-            clientDomainAccount = clientDomainAccount
+            clientDomainAccount = clientDomainAccount,
+            extraArgs = extraArgs
         )
 
         // Create server entry
@@ -1328,6 +1337,86 @@ class Sep45ChallengeValidationTest {
     }
 
     @Test
+    fun testFunctionNameWhoseBytesAreNotUtf8Rejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val argsMap = buildArgsMap(
+            account = testClientContractId,
+            homeDomain = testHomeDomain,
+            webAuthDomain = testWebAuthDomain,
+            webAuthDomainAccount = serverKeyPair.getAccountId(),
+            nonce = testNonce
+        )
+        val entry = buildAuthEntry(
+            credentialsAddress = createAccountAddress(serverKeyPair.getAccountId()),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap,
+            functionNameSymbol = SCSymbolXdr(notUtf8)
+        )
+
+        val exception = assertFailsWith<Sep45InvalidFunctionNameException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertEquals("web_auth_verify", exception.expected)
+        assertEquals("\\xff\\xfe abc", exception.actual)
+    }
+
+    @Test
+    fun testArgumentKeyWhoseBytesAreNotUtf8Ignored() = runTest {
+        val webAuth = createWebAuth()
+        val extra = SCMapEntryXdr(key = SCValXdr.Sym(SCSymbolXdr(notUtf8)), `val` = SCValXdr.Str(SCStringXdr("x")))
+        val entries = buildValidChallenge(extraArgs = listOf(extra))
+
+        webAuth.validateChallenge(
+            authEntries = entries,
+            clientAccountId = testClientContractId,
+            homeDomain = testHomeDomain
+        )
+    }
+
+    @Test
+    fun testArgumentValueWhoseBytesAreNotUtf8Rejected() = runTest {
+        val webAuth = createWebAuth()
+        val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
+        val argsMap = buildRawArgsMap(listOf(
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("account")),
+                `val` = SCValXdr.Str(SCStringXdr(testClientContractId))
+            ),
+            SCMapEntryXdr(
+                key = SCValXdr.Sym(SCSymbolXdr("home_domain")),
+                `val` = SCValXdr.Str(SCStringXdr(notUtf8))
+            )
+        ))
+        val entry = buildAuthEntry(
+            credentialsAddress = createAccountAddress(serverKeyPair.getAccountId()),
+            contractId = testWebAuthContractId,
+            functionName = "web_auth_verify",
+            argsMap = argsMap
+        )
+
+        val exception = assertFailsWith<Sep45InvalidArgsException> {
+            webAuth.validateChallenge(
+                authEntries = listOf(entry),
+                clientAccountId = testClientContractId,
+                homeDomain = testHomeDomain
+            )
+        }
+
+        assertEquals(
+            "Authorization entry arguments validation failed. " +
+                "The value of argument home_domain is not valid UTF-8: \\xff\\xfe abc",
+            exception.message
+        )
+    }
+
+    @Test
     fun testMissingHomeDomainArgumentRejected() = runTest {
         val webAuth = createWebAuth()
         val serverKeyPair = KeyPair.fromSecretSeed(testServerSecretSeed)
@@ -1677,6 +1766,26 @@ class Sep45ChallengeValidationTest {
                 homeDomain = testHomeDomain
             )
         }
+    }
+
+    @Test
+    fun testServerSignatureKeyWhoseBytesAreNotUtf8Ignored() = runTest {
+        val webAuth = createWebAuth()
+        val entries = buildValidChallenge()
+        val credentials = assertIs<SorobanCredentialsXdr.Address>(entries[0].credentials).value
+        val signatureMap = assertIs<SCValXdr.Map>(assertIs<SCValXdr.Vec>(credentials.signature).value!!.value[0])
+        val extra = SCMapEntryXdr(key = SCValXdr.Sym(SCSymbolXdr(notUtf8)), `val` = SCValXdr.Str(SCStringXdr("x")))
+        val serverEntry = entries[0].copy(
+            credentials = SorobanCredentialsXdr.Address(
+                credentials.copy(signature = buildSignatureVec(listOf(extra) + signatureMap.value!!.value))
+            )
+        )
+
+        webAuth.validateChallenge(
+            authEntries = listOf(serverEntry) + entries.drop(1),
+            clientAccountId = testClientContractId,
+            homeDomain = testHomeDomain
+        )
     }
 
     @Test

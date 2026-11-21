@@ -109,6 +109,18 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_snapshot 'SCStringXdr.kt'
   end
 
+  def test_snapshot_scsymbol_typedef
+    assert_snapshot 'SCSymbolXdr.kt'
+  end
+
+  def test_snapshot_memo_union
+    assert_snapshot 'MemoXdr.kt'
+  end
+
+  def test_snapshot_memo_type_enum
+    assert_snapshot 'MemoTypeXdr.kt'
+  end
+
   # -- Snapshot tests: Typedef ------------------------------------------------
 
   def test_snapshot_int32_typedef
@@ -610,6 +622,63 @@ class GeneratorSnapshotTest < Minitest::Test
       end
       assert_match(/ContractExecutableExternalRef\.tag/, error.message)
       assert_match(/SCVal\.executable_tag/, error.message)
+      assert_match(/Memo\.text/, error.message)
+      assert_match(/SCString\.value/, error.message)
+      assert_match(/SCSymbol\.value/, error.message)
+    end
+  end
+
+  # A :text typedef is a class over its stored bytes: the value class it replaces had the
+  # String constructor and `value`, which stay, and the wire and JSON forms use the bytes.
+  def test_text_backed_typedef_is_a_class_over_the_stored_bytes
+    content = File.read(File.join(@output_dir, 'SCSymbolXdr.kt'))
+    refute_includes content, 'value class'
+    refute_includes content, '@kotlin.jvm.JvmInline'
+    assert_includes content, "class SCSymbolXdr(bytes: ByteArray) {\n  private val storedBytes: ByteArray = bytes.copyOf()"
+    assert_includes content, 'constructor(value: String) : this(value.encodeToByteArray())'
+    assert_includes content, "val value: String\n    get() = storedBytes.decodeToString(throwOnInvalidSequence = true)"
+    assert_includes content, "val bytes: ByteArray\n    get() = storedBytes.copyOf()"
+    assert_includes content, 'val value = reader.readStringBytes(SCSYMBOL_LIMIT)'
+    assert_includes content, 'writer.writeStringBytes(storedBytes, SCSYMBOL_LIMIT)'
+    assert_includes content, 'XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value", maxLength = SCSYMBOL_LIMIT)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(storedBytes)'
+    assert_includes content, 'other is SCSymbolXdr && storedBytes.contentEquals(other.storedBytes)'
+    assert_includes content, 'override fun hashCode(): Int = storedBytes.contentHashCode()'
+    assert_includes content, 'override fun toString(): String = "SCSymbolXdr(value=${XdrJson.displayText(storedBytes)})"'
+
+    unbounded = File.read(File.join(@output_dir, 'SCStringXdr.kt'))
+    assert_includes unbounded, 'val value = reader.readVariableOpaque()'
+    assert_includes unbounded, 'writer.writeVariableOpaque(storedBytes)'
+    assert_includes unbounded, 'XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"))'
+  end
+
+  # A :text arm is an arm class over its stored bytes, and its siblings keep their data classes.
+  def test_text_backed_arm_is_an_arm_class_over_the_stored_bytes
+    union = File.read(File.join(@output_dir, 'MemoXdr.kt'))
+    assert_includes union, "  class Text(bytes: ByteArray) : MemoXdr() {\n    private val storedBytes: ByteArray = bytes.copyOf()"
+    refute_includes union, 'data class Text('
+    assert_includes union, "    override val discriminant: MemoTypeXdr = MemoTypeXdr.MEMO_TEXT\n"
+    assert_includes union, 'other is Text && storedBytes.contentEquals(other.storedBytes)'
+    assert_includes union, "val value = reader.readStringBytes(28)\n          Text(value)"
+    assert_includes union, "is Text -> {\n        writer.writeStringBytes(bytes, 28)\n      }"
+    assert_includes union, 'is Text -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("text", XdrJson.escapedString(bytes)) }'
+    assert_includes union, '"text" -> Text(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "text", maxLength = 28))'
+    assert_includes union, "  data class Id(\n    val value: Uint64Xdr\n  ) : MemoXdr()"
+  end
+
+  def test_text_backed_entries_outside_union_arms_and_string_typedefs_raise
+    {
+      'struct Holder { string label<8>; };' => [{ 'Holder' => { 'label' => :text } }, /only union arms and string typedefs/],
+      'union Pick switch (int kind) { case 0: case 1: string label<8>; };' =>
+        [{ 'Pick' => { 'label' => :text } }, /only an arm of a single case/],
+      'typedef int Count;' => [{ 'Count' => { 'value' => :text } }, /does not declare an XDR string/],
+      'typedef string Label<8>;' => [{ 'Label' => { 'value' => :bytes } }, /a typedef takes :text/],
+      'struct Other { string label<8>; };' => [{ 'Other' => { 'label' => :raw } }, /the emissions are :bytes and :text/]
+    }.each do |source, (table, message)|
+      error = with_bytes_backed_table(table) do
+        assert_raises(RuntimeError) { compile_source(source) }
+      end
+      assert_match message, error.message, source
     end
   end
 
@@ -627,6 +696,27 @@ class GeneratorSnapshotTest < Minitest::Test
   end
 
   private
+
+  def compile_source(source)
+    Dir.mktmpdir('xdr_text_backed_') do |dir|
+      path = File.join(dir, 'source.x')
+      File.write(path, source)
+      Xdrgen::Compilation.new([path], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+    end
+  end
+
+  # Runs the block with BYTES_BACKED_STRING_FIELDS replaced by [table] and restores it after.
+  def with_bytes_backed_table(table)
+    generator = Xdrgen::Generators::Kotlin
+    original = generator::BYTES_BACKED_STRING_FIELDS
+    generator.send(:remove_const, :BYTES_BACKED_STRING_FIELDS)
+    generator.const_set(:BYTES_BACKED_STRING_FIELDS, table)
+    yield
+  ensure
+    generator.send(:remove_const, :BYTES_BACKED_STRING_FIELDS)
+    generator.const_set(:BYTES_BACKED_STRING_FIELDS, original)
+  end
 
   def binary_length_fixture
     Dir.mktmpdir('xdr_binary_lengths_') do |dir|

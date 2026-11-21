@@ -167,6 +167,15 @@ class DelegatedSignerGuardTest {
         requireValidAddedSigners(entry(addContextRule(Scv.toVec(listOf(delegated(account))))), wallet)
     }
 
+    @Test
+    fun rawCallWhoseFunctionNameIsNotUtf8_addsNoSigner() = runTest {
+        val name = SCSymbolXdr(byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63))
+        val function = SorobanAuthorizedFunctionXdr.ContractFn(
+            InvokeContractArgsXdr(Address(wallet).toSCAddress(), name, listOf(Scv.toUint32(0u), delegated(otherContract)))
+        )
+        requireValidAddedSigners(entry(function), wallet)
+    }
+
     // The raw path applies the contract's and the kit's rules to the signer fields, not the
     // checks of the typed signers.
 

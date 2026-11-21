@@ -379,6 +379,41 @@ class ContractClientAndHelpersTest {
         }
     }
 
+    @Test
+    fun testMethodNamesAndUnknownMethodErrorsHandleAFunctionNameThatIsNotUtf8() = runTest {
+        val notUtf8 = SCSymbolXdr(byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61))
+        val spec = helloSpec(SCSpecEntryXdr.FunctionV0(SCSpecFunctionV0Xdr("", notUtf8, emptyList(), emptyList())))
+        mockRpcServer(simulateReturnValue = Scv.toVoid()).use { server ->
+            val client = ContractClient.forServer(MOCK_RPC_CONTRACT_ID, MOCK_RPC_SERVER_URL, Network.TESTNET, server, spec)
+
+            assertEquals(setOf("hello"), client.getMethodNames())
+            val failures = listOf(
+                assertFailsWith<IllegalArgumentException> {
+                    client.invoke<SCValXdr>(
+                        functionName = "missing",
+                        arguments = emptyMap(),
+                        source = MOCK_RPC_SOURCE_ACCOUNT,
+                        signer = null
+                    )
+                },
+                assertFailsWith<IllegalArgumentException> {
+                    client.buildInvoke<SCValXdr>(
+                        functionName = "missing",
+                        arguments = emptyMap(),
+                        source = MOCK_RPC_SOURCE_ACCOUNT,
+                        signer = null
+                    )
+                }
+            )
+            for (failure in failures) {
+                assertEquals(
+                    "Method 'missing' not found in contract spec. Available methods: \\xff\\xfe a, hello",
+                    failure.message
+                )
+            }
+        }
+    }
+
     // ==================== Map-based invoke/buildInvoke: argument conversion failure ====================
 
     @Test
@@ -498,8 +533,8 @@ class ContractClientAndHelpersTest {
         return SCSpecTypeDefXdr.decode(XdrReader(writer.toByteArray()))
     }
 
-    /** A minimal contract spec with a single "hello(to: symbol) -> symbol" function. */
-    private fun helloSpec(): ContractSpec {
+    /** A minimal contract spec with [before], then a "hello(to: symbol) -> symbol" function. */
+    private fun helloSpec(vararg before: SCSpecEntryXdr): ContractSpec {
         val entry = SCSpecEntryXdr.FunctionV0(
             SCSpecFunctionV0Xdr(
                 doc = "",
@@ -510,7 +545,7 @@ class ContractClientAndHelpersTest {
                 outputs = listOf(symbolTypeDef())
             )
         )
-        return ContractSpec(listOf(entry))
+        return ContractSpec(before.toList() + entry)
     }
 
     // ==================== requirePollableSend ====================

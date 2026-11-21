@@ -225,8 +225,19 @@ class Sep51SpecExampleTest {
     }
 
     /**
-     * The conformance example of the ladder, `hello\xc3world`, is not valid UTF-8, so it is
-     * carried by a bytes-typed member: an asset code holds arbitrary bytes and renders them
+     * The conformance example of the ladder, `hello\xc3world`, is not valid UTF-8. An `SCString`
+     * keeps the bytes the XDR carries, so it renders and restores the example exactly.
+     */
+    @Test
+    fun stringMemberRendersTheLadderConformanceExample() {
+        val xdr = "AAAAC2hlbGxvw3dvcmxkAA=="
+        val document = "\"hello\\\\xc3world\""
+        assertEquals(document, SCStringXdr.decode(reader(xdr)).toXdrJson())
+        assertEquals(xdr, base64 { SCStringXdr.fromXdrJson(document).encode(it) })
+    }
+
+    /**
+     * An asset code holds arbitrary bytes and renders the conformance example `hello\xc3world`
      * through the same ladder.
      */
     @Test

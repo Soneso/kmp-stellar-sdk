@@ -59,7 +59,7 @@ actual class XdrReader actual constructor(input: ByteArray) {
 
     actual fun readBoolean(): Boolean = readInt() != 0
 
-    actual fun readString(): String = readFixedOpaque(readInt()).decodeToString()
+    actual fun readString(): String = readFixedOpaque(readInt()).decodeToString(throwOnInvalidSequence = true)
 
     actual fun readFixedOpaque(length: Int): ByteArray {
         requireAvailable(length)

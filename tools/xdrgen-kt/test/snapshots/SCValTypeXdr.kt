@@ -12,11 +12,13 @@ private const val XDR_JSON_TYPE = "SCValTypeXdr"
  * enum SCValType
  * {
  *     SCV_STRING = 14,
+ *     SCV_SYMBOL = 15,
  *     SCV_EXECUTABLE_TAG = 22
  * };
  */
 enum class SCValTypeXdr(val value: Int, internal val xdrJsonName: String) {
   SCV_STRING(14, "string"),
+  SCV_SYMBOL(15, "symbol"),
   SCV_EXECUTABLE_TAG(22, "executable_tag");
 
   companion object {
