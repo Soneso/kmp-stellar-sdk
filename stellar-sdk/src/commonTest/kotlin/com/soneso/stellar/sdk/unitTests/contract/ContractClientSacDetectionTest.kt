@@ -30,14 +30,10 @@ import com.soneso.stellar.sdk.xdr.LedgerKeyContractDataXdr
 import com.soneso.stellar.sdk.xdr.LedgerKeyXdr
 import com.soneso.stellar.sdk.xdr.SCBytesXdr
 import com.soneso.stellar.sdk.xdr.SCContractInstanceXdr
-import com.soneso.stellar.sdk.xdr.SCEnvMetaEntryInterfaceVersionXdr
-import com.soneso.stellar.sdk.xdr.SCEnvMetaEntryXdr
 import com.soneso.stellar.sdk.xdr.SCSpecEntryXdr
 import com.soneso.stellar.sdk.xdr.SCSpecFunctionV0Xdr
 import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
-import com.soneso.stellar.sdk.xdr.Uint32Xdr
-import com.soneso.stellar.sdk.xdr.XdrWriter
 import com.soneso.stellar.sdk.xdr.toXdrBase64
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
@@ -119,20 +115,6 @@ class ContractClientSacDetectionTest {
 
     private val tagEntryB64: String =
         contractDataB64(ownerContractId, SCValXdr.ExecutableTag(executableTag), SCValXdr.Bytes(SCBytesXdr(wasmHash)))
-
-    /**
-     * Code with an environment meta section and a `contractspecv0` section whose bytes do not
-     * decode as a spec entry, so the parser returns contract info without spec entries.
-     */
-    private val codeWithoutDecodableSpec: ByteArray
-        get() {
-            val writer = XdrWriter()
-            SCEnvMetaEntryXdr.InterfaceVersion(
-                SCEnvMetaEntryInterfaceVersionXdr(protocol = Uint32Xdr(23u), preRelease = Uint32Xdr(0u))
-            ).encode(writer)
-            return "contractenvmetav0".encodeToByteArray() + writer.toByteArray() +
-                "contractspecv0".encodeToByteArray() + ByteArray(4) { 0xFF.toByte() }
-        }
 
     /**
      * A [SorobanServer] over a MockEngine that serves getLedgerEntries only. [entryFor] maps the
@@ -312,20 +294,20 @@ class ContractClientSacDetectionTest {
     }
 
     @Test
-    fun testCodeWithoutDecodableSpecEntryThrowsSpecNotFoundWithoutAFurtherRequest() = runTest {
+    fun testCodeWithUndecodableSpecEntryThrowsTheParserErrorWithoutAFurtherRequest() = runTest {
         val requests = mutableListOf<List<String>>()
         val instanceKey = instanceKeyB64(wasmContractId)
         val server = ledgerServer(requests) { _, key ->
             when (key) {
                 instanceKey -> instanceEntryB64(wasmContractId, wasmExecutable)
-                codeKeyB64 -> codeEntryB64(codeWithoutDecodableSpec)
+                codeKeyB64 -> codeEntryB64(undecodableSpecModule())
                 else -> error("unexpected ledger key: $key")
             }
         }
 
         val failure = failureOf(wasmContractId, server)
 
-        assertEquals(specNotFound(wasmContractId), failure.message)
+        assertEquals("Failed to load contract spec for $wasmContractId: $UNDECODABLE_SPEC_ERROR", failure.message)
         assertEquals(listOf(ledgerRequest(instanceKey), ledgerRequest(codeKeyB64)), requests)
     }
 

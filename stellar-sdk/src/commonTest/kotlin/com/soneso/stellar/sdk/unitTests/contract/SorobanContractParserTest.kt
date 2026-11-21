@@ -56,15 +56,22 @@ class SorobanContractParserTest {
     }
 
     @Test
-    fun testParseContractByteCodeWithOnlyEnvMetaMarker() {
-        // Byte code with just the marker but no valid XDR after it
-        val marker = "contractenvmetav0".encodeToByteArray()
-        val garbage = ByteArray(10) { 0xFF.toByte() }
-        val byteCode = marker + garbage
-        assertFailsWith<SorobanContractParserException> {
-            SorobanContractParser.parseContractByteCode(byteCode)
-        }
+    fun testParseContractByteCodeWithUndecodableEnvMeta() {
+        // An environment meta section whose bytes do not decode; its content starts at byte 28.
+        val module = wasmModule(customSection("contractenvmetav0", ByteArray(10) { 0xFF.toByte() }))
+        val cause = "Unknown SCEnvMetaKindXdr value: -1"
+        val expected = "Invalid byte code: the contractenvmetav0 entry at byte offset 28 does not decode: $cause."
+        assertEquals(expected, parseFailure(module))
     }
+
+    private fun parseFailure(code: ByteArray): String? =
+        assertFailsWith<SorobanContractParserException> { SorobanContractParser.parseContractByteCode(code) }.message
+
+    /** The marker-delimited layout of a module without its wasm framing is refused at the header. */
+    private fun assertRefusedWithoutFraming(byteCode: ByteArray) = assertEquals(
+        "Invalid byte code: expected the wasm magic 00 61 73 6d at byte offset 0, found 63 6f 6e 74.",
+        parseFailure(byteCode)
+    )
 
     private fun encodedBytes(block: (XdrWriter) -> Unit): ByteArray {
         val writer = XdrWriter()
@@ -89,43 +96,59 @@ class SorobanContractParserTest {
     }
 
     @Test
-    fun testParseContractByteCodeThrowsWhenSpecEntriesMarkerMissing() {
-        // Valid env meta and nothing else: every "contractspecv0" marker-search
-        // fallback in parseContractSpec fails, so parsing must report "spec entries
-        // not found" rather than silently producing an empty spec list.
-        val byteCode = "contractenvmetav0".encodeToByteArray() + envMetaBytes()
-        val ex = assertFailsWith<SorobanContractParserException> {
-            SorobanContractParser.parseContractByteCode(byteCode)
-        }
-        assertTrue(ex.message!!.contains("spec entries not found"))
+    fun testParseContractByteCodeThrowsWhenSpecSectionMissing() {
+        // A module without a spec section reports the missing spec rather than an empty spec list.
+        val module = wasmModule(customSection("contractenvmetav0", envMetaBytes()))
+        assertEquals("Invalid byte code: spec entries not found.", parseFailure(module))
+    }
+
+    @Test
+    fun testParseContractByteCodeThrowsWhenEnvMetaSectionMissingOrEmpty() {
+        val spec = customSection("contractspecv0", funcSpecEntryBytes())
+        assertEquals("Invalid byte code: environment meta not found.", parseFailure(wasmModule(spec)))
+        val emptyEnvMeta = customSection("contractenvmetav0", ByteArray(0))
+        val noVersion = "Invalid byte code: environment interface version not found."
+        assertEquals(noVersion, parseFailure(wasmModule(spec, emptyEnvMeta)))
+        // The first environment meta section counts, also when a later one holds the version.
+        val laterEnvMeta = customSection("contractenvmetav0", envMetaBytes())
+        assertEquals(noVersion, parseFailure(wasmModule(spec, emptyEnvMeta, laterEnvMeta)))
     }
 
     @Test
     fun testParseContractByteCodeParsesSingleSpecEntryToExhaustion() {
-        // The spec section contains exactly one entry with no trailing bytes before
-        // the next marker: the decode loop must exit by exhausting currentSpecBytes,
-        // not by hitting an unknown discriminant or a decode error.
-        val byteCode = "contractspecv0".encodeToByteArray() + funcSpecEntryBytes() +
-            "contractenvmetav0".encodeToByteArray() + envMetaBytes()
+        // The spec section holds exactly one entry, so reading ends at the section end.
+        val byteCode = wasmModule(
+            customSection("contractspecv0", funcSpecEntryBytes()),
+            customSection("contractenvmetav0", envMetaBytes())
+        )
         val info = SorobanContractParser.parseContractByteCode(byteCode)
         assertEquals(1, info.specEntries.size)
         assertEquals(1, info.funcs.size)
         assertEquals("hello", info.funcs[0].name.value)
         assertEquals(emptyMap(), info.metaEntries)
+        assertRefusedWithoutFraming(
+            "contractspecv0".encodeToByteArray() + funcSpecEntryBytes() +
+                "contractenvmetav0".encodeToByteArray() + envMetaBytes()
+        )
     }
 
     @Test
     fun testParseContractByteCodeParsesMetaEntryToExhaustion() {
-        // Layout: env meta, then contract meta, then contract spec, each section
-        // tight against the next marker. parseMeta lands on its second fallback
-        // (metav0 -> specv0) and its decode loop exits by exhaustion.
-        val byteCode = "contractenvmetav0".encodeToByteArray() + envMetaBytes() +
-            "contractmetav0".encodeToByteArray() + metaEntryBytes("rsdk_version", "1.0.0") +
-            "contractspecv0".encodeToByteArray() + funcSpecEntryBytes()
+        // Layout: environment meta, then contract meta, then contract spec.
+        val byteCode = wasmModule(
+            customSection("contractenvmetav0", envMetaBytes()),
+            customSection("contractmetav0", metaEntryBytes("rsdk_version", "1.0.0")),
+            customSection("contractspecv0", funcSpecEntryBytes())
+        )
         val info = SorobanContractParser.parseContractByteCode(byteCode)
         assertEquals(21UL, info.envInterfaceVersion)
         assertEquals(1, info.specEntries.size)
         assertEquals("1.0.0", info.metaEntries["rsdk_version"])
+        assertRefusedWithoutFraming(
+            "contractenvmetav0".encodeToByteArray() + envMetaBytes() +
+                "contractmetav0".encodeToByteArray() + metaEntryBytes("rsdk_version", "1.0.0") +
+                "contractspecv0".encodeToByteArray() + funcSpecEntryBytes()
+        )
     }
 
     // ========== SorobanContractInfo Tests ==========

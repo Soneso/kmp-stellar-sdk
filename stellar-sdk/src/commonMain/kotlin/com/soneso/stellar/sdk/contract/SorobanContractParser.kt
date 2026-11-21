@@ -17,6 +17,10 @@ import com.soneso.stellar.sdk.xdr.*
  * - contractspecv0: Contract specification entries (functions, structs, unions, enums, events)
  * - contractmetav0: Contract metadata (key-value pairs for application/tooling use)
  *
+ * The parser walks the sections of the module by their wasm framing. It reads the first
+ * contractenvmetav0 and the first contractspecv0 section, and every contractmetav0 section in
+ * module order.
+ *
  * Example usage:
  * ```kotlin
  * val wasmBytes = // ... load WASM file
@@ -33,29 +37,60 @@ import com.soneso.stellar.sdk.xdr.*
  */
 object SorobanContractParser {
 
+    private const val ENV_META_SECTION = "contractenvmetav0"
+    private const val SPEC_SECTION = "contractspecv0"
+    private const val META_SECTION = "contractmetav0"
+    private val SECTION_NAMES = setOf(ENV_META_SECTION, SPEC_SECTION, META_SECTION)
+    private const val SEP_KEY = "sep"
+    private const val CUSTOM_SECTION_ID = 0
+    private val WASM_MAGIC = byteArrayOf(0x00, 0x61, 0x73, 0x6D)
+    private val WASM_VERSION = byteArrayOf(0x01, 0x00, 0x00, 0x00)
+
     /**
      * Parses a Soroban contract byte code to extract Environment Meta, Contract Spec, and Contract Meta.
      *
+     * Every section of the module must be well framed. The first `contractenvmetav0` and the first
+     * `contractspecv0` custom section are read and later sections of these names are ignored.
+     * Every `contractmetav0` section is read, in module order, and a later entry replaces an earlier
+     * one with the same key, except that the values of repeated `sep` entries are joined with a
+     * comma, as SEP-47 defines. Each section is read entry by entry to its end, no entry spans two
+     * sections, and every entry must decode. The interface version comes from the first environment
+     * meta entry; a module without a `contractmetav0` section has no meta entries.
+     *
      * @param byteCode The WASM byte code of the Soroban contract
      * @return [SorobanContractInfo] containing the parsed environment version, spec entries, and meta entries
-     * @throws SorobanContractParserException if the byte code is invalid or cannot be parsed
+     * @throws SorobanContractParserException if the byte code is not a wasm module, a section is
+     *   malformed, the environment meta or spec section is missing, the first environment meta
+     *   section holds no entry, or an entry does not decode, such as an entry of an unknown kind.
+     *   Framing and entry decoding errors name the byte offset in the module.
      */
     fun parseContractByteCode(byteCode: ByteArray): SorobanContractInfo {
-        // Parse environment metadata
-        val envMeta = parseEnvironmentMeta(byteCode)
-            ?: throw SorobanContractParserException("Invalid byte code: environment meta not found.")
+        val sections = findSections(byteCode)
 
-        val interfaceVersion = when (envMeta) {
-            is SCEnvMetaEntryXdr.InterfaceVersion -> envMeta.value.protocol.value.toULong()
-            else -> throw SorobanContractParserException("Invalid byte code: environment interface version not found.")
+        val envMeta = sections[ENV_META_SECTION].orEmpty().firstOrNull()
+            ?: throw SorobanContractParserException("Invalid byte code: environment meta not found.")
+        val envMetaEntries = decodeEntries(byteCode, envMeta) { SCEnvMetaEntryXdr.decode(it) }
+        val interfaceVersion = when (val first = envMetaEntries.firstOrNull()) {
+            is SCEnvMetaEntryXdr.InterfaceVersion -> first.value.protocol.value.toULong()
+            null -> throw SorobanContractParserException("Invalid byte code: environment interface version not found.")
         }
 
-        // Parse contract specification entries
-        val specEntries = parseContractSpec(byteCode)
+        val spec = sections[SPEC_SECTION].orEmpty().firstOrNull()
             ?: throw SorobanContractParserException("Invalid byte code: spec entries not found.")
+        val specEntries = decodeEntries(byteCode, spec) { SCSpecEntryXdr.decode(it) }
 
-        // Parse contract metadata (may be empty)
-        val metaEntries = parseMeta(byteCode)
+        val metaEntries = mutableMapOf<String, String>()
+        for (meta in sections[META_SECTION].orEmpty()) {
+            for (entry in decodeEntries(byteCode, meta) { SCMetaEntryXdr.decode(it) }) {
+                when (entry) {
+                    is SCMetaEntryXdr.V0 -> {
+                        val (key, value) = entry.value.key to entry.value.`val`
+                        val earlier = metaEntries[key]
+                        metaEntries[key] = if (key == SEP_KEY && earlier != null) "$earlier,$value" else value
+                    }
+                }
+            }
+        }
 
         return SorobanContractInfo(
             envInterfaceVersion = interfaceVersion,
@@ -64,253 +99,122 @@ object SorobanContractParser {
         )
     }
 
-    /**
-     * Extracts and parses the environment metadata from the contract byte code.
-     *
-     * @param byteCode The contract byte code
-     * @return The parsed [SCEnvMetaEntryXdr] or null if not found or invalid
-     */
-    private fun parseEnvironmentMeta(byteCode: ByteArray): SCEnvMetaEntryXdr? {
-        return try {
-            // Try to extract environment metadata between markers
-            var metaEnvEntryBytes = extractBytesBetween(
-                byteCode,
-                "contractenvmetav0".encodeToByteArray(),
-                "contractmetav0".encodeToByteArray()
-            )
+    /** The content of the custom section [name], from byte offset [start] to [end] (exclusive) in the module. */
+    private class Section(val name: String, val start: Int, val end: Int)
 
-            if (metaEnvEntryBytes == null) {
-                metaEnvEntryBytes = extractBytesBetween(
-                    byteCode,
-                    "contractenvmetav0".encodeToByteArray(),
-                    "contractspecv0".encodeToByteArray()
+    /**
+     * Walks every section of [byteCode] and returns the custom sections of each name in
+     * [SECTION_NAMES], in module order. Each section needs a LEB128 u32 size whose payload lies
+     * within the module, and a custom section also a LEB128 u32 name length whose name lies within
+     * the section. Other payloads are skipped unread, so a section name inside a data segment or
+     * the code section never matches.
+     */
+    private fun findSections(byteCode: ByteArray): Map<String, List<Section>> {
+        checkHeader(byteCode)
+        val found = mutableMapOf<String, MutableList<Section>>()
+        var offset = WASM_MAGIC.size + WASM_VERSION.size
+        while (offset < byteCode.size) {
+            val sectionOffset = offset
+            val id = byteCode[offset].toInt() and 0xFF
+            val (size, payloadStart) =
+                readU32(byteCode, offset + 1, byteCode.size, "size of the section at byte offset $sectionOffset")
+            val remaining = byteCode.size - payloadStart
+            if (size > remaining) {
+                throw invalid(
+                    "the section at byte offset $sectionOffset (id $id) declares $size bytes, but $remaining remain"
                 )
             }
-
-            if (metaEnvEntryBytes == null) {
-                metaEnvEntryBytes = extractBytesToEnd(byteCode, "contractenvmetav0".encodeToByteArray())
+            val end = payloadStart + size.toInt()
+            if (id == CUSTOM_SECTION_ID) {
+                val nameLengthOf = "name length of the custom section at byte offset $sectionOffset"
+                val (nameLength, nameStart) = readU32(byteCode, payloadStart, end, nameLengthOf)
+                if (nameLength > end - nameStart) {
+                    throw invalid(
+                        "the name of the custom section at byte offset $sectionOffset declares $nameLength bytes, " +
+                            "but ${end - nameStart} remain in the section"
+                    )
+                }
+                val nameEnd = nameStart + nameLength.toInt()
+                val name = byteCode.copyOfRange(nameStart, nameEnd).decodeToString()
+                if (name in SECTION_NAMES) {
+                    found.getOrPut(name) { mutableListOf() }.add(Section(name, nameEnd, end))
+                }
             }
-
-            if (metaEnvEntryBytes == null) {
-                return null
-            }
-
-            SCEnvMetaEntryXdr.decode(XdrReader(metaEnvEntryBytes))
-        } catch (_: Exception) {
-            null
+            offset = end
         }
+        return found
     }
 
-    /**
-     * Extracts and parses all contract specification entries from the contract byte code.
-     *
-     * @param byteCode The contract byte code
-     * @return List of [SCSpecEntryXdr] or null if not found
-     */
-    private fun parseContractSpec(byteCode: ByteArray): List<SCSpecEntryXdr>? {
-        var specBytes = extractBytesBetween(
-            byteCode,
-            "contractspecv0".encodeToByteArray(),
-            "contractenvmetav0".encodeToByteArray()
-        )
-
-        if (specBytes == null) {
-            specBytes = extractBytesBetween(
-                byteCode,
-                "contractspecv0".encodeToByteArray(),
-                "contractspecv0".encodeToByteArray()
+    private fun checkHeader(byteCode: ByteArray) {
+        val headerSize = WASM_MAGIC.size + WASM_VERSION.size
+        if (byteCode.size < headerSize) {
+            throw invalid(
+                "the module has ${byteCode.size} bytes, fewer than the $headerSize bytes of the wasm header " +
+                    "at byte offset 0"
             )
         }
-
-        if (specBytes == null) {
-            specBytes = extractBytesToEnd(byteCode, "contractspecv0".encodeToByteArray())
+        val magic = byteCode.copyOfRange(0, WASM_MAGIC.size)
+        if (!magic.contentEquals(WASM_MAGIC)) {
+            throw invalid("expected the wasm magic ${hex(WASM_MAGIC)} at byte offset 0, found ${hex(magic)}")
         }
-
-        if (specBytes == null) {
-            return null
-        }
-
-        val result = mutableListOf<SCSpecEntryXdr>()
-
-        var currentSpecBytes: ByteArray? = specBytes
-        while (currentSpecBytes != null && currentSpecBytes.isNotEmpty()) {
-            try {
-                val entry = SCSpecEntryXdr.decode(XdrReader(currentSpecBytes))
-
-                // Only include valid spec entry types
-                when (entry.discriminant) {
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_FUNCTION_V0,
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_STRUCT_V0,
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_UNION_V0,
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_ENUM_V0,
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_UDT_ERROR_ENUM_V0,
-                    SCSpecEntryKindXdr.SC_SPEC_ENTRY_EVENT_V0 -> {
-                        result.add(entry)
-
-                        // Encode the entry back to determine how many bytes it consumed
-                        val writer = XdrWriter()
-                        entry.encode(writer)
-                        val entryBytes = writer.toByteArray()
-
-                        // Skip past the bytes we just decoded
-                        currentSpecBytes = if (entryBytes.size < currentSpecBytes.size) {
-                            currentSpecBytes.copyOfRange(entryBytes.size, currentSpecBytes.size)
-                        } else {
-                            ByteArray(0)
-                        }
-                    }
-                    else -> {
-                        // Unknown entry type, stop parsing
-                        break
-                    }
-                }
-            } catch (_: Exception) {
-                // Error decoding entry, stop parsing
-                break
-            }
-        }
-
-        return result
-    }
-
-    /**
-     * Extracts and parses all contract metadata entries from the contract byte code.
-     *
-     * @param byteCode The contract byte code
-     * @return Map of metadata key-value pairs (may be empty)
-     */
-    private fun parseMeta(byteCode: ByteArray): Map<String, String> {
-        var metaBytes = extractBytesBetween(
-            byteCode,
-            "contractmetav0".encodeToByteArray(),
-            "contractenvmetav0".encodeToByteArray()
-        )
-
-        if (metaBytes == null) {
-            metaBytes = extractBytesBetween(
-                byteCode,
-                "contractmetav0".encodeToByteArray(),
-                "contractspecv0".encodeToByteArray()
+        val version = byteCode.copyOfRange(WASM_MAGIC.size, headerSize)
+        if (!version.contentEquals(WASM_VERSION)) {
+            throw invalid(
+                "expected the wasm version ${hex(WASM_VERSION)} at byte offset ${WASM_MAGIC.size}, " +
+                    "found ${hex(version)}"
             )
         }
+    }
 
-        if (metaBytes == null) {
-            metaBytes = extractBytesToEnd(byteCode, "contractmetav0".encodeToByteArray())
+    /**
+     * Reads the LEB128 u32 [what] that starts at [offset] and must end before [end]. It has at most
+     * 5 bytes, and the fifth holds only the top 4 bits of the value; padded forms such as
+     * `80 80 80 80 00` are valid wasm.
+     *
+     * @return the value and the offset after its last byte
+     */
+    private fun readU32(bytes: ByteArray, offset: Int, end: Int, what: String): Pair<Long, Int> {
+        var value = 0L
+        var position = offset
+        var shift = 0
+        while (true) {
+            if (position >= end) throw invalid("the $what is cut off at byte offset $end")
+            val byte = bytes[position++].toInt() and 0xFF
+            if (shift == 28 && (byte and 0xF0) != 0) {
+                val problem = if ((byte and 0x80) != 0) "is longer than 5 bytes" else "exceeds the u32 range"
+                throw invalid("the $what $problem")
+            }
+            value = value or ((byte and 0x7F).toLong() shl shift)
+            if ((byte and 0x80) == 0) return value to position
+            shift += 7
         }
+    }
 
-        val result = mutableMapOf<String, String>()
-
-        if (metaBytes == null) {
-            return result
-        }
-
-        var currentMetaBytes: ByteArray? = metaBytes
-        while (currentMetaBytes != null && currentMetaBytes.isNotEmpty()) {
+    /**
+     * Decodes the entries of [section] one after the other until its content is consumed.
+     *
+     * @throws SorobanContractParserException if an entry does not decode, which includes an
+     *   unknown entry kind and trailing bytes that do not form an entry
+     */
+    private fun <T> decodeEntries(byteCode: ByteArray, section: Section, decode: (XdrReader) -> T): List<T> {
+        val content = byteCode.copyOfRange(section.start, section.end)
+        val reader = XdrReader(content)
+        val entries = mutableListOf<T>()
+        while (reader.position < content.size) {
+            val entryOffset = section.start + reader.position
             try {
-                when (val entry = SCMetaEntryXdr.decode(XdrReader(currentMetaBytes))) {
-                    is SCMetaEntryXdr.V0 -> {
-                        result[entry.value.key] = entry.value.`val`
-
-                        // Encode the entry back to determine how many bytes it consumed
-                        val writer = XdrWriter()
-                        entry.encode(writer)
-                        val entryBytes = writer.toByteArray()
-
-                        // Skip past the bytes we just decoded
-                        currentMetaBytes = if (entryBytes.size < currentMetaBytes.size) {
-                            currentMetaBytes.copyOfRange(entryBytes.size, currentMetaBytes.size)
-                        } else {
-                            ByteArray(0)
-                        }
-                    }
-                    else -> {
-                        // Unknown meta entry type, stop parsing
-                        break
-                    }
-                }
-            } catch (_: Exception) {
-                // Error decoding entry, stop parsing
-                break
+                entries.add(decode(reader))
+            } catch (e: Exception) {
+                throw invalid("the ${section.name} entry at byte offset $entryOffset does not decode: ${e.message}")
             }
         }
-
-        return result
+        return entries
     }
 
-    /**
-     * Extracts a byte sequence between two marker byte sequences.
-     * This is a binary-safe operation that does not corrupt binary WASM data.
-     *
-     * @param input The input ByteArray to search
-     * @param startSymbol The start marker (not included in result)
-     * @param endSymbol The end marker (not included in result)
-     * @return The extracted ByteArray or null if markers not found
-     */
-    private fun extractBytesBetween(
-        input: ByteArray,
-        startSymbol: ByteArray,
-        endSymbol: ByteArray
-    ): ByteArray? {
-        val startIndex = indexOfBytes(input, startSymbol)
-        if (startIndex == -1) {
-            return null
-        }
+    private fun invalid(detail: String) = SorobanContractParserException("Invalid byte code: $detail.")
 
-        val endIndex = indexOfBytes(input, endSymbol, startIndex + startSymbol.size)
-        if (endIndex == -1) {
-            return null
-        }
-
-        return input.copyOfRange(startIndex + startSymbol.size, endIndex)
-    }
-
-    /**
-     * Extracts a byte sequence from a marker to the end of the input.
-     * This is a binary-safe operation that does not corrupt binary WASM data.
-     *
-     * @param input The input ByteArray to search
-     * @param startSymbol The start marker (not included in result)
-     * @return The extracted ByteArray or null if marker not found
-     */
-    private fun extractBytesToEnd(input: ByteArray, startSymbol: ByteArray): ByteArray? {
-        val startIndex = indexOfBytes(input, startSymbol)
-        if (startIndex == -1) {
-            return null
-        }
-
-        return input.copyOfRange(startIndex + startSymbol.size, input.size)
-    }
-
-    /**
-     * Finds the first occurrence of a byte sequence within another byte sequence.
-     * This is similar to String.indexOf() but for ByteArray.
-     *
-     * @param input The ByteArray to search in
-     * @param pattern The byte pattern to search for
-     * @param startIndex The index to start searching from (default 0)
-     * @return The index of the first occurrence, or -1 if not found
-     */
-    private fun indexOfBytes(input: ByteArray, pattern: ByteArray, startIndex: Int = 0): Int {
-        if (pattern.isEmpty() || input.size < pattern.size) {
-            return -1
-        }
-
-        val maxIndex = input.size - pattern.size
-        for (i in startIndex..maxIndex) {
-            var match = true
-            for (j in pattern.indices) {
-                if (input[i + j] != pattern[j]) {
-                    match = false
-                    break
-                }
-            }
-            if (match) {
-                return i
-            }
-        }
-
-        return -1
-    }
+    private fun hex(bytes: ByteArray): String =
+        bytes.joinToString(" ") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
 }
 
 /**
@@ -340,7 +244,7 @@ data class SorobanContractInfo(
     /**
      * Returns the list of supported SEP (Stellar Ecosystem Proposal) numbers from the contract metadata.
      *
-     * This property parses the "sep" meta entry which contains comma-separated SEP numbers
+     * This property parses the "sep" meta value, the comma-separated SEP numbers of every "sep" entry
      * (e.g., "1, 10, 24"). The values are parsed, trimmed, deduplicated, and returned as a list.
      *
      * Example:
