@@ -8,6 +8,8 @@ import com.soneso.stellar.sdk.rpc.exception.FailedSimulationResponseException
 import com.soneso.stellar.sdk.rpc.exception.PrepareTransactionException
 import com.soneso.stellar.sdk.rpc.exception.SorobanRpcException
 import com.soneso.stellar.sdk.rpc.responses.ReportedContractError
+import com.soneso.stellar.sdk.unitTests.contract.customSection
+import com.soneso.stellar.sdk.unitTests.contract.wasmModule
 import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures
 import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_A
 import com.soneso.stellar.sdk.unitTests.rpc.responses.SimulationFixtures.CASE_A_CONTRACT
@@ -309,9 +311,9 @@ class SorobanServerTest {
             "CDCYWK73YTYFJZZSJ5V7EDFNHYBG4QN3VUNG2IGD27KJDDPNCZKBCBXK"
 
         /**
-         * Builds WASM bytecode that [com.soneso.stellar.sdk.contract.SorobanContractParser]
-         * accepts: a contract spec section, an environment meta section and a contract meta
-         * section, each tight against the next marker.
+         * Builds a WASM module that [com.soneso.stellar.sdk.contract.SorobanContractParser]
+         * accepts: an environment meta section, a contract meta section and a contract spec
+         * section.
          */
         private fun parseableContractByteCode(
             functionName: String = "hello",
@@ -346,9 +348,11 @@ class SorobanServerTest {
                 SCMetaEntryXdr.V0(SCMetaV0Xdr(key = metaKey, `val` = metaValue)).encode(writer)
             }
 
-            return "contractenvmetav0".encodeToByteArray() + envMetaBytes +
-                "contractmetav0".encodeToByteArray() + metaBytes +
-                "contractspecv0".encodeToByteArray() + specBytes
+            return wasmModule(
+                customSection("contractenvmetav0", envMetaBytes),
+                customSection("contractmetav0", metaBytes),
+                customSection("contractspecv0", specBytes)
+            )
         }
 
         /** Base64 XDR of an account ledger entry carrying [sequence]. */

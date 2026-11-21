@@ -2203,23 +2203,23 @@ class SEPAnalyzer:
         Map SEP-46 (Contract Meta) fields.
 
         SEP-46 implementation lives in SorobanContractParser.kt inside the contract/ directory.
-        - parseMeta (private) handles contractmetav0_section, multiple_entries_single_section,
-          multiple_sections, binary_stream_encoding, key_value_pairs
+        - parseContractByteCode, the public entry point, reads every contractmetav0 section in
+          module order and the entries of each one after the other: contractmetav0_section,
+          multiple_entries_single_section, multiple_sections, binary_stream_encoding
         - SCMetaEntryXdr is the XDR type used (scmetaentry_xdr)
         - metaEntries property on SorobanContractInfo exposes the parsed key-value map
-        - parseContractByteCode is the public entry point
         """
         present = self._contract_parser_present()
 
         metadata_storage_map: Dict[str, Optional[str]] = {
-            'contractmetav0_section': 'parseMeta' if present else None,
-            'multiple_entries_single_section': 'parseMeta' if present else None,
-            'multiple_sections': 'parseMeta' if present else None,
+            'contractmetav0_section': 'parseContractByteCode' if present else None,
+            'multiple_entries_single_section': 'parseContractByteCode' if present else None,
+            'multiple_sections': 'parseContractByteCode' if present else None,
         }
 
         encoding_format_map: Dict[str, Optional[str]] = {
             'scmetaentry_xdr': 'SCMetaEntryXdr' if present else None,
-            'binary_stream_encoding': 'parseMeta' if present else None,
+            'binary_stream_encoding': 'parseContractByteCode' if present else None,
             'key_value_pairs': 'metaEntries' if present else None,
         }
 
@@ -2298,11 +2298,11 @@ class SEPAnalyzer:
         Map SEP-48 (Contract Interface Specification) fields.
 
         SEP-48 implementation lives in SorobanContractParser.kt / SorobanContractInfo.
-        - parseContractByteCode: main entry point
-        - parseContractSpec: parses all 6 spec entry kinds
-        - parseEnvironmentMeta: parses env metadata / interface version
-        - parseMeta: parses contract metadata
-        - specEntries, funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events: typed accessors
+        - parseContractByteCode: main entry point; reads the contractspecv0, contractenvmetav0
+          and contractmetav0 sections
+        - specEntries: spec entries of all 6 kinds; envInterfaceVersion: environment interface
+          version; metaEntries: contract metadata
+        - funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events: typed accessors
         - XDR types: SCSpecEntryXdr, SCSpecTypeDefXdr, SCEnvMetaEntryXdr, SCMetaEntryXdr
         - Compound types: SCSpecTypeOptionXdr, SCSpecTypeResultXdr, SCSpecTypeVecXdr,
           SCSpecTypeMapXdr, SCSpecTypeTupleXdr, SCSpecTypeBytesNXdr, SCSpecTypeUDTXdr

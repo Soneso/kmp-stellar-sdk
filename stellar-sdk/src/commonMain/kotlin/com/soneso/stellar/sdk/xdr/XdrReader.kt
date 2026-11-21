@@ -1,6 +1,9 @@
 package com.soneso.stellar.sdk.xdr
 
 expect class XdrReader(input: ByteArray) {
+    /** The number of bytes read so far, which is the offset of the next byte in the input. */
+    internal val position: Int
+
     fun readInt(): Int
     fun readUnsignedInt(): UInt
     fun readLong(): Long

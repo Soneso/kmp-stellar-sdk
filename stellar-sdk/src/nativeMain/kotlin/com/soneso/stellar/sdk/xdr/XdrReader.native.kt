@@ -6,6 +6,9 @@ actual class XdrReader actual constructor(input: ByteArray) {
     private var offset = 0
     private var recursionDepth: Int = 0
 
+    internal actual val position: Int
+        get() = offset
+
     /**
      * Fails unless [count] more bytes can be read at the current [offset].
      *
