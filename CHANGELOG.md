@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Creating a passkey with `AndroidWebAuthnProvider.register` no longer throws `NoSuchMethodError` in an app that resolves androidx.credentials 1.6.0. Passkey registration and sign-in build their Credential Manager requests through public constructors that exist in androidx.credentials 1.3.0, 1.5.0, and 1.6.0. Before this change, `register` called a Kotlin default-argument constructor that androidx.credentials 1.6.0 and 1.7.0-alpha03 do not have.
 
 ### Security
+- JVM and Android: Bouncy Castle bcprov-jdk18on moves from 1.78.1 to 1.85.2, which fixes GHSA-9pwp-9qqc-pr26, GHSA-qp49-qgx5-5m26, GHSA-574f-3g2m-x479, GHSA-p93r-85wp-75v3, and GHSA-c3fc-8qff-9hwx. The SDK's own calls do not reach the affected code. Apps that resolve Bouncy Castle through the SDK get the fixed version.
 - API documentation build and smart account demo: Dokka 2.3.0 resolves Jackson 2.22.2 and jsoup 1.23.2, which fixes GHSA-3pjw-73gf-8qr5, GHSA-72hv-8253-57qq, GHSA-pmhh-3w7g-xqp8, and GHSA-65r4-943x-97jj. The demo's coordination server and reference agent use Ktor 3.6.1, which resolves httpcore5 and httpcore5-h2 5.4.3 and httpclient5 5.6.4. That fixes GHSA-hf6x-8p5f-cgmf, GHSA-v3jc-474w-2wm6, and GHSA-hjcp-jmpx-g3qm. Build tooling and demo code only: the SDK stays on Ktor 3.3.3, and its published artifacts do not contain these libraries.
 
 ## [1.18.0] - 2026-11-16
