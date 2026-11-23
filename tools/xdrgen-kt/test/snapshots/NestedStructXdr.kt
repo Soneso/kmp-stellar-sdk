@@ -91,7 +91,7 @@ data class NestedStructXdr(
     put("items", XdrJson.array(items, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("fixed_items", XdrJson.array(fixedItems.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("raw_data", XdrJson.hex(rawData))
-    put("fixed_data", XdrJson.hex(fixedData))
+    put("fixed_data", XdrJson.hex(XdrJson.checkFixedLength(fixedData, 4)))
     put("hash", hash.toXdrJsonElement(depth + 1))
   }
 

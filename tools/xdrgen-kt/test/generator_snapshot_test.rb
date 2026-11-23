@@ -473,8 +473,17 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_opaque_is_hexadecimal
     content = File.read(File.join(@output_dir, 'HashXdr.kt'))
-    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(value)'
+    assert_includes content,
+                    'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(XdrJson.checkFixedLength(value, 32))'
     assert_includes content, 'expectedLength = 32'
+  end
+
+  # Only a fixed-length opaque value has a declared length to check; a variable one is written
+  # as it is.
+  def test_variable_opaque_field_is_written_without_a_length_check
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'put("raw_data", XdrJson.hex(rawData))'
+    assert_includes content, 'put("fixed_data", XdrJson.hex(XdrJson.checkFixedLength(fixedData, 4)))'
   end
 
   # A leaf, an enum or an override type, writes one JSON string and has only the public writer,

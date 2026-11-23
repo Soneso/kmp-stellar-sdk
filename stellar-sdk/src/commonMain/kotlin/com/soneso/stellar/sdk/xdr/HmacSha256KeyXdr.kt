@@ -45,7 +45,7 @@ data class HmacSha256KeyXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("key", XdrJson.hex(key))
+    put("key", XdrJson.hex(XdrJson.checkFixedLength(key, 32)))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

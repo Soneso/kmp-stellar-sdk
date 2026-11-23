@@ -45,7 +45,7 @@ data class ShortHashSeedXdr(
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
   internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
-    put("seed", XdrJson.hex(seed))
+    put("seed", XdrJson.hex(XdrJson.checkFixedLength(seed, 16)))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

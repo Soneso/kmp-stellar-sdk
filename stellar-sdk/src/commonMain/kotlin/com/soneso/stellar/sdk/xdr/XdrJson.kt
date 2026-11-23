@@ -113,6 +113,20 @@ internal object XdrJson {
     fun hex(bytes: ByteArray): JsonElement = JsonPrimitive(toHex(bytes))
 
     /**
+     * Refuses a fixed-length opaque value, an asset code included, whose length differs from
+     * the [expectedLength] its XDR definition declares, returning [bytes] so a writer can check
+     * and write in one expression. The binary encoder refuses the same values with the same
+     * message; written as XDR-JSON, such a value would be refused on reading or read back as
+     * another value.
+     *
+     * @throws IllegalArgumentException if [bytes] does not hold exactly [expectedLength] bytes
+     */
+    fun checkFixedLength(bytes: ByteArray, expectedLength: Int): ByteArray {
+        require(bytes.size == expectedLength) { "Expected $expectedLength bytes, got ${bytes.size}" }
+        return bytes
+    }
+
+    /**
      * Applies the SEP-0051 string ladder byte by byte, first match winning: NUL, tab, newline
      * and carriage return take their short escapes, a backslash doubles, any other byte in the
      * printable range 0x20 to 0x7E is kept verbatim, and everything else becomes `\xNN` with
