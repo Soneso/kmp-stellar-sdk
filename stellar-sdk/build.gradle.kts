@@ -211,7 +211,7 @@ kotlin {
         val jvmMain = getByName("jvmMain") {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:3.3.3")
-                implementation("org.bouncycastle:bcprov-jdk18on:1.85")
+                implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
             }
         }
 
