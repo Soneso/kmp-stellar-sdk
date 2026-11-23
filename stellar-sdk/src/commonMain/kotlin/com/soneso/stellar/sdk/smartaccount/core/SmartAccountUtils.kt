@@ -245,7 +245,8 @@ object SmartAccountUtils {
      * 1. **Direct public key**: If [publicKey] is provided, validate it as a 65-byte
      *    uncompressed secp256r1 key (0x04 prefix) and verify the point lies on the
      *    secp256r1 curve. This is the primary path -- WebAuthnProvider implementations
-     *    should return the public key directly in [WebAuthnRegistrationResult.publicKey].
+     *    should return the public key directly in
+     *    [com.soneso.stellar.sdk.smartaccount.oz.WebAuthnRegistrationResult.publicKey].
      *
      * 2. **Authenticator data parsing**: If [authenticatorData] is provided, parse the
      *    attested credential data structure to extract X/Y coordinates from the COSE key.
