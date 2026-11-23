@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Breaking: `MemoXdr.Text` stores the bytes of the memo text. `MemoXdr.Text("text")` and `value` stay, and `value` throws `CharacterCodingException` for bytes that are not valid UTF-8. `MemoXdr.Text(bytes)` and `bytes` are added. The class has no `copy` or `component1`.
 
 ### Fixed
+- Smart account Android demo: Gradle resolves the kethereum, java-multibase, and Scarlet packages from JitPack, so the demo builds. Before this change, the build listed the JetBrains Compose development repository ahead of JitPack. Its host no longer resolves in DNS, so those lookups failed. Build configuration only: the published artifacts do not change.
 - `ExtendFootprintTTLOperation` accepts `extendTo = 0`, so `AbstractTransaction.fromEnvelopeXdr` parses applied transactions that use it, such as testnet transaction 21f5b9f42f5166038d3fb0d1bda5d13cc8b1fc1cdffaedb0bd76680c44180dec (#176).
 - Binary XDR decoding and encoding throw `IllegalArgumentException` for an array, string or variable-length opaque value longer than the maximum its XDR definition declares, such as a 29-byte memo text or 101 operations.
 - Binary XDR decoding throws `IllegalArgumentException` when the padding after a string or opaque value is missing or not zero.
