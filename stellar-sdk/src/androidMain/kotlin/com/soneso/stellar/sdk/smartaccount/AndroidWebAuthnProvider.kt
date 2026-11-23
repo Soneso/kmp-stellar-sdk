@@ -130,9 +130,7 @@ class AndroidWebAuthnProvider(
     ): WebAuthnRegistrationResult {
         val requestJson = buildRegistrationRequestJson(challenge, userId, userName)
 
-        val createRequest = CreatePublicKeyCredentialRequest(
-            requestJson = requestJson
-        )
+        val createRequest = createRegistrationRequest(requestJson)
 
         val response: CreatePublicKeyCredentialResponse
         try {
@@ -185,11 +183,7 @@ class AndroidWebAuthnProvider(
     ): WebAuthnAuthenticationResult {
         val requestJson = buildAuthenticationRequestJson(challenge, allowCredentials)
 
-        val getRequest = GetCredentialRequest(
-            credentialOptions = listOf(
-                GetPublicKeyCredentialOption(requestJson = requestJson)
-            )
-        )
+        val getRequest = createAuthenticationRequest(requestJson)
 
         val credential: PublicKeyCredential
         try {
@@ -664,5 +658,31 @@ class AndroidWebAuthnProvider(
     companion object {
         /** COSE algorithm identifier for ES256 (ECDSA with SHA-256 on P-256 curve). */
         private const val ES256_ALGORITHM_ID = -7
+
+        // Every parameter is passed explicitly. A call that omits one compiles to a synthetic
+        // default-argument constructor, whose signature changes when androidx.credentials adds a parameter.
+        internal fun createRegistrationRequest(requestJson: String): CreatePublicKeyCredentialRequest =
+            CreatePublicKeyCredentialRequest(
+                requestJson = requestJson,
+                clientDataHash = null,
+                preferImmediatelyAvailableCredentials = false,
+                origin = null,
+                isAutoSelectAllowed = false
+            )
+
+        internal fun createAuthenticationRequest(requestJson: String): GetCredentialRequest =
+            GetCredentialRequest(
+                credentialOptions = listOf(
+                    GetPublicKeyCredentialOption(
+                        requestJson = requestJson,
+                        clientDataHash = null,
+                        allowedProviders = emptySet()
+                    )
+                ),
+                origin = null,
+                preferIdentityDocUi = false,
+                preferUiBrandingComponentName = null,
+                preferImmediatelyAvailableCredentials = false
+            )
     }
 }

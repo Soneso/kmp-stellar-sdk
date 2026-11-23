@@ -44,7 +44,12 @@ kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
-        withHostTest { }
+        withHostTest {
+            // Credential Manager constructors call android.os.Bundle, whose android.jar stubs
+            // throw by default. With this flag they return null, 0 or false, and a Bundle keeps
+            // no values.
+            isReturnDefaultValues = true
+        }
     }
 
     // JS target (Browser and Node.js)
@@ -240,6 +245,12 @@ kotlin {
         // common expect declarations with no actuals and fails to resolve them.
         getByName("androidHostTest") {
             dependsOn(jvmTest)
+            dependencies {
+                // 1.6.0 lacks the default-argument constructor that 1.3.0 and 1.5.0 have; the host
+                // tests run against it, with a real org.json.
+                runtimeOnly("androidx.credentials:credentials:1.6.0")
+                runtimeOnly("org.json:json:20260814")
+            }
         }
 
         getByName("jsMain") {
