@@ -226,7 +226,7 @@ kotlin {
             }
         }
 
-        // Android source set: inherits all JVM platform code (BouncyCastle crypto, XDR, etc.)
+        // Android source set: inherits all JVM platform code (BouncyCastle crypto, etc.)
         // and adds Android-specific APIs (Credential Manager for WebAuthn passkeys).
         // The dependsOn(jvmMain) ensures the JVM actual declarations are used for Android compilation.
         getByName("androidMain") {

@@ -103,3 +103,15 @@ internal expect fun normalizeNfkd(input: String): String
 internal fun zeroOut(bytes: ByteArray) {
     bytes.fill(0)
 }
+
+/**
+ * Converts an integer to 4 bytes in big-endian order.
+ */
+internal fun intToBytesBigEndian(value: Int): ByteArray {
+    return byteArrayOf(
+        ((value shr 24) and 0xFF).toByte(),
+        ((value shr 16) and 0xFF).toByte(),
+        ((value shr 8) and 0xFF).toByte(),
+        (value and 0xFF).toByte()
+    )
+}

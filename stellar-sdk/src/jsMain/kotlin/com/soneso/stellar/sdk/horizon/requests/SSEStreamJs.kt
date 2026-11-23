@@ -6,9 +6,7 @@ import io.ktor.client.*
 import io.ktor.http.*
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import org.w3c.dom.events.Event
-import kotlin.js.Date
 
 /**
  * JS implementation of SSE request handling.
@@ -79,26 +77,6 @@ internal fun addClientIdentification(url: Url): String {
         parameters.append("X-Client-Name", Util.CLIENT_NAME)
         parameters.append("X-Client-Version", Util.getSdkVersion())
     }.buildString()
-}
-
-/**
- * JS implementation of currentTimeMillis.
- */
-internal actual fun currentTimeMillis(): Long {
-    return Date.now().toLong()
-}
-
-/**
- * JS implementation of JSON deserialization.
- */
-internal actual fun <T> deserializeJson(json: String, serializer: KSerializer<T>): T {
-    val jsonConfig = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        encodeDefaults = true
-    }
-    return jsonConfig.decodeFromString(serializer, json)
 }
 
 /**
