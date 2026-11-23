@@ -1120,7 +1120,7 @@ class OZWalletOperations internal constructor(
      *   storage → derivation → indexer cascade.
      *   - Stage A (storage): a credential with PENDING status is trusted;
      *     FAILED throws with a recovery hint pointing at
-     *     [deployPendingCredential] or [deleteCredential].
+     *     [deployPendingCredential] or [OZCredentialManager.deleteCredential].
      *   - Stage B (derivation): derives the deterministic address under the
      *     configured deployer and verifies it on-chain. NotFound from
      *     verification falls through to the indexer; other RPC errors

@@ -41,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SCValXdr.toNative()` returns a string or symbol whose bytes are not valid UTF-8 as the `SCValXdr` itself, and a map with such a key converts to the `SCValXdr` itself. `ContractSpec.scValToNative` throws `ContractSpecException` for such a string or symbol value, and `ContractClient.getMethodNames` leaves out a function whose name is not valid UTF-8. `compareScValHostOrder` and `Scv.toMap` order strings and symbols by their bytes. Before this change, such bytes were converted and ordered as replacement characters, so two keys could get the same text.
 - `WebAuthForContracts.validateChallenge` compares the function name of an entry by its bytes. It throws `Sep45InvalidFunctionNameException` for a name that is not valid UTF-8 and `Sep45InvalidArgsException` for an argument value that is not, and it ignores an argument key that is not. `WebAuth.validateChallenge` throws `InvalidMemoTypeException` for a challenge with a text memo that is not valid UTF-8. Before this change, the names and values were compared as replacement characters, and a memo text that replacement characters made longer than 28 bytes failed with `GenericChallengeValidationException`.
 
+### Security
+- API documentation build and smart account demo: Dokka 2.3.0 resolves Jackson 2.22.2 and jsoup 1.23.2, which fixes GHSA-3pjw-73gf-8qr5, GHSA-72hv-8253-57qq, GHSA-pmhh-3w7g-xqp8, and GHSA-65r4-943x-97jj. The demo's coordination server and reference agent use Ktor 3.6.1, which resolves httpcore5 and httpcore5-h2 5.4.3 and httpclient5 5.6.4. That fixes GHSA-hf6x-8p5f-cgmf, GHSA-v3jc-474w-2wm6, and GHSA-hjcp-jmpx-g3qm. Build tooling and demo code only: the SDK stays on Ktor 3.3.3, and its published artifacts do not contain these libraries.
+
 ## [1.18.0] - 2026-11-16
 
 Migration guide: [docs/migration/1.18.0.md](docs/migration/1.18.0.md)
