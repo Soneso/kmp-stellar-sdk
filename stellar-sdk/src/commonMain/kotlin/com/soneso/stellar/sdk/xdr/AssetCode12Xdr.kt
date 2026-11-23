@@ -32,7 +32,7 @@ value class AssetCode12Xdr(val value: ByteArray) {
     writer.writeFixedOpaque(value, 12)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(value, 5))
+  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 5))
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

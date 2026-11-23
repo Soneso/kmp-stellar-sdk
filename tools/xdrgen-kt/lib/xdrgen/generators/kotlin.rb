@@ -1311,6 +1311,8 @@ module Xdrgen
 
       def json_depth(offset) = offset.zero? ? 'depth' : "depth + #{offset}"
 
+      # A fixed-length opaque value is checked against its declared length before it is written,
+      # so the writer refuses what the binary encoder and the reader refuse.
       def json_to_typespec(typespec, value_expr, offset)
         case typespec
         when AST::Typespecs::Int
@@ -1328,7 +1330,11 @@ module Xdrgen
         when AST::Typespecs::String
           "XdrJson.escapedString(#{value_expr})"
         when AST::Typespecs::Opaque
-          "XdrJson.hex(#{value_expr})"
+          if typespec.fixed?
+            "XdrJson.hex(XdrJson.checkFixedLength(#{value_expr}, #{typespec.size}))"
+          else
+            "XdrJson.hex(#{value_expr})"
+          end
         else
           depth = json_leaf?(typespec) ? '' : json_depth(offset)
           "#{value_expr}.toXdrJsonElement(#{depth})"

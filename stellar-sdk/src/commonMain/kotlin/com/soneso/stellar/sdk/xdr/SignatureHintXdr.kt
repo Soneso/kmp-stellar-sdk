@@ -33,7 +33,7 @@ value class SignatureHintXdr(val value: ByteArray) {
 
   fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
 
-  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(value)
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(XdrJson.checkFixedLength(value, 4))
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }
