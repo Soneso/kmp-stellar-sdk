@@ -57,7 +57,12 @@ actual class XdrReader actual constructor(input: ByteArray) {
 
     actual fun readDouble(): Double = Double.fromBits(readLong())
 
-    actual fun readBoolean(): Boolean = readInt() != 0
+    actual fun readBoolean(): Boolean {
+        val index = offset
+        val value = readInt()
+        require(value == 0 || value == 1) { "XDR boolean at offset $index must be 0 or 1, got $value" }
+        return value == 1
+    }
 
     actual fun readString(): String = readFixedOpaque(readInt()).decodeToString(throwOnInvalidSequence = true)
 

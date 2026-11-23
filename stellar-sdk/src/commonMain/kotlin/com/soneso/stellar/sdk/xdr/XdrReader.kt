@@ -10,6 +10,12 @@ expect class XdrReader(input: ByteArray) {
     fun readUnsignedLong(): ULong
     fun readFloat(): Float
     fun readDouble(): Double
+
+    /**
+     * Reads an XDR boolean or optional presence flag: 0 is false and 1 is true.
+     *
+     * @throws IllegalArgumentException if the value is neither 0 nor 1.
+     */
     fun readBoolean(): Boolean
 
     /**
