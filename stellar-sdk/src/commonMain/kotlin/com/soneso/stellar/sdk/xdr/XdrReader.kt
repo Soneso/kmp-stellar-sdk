@@ -1,22 +1,73 @@
 package com.soneso.stellar.sdk.xdr
 
-expect class XdrReader(input: ByteArray) {
+class XdrReader(input: ByteArray) {
+    private val data = input
+    private var offset = 0
+    private var recursionDepth: Int = 0
+
     /** The number of bytes read so far, which is the offset of the next byte in the input. */
     internal val position: Int
+        get() = offset
 
-    fun readInt(): Int
-    fun readUnsignedInt(): UInt
-    fun readLong(): Long
-    fun readUnsignedLong(): ULong
-    fun readFloat(): Float
-    fun readDouble(): Double
+    /**
+     * Fails unless [count] more bytes can be read at the current [offset].
+     *
+     * XDR carries no stream-level length prefix, so a truncated or malformed buffer is only
+     * detectable at the read that would run past the end. Length prefixes are checked here
+     * before any allocation, so a hostile prefix cannot trigger a large one.
+     *
+     * @param count Number of bytes the caller is about to consume.
+     * @throws IllegalArgumentException if [count] is negative or exceeds the remaining bytes.
+     */
+    private fun requireAvailable(count: Int) {
+        if (count < 0) {
+            throw IllegalArgumentException("XDR decode length cannot be negative, got $count")
+        }
+        // Subtraction rather than offset + count: the sum overflows for a hostile length.
+        if (count > data.size - offset) {
+            val remaining = if (offset >= data.size) 0 else data.size - offset
+            throw IllegalArgumentException(
+                "XDR decode requires $count byte(s) at offset $offset " +
+                    "but only $remaining remain in a ${data.size}-byte buffer"
+            )
+        }
+    }
+
+    fun readInt(): Int {
+        requireAvailable(4)
+        val value = ((data[offset].toInt() and 0xFF) shl 24) or
+                    ((data[offset + 1].toInt() and 0xFF) shl 16) or
+                    ((data[offset + 2].toInt() and 0xFF) shl 8) or
+                    (data[offset + 3].toInt() and 0xFF)
+        offset += 4
+        return value
+    }
+
+    fun readUnsignedInt(): UInt = readInt().toUInt()
+
+    fun readLong(): Long {
+        val high = readInt().toLong()
+        val low = readInt().toLong() and 0xFFFFFFFFL
+        return (high shl 32) or low
+    }
+
+    fun readUnsignedLong(): ULong = readLong().toULong()
+
+    fun readFloat(): Float = Float.fromBits(readInt())
+
+    fun readDouble(): Double = Double.fromBits(readLong())
 
     /**
      * Reads an XDR boolean or optional presence flag: 0 is false and 1 is true.
      *
      * @throws IllegalArgumentException if the value is neither 0 nor 1.
      */
-    fun readBoolean(): Boolean
+    fun readBoolean(): Boolean {
+        val index = offset
+        val value = readInt()
+        require(value == 0 || value == 1) { "XDR boolean at offset $index must be 0 or 1, got $value" }
+        return value == 1
+    }
 
     /**
      * Reads a string of any length and decodes its bytes as strict UTF-8, every leading byte
@@ -24,9 +75,27 @@ expect class XdrReader(input: ByteArray) {
      *
      * @throws CharacterCodingException if the bytes are not valid UTF-8
      */
-    fun readString(): String
-    fun readFixedOpaque(length: Int): ByteArray
-    fun readVariableOpaque(): ByteArray
+    fun readString(): String = readFixedOpaque(readInt()).decodeToString(throwOnInvalidSequence = true)
+
+    fun readFixedOpaque(length: Int): ByteArray {
+        requireAvailable(length)
+        val bytes = data.copyOfRange(offset, offset + length)
+        offset += length
+        // Padding is required and every padding byte must be zero.
+        val padding = (4 - (length % 4)) % 4
+        requireAvailable(padding)
+        repeat(padding) {
+            val index = offset++
+            val value = data[index].toInt() and 0xFF
+            require(value == 0) { "XDR padding at offset $index must be zero, got $value" }
+        }
+        return bytes
+    }
+
+    fun readVariableOpaque(): ByteArray {
+        val length = readInt()
+        return readFixedOpaque(length)
+    }
 
     /**
      * Reads the element count of a variable-length XDR array and validates it against the
@@ -41,7 +110,21 @@ expect class XdrReader(input: ByteArray) {
      * @throws IllegalArgumentException if the count is negative or exceeds a quarter of the
      *   remaining bytes.
      */
-    fun readArrayLength(): Int
+    fun readArrayLength(): Int {
+        val count = readInt()
+        if (count < 0) {
+            throw IllegalArgumentException("XDR array count cannot be negative, got $count")
+        }
+        // The count was read in full, so offset does not exceed data.size here.
+        val remaining = data.size - offset
+        if (count > remaining / 4) {
+            throw IllegalArgumentException(
+                "XDR array count $count exceeds the maximum of ${remaining / 4} " +
+                    "for the $remaining byte(s) remaining at offset $offset"
+            )
+        }
+        return count
+    }
 
     /**
      * Checks [cap] before incrementing the shared recursion depth counter.
@@ -52,14 +135,23 @@ expect class XdrReader(input: ByteArray) {
      * @param cap Maximum allowed nesting depth (inclusive)
      * @throws IllegalArgumentException if depth exceeds [cap]
      */
-    fun enterRecursion(cap: Int)
+    fun enterRecursion(cap: Int) {
+        if (recursionDepth >= cap) {
+            throw IllegalArgumentException(
+                "XDR decode recursion depth ${recursionDepth + 1} exceeds cap $cap"
+            )
+        }
+        recursionDepth++
+    }
 
     /**
      * Decrements the recursion depth counter.
      *
      * Must be called in a finally block after each successful [enterRecursion].
      */
-    fun exitRecursion()
+    fun exitRecursion() {
+        recursionDepth--
+    }
 }
 
 /**

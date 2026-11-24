@@ -1,13 +1,18 @@
 package com.soneso.stellar.sdk.horizon.requests
 
+import com.soneso.stellar.sdk.currentTimeMillis
 import com.soneso.stellar.sdk.horizon.responses.Pageable
 import com.soneso.stellar.sdk.horizon.responses.Response
 import com.soneso.stellar.sdk.isFatal
 import io.ktor.client.*
 import io.ktor.http.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
 import kotlin.concurrent.Volatile
+import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -300,16 +305,100 @@ internal expect suspend fun <T : Response> sseRequest(
 )
 
 /**
- * Platform-specific current time in milliseconds.
+ * Reads Server-Sent Events from [channel] line by line and passes the id and data of each
+ * complete event to [onEvent]; a read error goes to [onFailure] with [statusCode]. The JVM and
+ * native [sseRequest] call it, the JS one receives its events from the browser `EventSource`.
  */
-internal expect fun currentTimeMillis(): Long
+internal suspend fun parseSSEStream(
+    channel: ByteReadChannel,
+    onEvent: (eventId: String?, data: String) -> Unit,
+    onFailure: (error: Throwable, statusCode: Int?) -> Unit,
+    statusCode: Int
+) {
+    var currentEventId: String? = null
+    var currentData = StringBuilder()
+
+    try {
+        while (!channel.isClosedForRead) {
+            coroutineContext.ensureActive()
+
+            // Yield to allow other coroutines to run (important for event processing)
+            yield()
+
+            val line = try {
+                channel.readUTF8Line() ?: break
+            } catch (e: Exception) {
+                if (coroutineContext.isActive) {
+                    onFailure(e, statusCode)
+                }
+                break
+            }
+
+            when {
+                line.isEmpty() -> {
+                    // Empty line signals end of event
+                    if (currentData.isNotEmpty()) {
+                        val data = currentData.toString().trimEnd()
+                        onEvent(currentEventId, data)
+                        currentData = StringBuilder()
+                        // Yield after processing event to allow listeners to react
+                        yield()
+                    }
+                }
+                line.startsWith(":") -> {
+                    // Comment line, ignore
+                    continue
+                }
+                line.startsWith("id:") -> {
+                    currentEventId = line.substring(3).trim()
+                }
+                line.startsWith("data:") -> {
+                    if (currentData.isNotEmpty()) {
+                        currentData.append('\n')
+                    }
+                    currentData.append(line.substring(5).trimStart())
+                }
+                line.startsWith("event:") -> {
+                    // Event type field - we ignore this for now
+                    continue
+                }
+                line.startsWith("retry:") -> {
+                    // Retry field - we ignore this as we have our own reconnection logic
+                    continue
+                }
+            }
+        }
+    } catch (e: Exception) {
+        if (coroutineContext.isActive) {
+            onFailure(e, statusCode)
+        }
+    }
+}
 
 /**
- * Platform-specific JSON deserialization.
+ * Decodes the data of an SSE event with [serializer]. Unknown keys are ignored, the input is
+ * read leniently, and a null for a non-nullable property or an unknown enum value takes the
+ * property's default where one is declared.
  */
-internal expect fun <T> deserializeJson(json: String, serializer: KSerializer<T>): T
+internal fun <T> deserializeJson(json: String, serializer: KSerializer<T>): T {
+    val jsonConfig = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        coerceInputValues = true
+        encodeDefaults = true
+    }
+    return jsonConfig.decodeFromString(serializer, json)
+}
 
 /**
  * Platform-specific network error detection.
  */
 internal expect fun isNetworkError(error: Throwable): Boolean
+
+/**
+ * Reports an SSE response whose status is outside 200 to 299, with the response [body].
+ */
+internal class HttpResponseException(
+    val status: HttpStatusCode,
+    val body: String
+) : Exception("HTTP ${status.value}: $body")
