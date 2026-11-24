@@ -70,6 +70,13 @@ class BigIntegerConversionTest {
     }
 
     @Test
+    fun testValueWiderThanByteCountKeepsItsLowBytes() {
+        // 257 is 0x0101 and -257 is 0xfeff in two's complement.
+        assertEquals("01", Util.bytesToHex(bigIntegerToBytesSigned(BigInteger.parseString("257"), 1)))
+        assertEquals("ff", Util.bytesToHex(bigIntegerToBytesSigned(BigInteger.parseString("-257"), 1)))
+    }
+
+    @Test
     fun testValuesEncodeToTheirLiteralBytes() {
         for (vector in vectors) {
             val bytes = bigIntegerToBytesSigned(BigInteger.parseString(vector.decimal), vector.byteCount)
