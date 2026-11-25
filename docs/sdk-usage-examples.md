@@ -1386,7 +1386,7 @@ Reach for `toNative()` when no spec is at hand: contract event values, ledger en
 | `SCV_I64` | `Long` |
 | `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` | `BigInteger` (`com.ionspin.kotlin.bignum.integer`) |
 | `SCV_BYTES` | `ByteArray` (the stored payload array, so writes to it go through to the value) |
-| `SCV_STRING`, `SCV_SYMBOL` | `String` |
+| `SCV_STRING`, `SCV_SYMBOL` | `String`; the `SCValXdr` itself when the bytes are not valid UTF-8 |
 | `SCV_ADDRESS` | strkey `String` (`G...`, `C...`, `M...`, `W...`, `B...` or `L...`); the `SCValXdr` itself when the address has no strkey form |
 | `SCV_VEC` | `List<Any?>`, each element converted in order; an absent payload gives an empty list |
 | `SCV_MAP` | `Map<Any?, Any?>` under the key rules below, or the `SCValXdr` itself; an absent payload gives an empty map |
@@ -1398,7 +1398,7 @@ Map keys need value-based equality, which `ByteArray` and the XDR types do not p
 
 | Key Type | Map Key |
 |----------|---------|
-| `SCV_SYMBOL`, `SCV_STRING` | `String` |
+| `SCV_SYMBOL`, `SCV_STRING` | `String` when the bytes are valid UTF-8 |
 | `SCV_U32` / `SCV_I32` | `UInt` / `Int` |
 | `SCV_U64`, `SCV_TIMEPOINT`, `SCV_DURATION` | `ULong` |
 | `SCV_I64` | `Long` |
@@ -1418,7 +1418,7 @@ Key equality is plain Kotlin `equals`/`hashCode` on the converted keys, and a ke
 
 A map converts to the `SCValXdr` itself as a whole when either
 
-- any key is unrepresentable: a vec, map, error, contract instance, nonce key, executable tag or ledger-key-contract-instance key, or an address key with no strkey form; or
+- any key is unrepresentable: a vec, map, error, contract instance, nonce key, executable tag or ledger-key-contract-instance key, a symbol or string key whose bytes are not valid UTF-8, or an address key with no strkey form; or
 - two entries collide on equal converted keys.
 
 A nested map that falls back is contained: the enclosing vec or map still converts, with that map left as an `SCValXdr` element. A converted map preserves the entry order of the XDR map.

@@ -3,7 +3,7 @@
 **Purpose:** Render any XDR value as canonical JSON and read that JSON back into the same value.
 **Prerequisites:** None (no network, no authentication, no anchor)
 **SDK Class:** every generated XDR type in `com.soneso.stellar.sdk.xdr`
-**Specification:** SEP-0051 v2.0.1, Draft status
+**Specification:** written against SEP-0051 v2.1.0
 
 Code examples assume a `suspend` calling context and these imports:
 
@@ -30,7 +30,7 @@ SEP-0051 defines a canonical JSON rendering of XDR. The SDK implements it as fou
 
 | Member | Kind | Returns | Throws |
 |--------|------|---------|--------|
-| `toXdrJson()` | instance | `String` — compact JSON, never pretty-printed | `IllegalArgumentException` for the rare value with no JSON form |
+| `toXdrJson()` | instance | `String`: compact JSON, never pretty-printed | `IllegalArgumentException` for a value it cannot write, see [Error Handling](#error-handling) |
 | `toXdrJsonElement()` | instance | `kotlinx.serialization.json.JsonElement` | same |
 | `Companion.fromXdrJson(json: String)` | companion | an instance of the type | `IllegalArgumentException` on any malformed input |
 | `Companion.fromXdrJsonElement(element: JsonElement)` | companion | an instance of the type | same |
@@ -430,7 +430,7 @@ fun errors() {
 
 Text that is not JSON at all fails the same way — `fromXdrJson()` never throws a serialization exception, so one `catch (e: IllegalArgumentException)` covers parsing and mapping alike. Untrusted values quoted back in a message are truncated and have their control bytes escaped, so a hostile document cannot inject line breaks into a log.
 
-Encoding raises only where XDR admits a value that has no SEP-0051 form: a `SignerKey` ed25519 signed payload with an empty payload has no P-strkey, so `toXdrJsonElement()` raises rather than emitting a strkey no decoder would read back.
+Encoding raises `IllegalArgumentException` for a value nested deeper than the 128 levels decoding accepts. It raises for a fixed-length opaque value written as hexadecimal, or an asset code, whose byte count differs from its XDR definition, such as a 31-byte `HashXdr`. A `SignerKey` ed25519 signed payload with an empty payload has no P-strkey, so encoding raises for it too.
 
 ## Common Pitfalls
 

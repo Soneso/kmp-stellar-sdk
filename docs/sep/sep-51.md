@@ -2,7 +2,7 @@
 
 SEP-51 defines a canonical JSON rendering for XDR values. Every generated XDR type in the SDK converts to that rendering and back, so binary Stellar data — transaction envelopes, results, meta, ledger entries, contract values — can be read, logged and moved through JSON systems without leaving the SDK.
 
-A value rendered to XDR-JSON and read back encodes to the byte sequence it started from, and the rendering is canonical, so the same value always produces the same document. One category of member is not byte-exact, for a reason that predates the JSON layer; see [Limitations](#limitations).
+A value rendered to XDR-JSON and read back encodes to the byte sequence it started from, and the rendering is canonical, so the same value always produces the same document. Most string members must hold valid UTF-8; [Limitations](#limitations) names the members that keep arbitrary bytes.
 
 **Use Cases**:
 - Inspect a transaction envelope, result or meta while debugging, instead of reading base64 by hand
@@ -224,7 +224,7 @@ fun opaque() {
 }
 ```
 
-A fixed-length field validates its byte count on input, so a `Thresholds` of three or five bytes is rejected rather than silently truncated or padded.
+A fixed-length field validates its byte count on input and on output, so a `Thresholds` of three or five bytes is rejected.
 
 ### Strings
 
@@ -445,9 +445,9 @@ A `$schema` property is accepted anywhere an object is read, ignored, and never 
 
 ### Text Fidelity on String-Typed Members
 
-An XDR `string` member is text: the SDK holds it as a Kotlin `String`, so the wire bytes are decoded as UTF-8 when the value is built. Wire bytes that are not valid UTF-8 have already become the Unicode replacement character by the time the JSON is produced, and the escape ladder is applied to the replacement rather than to the original byte. Round-tripping such a value through JSON therefore does not restore the original bytes — and neither does round-tripping it through binary XDR, since the loss happens at the type boundary rather than in the JSON layer.
+Most XDR `string` members are text: the SDK holds them as a Kotlin `String` and decodes the wire bytes as strict UTF-8, every leading byte order mark kept. For bytes that are not valid UTF-8, binary decoding throws `CharacterCodingException` and XDR-JSON decoding throws `IllegalArgumentException`.
 
-Members that must preserve arbitrary bytes exactly are typed `ByteArray`, not `String`, even where the XDR declares a string: asset codes (`AssetCode4`, `AssetCode12`) and the CAP-85 executable tag (`SCValXdr.ExecutableTag`, `ContractExecutableExternalRefXdr.tag`) hold bytes, so a value that is not valid UTF-8 renders and restores exactly.
+Members that must preserve arbitrary bytes exactly hold the bytes, so a value that is not valid UTF-8 renders and restores exactly. Asset codes (`AssetCode4`, `AssetCode12`) and the CAP-85 executable tag (`SCValXdr.ExecutableTag`, `ContractExecutableExternalRefXdr.tag`) are typed `ByteArray`. `SCStringXdr`, `SCSymbolXdr` and `MemoXdr.Text` return their bytes from `bytes`, and their `value` throws `CharacterCodingException` for bytes that are not valid UTF-8.
 
 ### Zero-Length Signed Payloads
 
@@ -494,14 +494,14 @@ The decoder rejects rather than repairs. A struct missing a key or carrying one 
 
 | Member | Parameters | Return | Throws | Description |
 |--------|-----------|--------|--------|-------------|
-| `toXdrJson()` | -- | `String` | `IllegalArgumentException` for a value with no rendering | Canonical XDR-JSON document for this value |
-| `toXdrJsonElement()` | -- | `JsonElement` | `IllegalArgumentException` for a value with no rendering | The same document as a tree |
+| `toXdrJson()` | -- | `String` | `IllegalArgumentException` for a value it cannot write | Canonical XDR-JSON document for this value |
+| `toXdrJsonElement()` | -- | `JsonElement` | `IllegalArgumentException` for a value it cannot write | The same document as a tree |
 | `Companion.fromXdrJson(json: String)` | XDR-JSON document | the type | `IllegalArgumentException` on malformed input | Parse and decode a document |
 | `Companion.fromXdrJsonElement(element: JsonElement)` | XDR-JSON tree | the type | `IllegalArgumentException` on malformed input | Decode an already-parsed tree |
 
 All four members exist on every generated XDR type in `com.soneso.stellar.sdk.xdr`. None is a `suspend` function. `toXdrJson()` and `fromXdrJson(String)` are the string boundary and are named after the `toXdrBase64()` and `Companion.fromXdrBase64(String)` pair, which reads the same way but is an extension on fifteen commonly exchanged types rather than a member on all of them. `toXdrJsonElement()` and `fromXdrJsonElement(JsonElement)` are the tree boundary.
 
-`toXdrJson` and `toXdrJsonElement` raise only for `SignerKeyEd25519SignedPayload` with an empty payload, and for any value containing one, such as the `SignerKey` signed-payload arm. Every other value has a rendering.
+`toXdrJson` and `toXdrJsonElement` raise for a value nested deeper than the 128 levels decoding accepts. They raise for a fixed-length opaque value written as hexadecimal, or an asset code, whose byte count differs from its XDR definition, such as a 31-byte `HashXdr` or a 5-byte `AssetCode4Xdr`. They raise for `SignerKeyEd25519SignedPayload` with an empty payload, and for any value containing one, such as the `SignerKey` signed-payload arm.
 
 **Specification**: [SEP-51: XDR-JSON](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0051.md)
 

@@ -126,7 +126,7 @@ actual object Ed25519 {
 
 | Platform | Library | Algorithm | Security Features |
 |----------|---------|-----------|-------------------|
-| JVM | BouncyCastle 1.78 | Ed25519 (RFC 8032) | FIPS 140-2 Level 1, Constant-time |
+| JVM | BouncyCastle 1.85.2 | Ed25519 (RFC 8032) | FIPS 140-2 Level 1, Constant-time |
 | JavaScript | libsodium-wrappers-sumo 0.7.13 | Ed25519, SHA-256 | Audited, WebAssembly sandboxed, Sumo for SHA-256 |
 | iOS/macOS | libsodium (native) | Ed25519 (crypto_sign) | Audited, Constant-time, Memory-safe |
 

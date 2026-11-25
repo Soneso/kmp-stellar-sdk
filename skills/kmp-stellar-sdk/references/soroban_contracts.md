@@ -826,7 +826,7 @@ Type mapping (XDR -> Kotlin via toNative):
 | SCV_I64 | Long |
 | SCV_U128, SCV_I128, SCV_U256, SCV_I256 | BigInteger (com.ionspin.kotlin.bignum.integer) |
 | SCV_BYTES | ByteArray (the stored payload array) |
-| SCV_STRING, SCV_SYMBOL | String |
+| SCV_STRING, SCV_SYMBOL | String; the SCValXdr itself when the bytes are not valid UTF-8 |
 | SCV_ADDRESS | String (G.../C.../M.../W.../B.../L...); the SCValXdr itself when the address has no strkey form |
 | SCV_VEC | List\<Any?\>, elements converted in order; absent payload -> empty list |
 | SCV_MAP | Map\<Any?, Any?\> under the key rules below, or the SCValXdr itself; absent payload -> empty map |
@@ -836,7 +836,7 @@ Map key rules:
 
 | Key Type | Map Key |
 |---|---|
-| SCV_SYMBOL, SCV_STRING | String |
+| SCV_SYMBOL, SCV_STRING | String when the bytes are valid UTF-8 |
 | SCV_U32 | UInt |
 | SCV_I32 | Int |
 | SCV_U64, SCV_TIMEPOINT, SCV_DURATION | ULong |
@@ -846,7 +846,7 @@ Map key rules:
 | SCV_VOID | null |
 | SCV_BYTES | lowercase hex String (values stay ByteArray; keys do not) |
 | SCV_ADDRESS | strkey String (same as for a value) |
-| SCV_VEC, SCV_MAP, SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG, an address with no strkey form | unrepresentable |
+| SCV_VEC, SCV_MAP, SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG, a symbol or string whose bytes are not valid UTF-8, an address with no strkey form | unrepresentable |
 
 - Look a key up with the exact type in this table: `UInt` for u32, `ULong` for u64, `BigInteger` for a 128-bit or 256-bit key. The primitive integer types are never normalized against each other, so a u32 key `5` and a u64 key `5` are two distinct entries (`5u` and `5uL`).
 - Collisions: a wide-integer key and a primitive integer key of equal value (i128 `5` and u64 `5`, in either order); wide-integer keys of equal value across arms (u128 `5` and i256 `5`); a bytes key and a symbol or string key spelling its hex (bytes `[0x30, 0x31]` and symbol `"3031"`). Keys of different numeric value coexist (i128 `-1` and u64 `18446744073709551615`).
