@@ -1,4 +1,4 @@
-"""SEP-51 (XDR-JSON) matrix: the Address Types rows the parser lists and the analyzer marks."""
+"""SEP-51 (XDR-JSON) matrix: address and asset code rows the analyzer marks."""
 
 import contextlib
 import io
@@ -59,6 +59,20 @@ MUXED_CONTRACT_KT = (
     "ContractIDXdr(HashXdr(payload.copyOfRange(0, 32))))\n    }\n  }\n\n"
     + MUXED_CONTRACT_ENCODE
     + "}\n"
+)
+
+# The XDR-JSON writers of AssetCode4Xdr.kt and AssetCode12Xdr.kt as the XDR generator emits them.
+ASSET_CODE4_KT = (
+    "package com.soneso.stellar.sdk.xdr\n\n@kotlin.jvm.JvmInline\nvalue class AssetCode4Xdr(val value: ByteArray) {\n"
+    "  fun toXdrJsonElement(): JsonElement = "
+    "XdrJson.escapedString(XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 4), 0))\n"
+    "}\n"
+)
+ASSET_CODE12_KT = (
+    "package com.soneso.stellar.sdk.xdr\n\n@kotlin.jvm.JvmInline\nvalue class AssetCode12Xdr(val value: ByteArray) {\n"
+    "  fun toXdrJsonElement(): JsonElement = "
+    "XdrJson.escapedString(XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 5))\n"
+    "}\n"
 )
 
 
@@ -128,6 +142,37 @@ class Sep51AddressDetectionTest(unittest.TestCase):
             with self.subTest(label):
                 mapped = self.mappings(muxed_contract=replace_once(MUXED_CONTRACT_KT, line, ""))
                 self.assertIsNone(mapped["muxed_contract"])
+
+    def asset_code_mappings(self, asset_code4: str = ASSET_CODE4_KT,
+                            asset_code12: str = ASSET_CODE12_KT) -> Dict[str, Optional[str]]:
+        (self.xdr_dir / "AssetCode4Xdr.kt").write_text(asset_code4, encoding="utf-8")
+        (self.xdr_dir / "AssetCode12Xdr.kt").write_text(asset_code12, encoding="utf-8")
+        mapped = sep_analyzer.SEPAnalyzer("0051").generate_field_mappings([], spec_definition())
+        return mapped["asset_code_types"]
+
+    def test_asset_code4_requires_trim_with_minimum_zero(self) -> None:
+        self.assertEqual(self.asset_code_mappings()["asset_code4"], "AssetCode4Xdr.toXdrJsonElement")
+        trim = "XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 4), 0)"
+        for label, replacement in (
+            ("without trim", "XdrJson.checkFixedLength(value, 4)"),
+            ("wrong minimum", "XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 4), 5)"),
+        ):
+            with self.subTest(label):
+                mapped = self.asset_code_mappings(asset_code4=replace_once(ASSET_CODE4_KT, trim, replacement))
+                self.assertIsNone(mapped["asset_code4"])
+                self.assertEqual(mapped["asset_code12"], "AssetCode12Xdr.toXdrJsonElement")
+
+    def test_asset_code12_requires_trim_with_minimum_five(self) -> None:
+        self.assertEqual(self.asset_code_mappings()["asset_code12"], "AssetCode12Xdr.toXdrJsonElement")
+        trim = "XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 5)"
+        for label, replacement in (
+            ("without trim", "XdrJson.checkFixedLength(value, 12)"),
+            ("wrong minimum", "XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 0)"),
+        ):
+            with self.subTest(label):
+                mapped = self.asset_code_mappings(asset_code12=replace_once(ASSET_CODE12_KT, trim, replacement))
+                self.assertIsNone(mapped["asset_code12"])
+                self.assertEqual(mapped["asset_code4"], "AssetCode4Xdr.toXdrJsonElement")
 
     def test_the_sdk_marks_every_row(self) -> None:
         with mock.patch.object(sep_analyzer, "SDK_ROOT", common.SDK_ROOT):
