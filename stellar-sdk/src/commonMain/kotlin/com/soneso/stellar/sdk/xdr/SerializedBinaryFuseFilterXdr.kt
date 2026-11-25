@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SerializedBinaryFuseFilterXdr"
 
@@ -92,15 +91,17 @@ data class SerializedBinaryFuseFilterXdr(
     writer.writeVariableOpaque(fingerprints)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("type", type.toXdrJsonElement())
-    put("input_hash_seed", inputHashSeed.toXdrJsonElement())
-    put("filter_seed", filterSeed.toXdrJsonElement())
-    put("segment_length", segmentLength.toXdrJsonElement())
-    put("segement_length_mask", segementLengthMask.toXdrJsonElement())
-    put("segment_count", segmentCount.toXdrJsonElement())
-    put("segment_count_length", segmentCountLength.toXdrJsonElement())
-    put("fingerprint_length", fingerprintLength.toXdrJsonElement())
+    put("input_hash_seed", inputHashSeed.toXdrJsonElement(depth + 1))
+    put("filter_seed", filterSeed.toXdrJsonElement(depth + 1))
+    put("segment_length", segmentLength.toXdrJsonElement(depth + 1))
+    put("segement_length_mask", segementLengthMask.toXdrJsonElement(depth + 1))
+    put("segment_count", segmentCount.toXdrJsonElement(depth + 1))
+    put("segment_count_length", segmentCountLength.toXdrJsonElement(depth + 1))
+    put("fingerprint_length", fingerprintLength.toXdrJsonElement(depth + 1))
     put("fingerprints", XdrJson.hex(fingerprints))
   }
 

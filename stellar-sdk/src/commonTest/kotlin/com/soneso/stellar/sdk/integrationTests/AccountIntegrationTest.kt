@@ -578,6 +578,52 @@ class AccountIntegrationTest {
     }
 
     /**
+     * Test a ManageData operation whose data name is one space.
+     *
+     * This test:
+     * 1. Creates and funds a test account
+     * 2. Sets a data entry named " " using ManageData operation
+     * 3. Reads the transaction back from Horizon and parses its envelope
+     * 4. Verifies the parsed operation and the transaction hash
+     */
+    @Test
+    fun testManageDataNameOfSpace() = runTest(timeout = 180.seconds) {
+        val keyPair = KeyPair.random()
+        val accountId = keyPair.getAccountId()
+
+        fundTestAccountAndAwaitVisibility(
+            accountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+
+        val account = horizonServer.accounts().account(accountId)
+        val manageDataOp = ManageDataOperation(name = " ", value = "v".encodeToByteArray())
+
+        val transaction = TransactionBuilder(
+            sourceAccount = Account(accountId, account.sequenceNumber),
+            network = network
+        )
+            .addOperation(manageDataOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(keyPair)
+
+        val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "ManageData transaction with the name \" \" should succeed")
+
+        realDelay(3000)
+
+        val stored = horizonServer.transactions().transaction(response.hash)
+        val envelope = assertNotNull(stored.envelopeXdr, "Horizon should return the envelope")
+        val parsed = AbstractTransaction.fromEnvelopeXdr(envelope, network) as Transaction
+        assertEquals(manageDataOp, parsed.operations.single())
+        assertEquals(stored.hash, parsed.hashHex(), "Parsed hash should match the Horizon hash")
+    }
+
+    /**
      * Test MuxedAccount ID parsing.
      *
      * This test verifies that muxed account IDs (M... addresses) can be correctly

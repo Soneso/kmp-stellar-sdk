@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "MultiCaseUnionXdr"
 
@@ -50,11 +49,11 @@ sealed class MultiCaseUnionXdr {
           SimpleValue(value)
         }
         1 -> {
-          val value = reader.readString()
+          val value = reader.readString(128)
           TextValue(discriminant, value)
         }
         2 -> {
-          val value = reader.readString()
+          val value = reader.readString(128)
           TextValue(discriminant, value)
         }
         else -> {
@@ -86,7 +85,7 @@ sealed class MultiCaseUnionXdr {
         writer.writeInt(value)
       }
       is TextValue -> {
-        writer.writeString(value)
+        writer.writeString(value, 128)
       }
       is RawValue -> {
         writer.writeVariableOpaque(value)
@@ -94,10 +93,12 @@ sealed class MultiCaseUnionXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is SimpleValue -> buildJsonObject { put("v0", XdrJson.int32(value)) }
-    is TextValue -> buildJsonObject { put("v$discriminant", XdrJson.escapedString(value)) }
-    is RawValue -> buildJsonObject { put("v$discriminant", XdrJson.hex(value)) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is SimpleValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", XdrJson.int32(value)) }
+    is TextValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v$discriminant", XdrJson.escapedString(value)) }
+    is RawValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v$discriminant", XdrJson.hex(value)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreateClaimableBalanceOpXdr"
 
@@ -29,7 +28,7 @@ data class CreateClaimableBalanceOpXdr(
     fun decode(reader: XdrReader): CreateClaimableBalanceOpXdr {
       val asset = AssetXdr.decode(reader)
       val amount = Int64Xdr.decode(reader)
-      val claimants = List(reader.readArrayLength()) { ClaimantXdr.decode(reader) }
+      val claimants = List(reader.readArrayLength(10)) { ClaimantXdr.decode(reader) }
       return CreateClaimableBalanceOpXdr(asset, amount, claimants)
     }
 
@@ -50,16 +49,19 @@ data class CreateClaimableBalanceOpXdr(
   fun encode(writer: XdrWriter) {
     asset.encode(writer)
     amount.encode(writer)
+    require(claimants.size <= 10) { "XDR array count ${claimants.size} exceeds maximum 10" }
     writer.writeInt(claimants.size)
     claimants.forEach { item ->
       item.encode(writer)
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("asset", asset.toXdrJsonElement())
-    put("amount", amount.toXdrJsonElement())
-    put("claimants", XdrJson.array(claimants) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("asset", asset.toXdrJsonElement(depth + 1))
+    put("amount", amount.toXdrJsonElement(depth + 1))
+    put("claimants", XdrJson.array(claimants, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

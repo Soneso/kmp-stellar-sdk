@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "KeywordStructXdr"
 
@@ -26,7 +25,7 @@ data class KeywordStructXdr(
 
     fun decode(reader: XdrReader): KeywordStructXdr {
       val `val` = reader.readInt()
-      val `when` = reader.readString()
+      val `when` = reader.readString(32)
       return KeywordStructXdr(`val`, `when`)
     }
 
@@ -45,10 +44,12 @@ data class KeywordStructXdr(
 
   fun encode(writer: XdrWriter) {
     writer.writeInt(`val`)
-    writer.writeString(`when`)
+    writer.writeString(`when`, 32)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("val", XdrJson.int32(`val`))
     put("when", XdrJson.escapedString(`when`))
   }

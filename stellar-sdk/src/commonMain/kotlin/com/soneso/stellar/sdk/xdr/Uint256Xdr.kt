@@ -31,7 +31,9 @@ value class Uint256Xdr(val value: ByteArray) {
     writer.writeFixedOpaque(value, 32)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(XdrJson.checkFixedLength(value, 32))
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

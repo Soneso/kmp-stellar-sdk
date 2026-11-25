@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "PathPaymentStrictSendOpXdr"
 
@@ -47,7 +46,7 @@ data class PathPaymentStrictSendOpXdr(
       val destination = MuxedAccountXdr.decode(reader)
       val destAsset = AssetXdr.decode(reader)
       val destMin = Int64Xdr.decode(reader)
-      val path = List(reader.readArrayLength()) { AssetXdr.decode(reader) }
+      val path = List(reader.readArrayLength(5)) { AssetXdr.decode(reader) }
       return PathPaymentStrictSendOpXdr(sendAsset, sendAmount, destination, destAsset, destMin, path)
     }
 
@@ -74,19 +73,22 @@ data class PathPaymentStrictSendOpXdr(
     destination.encode(writer)
     destAsset.encode(writer)
     destMin.encode(writer)
+    require(path.size <= 5) { "XDR array count ${path.size} exceeds maximum 5" }
     writer.writeInt(path.size)
     path.forEach { item ->
       item.encode(writer)
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("send_asset", sendAsset.toXdrJsonElement())
-    put("send_amount", sendAmount.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("send_asset", sendAsset.toXdrJsonElement(depth + 1))
+    put("send_amount", sendAmount.toXdrJsonElement(depth + 1))
     put("destination", destination.toXdrJsonElement())
-    put("dest_asset", destAsset.toXdrJsonElement())
-    put("dest_min", destMin.toXdrJsonElement())
-    put("path", XdrJson.array(path) { it.toXdrJsonElement() })
+    put("dest_asset", destAsset.toXdrJsonElement(depth + 1))
+    put("dest_min", destMin.toXdrJsonElement(depth + 1))
+    put("path", XdrJson.array(path, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCPNominationXdr"
 
@@ -60,10 +59,12 @@ data class SCPNominationXdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("quorum_set_hash", quorumSetHash.toXdrJsonElement())
-    put("votes", XdrJson.array(votes) { it.toXdrJsonElement() })
-    put("accepted", XdrJson.array(accepted) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("quorum_set_hash", quorumSetHash.toXdrJsonElement(depth + 1))
+    put("votes", XdrJson.array(votes, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("accepted", XdrJson.array(accepted, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecUDTUnionCaseVoidV0Xdr"
 
@@ -25,8 +24,8 @@ data class SCSpecUDTUnionCaseVoidV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTUnionCaseVoidV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(60)
       return SCSpecUDTUnionCaseVoidV0Xdr(doc, name)
     }
 
@@ -44,11 +43,13 @@ data class SCSpecUDTUnionCaseVoidV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 60)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("doc", XdrJson.escapedString(doc))
     put("name", XdrJson.escapedString(name))
   }

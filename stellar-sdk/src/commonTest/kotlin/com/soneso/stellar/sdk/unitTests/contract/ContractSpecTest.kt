@@ -2443,6 +2443,61 @@ class ContractSpecTest {
         assertTrue(ex.message!!.contains("Unknown"))
     }
 
+    // ========== Names and values whose bytes are not valid UTF-8 ==========
+
+    private val notUtf8 = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61)
+
+    @Test
+    fun testGetFuncAndFindEntrySkipAFunctionWhoseNameIsNotUtf8() {
+        val spec = ContractSpec(
+            listOf(
+                SCSpecEntryXdr.FunctionV0(SCSpecFunctionV0Xdr("", SCSymbolXdr(notUtf8), emptyList(), emptyList())),
+                createFunctionEntry("hello", listOf("to")),
+                createStructEntry("MyStruct", listOf("field1" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL))
+            )
+        )
+
+        assertEquals("hello", spec.getFunc("hello")?.name?.value)
+        assertEquals("hello", assertIs<SCSpecEntryXdr.FunctionV0>(spec.findEntry("hello")).value.name.value)
+        assertIs<SCSpecEntryXdr.UdtStructV0>(spec.findEntry("MyStruct"))
+        // Names compare by their bytes, so the escaped display form names no function.
+        assertNull(spec.getFunc("\\xff\\xfe a"))
+    }
+
+    @Test
+    fun testScValToNativeRejectsAStringOrSymbolWhoseBytesAreNotUtf8() {
+        val spec = ContractSpec(emptyList())
+
+        val string = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Str(SCStringXdr(notUtf8)), createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_STRING))
+        }
+        assertEquals("Conversion failed: SCV_STRING bytes are not valid UTF-8: \\xff\\xfe a", string.message)
+        val symbol = assertFailsWith<ContractSpecException> {
+            spec.scValToNative(SCValXdr.Sym(SCSymbolXdr(notUtf8)), createTypeDef(SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL))
+        }
+        assertEquals("Conversion failed: SCV_SYMBOL bytes are not valid UTF-8: \\xff\\xfe a", symbol.message)
+    }
+
+    @Test
+    fun testStructToNativeNamesAKeyWhoseBytesAreNotUtf8AsNoField() {
+        val spec = ContractSpec(listOf(createStructEntry("Person", listOf("name" to SCSpecTypeXdr.SC_SPEC_TYPE_SYMBOL))))
+        val map = SCValXdr.Map(
+            SCMapXdr(listOf(SCMapEntryXdr(SCValXdr.Sym(SCSymbolXdr(notUtf8)), SCValXdr.Sym(SCSymbolXdr("Alice")))))
+        )
+
+        val ex = assertFailsWith<ContractSpecException> { spec.scValToNative(map, createUdtTypeDef("Person")) }
+        assertEquals("""Invalid type: Struct Person has no field {"symbol":"\\xff\\xfe a"}""", ex.message)
+    }
+
+    @Test
+    fun testUnionToNativeNamesATagWhoseBytesAreNotUtf8AsUnknownCase() {
+        val spec = ContractSpec(listOf(createUnionEntry("Result", listOf("Success" to 0))))
+        val union = SCValXdr.Vec(SCVecXdr(listOf(SCValXdr.Sym(SCSymbolXdr(notUtf8)))))
+
+        val ex = assertFailsWith<ContractSpecException> { spec.scValToNative(union, createUdtTypeDef("Result")) }
+        assertEquals("Invalid type: Failed to find union case '\\xff\\xfe a' in union Result", ex.message)
+    }
+
     // ========== handleValueType: VOID with a value, and unsupported discriminant ==========
 
     @Test

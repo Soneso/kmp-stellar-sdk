@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "String32Xdr"
 value class String32Xdr(val value: String) {
   companion object {
     fun decode(reader: XdrReader): String32Xdr {
-      val value = reader.readString()
+      val value = reader.readString(32)
       return String32Xdr(value)
     }
 
@@ -28,10 +28,12 @@ value class String32Xdr(val value: String) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(value)
+    writer.writeString(value, 32)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

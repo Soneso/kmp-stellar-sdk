@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCErrorXdr"
 
@@ -123,9 +122,11 @@ sealed class SCErrorXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is ContractCode -> buildJsonObject { put("contract", value.toXdrJsonElement()) }
-    is Code -> buildJsonObject { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is ContractCode -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract", value.toXdrJsonElement(depth + 1)) }
+    is Code -> XdrJson.obj(depth, XDR_JSON_TYPE) { put(discriminant.xdrJsonName, value.toXdrJsonElement()) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -252,4 +252,56 @@ class ClaimableBalanceIntegrationTest {
 
         println("Test completed successfully!")
     }
+
+    /**
+     * Test a claimable balance whose predicate is a NOT predicate inside a NOT predicate.
+     *
+     * This test:
+     * 1. Creates and funds a source account
+     * 2. Creates a claimable balance for one claimant with Not(Not(Unconditional))
+     * 3. Reads the transaction back from Horizon and parses its envelope
+     * 4. Verifies the parsed predicate and the transaction hash
+     */
+    @Test
+    fun testClaimableBalanceNestedNot() = runTest(timeout = 180.seconds) {
+        val sourceAccountKeyPair = KeyPair.random()
+        val sourceAccountId = sourceAccountKeyPair.getAccountId()
+
+        fundTestAccountAndAwaitVisibility(
+            sourceAccountId,
+            horizon = horizonServer,
+            useFuturenet = testOn != "testnet"
+        )
+
+        val sourceAccount = horizonServer.accounts().account(sourceAccountId)
+        val predicate = ClaimPredicate.Not(ClaimPredicate.Not(ClaimPredicate.Unconditional))
+        val createClaimableBalanceOp = CreateClaimableBalanceOperation(
+            asset = AssetTypeNative,
+            amount = "1",
+            claimants = listOf(Claimant(KeyPair.random().getAccountId(), predicate))
+        )
+
+        val transaction = TransactionBuilder(
+            sourceAccount = Account(sourceAccountId, sourceAccount.sequenceNumber),
+            network = network
+        )
+            .addOperation(createClaimableBalanceOp)
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+
+        transaction.sign(sourceAccountKeyPair)
+
+        val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Transaction with a nested NOT predicate should succeed")
+
+        realDelay(3000)
+
+        val stored = horizonServer.transactions().transaction(response.hash)
+        val envelope = assertNotNull(stored.envelopeXdr, "Horizon should return the envelope")
+        val parsed = AbstractTransaction.fromEnvelopeXdr(envelope, network) as Transaction
+        val parsedOp = parsed.operations.single() as CreateClaimableBalanceOperation
+        assertEquals(predicate, parsedOp.claimants.single().predicate)
+        assertEquals(stored.hash, parsed.hashHex(), "Parsed hash should match the Horizon hash")
+    }
 }

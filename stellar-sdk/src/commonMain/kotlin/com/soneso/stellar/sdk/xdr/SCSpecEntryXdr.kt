@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecEntryXdr"
 
@@ -140,13 +139,15 @@ sealed class SCSpecEntryXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is FunctionV0 -> buildJsonObject { put("function_v0", value.toXdrJsonElement()) }
-    is UdtStructV0 -> buildJsonObject { put("udt_struct_v0", value.toXdrJsonElement()) }
-    is UdtUnionV0 -> buildJsonObject { put("udt_union_v0", value.toXdrJsonElement()) }
-    is UdtEnumV0 -> buildJsonObject { put("udt_enum_v0", value.toXdrJsonElement()) }
-    is UdtErrorEnumV0 -> buildJsonObject { put("udt_error_enum_v0", value.toXdrJsonElement()) }
-    is EventV0 -> buildJsonObject { put("event_v0", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is FunctionV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("function_v0", value.toXdrJsonElement(depth + 1)) }
+    is UdtStructV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("udt_struct_v0", value.toXdrJsonElement(depth + 1)) }
+    is UdtUnionV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("udt_union_v0", value.toXdrJsonElement(depth + 1)) }
+    is UdtEnumV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("udt_enum_v0", value.toXdrJsonElement(depth + 1)) }
+    is UdtErrorEnumV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("udt_error_enum_v0", value.toXdrJsonElement(depth + 1)) }
+    is EventV0 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("event_v0", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -8,7 +8,8 @@ module Xdrgen
     # Each entry replaces the default emission entirely, supplying the body of
     # toXdrJsonElement and of the internal fromXdrJsonTree that the generic entry points
     # delegate to. Bodies are written against the generated Kotlin shape of the type, so a
-    # renamed arm or field surfaces as a compile error rather than as wrong output.
+    # renamed arm or field surfaces as a compile error rather than as wrong output. Every
+    # entry writes a single JSON string, so the generated type has no depth-taking writer.
     #
     # AccountID and NodeID are absent deliberately. Both are typedefs of PublicKey, and the
     # generated value class delegates its JSON form to the type it wraps, so both already
@@ -206,10 +207,12 @@ module Xdrgen
         # five bytes, which is what tells the two forms apart once trimmed. SEP-0051 sets
         # those five bytes as the floor of a twelve-character code, so its reader refuses a
         # string that unescapes to fewer; a short code carries escaped NULs up to the floor.
+        # Each writer refuses a code whose width is not its declared four or twelve bytes before
+        # trimming, as the binary encoder does.
         'AssetCode4Xdr' => {
           imports: [],
           to: <<~KOTLIN,
-            fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(value, 0))
+            fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 4), 0))
           KOTLIN
           from: <<~KOTLIN
             internal fun fromXdrJsonTree(element: JsonElement): AssetCode4Xdr =
@@ -220,7 +223,7 @@ module Xdrgen
         'AssetCode12Xdr' => {
           imports: [],
           to: <<~KOTLIN,
-            fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(value, 5))
+            fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 5))
           KOTLIN
           from: <<~KOTLIN
             internal fun fromXdrJsonTree(element: JsonElement): AssetCode12Xdr =

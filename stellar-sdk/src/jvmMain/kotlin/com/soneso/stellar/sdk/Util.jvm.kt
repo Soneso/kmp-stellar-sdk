@@ -4,11 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * JVM implementation of currentTimeMillis using System.currentTimeMillis().
- */
-internal actual fun currentTimeMillis(): Long = System.currentTimeMillis()
-
-/**
  * JVM implementation of platformDelay using Thread.sleep via Dispatchers.IO.
  *
  * Uses a blocking Thread.sleep on the IO dispatcher to guarantee real wall-clock delay,

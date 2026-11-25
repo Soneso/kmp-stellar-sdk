@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecFunctionV0Xdr"
 
@@ -29,10 +28,10 @@ data class SCSpecFunctionV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecFunctionV0Xdr {
-      val doc = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
       val name = SCSymbolXdr.decode(reader)
       val inputs = List(reader.readArrayLength()) { SCSpecFunctionInputV0Xdr.decode(reader) }
-      val outputs = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
+      val outputs = List(reader.readArrayLength(1)) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecFunctionV0Xdr(doc, name, inputs, outputs)
     }
 
@@ -52,23 +51,26 @@ data class SCSpecFunctionV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
     name.encode(writer)
     writer.writeInt(inputs.size)
     inputs.forEach { item ->
       item.encode(writer)
     }
+    require(outputs.size <= 1) { "XDR array count ${outputs.size} exceeds maximum 1" }
     writer.writeInt(outputs.size)
     outputs.forEach { item ->
       item.encode(writer)
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("doc", XdrJson.escapedString(doc))
-    put("name", name.toXdrJsonElement())
-    put("inputs", XdrJson.array(inputs) { it.toXdrJsonElement() })
-    put("outputs", XdrJson.array(outputs) { it.toXdrJsonElement() })
+    put("name", name.toXdrJsonElement(depth + 1))
+    put("inputs", XdrJson.array(inputs, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("outputs", XdrJson.array(outputs, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

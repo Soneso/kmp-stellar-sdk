@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SimpleResultXdr"
 
@@ -43,7 +42,7 @@ sealed class SimpleResultXdr {
           SuccessCode(value)
         }
         SimpleStatusXdr.INACTIVE -> {
-          val value = reader.readString()
+          val value = reader.readString(256)
           ErrorMessage(value)
         }
         else -> throw IllegalArgumentException("Unknown SimpleResultXdr discriminant: $discriminant")
@@ -71,14 +70,16 @@ sealed class SimpleResultXdr {
         writer.writeInt(value)
       }
       is ErrorMessage -> {
-        writer.writeString(value)
+        writer.writeString(value, 256)
       }
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is SuccessCode -> buildJsonObject { put("active", XdrJson.int32(value)) }
-    is ErrorMessage -> buildJsonObject { put("inactive", XdrJson.escapedString(value)) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is SuccessCode -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("active", XdrJson.int32(value)) }
+    is ErrorMessage -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("inactive", XdrJson.escapedString(value)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

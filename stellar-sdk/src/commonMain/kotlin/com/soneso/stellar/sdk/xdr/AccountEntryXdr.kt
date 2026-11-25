@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "AccountEntryXdr"
 
@@ -78,7 +77,7 @@ data class AccountEntryXdr(
       val flags = Uint32Xdr.decode(reader)
       val homeDomain = String32Xdr.decode(reader)
       val thresholds = ThresholdsXdr.decode(reader)
-      val signers = List(reader.readArrayLength()) { SignerXdr.decode(reader) }
+      val signers = List(reader.readArrayLength(MAX_SIGNERS)) { SignerXdr.decode(reader) }
       val ext = AccountEntryExtXdr.decode(reader)
       return AccountEntryXdr(accountId, balance, seqNum, numSubEntries, inflationDest, flags, homeDomain, thresholds, signers, ext)
     }
@@ -118,6 +117,7 @@ data class AccountEntryXdr(
     flags.encode(writer)
     homeDomain.encode(writer)
     thresholds.encode(writer)
+    require(signers.size <= MAX_SIGNERS) { "XDR array count ${signers.size} exceeds maximum $MAX_SIGNERS" }
     writer.writeInt(signers.size)
     signers.forEach { item ->
       item.encode(writer)
@@ -125,17 +125,19 @@ data class AccountEntryXdr(
     ext.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("account_id", accountId.toXdrJsonElement())
-    put("balance", balance.toXdrJsonElement())
-    put("seq_num", seqNum.toXdrJsonElement())
-    put("num_sub_entries", numSubEntries.toXdrJsonElement())
-    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement() })
-    put("flags", flags.toXdrJsonElement())
-    put("home_domain", homeDomain.toXdrJsonElement())
-    put("thresholds", thresholds.toXdrJsonElement())
-    put("signers", XdrJson.array(signers) { it.toXdrJsonElement() })
-    put("ext", ext.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("account_id", accountId.toXdrJsonElement(depth + 1))
+    put("balance", balance.toXdrJsonElement(depth + 1))
+    put("seq_num", seqNum.toXdrJsonElement(depth + 1))
+    put("num_sub_entries", numSubEntries.toXdrJsonElement(depth + 1))
+    put("inflation_dest", XdrJson.optional(inflationDest) { it.toXdrJsonElement(depth + 1) })
+    put("flags", flags.toXdrJsonElement(depth + 1))
+    put("home_domain", homeDomain.toXdrJsonElement(depth + 1))
+    put("thresholds", thresholds.toXdrJsonElement(depth + 1))
+    put("signers", XdrJson.array(signers, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("ext", ext.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

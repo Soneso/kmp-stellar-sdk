@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "DataValueXdr"
 value class DataValueXdr(val value: ByteArray) {
   companion object {
     fun decode(reader: XdrReader): DataValueXdr {
-      val value = reader.readVariableOpaque()
+      val value = reader.readVariableOpaque(64)
       return DataValueXdr(value)
     }
 
@@ -28,10 +28,12 @@ value class DataValueXdr(val value: ByteArray) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeVariableOpaque(value)
+    writer.writeVariableOpaque(value, 64)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

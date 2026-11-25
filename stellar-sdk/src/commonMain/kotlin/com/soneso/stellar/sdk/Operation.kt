@@ -423,7 +423,8 @@ data class PathPaymentStrictSendOperation(
  * @property buying The asset being bought in this operation
  * @property amount Amount of selling being sold
  * @property price Price of 1 unit of selling in terms of buying
- * @property offerId The ID of the offer (0 for new, existing ID to update/delete)
+ * @property offerId The ID of the offer (0 for new, existing ID to update/delete). Any `int64` value is
+ *                   accepted; the network refuses a negative ID as malformed from protocol 15 on
  */
 data class ManageSellOfferOperation(
     val selling: Asset,
@@ -438,7 +439,6 @@ data class ManageSellOfferOperation(
             "Selling and buying assets must be different"
         }
         toXdrAmount(amount) // Validate
-        require(offerId >= 0) { "Offer ID must be non-negative, got $offerId" }
     }
 
     override fun toOperationBody(): OperationBodyXdr {
@@ -478,7 +478,8 @@ data class ManageSellOfferOperation(
  * @property buying The asset being bought in this operation
  * @property buyAmount Amount of buying being bought
  * @property price Price of 1 unit of buying in terms of selling
- * @property offerId The ID of the offer (0 for new, existing ID to update/delete)
+ * @property offerId The ID of the offer (0 for new, existing ID to update/delete). Any `int64` value is
+ *                   accepted; the network refuses a negative ID as malformed from protocol 15 on
  */
 data class ManageBuyOfferOperation(
     val selling: Asset,
@@ -493,7 +494,6 @@ data class ManageBuyOfferOperation(
             "Selling and buying assets must be different"
         }
         toXdrAmount(buyAmount) // Validate
-        require(offerId >= 0) { "Offer ID must be non-negative, got $offerId" }
     }
 
     override fun toOperationBody(): OperationBodyXdr {
@@ -739,6 +739,11 @@ class InflationOperation : Operation() {
 /**
  * Represents a [SetOptions](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations#set-options) operation.
  *
+ * The constructor and `copy` take a signer weight from 0 to 255, the range the network accepts from
+ * protocol 10 on. [fromXdr] keeps any `uint32` weight, because a transaction applied before protocol 10
+ * can carry a higher one: [signerWeightExact] returns it, and [signerWeight] and `component10` throw
+ * [IllegalStateException] for a weight above `Int.MAX_VALUE`.
+ *
  * @property inflationDestination Account of the inflation destination
  * @property clearFlags Indicates which flags to clear
  * @property setFlags Indicates which flags to set
@@ -747,21 +752,48 @@ class InflationOperation : Operation() {
  * @property mediumThreshold Medium threshold for operations
  * @property highThreshold High threshold for operations
  * @property homeDomain The home domain of the account
- * @property signer Additional signer to add/remove
- * @property signerWeight Weight of the signer (0 to remove)
+ * @property signer Additional signer to add/remove. A signed payload signer needs a payload of 1 to 64
+ *                  bytes, because the network refuses an empty one
+ * @property signerWeightExact Weight of the signer (0 to remove), as the XDR `uint32` value
+ * @property signerWeight [signerWeightExact] as an `Int`
  */
-data class SetOptionsOperation(
-    val inflationDestination: String? = null,
-    val clearFlags: Int? = null,
-    val setFlags: Int? = null,
-    val masterKeyWeight: Int? = null,
-    val lowThreshold: Int? = null,
-    val mediumThreshold: Int? = null,
-    val highThreshold: Int? = null,
-    val homeDomain: String? = null,
-    val signer: SignerKey? = null,
-    val signerWeight: Int? = null
+class SetOptionsOperation private constructor(
+    val inflationDestination: String?,
+    val clearFlags: Int?,
+    val setFlags: Int?,
+    val masterKeyWeight: Int?,
+    val lowThreshold: Int?,
+    val mediumThreshold: Int?,
+    val highThreshold: Int?,
+    val homeDomain: String?,
+    val signer: SignerKey?,
+    val signerWeightExact: UInt?,
+    // Sets this constructor apart from the public one for arguments that fit both, such as null.
+    @Suppress("UNUSED_PARAMETER") exact: Unit
 ) : Operation() {
+
+    /**
+     * @throws IllegalArgumentException if a value is out of its range, if only one of [signer] and
+     * [signerWeight] is set, or if [signer] is a signed payload signer with an empty payload
+     */
+    constructor(
+        inflationDestination: String? = null,
+        clearFlags: Int? = null,
+        setFlags: Int? = null,
+        masterKeyWeight: Int? = null,
+        lowThreshold: Int? = null,
+        mediumThreshold: Int? = null,
+        highThreshold: Int? = null,
+        homeDomain: String? = null,
+        signer: SignerKey? = null,
+        signerWeight: Int? = null
+    ) : this(
+        inflationDestination, clearFlags, setFlags, masterKeyWeight, lowThreshold, mediumThreshold,
+        highThreshold, homeDomain, signer, signerWeightOf(signerWeight), Unit
+    )
+
+    /** Creates a SetOptions operation that changes nothing; Java calls it as `new SetOptionsOperation()`. */
+    constructor() : this(null, null, null, null, null, null, null, null, null, null, Unit)
 
     init {
         masterKeyWeight?.let {
@@ -776,9 +808,6 @@ data class SetOptionsOperation(
         highThreshold?.let {
             require(it in 0..255) { "High threshold must be between 0 and 255, got $it" }
         }
-        signerWeight?.let {
-            require(it in 0..255) { "Signer weight must be between 0 and 255, got $it" }
-        }
         clearFlags?.let {
             require(it >= 0) { "Clear flags must be non-negative, got $it" }
         }
@@ -790,11 +819,8 @@ data class SetOptionsOperation(
                 "Home domain cannot exceed 32 bytes"
             }
         }
-        if (signer != null && signerWeight == null) {
-            throw IllegalArgumentException("Signer weight cannot be null if signer is not null")
-        }
-        if (signer == null && signerWeight != null) {
-            throw IllegalArgumentException("Signer cannot be null if signer weight is not null")
+        require(!(signer is SignerKey.Ed25519SignedPayload && signer.payload.isEmpty())) {
+            "Signer payload must be between 1 and ${SignerKey.SIGNED_PAYLOAD_MAX_PAYLOAD_LENGTH} bytes, got 0"
         }
         inflationDestination?.let {
             require(StrKey.isValidEd25519PublicKey(it)) {
@@ -802,6 +828,49 @@ data class SetOptionsOperation(
             }
         }
     }
+
+    // The signer entry that toOperationBody writes. Building it refuses a signer without a weight and a
+    // weight without a signer.
+    private val signerXdr: SignerXdr? = when {
+        signer != null && signerWeightExact != null ->
+            SignerXdr(key = signer.toXdr(), weight = Uint32Xdr(signerWeightExact))
+        signer != null -> throw IllegalArgumentException("Signer weight cannot be null if signer is not null")
+        signerWeightExact != null -> throw IllegalArgumentException("Signer cannot be null if signer weight is not null")
+        else -> null
+    }
+
+    val signerWeight: Int?
+        get() = signerWeightExact?.let {
+            check(it <= Int.MAX_VALUE.toUInt()) { "signerWeight $it exceeds Int.MAX_VALUE; read signerWeightExact" }
+            it.toInt()
+        }
+
+    operator fun component1(): String? = inflationDestination
+    operator fun component2(): Int? = clearFlags
+    operator fun component3(): Int? = setFlags
+    operator fun component4(): Int? = masterKeyWeight
+    operator fun component5(): Int? = lowThreshold
+    operator fun component6(): Int? = mediumThreshold
+    operator fun component7(): Int? = highThreshold
+    operator fun component8(): String? = homeDomain
+    operator fun component9(): SignerKey? = signer
+    operator fun component10(): Int? = signerWeight
+
+    fun copy(
+        inflationDestination: String? = this.inflationDestination,
+        clearFlags: Int? = this.clearFlags,
+        setFlags: Int? = this.setFlags,
+        masterKeyWeight: Int? = this.masterKeyWeight,
+        lowThreshold: Int? = this.lowThreshold,
+        mediumThreshold: Int? = this.mediumThreshold,
+        highThreshold: Int? = this.highThreshold,
+        homeDomain: String? = this.homeDomain,
+        signer: SignerKey? = this.signer,
+        signerWeight: Int? = this.signerWeight
+    ): SetOptionsOperation = SetOptionsOperation(
+        inflationDestination, clearFlags, setFlags, masterKeyWeight, lowThreshold, mediumThreshold,
+        highThreshold, homeDomain, signer, signerWeight
+    )
 
     override fun toOperationBody(): OperationBodyXdr {
         val op = SetOptionsOpXdr(
@@ -815,17 +884,29 @@ data class SetOptionsOperation(
             medThreshold = mediumThreshold?.let { Uint32Xdr(it.toUInt()) },
             highThreshold = highThreshold?.let { Uint32Xdr(it.toUInt()) },
             homeDomain = homeDomain?.let { String32Xdr(it) },
-            signer = if (signer != null && signerWeight != null) {
-                SignerXdr(
-                    key = signer.toXdr(),
-                    weight = Uint32Xdr(signerWeight.toUInt())
-                )
-            } else {
-                null
-            }
+            signer = signerXdr
         )
         return OperationBodyXdr.SetOptionsOp(op)
     }
+
+    override fun equals(other: Any?): Boolean =
+        other is SetOptionsOperation && inflationDestination == other.inflationDestination &&
+            clearFlags == other.clearFlags && setFlags == other.setFlags && masterKeyWeight == other.masterKeyWeight &&
+            lowThreshold == other.lowThreshold && mediumThreshold == other.mediumThreshold &&
+            highThreshold == other.highThreshold && homeDomain == other.homeDomain && signer == other.signer &&
+            signerWeightExact == other.signerWeightExact
+
+    override fun hashCode(): Int =
+        listOf(
+            inflationDestination, clearFlags, setFlags, masterKeyWeight, lowThreshold, mediumThreshold,
+            highThreshold, homeDomain, signer, signerWeightExact
+        ).fold(0) { result, value -> 31 * result + (value?.hashCode() ?: 0) }
+
+    override fun toString(): String =
+        "SetOptionsOperation(inflationDestination=$inflationDestination, clearFlags=$clearFlags, " +
+            "setFlags=$setFlags, masterKeyWeight=$masterKeyWeight, lowThreshold=$lowThreshold, " +
+            "mediumThreshold=$mediumThreshold, highThreshold=$highThreshold, homeDomain=$homeDomain, " +
+            "signer=$signer, signerWeight=$signerWeightExact)"
 
     companion object {
         fun fromXdr(op: SetOptionsOpXdr): SetOptionsOperation {
@@ -844,7 +925,7 @@ data class SetOptionsOperation(
             val homeDomain = op.homeDomain?.value
 
             val signer = op.signer?.let { SignerKey.fromXdr(it.key) }
-            val signerWeight = op.signer?.weight?.value?.toInt()
+            val signerWeight = op.signer?.weight?.value
 
             return SetOptionsOperation(
                 inflationDestination = inflationDest,
@@ -856,8 +937,14 @@ data class SetOptionsOperation(
                 highThreshold = highThreshold,
                 homeDomain = homeDomain,
                 signer = signer,
-                signerWeight = signerWeight
+                signerWeightExact = signerWeight,
+                exact = Unit
             )
+        }
+
+        private fun signerWeightOf(signerWeight: Int?): UInt? = signerWeight?.let {
+            require(it in 0..255) { "Signer weight must be between 0 and 255, got $it" }
+            it.toUInt()
         }
     }
 }
@@ -874,7 +961,7 @@ data class ManageDataOperation(
 ) : Operation() {
 
     init {
-        require(name.isNotBlank()) { "Data entry name cannot be blank" }
+        require(name.isNotEmpty()) { "Data entry name cannot be empty" }
         require(name.encodeToByteArray().size <= 64) {
             "Data entry name cannot exceed 64 bytes"
         }
@@ -1005,6 +1092,9 @@ data class CreateClaimableBalanceOperation(
         require(claimants.isNotEmpty()) {
             "Claimants list cannot be empty"
         }
+        require(claimants.size <= MAX_CLAIMANTS) {
+            "Claimant count ${claimants.size} exceeds maximum $MAX_CLAIMANTS"
+        }
     }
 
     override fun toOperationBody(): OperationBodyXdr {
@@ -1025,6 +1115,9 @@ data class CreateClaimableBalanceOperation(
     }
 
     companion object {
+        /** Maximum from the XDR declaration `Claimant claimants<10>;` in `CreateClaimableBalanceOp`. */
+        private const val MAX_CLAIMANTS = 10
+
         fun fromXdr(op: CreateClaimableBalanceOpXdr): CreateClaimableBalanceOperation {
             val asset = Asset.fromXdr(op.asset)
             val amount = fromXdrAmount(op.amount.value)
@@ -1223,7 +1316,9 @@ data class RevokeSponsorshipOperation(
                 )
             }
             is Sponsorship.TrustLine -> {
-                val trustLineAsset = when (val asset = sponsorship.asset) {
+                val trustLineAsset = sponsorship.liquidityPoolId?.let {
+                    TrustLineAssetXdr.LiquidityPoolID(PoolIDXdr(HashXdr(Util.hexToBytes(it))))
+                } ?: when (val asset = sponsorship.asset) {
                     is AssetTypeNative -> TrustLineAssetXdr.Void
                     is AssetTypeCreditAlphaNum4 -> {
                         val assetXdr = asset.toXdr() as AssetXdr.AlphaNum4
@@ -1300,13 +1395,17 @@ data class RevokeSponsorshipOperation(
                             val accountId = when (val pk = ledgerKey.value.accountId.value) {
                                 is PublicKeyXdr.Ed25519 -> StrKey.encodeEd25519PublicKey(pk.value.value)
                             }
-                            val asset = when (val tla = ledgerKey.value.asset) {
-                                is TrustLineAssetXdr.Void -> AssetTypeNative
-                                is TrustLineAssetXdr.AlphaNum4 -> AssetTypeCreditAlphaNum4.fromXdr(tla.value)
-                                is TrustLineAssetXdr.AlphaNum12 -> AssetTypeCreditAlphaNum12.fromXdr(tla.value)
-                                is TrustLineAssetXdr.LiquidityPoolID -> throw UnsupportedOperationException("Pool share trustlines not supported")
+                            when (val tla = ledgerKey.value.asset) {
+                                is TrustLineAssetXdr.Void -> Sponsorship.TrustLine(accountId, AssetTypeNative)
+                                is TrustLineAssetXdr.AlphaNum4 ->
+                                    Sponsorship.TrustLine(accountId, AssetTypeCreditAlphaNum4.fromXdr(tla.value))
+                                is TrustLineAssetXdr.AlphaNum12 ->
+                                    Sponsorship.TrustLine(accountId, AssetTypeCreditAlphaNum12.fromXdr(tla.value))
+                                is TrustLineAssetXdr.LiquidityPoolID -> Sponsorship.TrustLine.forLiquidityPool(
+                                    accountId,
+                                    Util.bytesToHex(tla.value.value.value)
+                                )
                             }
-                            Sponsorship.TrustLine(accountId, asset)
                         }
                         is LedgerKeyXdr.Offer -> {
                             val sellerId = when (val pk = ledgerKey.value.sellerId.value) {
@@ -1354,10 +1453,60 @@ sealed class Sponsorship {
 
     /**
      * Revoke sponsorship of a trustline.
+     *
+     * The trustline of a liquidity pool share is keyed by the pool ID alone; [forLiquidityPool] creates
+     * it. For such a trustline [asset], `copy` and `component2` throw [UnsupportedOperationException],
+     * as [ChangeTrustOperation.asset] does; read [liquidityPoolId] instead.
+     *
      * @property accountId The account ID
      * @property asset The asset of the trustline
+     * @property liquidityPoolId The liquidity pool ID of a pool share trustline, held as 64 lowercase hex
+     * characters; null for an asset trustline
      */
-    data class TrustLine(val accountId: String, val asset: Asset) : Sponsorship()
+    class TrustLine private constructor(
+        val accountId: String,
+        private val assetOrNull: Asset?,
+        val liquidityPoolId: String?
+    ) : Sponsorship() {
+        constructor(accountId: String, asset: Asset) : this(accountId, asset, null)
+
+        val asset: Asset
+            get() = assetOrNull ?: throw UnsupportedOperationException(
+                "This is a liquidity pool share trustline. Use 'liquidityPoolId' property to access the pool ID."
+            )
+
+        operator fun component1(): String = accountId
+        operator fun component2(): Asset = asset
+        fun copy(accountId: String = this.accountId, asset: Asset = this.asset): TrustLine = TrustLine(accountId, asset)
+
+        override fun equals(other: Any?): Boolean =
+            other is TrustLine && accountId == other.accountId && assetOrNull == other.assetOrNull &&
+                liquidityPoolId == other.liquidityPoolId
+
+        override fun hashCode(): Int =
+            31 * accountId.hashCode() + (assetOrNull?.hashCode() ?: 0) + (liquidityPoolId?.hashCode() ?: 0)
+
+        override fun toString(): String =
+            if (liquidityPoolId != null) "TrustLine(accountId=$accountId, liquidityPoolId=$liquidityPoolId)"
+            else "TrustLine(accountId=$accountId, asset=$assetOrNull)"
+
+        companion object {
+            /**
+             * Creates the trustline of a liquidity pool share.
+             *
+             * @param accountId The account ID
+             * @param liquidityPoolId The liquidity pool ID (hex-encoded, 64 characters)
+             * @return The pool share trustline
+             * @throws IllegalArgumentException if [liquidityPoolId] is not 64 hex characters
+             */
+            fun forLiquidityPool(accountId: String, liquidityPoolId: String): TrustLine {
+                require(liquidityPoolId.length == 64) {
+                    "Invalid liquidity pool ID length: expected 64 characters, got ${liquidityPoolId.length}"
+                }
+                return TrustLine(accountId, null, Util.bytesToHex(Util.hexToBytes(liquidityPoolId)))
+            }
+        }
+    }
 
     /**
      * Revoke sponsorship of an offer.
@@ -1822,6 +1971,39 @@ data class InvokeHostFunctionOperation(
                 auth = emptyList()
             )
         }
+
+        /**
+         * Creates an InvokeHostFunctionOperation that deploys the Stellar Asset Contract (SAC)
+         * of an asset.
+         *
+         * The host function creates a contract from the asset preimage with the Stellar asset
+         * executable, and the operation carries no authorization entry. The host derives the
+         * contract id from the asset and the network the transaction runs on, so the deployed
+         * contract has the id [Asset.getContractId] returns for that network.
+         *
+         * @param asset The asset whose contract to deploy, the native asset included
+         * @return An InvokeHostFunctionOperation for deploying the Stellar Asset Contract
+         *
+         * ## Example
+         * ```kotlin
+         * val asset = Asset.createNonNativeAsset("USDC", issuerAccountId)
+         * val deployOp = InvokeHostFunctionOperation.createStellarAssetContract(asset)
+         * val contractId = asset.getContractId(Network.TESTNET)
+         * ```
+         *
+         * @see <a href="https://developers.stellar.org/docs/tokens/stellar-asset-contract">Stellar Asset Contract</a>
+         */
+        fun createStellarAssetContract(asset: Asset): InvokeHostFunctionOperation {
+            return InvokeHostFunctionOperation(
+                hostFunction = HostFunctionXdr.CreateContract(
+                    CreateContractArgsXdr(
+                        contractIdPreimage = ContractIDPreimageXdr.FromAsset(asset.toXdr()),
+                        executable = ContractExecutableXdr.Void
+                    )
+                ),
+                auth = emptyList()
+            )
+        }
     }
 }
 
@@ -1830,15 +2012,16 @@ data class InvokeHostFunctionOperation(
  *
  * This operation extends the expiration of Soroban contract storage.
  *
- * @property extendTo Number of ledgers to extend the TTL
+ * @property extendTo Number of ledgers to extend the TTL. 0 is valid: stellar-core rejects only a
+ * value above the network's maximum entry TTL.
  */
 data class ExtendFootprintTTLOperation(
     val extendTo: Int
 ) : Operation() {
 
     init {
-        require(extendTo > 0) {
-            "extendTo must be positive, got $extendTo"
+        require(extendTo >= 0) {
+            "extendTo must not be negative, got $extendTo"
         }
     }
 
@@ -1944,11 +2127,6 @@ sealed class ClaimPredicate {
      * @property predicate The predicate to negate
      */
     data class Not(val predicate: ClaimPredicate) : ClaimPredicate() {
-        init {
-            require(predicate !is Not) {
-                "Cannot nest NOT predicates"
-            }
-        }
         override fun toXdr(): ClaimPredicateXdr {
             return ClaimPredicateXdr.NotPredicate(predicate.toXdr())
         }

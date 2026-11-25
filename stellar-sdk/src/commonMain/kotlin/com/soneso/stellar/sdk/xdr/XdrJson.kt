@@ -1,12 +1,15 @@
 package com.soneso.stellar.sdk.xdr
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.soneso.stellar.sdk.Util
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * The shared runtime behind the XDR-JSON (SEP-0051) conversion methods on the XDR types.
@@ -44,8 +47,12 @@ import kotlinx.serialization.json.JsonPrimitive
 internal object XdrJson {
 
     /**
-     * Maximum JSON nesting depth accepted when decoding. The limit bounds the
-     * call-stack traversal of the document.
+     * The deepest XDR-JSON nesting this SDK reads or writes: 128 levels. Each object and each
+     * array is one level, the outermost being level 1; a string, number, boolean or null adds
+     * none. The parser, the generated readers and writers and the serialiser traverse the
+     * document recursively, so the limit bounds the call stack they use, which matters on
+     * threads with a small stack. Reading refuses a deeper document, and writing refuses a
+     * value whose XDR-JSON would nest deeper.
      */
     const val RECURSION_CAP: Int = 128
 
@@ -106,6 +113,20 @@ internal object XdrJson {
     fun hex(bytes: ByteArray): JsonElement = JsonPrimitive(toHex(bytes))
 
     /**
+     * Refuses a fixed-length opaque value, an asset code included, whose length differs from
+     * the [expectedLength] its XDR definition declares, returning [bytes] so a writer can check
+     * and write in one expression. The binary encoder refuses the same values with the same
+     * message; written as XDR-JSON, such a value would be refused on reading or read back as
+     * another value.
+     *
+     * @throws IllegalArgumentException if [bytes] does not hold exactly [expectedLength] bytes
+     */
+    fun checkFixedLength(bytes: ByteArray, expectedLength: Int): ByteArray {
+        require(bytes.size == expectedLength) { "Expected $expectedLength bytes, got ${bytes.size}" }
+        return bytes
+    }
+
+    /**
      * Applies the SEP-0051 string ladder byte by byte, first match winning: NUL, tab, newline
      * and carriage return take their short escapes, a backslash doubles, any other byte in the
      * printable range 0x20 to 0x7E is kept verbatim, and everything else becomes `\xNN` with
@@ -118,12 +139,10 @@ internal object XdrJson {
     /**
      * Escapes text using its XDR byte representation, so the JSON and binary forms agree.
      *
-     * A `String`-typed member carries text, not arbitrary bytes: its value is the UTF-8 decoding
-     * of the wire bytes. Text that is valid UTF-8 therefore survives unchanged, and text that is
-     * not was already replaced with the Unicode replacement character before it reached this
-     * point, so the escape is applied to the replacement rather than to the original byte. A
-     * member that must preserve arbitrary bytes exactly is typed `ByteArray` and uses
-     * [escapedString] with that argument instead.
+     * A `String`-typed member carries text: the binary reader decodes its wire bytes as strict
+     * UTF-8 and refuses bytes that are not, so the UTF-8 encoding of the text is the wire
+     * bytes. A member that carries arbitrary bytes stores them and uses [escapedString] with
+     * those bytes instead.
      */
     fun escapedString(value: String): JsonElement = escapedString(value.encodeToByteArray())
 
@@ -134,8 +153,24 @@ internal object XdrJson {
      */
     fun name(value: String): JsonElement = JsonPrimitive(value)
 
-    fun <T> array(values: List<T>, encode: (T) -> JsonElement): JsonElement =
-        JsonArray(values.map(encode))
+    /**
+     * Builds the object a value opens at nesting [depth]. A depth past [RECURSION_CAP] is
+     * refused before [build] writes a member, so the writer stops before descending past it.
+     */
+    inline fun obj(depth: Int, type: String, build: JsonObjectBuilder.() -> Unit): JsonElement {
+        checkWriteDepth(depth, type)
+        return buildJsonObject(build)
+    }
+
+    /** Builds the array a value opens at nesting [depth], refused like [obj] past [RECURSION_CAP]. */
+    fun <T> array(values: List<T>, depth: Int, type: String, encode: (T) -> JsonElement): JsonElement {
+        checkWriteDepth(depth, type)
+        return JsonArray(values.map(encode))
+    }
+
+    fun checkWriteDepth(depth: Int, type: String) {
+        if (depth > RECURSION_CAP) fail(type, "value nests deeper than the limit of $RECURSION_CAP")
+    }
 
     fun <T> optional(value: T?, encode: (T) -> JsonElement): JsonElement =
         if (value == null) JsonNull else encode(value)
@@ -367,17 +402,30 @@ internal object XdrJson {
     /**
      * Reverses the [escapedString] ladder, returning text in the SDK's string representation.
      *
-     * The unescaped bytes are decoded as UTF-8, matching how a `String`-typed member is read from
-     * the binary form. Bytes that are not valid UTF-8 become the Unicode replacement character,
-     * so this path is lossless for text and lossy for arbitrary bytes; use [unescapeStringBytes]
-     * where the exact bytes matter.
+     * The unescaped bytes are decoded as strict UTF-8 with every leading byte order mark kept,
+     * matching how a `String`-typed member is read from the binary form. Bytes that are not
+     * valid UTF-8 are refused; [unescapeStringBytes] returns them for a member that carries
+     * arbitrary bytes.
+     *
+     * @throws IllegalArgumentException if the bytes are not valid UTF-8, with the
+     *   [CharacterCodingException] as the cause
      */
     fun unescapeString(
         element: JsonElement,
         type: String,
         key: String,
         maxLength: Int? = null
-    ): String = unescapeStringBytes(element, type, key, maxLength).decodeToString()
+    ): String {
+        val bytes = unescapeStringBytes(element, type, key, maxLength)
+        return try {
+            bytes.decodeToString(throwOnInvalidSequence = true)
+        } catch (e: CharacterCodingException) {
+            throw IllegalArgumentException(
+                "$type: key \"$key\" resolves to bytes that are not valid UTF-8: ${preview(element)}",
+                e
+            )
+        }
+    }
 
     /**
      * Reads an array.
@@ -638,6 +686,12 @@ internal object XdrJson {
      * so arbitrary bytes cannot inject line breaks or terminal control sequences into a log.
      */
     fun displayString(bytes: ByteArray): String = escape(bytes)
+
+    /**
+     * Renders the bytes of a string or symbol for `toString` and error messages: their text
+     * when they are valid UTF-8, otherwise their [displayString] form.
+     */
+    fun displayText(bytes: ByteArray): String = Util.utf8OrNull(bytes) ?: displayString(bytes)
 
     /**
      * Renders an untrusted value for an error message: truncated, with control bytes escaped so

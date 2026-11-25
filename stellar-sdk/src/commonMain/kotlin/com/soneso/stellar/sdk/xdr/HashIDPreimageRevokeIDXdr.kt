@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HashIDPreimageRevokeIDXdr"
 
@@ -63,12 +62,14 @@ data class HashIDPreimageRevokeIDXdr(
     asset.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("source_account", sourceAccount.toXdrJsonElement())
-    put("seq_num", seqNum.toXdrJsonElement())
-    put("op_num", opNum.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("source_account", sourceAccount.toXdrJsonElement(depth + 1))
+    put("seq_num", seqNum.toXdrJsonElement(depth + 1))
+    put("op_num", opNum.toXdrJsonElement(depth + 1))
     put("liquidity_pool_id", liquidityPoolId.toXdrJsonElement())
-    put("asset", asset.toXdrJsonElement())
+    put("asset", asset.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

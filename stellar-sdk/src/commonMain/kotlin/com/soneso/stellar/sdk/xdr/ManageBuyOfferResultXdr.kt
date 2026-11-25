@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ManageBuyOfferResultXdr"
 
@@ -108,8 +107,10 @@ sealed class ManageBuyOfferResultXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is Success -> buildJsonObject { put("success", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is Success -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("success", value.toXdrJsonElement(depth + 1)) }
     is Void -> XdrJson.name(discriminant.xdrJsonName)
   }
 

@@ -328,8 +328,8 @@ class Transaction internal constructor(
         internal fun fromV1EnvelopeXdr(envelope: TransactionV1EnvelopeXdr, network: Network): Transaction {
             val tx = envelope.tx
 
-            // Parse source account (may be muxed)
-            val sourceAccount = MuxedAccount.fromXdr(tx.sourceAccount).accountId
+            // A muxed source keeps its id as an M... address, so the transaction writes back the same bytes
+            val sourceAccount = MuxedAccount.fromXdr(tx.sourceAccount).address
 
             // Parse operations
             val operations = tx.operations.map { Operation.fromXdr(it) }

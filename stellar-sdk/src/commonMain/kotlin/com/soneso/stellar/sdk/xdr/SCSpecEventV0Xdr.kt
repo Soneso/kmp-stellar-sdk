@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecEventV0Xdr"
 
@@ -33,10 +32,10 @@ data class SCSpecEventV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecEventV0Xdr {
-      val doc = reader.readString()
-      val lib = reader.readString()
-      val name = reader.readString()
-      val prefixTopics = List(reader.readArrayLength()) { SCSymbolXdr.decode(reader) }
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val lib = reader.readString(80)
+      val name = reader.readString(SC_SPEC_TYPE_NAME_LIMIT)
+      val prefixTopics = List(reader.readArrayLength(2)) { SCSymbolXdr.decode(reader) }
       val params = List(reader.readArrayLength()) { SCSpecEventParamV0Xdr.decode(reader) }
       val dataFormat = SCSpecEventDataFormatXdr.decode(reader)
       return SCSpecEventV0Xdr(doc, lib, name, prefixTopics, params, dataFormat)
@@ -60,9 +59,10 @@ data class SCSpecEventV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(lib)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(lib, 80)
+    writer.writeString(name, SC_SPEC_TYPE_NAME_LIMIT)
+    require(prefixTopics.size <= 2) { "XDR array count ${prefixTopics.size} exceeds maximum 2" }
     writer.writeInt(prefixTopics.size)
     prefixTopics.forEach { item ->
       item.encode(writer)
@@ -74,12 +74,14 @@ data class SCSpecEventV0Xdr(
     dataFormat.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("doc", XdrJson.escapedString(doc))
     put("lib", XdrJson.escapedString(lib))
     put("name", XdrJson.escapedString(name))
-    put("prefix_topics", XdrJson.array(prefixTopics) { it.toXdrJsonElement() })
-    put("params", XdrJson.array(params) { it.toXdrJsonElement() })
+    put("prefix_topics", XdrJson.array(prefixTopics, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("params", XdrJson.array(params, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
     put("data_format", dataFormat.toXdrJsonElement())
   }
 

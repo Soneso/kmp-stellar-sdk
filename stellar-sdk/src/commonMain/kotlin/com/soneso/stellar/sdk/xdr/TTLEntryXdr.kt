@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TTLEntryXdr"
 
@@ -49,9 +48,11 @@ data class TTLEntryXdr(
     liveUntilLedgerSeq.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("key_hash", keyHash.toXdrJsonElement())
-    put("live_until_ledger_seq", liveUntilLedgerSeq.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("key_hash", keyHash.toXdrJsonElement(depth + 1))
+    put("live_until_ledger_seq", liveUntilLedgerSeq.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

@@ -4,8 +4,13 @@ import com.soneso.stellar.sdk.*
 import com.soneso.stellar.sdk.horizon.HorizonServer
 import com.soneso.stellar.sdk.horizon.requests.RequestBuilder
 import com.soneso.stellar.sdk.horizon.responses.operations.PaymentOperationResponse
+import com.soneso.stellar.sdk.rpc.SorobanServer
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+import com.soneso.stellar.sdk.unitTests.MuxedSourceAccount
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
+import kotlin.io.encoding.Base64
 import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
 
@@ -48,6 +53,11 @@ class PaymentsIntegrationTest {
         Network.TESTNET
     } else {
         Network.FUTURENET
+    }
+    private val rpcUrl = if (testOn == "testnet") {
+        "https://soroban-testnet.stellar.org"
+    } else {
+        "https://rpc-futurenet.stellar.org"
     }
 
     /**
@@ -145,6 +155,101 @@ class PaymentsIntegrationTest {
 
         val effectsPage = horizonServer.effects().forAccount(accountAId).execute()
         assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+    }
+
+    /**
+     * Test native payments whose preconditions hold values at the limits of their XDR types:
+     * time bounds {0, 2^64-1}, ledger bounds {0, 2^32-1} and a minimum sequence number of -1.
+     *
+     * Horizon refuses a negative minimum sequence number itself, so that payment is sent through RPC.
+     * Each payment is read back from Horizon: its envelope decodes, encodes to the same bytes,
+     * keeps Horizon's hash and holds the submitted preconditions.
+     */
+    @Test
+    fun testSendNativePaymentWithPreconditionsAtXdrLimits() = runTest(timeout = 240.seconds) {
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountBId = KeyPair.random().getAccountId()
+        for (accountId in listOf(accountAId, accountBId)) {
+            fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        }
+        val accountA = Account(accountAId, horizonServer.accounts().account(accountAId).sequenceNumber)
+
+        val preconditions = listOf(
+            TransactionPreconditions(timeBounds = TimeBounds.ofUnsigned(0uL, ULong.MAX_VALUE)),
+            TransactionPreconditions(ledgerBounds = LedgerBounds.ofUnsigned(0u, UInt.MAX_VALUE)),
+            TransactionPreconditions(minSequenceNumber = -1)
+        )
+        for (precond in preconditions) {
+            val transaction = TransactionBuilder(sourceAccount = accountA, network = network)
+                .addOperation(PaymentOperation(destination = accountBId, asset = AssetTypeNative, amount = "1"))
+                .addPreconditions(precond)
+                .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+                .build()
+            transaction.sign(keyPairA)
+            if (precond.minSequenceNumber == null) {
+                val response = horizonServer.submitTransaction(transaction.toEnvelopeXdrBase64())
+                assertTrue(response.successful, "Payment with $precond should succeed")
+            } else {
+                SorobanServer(rpcUrl).use { rpc ->
+                    val sent = rpc.sendTransaction(transaction)
+                    assertEquals(SendTransactionStatus.PENDING, sent.status, "RPC result: ${sent.errorResultXdr}")
+                    assertEquals(GetTransactionStatus.SUCCESS, rpc.pollTransaction(transaction.hashHex()).status)
+                }
+            }
+            realDelay(3000)
+
+            val trx = horizonServer.transactions().transaction(transaction.hashHex())
+            assertTrue(trx.successful)
+            val decoded = AbstractTransaction.fromEnvelopeXdr(trx.envelopeXdr!!, network) as Transaction
+            assertEquals(trx.envelopeXdr, decoded.toEnvelopeXdrBase64())
+            assertEquals(trx.hash, decoded.hashHex())
+            assertEquals(precond, decoded.preconditions)
+            // Horizon reports a max_time above 2^63-1 as 2^63-1, so only its ledger bounds are compared.
+            precond.ledgerBounds?.let { assertEquals(it.maxLedgerExact.toLong(), trx.preconditions?.ledgerBounds?.maxLedger) }
+            precond.minSequenceNumber?.let { assertEquals(it, trx.preconditions?.minAccountSequence) }
+        }
+    }
+
+    /**
+     * Test a native payment whose text memo is the bytes ff fe 20 61 62 63, which are not valid
+     * UTF-8. The payment is read back from Horizon by hash: its envelope is the submitted one,
+     * decodes and encodes to the same bytes and keeps Horizon's hash, and Horizon's memo bytes are
+     * the memo bytes.
+     */
+    @Test
+    fun testSendNativePaymentWithATextMemoThatIsNotUtf8() = runTest(timeout = 180.seconds) {
+        val memoBytes = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63)
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountBId = KeyPair.random().getAccountId()
+        for (accountId in listOf(accountAId, accountBId)) {
+            fundTestAccountAndAwaitVisibility(accountId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        }
+        val accountA = Account(accountAId, horizonServer.accounts().account(accountAId).sequenceNumber)
+
+        val transaction = TransactionBuilder(sourceAccount = accountA, network = network)
+            .addOperation(PaymentOperation(destination = accountBId, asset = AssetTypeNative, amount = "1"))
+            .addMemo(MemoText(memoBytes))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        transaction.sign(keyPairA)
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val response = horizonServer.submitTransaction(envelope)
+        assertTrue(response.successful, "Payment with a text memo that is not UTF-8 should succeed")
+        assertEquals(transaction.hashHex(), response.hash)
+
+        realDelay(3000)
+
+        val trx = horizonServer.transactions().transaction(transaction.hashHex())
+        assertEquals(envelope, trx.envelopeXdr)
+        val decoded = AbstractTransaction.fromEnvelopeXdr(trx.envelopeXdr!!, network) as Transaction
+        assertEquals(envelope, decoded.toEnvelopeXdrBase64())
+        assertEquals(trx.hash, decoded.hashHex())
+        assertContentEquals(memoBytes, assertIs<MemoText>(decoded.memo).bytes)
+        assertEquals("text", trx.memoType)
+        assertContentEquals(memoBytes, Base64.decode(assertNotNull(trx.memoBytes)))
     }
 
     /**
@@ -394,6 +499,50 @@ class PaymentsIntegrationTest {
 
         val effectsPage = horizonServer.effects().forAccount(accountAId).execute()
         assertTrue(effectsPage.records.isNotEmpty(), "Should have effects")
+    }
+
+    /**
+     * Test submitting a payment whose transaction source is a muxed account, read back from its envelope.
+     *
+     * This test:
+     * 1. Creates and funds accounts A and C
+     * 2. Builds and signs a payment from A to C with the muxed address of A as the transaction source
+     * 3. Reads the envelope back and verifies the source, the hash and the envelope bytes are unchanged
+     * 4. Submits the decoded transaction and verifies the network reports the original hash
+     */
+    @Test
+    fun testSendNativePaymentFromDecodedMuxedTransactionSource() = runTest(timeout = 180.seconds) {
+        val keyPairA = KeyPair.random()
+        val accountAId = keyPairA.getAccountId()
+        val accountCId = KeyPair.random().getAccountId()
+
+        fundTestAccountAndAwaitVisibility(accountAId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+        fundTestAccountAndAwaitVisibility(accountCId, horizon = horizonServer, useFuturenet = testOn != "testnet")
+
+        val accountA = horizonServer.accounts().account(accountAId)
+        val muxedSource = MuxedAccount(accountAId, 8070605040302010UL).address
+
+        val transaction = TransactionBuilder(
+            sourceAccount = MuxedSourceAccount(muxedSource, accountA.sequenceNumber),
+            network = network
+        )
+            .addOperation(PaymentOperation(destination = accountCId, asset = AssetTypeNative, amount = "100"))
+            .setTimeout(TransactionPreconditions.TIMEOUT_INFINITE)
+            .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+            .build()
+        transaction.sign(keyPairA)
+
+        val envelope = transaction.toEnvelopeXdrBase64()
+        val hash = transaction.hashHex()
+
+        val decoded = AbstractTransaction.fromEnvelopeXdr(envelope, network) as Transaction
+        assertEquals(muxedSource, decoded.sourceAccount, "Decoded transaction source should stay muxed")
+        assertEquals(hash, decoded.hashHex(), "Decoded transaction should keep its hash")
+        assertEquals(envelope, decoded.toEnvelopeXdrBase64(), "Decoded transaction should keep its envelope bytes")
+
+        val response = horizonServer.submitTransaction(decoded.toEnvelopeXdrBase64())
+        assertTrue(response.successful, "Decoded payment with muxed transaction source should succeed")
+        assertEquals(hash, response.hash, "Network should report the original transaction hash")
     }
 
     /**

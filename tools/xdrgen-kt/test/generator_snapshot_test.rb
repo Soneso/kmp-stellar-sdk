@@ -109,6 +109,18 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_snapshot 'SCStringXdr.kt'
   end
 
+  def test_snapshot_scsymbol_typedef
+    assert_snapshot 'SCSymbolXdr.kt'
+  end
+
+  def test_snapshot_memo_union
+    assert_snapshot 'MemoXdr.kt'
+  end
+
+  def test_snapshot_memo_type_enum
+    assert_snapshot 'MemoTypeXdr.kt'
+  end
+
   # -- Snapshot tests: Typedef ------------------------------------------------
 
   def test_snapshot_int32_typedef
@@ -343,7 +355,7 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_struct_emits_keys_in_declaration_order
     content = File.read(File.join(@output_dir, 'SimpleStructXdr.kt'))
-    body = content[/fun toXdrJsonElement\(\): JsonElement = buildJsonObject \{\n(.*?)^  \}$/m, 1]
+    body = content[/fun toXdrJsonElement\(depth: Int\): JsonElement = XdrJson\.obj\(depth, XDR_JSON_TYPE\) \{\n(.*?)^  \}$/m, 1]
     keys = body.scan(/put\("([^"]+)"/).flatten
     assert_equal %w[count flags big_number unsigned_big active label], keys
   end
@@ -373,15 +385,56 @@ class GeneratorSnapshotTest < Minitest::Test
     assert_includes content, '"fixed_data", expectedLength = 4'
   end
 
+  def test_binary_declared_maxima_are_emitted
+    content = File.read(File.join(@output_dir, 'IntListXdr.kt'))
+    assert_includes content, 'XDR array count ${value.size} exceeds maximum 100'
+
+    binary_length_fixture do |dir|
+      %w[BoundedXdr TextXdr TextAliasXdr BlobXdr BlobAliasXdr ItemsXdr ItemsAliasXdr ChoiceXdr].each do |type|
+        content = File.read(File.join(dir, "#{type}.kt"))
+        if type.include?('Alias')
+          wrapped = type.sub('Alias', '')
+          assert_includes content, "#{wrapped}.decode(reader)"
+          assert_includes content, 'value.encode(writer)'
+          next
+        end
+        if %w[BoundedXdr TextXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readString(3)'
+          assert_match(/writer.writeString\(\w+, 3\)/, content)
+        end
+        if %w[BoundedXdr BlobXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readVariableOpaque(4)'
+          assert_match(/writer.writeVariableOpaque\(\w+, 4\)/, content)
+        end
+        if %w[BoundedXdr ItemsXdr ChoiceXdr].include?(type)
+          assert_includes content, 'reader.readArrayLength(LIMIT)'
+          assert_match(/require\(\w+.size <= LIMIT\)/, content)
+          assert_match(/XDR array count \$\{\w+.size\} exceeds maximum \$LIMIT/, content)
+        end
+      end
+    end
+  end
+
+  def test_binary_unbounded_declarations_emit_no_maximum
+    binary_length_fixture do |dir|
+      content = File.read(File.join(dir, 'UnboundedXdr.kt'))
+      %w[readString readVariableOpaque readArrayLength].each { |method| assert_includes content, "reader.#{method}()" }
+      assert_includes content, 'writer.writeString(text)'
+      assert_includes content, 'writer.writeVariableOpaque(blob)'
+      assert_includes content, 'writer.writeInt(items.size)'
+      refute_includes content, 'require('
+    end
+  end
+
   def test_optional_field_round_trips_through_null
     content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
-    assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement() })'
+    assert_includes content, 'put("optional_inner", XdrJson.optional(optionalInner) { it.toXdrJsonElement(depth + 1) })'
     assert_includes content, 'XdrJson.optional(XdrJson.field(json, "optional_inner", XDR_JSON_TYPE))?.let'
   end
 
   def test_void_union_arm_is_a_bare_string_and_a_value_arm_is_an_object
     content = File.read(File.join(@output_dir, 'ResultXdr.kt'))
-    assert_includes content, 'is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }'
+    assert_includes content, 'is Error -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("error", value.toXdrJsonElement(depth + 1)) }'
     assert_includes content, 'is Void -> XdrJson.name(discriminant.xdrJsonName)'
     assert_includes content, '"ok" -> Void(ResultTypeXdr.RESULT_OK)'
     assert_includes content, '"error" -> Error(ErrorDetailXdr.fromXdrJsonTree(value))'
@@ -399,7 +452,7 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_integer_discriminated_union_keys_its_arms_with_v
     content = File.read(File.join(@output_dir, 'MultiCaseUnionXdr.kt'))
-    assert_includes content, 'is SimpleValue -> buildJsonObject { put("v0", XdrJson.int32(value)) }'
+    assert_includes content, 'is SimpleValue -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", XdrJson.int32(value)) }'
     assert_includes content, '"v1" -> TextValue(1,'
     assert_includes content, 'put("v$discriminant"'
     assert_includes content, 'XdrJson.intArm(XDR_JSON_TYPE, arm)'
@@ -407,21 +460,116 @@ class GeneratorSnapshotTest < Minitest::Test
 
   def test_sixty_four_bit_values_are_strings_and_thirty_two_bit_values_are_numbers
     content = File.read(File.join(@output_dir, 'Int64Xdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int64(value)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.int64(value)'
     content = File.read(File.join(@output_dir, 'Int32Xdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.int32(value)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.int32(value)'
   end
 
   def test_typedef_delegates_to_the_type_it_wraps
     content = File.read(File.join(@output_dir, 'MyCounterXdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = value.toXdrJsonElement()'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = value.toXdrJsonElement(depth)'
     assert_includes content, 'SignedCountXdr.fromXdrJsonTree(element)'
   end
 
   def test_opaque_is_hexadecimal
     content = File.read(File.join(@output_dir, 'HashXdr.kt'))
-    assert_includes content, 'fun toXdrJsonElement(): JsonElement = XdrJson.hex(value)'
+    assert_includes content,
+                    'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.hex(XdrJson.checkFixedLength(value, 32))'
     assert_includes content, 'expectedLength = 32'
+  end
+
+  # Only a fixed-length opaque value has a declared length to check; a variable one is written
+  # as it is.
+  def test_variable_opaque_field_is_written_without_a_length_check
+    content = File.read(File.join(@output_dir, 'NestedStructXdr.kt'))
+    assert_includes content, 'put("raw_data", XdrJson.hex(rawData))'
+    assert_includes content, 'put("fixed_data", XdrJson.hex(XdrJson.checkFixedLength(fixedData, 4)))'
+  end
+
+  # A leaf, an enum or an override type, writes one JSON string and has only the public writer,
+  # which every position holding a leaf calls; an array around a leaf still opens a level. Any
+  # other type takes the depth, a typedef of a leaf included, and the positions holding it pass
+  # the depth on.
+  def test_leaf_positions_call_the_public_writer_and_container_positions_pass_the_depth
+    Dir.mktmpdir('xdr_json_leaves_') do |dir|
+      source = File.join(dir, 'leaves.x')
+      File.write(source, <<~XDR)
+        enum Shade { LIGHT = 0, DARK = 1 };
+        typedef Shade ShadeAlias;
+        typedef ShadeAlias ShadeChain;
+        typedef Shade ShadeList<4>;
+        typedef opaque AssetCode4[4];
+        typedef AssetCode4 CodeAlias;
+        struct Box { int size; };
+        struct Holder {
+          ShadeChain chain; Shade pair[2]; Shade shades<3>; Shade* maybeShade; AssetCode4 code; CodeAlias aliasCode;
+          Box box; Box boxPair[2]; Box boxes<3>; Box* maybeBox;
+        };
+        union Pick switch (int kind) { case 0: Shade shade; case 1: Box box; };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      read = ->(type) { File.read(File.join(dir, "#{type}Xdr.kt")) }
+
+      %w[Shade AssetCode4].each { |leaf| refute_includes read.(leaf), 'toXdrJsonElement(depth: Int)', leaf }
+      assert_includes read.('AssetCode4'), 'fun toXdrJsonElement(): JsonElement = XdrJson.escapedString('
+      {
+        'ShadeAlias' => 'value.toXdrJsonElement()',
+        'ShadeChain' => 'value.toXdrJsonElement(depth)',
+        'ShadeList' => 'XdrJson.array(value, depth, XDR_JSON_TYPE) { it.toXdrJsonElement() }',
+        'CodeAlias' => 'value.toXdrJsonElement()',
+        'Box' => 'XdrJson.obj(depth, XDR_JSON_TYPE) {'
+      }.each do |type, body|
+        assert_includes read.(type), "  internal fun toXdrJsonElement(depth: Int): JsonElement = #{body}\n", type
+      end
+      [
+        'put("chain", chain.toXdrJsonElement(depth + 1))',
+        'put("pair", XdrJson.array(pair.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })',
+        'put("shades", XdrJson.array(shades, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement() })',
+        'put("maybe_shade", XdrJson.optional(maybeShade) { it.toXdrJsonElement() })',
+        'put("code", code.toXdrJsonElement())',
+        'put("alias_code", aliasCode.toXdrJsonElement(depth + 1))',
+        'put("box", box.toXdrJsonElement(depth + 1))',
+        'put("box_pair", XdrJson.array(boxPair.asList(), depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })',
+        'put("boxes", XdrJson.array(boxes, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })',
+        'put("maybe_box", XdrJson.optional(maybeBox) { it.toXdrJsonElement(depth + 1) })'
+      ].each { |line| assert_includes read.('Holder'), "    #{line}\n" }
+      [
+        'is Shade -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v0", value.toXdrJsonElement()) }',
+        'is Box -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("v1", value.toXdrJsonElement(depth + 1)) }'
+      ].each { |line| assert_includes read.('Pick'), "    #{line}\n" }
+    end
+  end
+
+  # The committed output holds the same rule: the leaves are exactly the enums and the override
+  # types, and each position calls the writer of the type it declares with the depth exactly
+  # when that type is not a leaf. A position names its value as a struct field, a union arm or
+  # the value of a typedef, and the declaration of that name gives the type.
+  def test_committed_positions_call_leaves_without_and_containers_with_the_depth
+    overrides = Xdrgen::Generators::KotlinJsonOverrides.type_names
+    files = generated_sdk_files.to_h { |file| [File.basename(file, '.kt'), File.read(file)] }
+    files.select! { |_, content| content.include?('fun toXdrJsonElement(): JsonElement') }
+    leaves = files.keys.reject { |type| files[type].include?('fun toXdrJsonElement(depth: Int)') }
+    enums = files.keys.select { |type| files[type].include?("enum class #{type}(") }
+    assert_equal (enums + overrides).sort, leaves.sort
+
+    arm = / +data class (\w+)\(\n(?: +override val discriminant: \w+,\n)? */
+    calls = Hash.new(0)
+    files.each do |type, content|
+      next if overrides.include?(type)
+
+      declared = content.scan(/^(?:#{arm}|value class \w+\(| *)val `?(\w+)`?: ([^,)\n]+)/)
+                        .to_h { |arm_name, field, kotlin| [arm_name || field, kotlin[/\w+Xdr/]] }
+      content.each_line.grep(/\.toXdrJsonElement\(/) do |line|
+        subject = line[/is (\w+) ->/, 1] || line[/put\("[^"]+", (?:XdrJson\.\w+\()?`?(\w+)/, 1] || 'value'
+        written = declared.fetch(subject) { flunk("#{type}: no declaration for #{subject} in #{line}") }
+        depth = line[/\.toXdrJsonElement\(([^)]*)\)/, 1]
+        leaf = leaves.include?(written)
+        assert_match(leaf ? /\A\z/ : /\Adepth( \+ \d)?\z/, depth, "#{type} writes #{written}: #{line}")
+        calls[leaf] += 1
+      end
+    end
+    assert calls[true].positive? && calls[false].positive?, "positions found: #{calls}"
   end
 
   # -- Bytes-backed string fields ---------------------------------------------
@@ -441,7 +589,7 @@ class GeneratorSnapshotTest < Minitest::Test
     tag_arm = union[/data class ExecutableTag\(\n(.*?)\n  \)/m, 1]
     assert_equal '    val value: ByteArray', tag_arm
     assert_includes union, 'ExecutableTag(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "executable_tag"))'
-    assert_includes union, 'is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }'
+    assert_includes union, 'is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }'
   end
 
   def test_a_string_position_beside_a_bytes_backed_one_keeps_the_wrapper_type
@@ -449,6 +597,23 @@ class GeneratorSnapshotTest < Minitest::Test
     str_arm = union[/data class Str\(\n(.*?)\n  \)/m, 1]
     assert_equal '    val value: SCStringXdr', str_arm
     assert_includes union, '"string" -> Str(SCStringXdr.fromXdrJsonTree(value))'
+  end
+
+  def test_bounded_bytes_backed_string_emits_binary_maximum
+    Dir.mktmpdir('xdr_bounded_bytes_string_') do |dir|
+      source = File.join(dir, 'bounded.x')
+      File.write(source, <<~XDR)
+        typedef string BoundedString<7>;
+        typedef BoundedString StringAlias;
+        struct ContractExecutableExternalRef { StringAlias tag; };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      content = File.read(File.join(dir, 'ContractExecutableExternalRefXdr.kt'))
+      assert_includes content, 'val tag: ByteArray'
+      assert_includes content, 'val tag = reader.readVariableOpaque(7)'
+      assert_includes content, 'writer.writeVariableOpaque(tag, 7)'
+    end
   end
 
   # A table entry naming a field no processed type declares is a stale entry; when the
@@ -466,6 +631,63 @@ class GeneratorSnapshotTest < Minitest::Test
       end
       assert_match(/ContractExecutableExternalRef\.tag/, error.message)
       assert_match(/SCVal\.executable_tag/, error.message)
+      assert_match(/Memo\.text/, error.message)
+      assert_match(/SCString\.value/, error.message)
+      assert_match(/SCSymbol\.value/, error.message)
+    end
+  end
+
+  # A :text typedef is a class over its stored bytes: the value class it replaces had the
+  # String constructor and `value`, which stay, and the wire and JSON forms use the bytes.
+  def test_text_backed_typedef_is_a_class_over_the_stored_bytes
+    content = File.read(File.join(@output_dir, 'SCSymbolXdr.kt'))
+    refute_includes content, 'value class'
+    refute_includes content, '@kotlin.jvm.JvmInline'
+    assert_includes content, "class SCSymbolXdr(bytes: ByteArray) {\n  private val storedBytes: ByteArray = bytes.copyOf()"
+    assert_includes content, 'constructor(value: String) : this(value.encodeToByteArray())'
+    assert_includes content, "val value: String\n    get() = storedBytes.decodeToString(throwOnInvalidSequence = true)"
+    assert_includes content, "val bytes: ByteArray\n    get() = storedBytes.copyOf()"
+    assert_includes content, 'val value = reader.readStringBytes(SCSYMBOL_LIMIT)'
+    assert_includes content, 'writer.writeStringBytes(storedBytes, SCSYMBOL_LIMIT)'
+    assert_includes content, 'XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value", maxLength = SCSYMBOL_LIMIT)'
+    assert_includes content, 'internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(storedBytes)'
+    assert_includes content, 'other is SCSymbolXdr && storedBytes.contentEquals(other.storedBytes)'
+    assert_includes content, 'override fun hashCode(): Int = storedBytes.contentHashCode()'
+    assert_includes content, 'override fun toString(): String = "SCSymbolXdr(value=${XdrJson.displayText(storedBytes)})"'
+
+    unbounded = File.read(File.join(@output_dir, 'SCStringXdr.kt'))
+    assert_includes unbounded, 'val value = reader.readVariableOpaque()'
+    assert_includes unbounded, 'writer.writeVariableOpaque(storedBytes)'
+    assert_includes unbounded, 'XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"))'
+  end
+
+  # A :text arm is an arm class over its stored bytes, and its siblings keep their data classes.
+  def test_text_backed_arm_is_an_arm_class_over_the_stored_bytes
+    union = File.read(File.join(@output_dir, 'MemoXdr.kt'))
+    assert_includes union, "  class Text(bytes: ByteArray) : MemoXdr() {\n    private val storedBytes: ByteArray = bytes.copyOf()"
+    refute_includes union, 'data class Text('
+    assert_includes union, "    override val discriminant: MemoTypeXdr = MemoTypeXdr.MEMO_TEXT\n"
+    assert_includes union, 'other is Text && storedBytes.contentEquals(other.storedBytes)'
+    assert_includes union, "val value = reader.readStringBytes(28)\n          Text(value)"
+    assert_includes union, "is Text -> {\n        writer.writeStringBytes(bytes, 28)\n      }"
+    assert_includes union, 'is Text -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("text", XdrJson.escapedString(bytes)) }'
+    assert_includes union, '"text" -> Text(XdrJson.unescapeStringBytes(value, XDR_JSON_TYPE, "text", maxLength = 28))'
+    assert_includes union, "  data class Id(\n    val value: Uint64Xdr\n  ) : MemoXdr()"
+  end
+
+  def test_text_backed_entries_outside_union_arms_and_string_typedefs_raise
+    {
+      'struct Holder { string label<8>; };' => [{ 'Holder' => { 'label' => :text } }, /only union arms and string typedefs/],
+      'union Pick switch (int kind) { case 0: case 1: string label<8>; };' =>
+        [{ 'Pick' => { 'label' => :text } }, /only an arm of a single case/],
+      'typedef int Count;' => [{ 'Count' => { 'value' => :text } }, /does not declare an XDR string/],
+      'typedef string Label<8>;' => [{ 'Label' => { 'value' => :bytes } }, /a typedef takes :text/],
+      'struct Other { string label<8>; };' => [{ 'Other' => { 'label' => :raw } }, /the emissions are :bytes and :text/]
+    }.each do |source, (table, message)|
+      error = with_bytes_backed_table(table) do
+        assert_raises(RuntimeError) { compile_source(source) }
+      end
+      assert_match message, error.message, source
     end
   end
 
@@ -476,13 +698,59 @@ class GeneratorSnapshotTest < Minitest::Test
 
     both_branches = File.read(File.join(@output_dir, 'ResultXdr.kt'))
     assert_includes both_branches, 'import kotlinx.serialization.json.JsonObject'
-    assert_includes both_branches, 'import kotlinx.serialization.json.buildJsonObject'
+    refute_includes both_branches, 'import kotlinx.serialization.json.buildJsonObject'
 
     value_arms_only = File.read(File.join(@output_dir, 'SimpleResultXdr.kt'))
     refute_includes value_arms_only, 'import kotlinx.serialization.json.JsonObject'
   end
 
   private
+
+  def compile_source(source)
+    Dir.mktmpdir('xdr_text_backed_') do |dir|
+      path = File.join(dir, 'source.x')
+      File.write(path, source)
+      Xdrgen::Compilation.new([path], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+    end
+  end
+
+  # Runs the block with BYTES_BACKED_STRING_FIELDS replaced by [table] and restores it after.
+  def with_bytes_backed_table(table)
+    generator = Xdrgen::Generators::Kotlin
+    original = generator::BYTES_BACKED_STRING_FIELDS
+    generator.send(:remove_const, :BYTES_BACKED_STRING_FIELDS)
+    generator.const_set(:BYTES_BACKED_STRING_FIELDS, table)
+    yield
+  ensure
+    generator.send(:remove_const, :BYTES_BACKED_STRING_FIELDS)
+    generator.const_set(:BYTES_BACKED_STRING_FIELDS, original)
+  end
+
+  def binary_length_fixture
+    Dir.mktmpdir('xdr_binary_lengths_') do |dir|
+      source = File.join(dir, 'lengths.x')
+      File.write(source, <<~XDR)
+        const LIMIT = 2;
+        typedef string Text<3>;
+        typedef opaque Blob<4>;
+        typedef int Items<LIMIT>;
+        typedef Text TextAlias;
+        typedef Blob BlobAlias;
+        typedef Items ItemsAlias;
+        struct Bounded { string text<3>; opaque blob<4>; int items<LIMIT>; };
+        struct Unbounded { string text<>; opaque blob<>; int items<>; };
+        union Choice switch (int kind) {
+          case 0: string text<3>;
+          case 1: opaque blob<4>;
+          case 2: int items<LIMIT>;
+        };
+      XDR
+      Xdrgen::Compilation.new([source], output_dir: dir + '/', generator: Xdrgen::Generators::Kotlin,
+        namespace: 'com.soneso.stellar.sdk.xdr', options: {}).compile
+      yield dir
+    end
+  end
 
   SDK_XDR_DIR = File.expand_path(
     '../../../stellar-sdk/src/commonMain/kotlin/com/soneso/stellar/sdk/xdr', __dir__

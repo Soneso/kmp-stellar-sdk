@@ -137,27 +137,31 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     }
 
     /**
-     * Finds a specific function specification by name.
+     * Finds a specific function specification by name. Names compare by their bytes, so a
+     * function whose name is not valid UTF-8 matches no name.
      *
      * @param name The function name to search for
      * @return The function specification, or null if not found
      */
     fun getFunc(name: String): SCSpecFunctionV0Xdr? {
-        return funcs().firstOrNull { it.name.value == name }
+        val symbol = SCSymbolXdr(name)
+        return funcs().firstOrNull { it.name == symbol }
     }
 
     /**
      * Finds any spec entry by name.
      * Searches functions, structs, unions, enums, error enums, and events in spec order
-     * and returns the first entry with that name.
+     * and returns the first entry with that name. A function name compares by its bytes, so a
+     * function whose name is not valid UTF-8 matches no name.
      *
      * @param name The entry name to search for
      * @return The spec entry, or null if not found
      */
     fun findEntry(name: String): SCSpecEntryXdr? {
+        val symbol = SCSymbolXdr(name)
         return entries.firstOrNull { entry ->
             when (entry) {
-                is SCSpecEntryXdr.FunctionV0 -> entry.value.name.value == name
+                is SCSpecEntryXdr.FunctionV0 -> entry.value.name == symbol
                 is SCSpecEntryXdr.UdtStructV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtUnionV0 -> entry.value.name == name
                 is SCSpecEntryXdr.UdtEnumV0 -> entry.value.name == name
@@ -309,7 +313,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
      * - **U32, I32** → Int/UInt
      * - **U64, I64** → Long/ULong
      * - **U128, I128, U256, I256** → BigInteger
-     * - **String, Symbol** → String
+     * - **String, Symbol** → String; bytes that are not valid UTF-8 fail the conversion
      * - **Bytes** → ByteArray
      * - **Address** → String (StrKey-encoded)
      * - **Timepoint, Duration** → ULong
@@ -393,12 +397,12 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
 
             SCValTypeXdr.SCV_STRING -> {
                 require(scVal is SCValXdr.Str) { "Expected SCValXdr.Str for SCV_STRING" }
-                scVal.value.value
+                utf8Text(scVal.value.bytes, "SCV_STRING")
             }
 
             SCValTypeXdr.SCV_SYMBOL -> {
                 require(scVal is SCValXdr.Sym) { "Expected SCValXdr.Sym for SCV_SYMBOL" }
-                scVal.value.value
+                utf8Text(scVal.value.bytes, "SCV_SYMBOL")
             }
 
             SCValTypeXdr.SCV_ADDRESS -> {
@@ -560,7 +564,9 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
             val fieldsByName = fields.associateBy { it.name }
             val result = mutableMapOf<String, Any?>()
             map.forEach { entry ->
-                val field = fieldsByName[(entry.key as? SCValXdr.Sym)?.value?.value]
+                // A key that is not valid UTF-8 names no field.
+                val key = (entry.key as? SCValXdr.Sym)?.let { Util.utf8OrNull(it.value.bytes) }
+                val field = fieldsByName[key]
                     ?: throw ContractSpecException.invalidType(
                         "Struct ${structDef.name} has no field ${entry.key.toXdrJson()}"
                     )
@@ -590,7 +596,12 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
         require(tagScVal is SCValXdr.Sym) {
             "Union tag must be a symbol, got ${tagScVal.discriminant}"
         }
-        val tag = tagScVal.value.value
+        fun unknownCase(tagText: String) =
+            ContractSpecException.invalidType("Failed to find union case '$tagText' in union ${unionDef.name}")
+
+        // A tag that is not valid UTF-8 names no case.
+        val tagBytes = tagScVal.value.bytes
+        val tag = Util.utf8OrNull(tagBytes) ?: throw unknownCase(XdrJson.displayString(tagBytes))
 
         // Find the matching union case
         val matchingCase = unionDef.cases.firstOrNull { unionCase ->
@@ -599,9 +610,7 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
                 is SCSpecUDTUnionCaseV0Xdr.TupleCase -> unionCase.value.name
             }
             caseName == tag
-        } ?: throw ContractSpecException.invalidType(
-            "Failed to find union case '$tag' in union ${unionDef.name}"
-        )
+        } ?: throw unknownCase(tag)
 
         // Convert based on case type
         return when (matchingCase) {
@@ -1301,6 +1310,16 @@ class ContractSpec(private val entries: List<SCSpecEntryXdr>) {
     private fun isNumericString(str: String): Boolean {
         return str.toIntOrNull() != null
     }
+
+    /**
+     * The text of a string or symbol value of type [type].
+     *
+     * @throws ContractSpecException if [bytes] are not valid UTF-8
+     */
+    private fun utf8Text(bytes: ByteArray, type: String): String =
+        Util.utf8OrNull(bytes) ?: throw ContractSpecException.conversionFailed(
+            "$type bytes are not valid UTF-8: ${XdrJson.displayString(bytes)}"
+        )
 
     /**
      * Convert hex string to bytes, accepting an optional "0x" prefix.

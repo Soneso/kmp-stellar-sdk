@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCValXdr"
 
@@ -436,29 +435,31 @@ sealed class SCValXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is B -> buildJsonObject { put("bool", XdrJson.bool(value)) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is B -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("bool", XdrJson.bool(value)) }
     is Void -> XdrJson.name(discriminant.xdrJsonName)
-    is Error -> buildJsonObject { put("error", value.toXdrJsonElement()) }
-    is U32 -> buildJsonObject { put("u32", value.toXdrJsonElement()) }
-    is I32 -> buildJsonObject { put("i32", value.toXdrJsonElement()) }
-    is U64 -> buildJsonObject { put("u64", value.toXdrJsonElement()) }
-    is I64 -> buildJsonObject { put("i64", value.toXdrJsonElement()) }
-    is Timepoint -> buildJsonObject { put("timepoint", value.toXdrJsonElement()) }
-    is Duration -> buildJsonObject { put("duration", value.toXdrJsonElement()) }
-    is U128 -> buildJsonObject { put("u128", value.toXdrJsonElement()) }
-    is I128 -> buildJsonObject { put("i128", value.toXdrJsonElement()) }
-    is U256 -> buildJsonObject { put("u256", value.toXdrJsonElement()) }
-    is I256 -> buildJsonObject { put("i256", value.toXdrJsonElement()) }
-    is Bytes -> buildJsonObject { put("bytes", value.toXdrJsonElement()) }
-    is Str -> buildJsonObject { put("string", value.toXdrJsonElement()) }
-    is Sym -> buildJsonObject { put("symbol", value.toXdrJsonElement()) }
-    is Vec -> buildJsonObject { put("vec", XdrJson.optional(value) { it.toXdrJsonElement() }) }
-    is Map -> buildJsonObject { put("map", XdrJson.optional(value) { it.toXdrJsonElement() }) }
-    is Address -> buildJsonObject { put("address", value.toXdrJsonElement()) }
-    is Instance -> buildJsonObject { put("contract_instance", value.toXdrJsonElement()) }
-    is NonceKey -> buildJsonObject { put("ledger_key_nonce", value.toXdrJsonElement()) }
-    is ExecutableTag -> buildJsonObject { put("executable_tag", XdrJson.escapedString(value)) }
+    is Error -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("error", value.toXdrJsonElement(depth + 1)) }
+    is U32 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u32", value.toXdrJsonElement(depth + 1)) }
+    is I32 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i32", value.toXdrJsonElement(depth + 1)) }
+    is U64 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u64", value.toXdrJsonElement(depth + 1)) }
+    is I64 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i64", value.toXdrJsonElement(depth + 1)) }
+    is Timepoint -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("timepoint", value.toXdrJsonElement(depth + 1)) }
+    is Duration -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("duration", value.toXdrJsonElement(depth + 1)) }
+    is U128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u128", value.toXdrJsonElement()) }
+    is I128 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i128", value.toXdrJsonElement()) }
+    is U256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("u256", value.toXdrJsonElement()) }
+    is I256 -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("i256", value.toXdrJsonElement()) }
+    is Bytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("bytes", value.toXdrJsonElement(depth + 1)) }
+    is Str -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("string", value.toXdrJsonElement(depth + 1)) }
+    is Sym -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("symbol", value.toXdrJsonElement(depth + 1)) }
+    is Vec -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("vec", XdrJson.optional(value) { it.toXdrJsonElement(depth + 1) }) }
+    is Map -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("map", XdrJson.optional(value) { it.toXdrJsonElement(depth + 1) }) }
+    is Address -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("address", value.toXdrJsonElement()) }
+    is Instance -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_instance", value.toXdrJsonElement(depth + 1)) }
+    is NonceKey -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("ledger_key_nonce", value.toXdrJsonElement(depth + 1)) }
+    is ExecutableTag -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("executable_tag", XdrJson.escapedString(value)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

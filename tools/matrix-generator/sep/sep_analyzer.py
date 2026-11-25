@@ -109,6 +109,7 @@ class SEPAnalyzer:
         'MuxedAccountXdr.kt',
         'MuxedAccountMed25519Xdr.kt',
         'MuxedEd25519AccountXdr.kt',
+        'MuxedContractXdr.kt',
         'PoolIDXdr.kt',
         'ClaimableBalanceIDXdr.kt',
         'PublicKeyXdr.kt',
@@ -2202,23 +2203,23 @@ class SEPAnalyzer:
         Map SEP-46 (Contract Meta) fields.
 
         SEP-46 implementation lives in SorobanContractParser.kt inside the contract/ directory.
-        - parseMeta (private) handles contractmetav0_section, multiple_entries_single_section,
-          multiple_sections, binary_stream_encoding, key_value_pairs
+        - parseContractByteCode, the public entry point, reads every contractmetav0 section in
+          module order and the entries of each one after the other: contractmetav0_section,
+          multiple_entries_single_section, multiple_sections, binary_stream_encoding
         - SCMetaEntryXdr is the XDR type used (scmetaentry_xdr)
         - metaEntries property on SorobanContractInfo exposes the parsed key-value map
-        - parseContractByteCode is the public entry point
         """
         present = self._contract_parser_present()
 
         metadata_storage_map: Dict[str, Optional[str]] = {
-            'contractmetav0_section': 'parseMeta' if present else None,
-            'multiple_entries_single_section': 'parseMeta' if present else None,
-            'multiple_sections': 'parseMeta' if present else None,
+            'contractmetav0_section': 'parseContractByteCode' if present else None,
+            'multiple_entries_single_section': 'parseContractByteCode' if present else None,
+            'multiple_sections': 'parseContractByteCode' if present else None,
         }
 
         encoding_format_map: Dict[str, Optional[str]] = {
             'scmetaentry_xdr': 'SCMetaEntryXdr' if present else None,
-            'binary_stream_encoding': 'parseMeta' if present else None,
+            'binary_stream_encoding': 'parseContractByteCode' if present else None,
             'key_value_pairs': 'metaEntries' if present else None,
         }
 
@@ -2297,11 +2298,11 @@ class SEPAnalyzer:
         Map SEP-48 (Contract Interface Specification) fields.
 
         SEP-48 implementation lives in SorobanContractParser.kt / SorobanContractInfo.
-        - parseContractByteCode: main entry point
-        - parseContractSpec: parses all 6 spec entry kinds
-        - parseEnvironmentMeta: parses env metadata / interface version
-        - parseMeta: parses contract metadata
-        - specEntries, funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events: typed accessors
+        - parseContractByteCode: main entry point; reads the contractspecv0, contractenvmetav0
+          and contractmetav0 sections
+        - specEntries: spec entries of all 6 kinds; envInterfaceVersion: environment interface
+          version; metaEntries: contract metadata
+        - funcs, udtStructs, udtUnions, udtEnums, udtErrorEnums, events: typed accessors
         - XDR types: SCSpecEntryXdr, SCSpecTypeDefXdr, SCEnvMetaEntryXdr, SCMetaEntryXdr
         - Compound types: SCSpecTypeOptionXdr, SCSpecTypeResultXdr, SCSpecTypeVecXdr,
           SCSpecTypeMapXdr, SCSpecTypeTupleXdr, SCSpecTypeBytesNXdr, SCSpecTypeUDTXdr
@@ -2405,8 +2406,9 @@ class SEPAnalyzer:
         XdrJson.kt runtime. Every requirement is therefore mapped to the symbol that carries
         it, and counts as implemented only while that symbol is present in the source.
         """
-        # field name -> (SDK symbol, file in the xdr/ package, literal proving the mapping)
-        evidence: Dict[str, Dict[str, Tuple[str, str, str]]] = {
+        # field name -> (SDK symbol, file in the xdr/ package, one or more literals that
+        # together prove the mapping)
+        evidence: Dict[str, Dict[str, Tuple[str, ...]]] = {
             'xdr_data_types': {
                 'integer_32': ('XdrJson.int32', 'XdrJson.kt', 'fun int32(value: Int)'),
                 'unsigned_integer_32': ('XdrJson.uint32', 'XdrJson.kt', 'fun uint32(value: UInt)'),
@@ -2419,18 +2421,21 @@ class SEPAnalyzer:
                 'array_fixed_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
                 'array_variable_length': ('XdrJson.array', 'XdrJson.kt', 'fun <T> array('),
                 'enum': ('SCValTypeXdr.xdrJsonName', 'SCValTypeXdr.kt', 'xdrJsonName'),
-                'struct': ('TimeBoundsXdr.toXdrJsonElement', 'TimeBoundsXdr.kt', 'buildJsonObject'),
+                'struct': ('TimeBoundsXdr.toXdrJsonElement', 'TimeBoundsXdr.kt', 'XdrJson.obj(depth, XDR_JSON_TYPE)'),
                 'discriminated_union': ('AssetXdr.toXdrJsonElement', 'AssetXdr.kt', 'XdrJson.singleKeyObject'),
                 'void': ('AssetXdr.Void', 'AssetXdr.kt', 'XdrJson.name("native")'),
                 'optional_data': ('XdrJson.optional', 'XdrJson.kt', 'fun <T> optional('),
             },
             'address_types': {
-                'sc_address': ('SCAddressXdr.toXdrJsonElement', 'SCAddressXdr.kt', 'MuxedEd25519AccountXdr.fromXdrJsonTree'),
+                'sc_address': ('SCAddressXdr.toXdrJsonElement', 'SCAddressXdr.kt', 'MuxedEd25519AccountXdr.fromXdrJsonTree',
+                               "'W' -> MuxedContract(MuxedContractXdr.fromXdrJsonTree(element))"),
                 'account_id': ('AccountIDXdr.toXdrJsonElement', 'AccountIDXdr.kt', 'PublicKeyXdr.fromXdrJsonTree'),
                 'contract_id': ('ContractIDXdr.toXdrJsonElement', 'ContractIDXdr.kt', 'StrKey.encodeContract'),
                 'muxed_account': ('MuxedAccountXdr.toXdrJsonElement', 'MuxedAccountXdr.kt', 'StrKey.encodeEd25519PublicKey'),
                 'muxed_account_med25519': ('MuxedAccountMed25519Xdr.toXdrJsonElement', 'MuxedAccountMed25519Xdr.kt', 'StrKey.encodeMed25519PublicKey'),
                 'muxed_ed25519_account': ('MuxedEd25519AccountXdr.toXdrJsonElement', 'MuxedEd25519AccountXdr.kt', 'StrKey.encodeMed25519PublicKey'),
+                'muxed_contract': ('MuxedContractXdr.toXdrJsonElement', 'MuxedContractXdr.kt', 'StrKey.encodeMuxedContract',
+                                   'StrKey.decodeMuxedContract'),
                 'pool_id': ('PoolIDXdr.toXdrJsonElement', 'PoolIDXdr.kt', 'StrKey.encodeLiquidityPool'),
                 'claimable_balance_id': ('ClaimableBalanceIDXdr.toXdrJsonElement', 'ClaimableBalanceIDXdr.kt', 'StrKey.encodeClaimableBalance'),
                 'public_key': ('PublicKeyXdr.toXdrJsonElement', 'PublicKeyXdr.kt', 'StrKey.encodeEd25519PublicKey'),
@@ -2476,9 +2481,9 @@ class SEPAnalyzer:
                 if entry is None:
                     section_mappings[field_name] = None
                     continue
-                symbol, file_name, token = entry
+                symbol, file_name, *tokens = entry
                 section_mappings[field_name] = (
-                    symbol if self._xdr_source_contains(file_name, token) else None
+                    symbol if all(self._xdr_source_contains(file_name, token) for token in tokens) else None
                 )
 
             field_mappings[section_key] = section_mappings

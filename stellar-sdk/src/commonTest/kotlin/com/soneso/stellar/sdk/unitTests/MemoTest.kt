@@ -484,4 +484,51 @@ class MemoTest {
         @Suppress("EqualsBetweenInconvertibleTypes")
         assertFalse(memo.equals(MemoHash(ByteArray(32) { it.toByte() })))
     }
+
+    // ========== MemoText bytes that are not valid UTF-8 ==========
+
+    private val notUtf8 = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63)
+
+    @Test
+    fun testMemoTextFromBytesWritesTheBytes() {
+        val xdr = assertIs<MemoXdr.Text>(MemoText(notUtf8).toXdr())
+        assertContentEquals(notUtf8, xdr.bytes)
+
+        val memo = assertIs<MemoText>(Memo.fromXdr(xdr))
+        assertContentEquals(notUtf8, memo.bytes)
+        assertEquals("\uFFFD\uFFFD abc", memo.text)
+        assertEquals(MemoText(notUtf8), memo)
+    }
+
+    @Test
+    fun testMemoTextOfTwentyEightBytesCutInsideASequenceEncodesTheSameBytes() {
+        val cut = ByteArray(27) { 0x61 } + byteArrayOf(0xc3.toByte())
+        val writer = XdrWriter()
+        MemoText(cut).toXdr().encode(writer)
+        val encoded = writer.toByteArray()
+
+        assertContentEquals(byteArrayOf(0, 0, 0, 1, 0, 0, 0, 28) + cut, encoded)
+        val decoded = assertIs<MemoText>(Memo.fromXdr(MemoXdr.decode(XdrReader(encoded))))
+        assertContentEquals(cut, decoded.bytes)
+    }
+
+    @Test
+    fun testMemoTextEqualityComparesTheBytes() {
+        val sameText = byteArrayOf(0xfe.toByte(), 0xfe.toByte(), 0x20, 0x61, 0x62, 0x63)
+        assertEquals(MemoText(notUtf8).text, MemoText(sameText).text)
+        assertNotEquals(MemoText(notUtf8), MemoText(sameText))
+        assertEquals(MemoText(notUtf8.copyOf()), MemoText(notUtf8.copyOf()))
+        assertEquals(MemoText(notUtf8).hashCode(), MemoText(notUtf8.copyOf()).hashCode())
+        assertEquals(MemoText("abc"), MemoText("abc".encodeToByteArray()))
+    }
+
+    @Test
+    fun testMemoTextCopiesTheBytesInAndOut() {
+        val input = notUtf8.copyOf()
+        val memo = MemoText(input)
+        input[0] = 0
+        memo.bytes[1] = 0
+        assertContentEquals(notUtf8, memo.bytes)
+        assertContentEquals(notUtf8, assertIs<MemoXdr.Text>(memo.toXdr()).bytes)
+    }
 }

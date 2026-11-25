@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SorobanAuthorizedFunctionXdr"
 
@@ -112,10 +111,12 @@ sealed class SorobanAuthorizedFunctionXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is ContractFn -> buildJsonObject { put("contract_fn", value.toXdrJsonElement()) }
-    is CreateContractHostFn -> buildJsonObject { put("create_contract_host_fn", value.toXdrJsonElement()) }
-    is CreateContractV2HostFn -> buildJsonObject { put("create_contract_v2_host_fn", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is ContractFn -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_fn", value.toXdrJsonElement(depth + 1)) }
+    is CreateContractHostFn -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("create_contract_host_fn", value.toXdrJsonElement(depth + 1)) }
+    is CreateContractV2HostFn -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("create_contract_v2_host_fn", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

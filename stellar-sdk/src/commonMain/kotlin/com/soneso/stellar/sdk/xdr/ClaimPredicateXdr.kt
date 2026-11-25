@@ -5,7 +5,6 @@ package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ClaimPredicateXdr"
 
@@ -74,11 +73,11 @@ sealed class ClaimPredicateXdr {
         return when (discriminant) {
           ClaimPredicateTypeXdr.CLAIM_PREDICATE_UNCONDITIONAL -> Void
           ClaimPredicateTypeXdr.CLAIM_PREDICATE_AND -> {
-            val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
+            val value = List(reader.readArrayLength(2)) { ClaimPredicateXdr.decode(reader) }
             AndPredicates(value)
           }
           ClaimPredicateTypeXdr.CLAIM_PREDICATE_OR -> {
-            val value = List(reader.readArrayLength()) { ClaimPredicateXdr.decode(reader) }
+            val value = List(reader.readArrayLength(2)) { ClaimPredicateXdr.decode(reader) }
             OrPredicates(value)
           }
           ClaimPredicateTypeXdr.CLAIM_PREDICATE_NOT -> {
@@ -128,12 +127,14 @@ sealed class ClaimPredicateXdr {
     when (this) {
       is Void -> {}
       is AndPredicates -> {
+        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum 2" }
         writer.writeInt(value.size)
         value.forEach { item ->
           item.encode(writer)
         }
       }
       is OrPredicates -> {
+        require(value.size <= 2) { "XDR array count ${value.size} exceeds maximum 2" }
         writer.writeInt(value.size)
         value.forEach { item ->
           item.encode(writer)
@@ -156,13 +157,15 @@ sealed class ClaimPredicateXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
     is Void -> XdrJson.name("unconditional")
-    is AndPredicates -> buildJsonObject { put("and", XdrJson.array(value) { it.toXdrJsonElement() }) }
-    is OrPredicates -> buildJsonObject { put("or", XdrJson.array(value) { it.toXdrJsonElement() }) }
-    is NotPredicate -> buildJsonObject { put("not", XdrJson.optional(value) { it.toXdrJsonElement() }) }
-    is AbsBefore -> buildJsonObject { put("before_absolute_time", value.toXdrJsonElement()) }
-    is RelBefore -> buildJsonObject { put("before_relative_time", value.toXdrJsonElement()) }
+    is AndPredicates -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("and", XdrJson.array(value, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) }) }
+    is OrPredicates -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("or", XdrJson.array(value, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) }) }
+    is NotPredicate -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("not", XdrJson.optional(value) { it.toXdrJsonElement(depth + 1) }) }
+    is AbsBefore -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("before_absolute_time", value.toXdrJsonElement(depth + 1)) }
+    is RelBefore -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("before_relative_time", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

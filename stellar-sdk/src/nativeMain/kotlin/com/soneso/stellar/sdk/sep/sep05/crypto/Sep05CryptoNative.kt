@@ -114,18 +114,6 @@ internal actual suspend fun pbkdf2HmacSha512(
 }
 
 /**
- * Converts an integer to 4 bytes in big-endian order.
- */
-private fun intToBytesBigEndian(value: Int): ByteArray {
-    return byteArrayOf(
-        ((value shr 24) and 0xFF).toByte(),
-        ((value shr 16) and 0xFF).toByte(),
-        ((value shr 8) and 0xFF).toByte(),
-        (value and 0xFF).toByte()
-    )
-}
-
-/**
  * Internal HMAC-SHA512 implementation using libsodium.
  */
 private fun hmacSha512Internal(key: ByteArray, data: ByteArray): ByteArray {

@@ -16,6 +16,7 @@ import com.soneso.stellar.sdk.smartaccount.core.SmartAccountAuthPayloadCodec
 import com.soneso.stellar.sdk.smartaccount.core.TransactionException
 import com.soneso.stellar.sdk.xdr.SCMapEntryXdr
 import com.soneso.stellar.sdk.xdr.SCMapXdr
+import com.soneso.stellar.sdk.xdr.SCSymbolXdr
 import com.soneso.stellar.sdk.xdr.SCValXdr
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -35,6 +36,8 @@ class SmartAccountAuthPayloadTest {
     private val validAccountAddress = "GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ"
     private val validAccountAddress2 = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN7"
     private val validContractAddress = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+
+    private val notUtf8 = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0x20, 0x61)
 
     private fun keyData(): ByteArray = ByteArray(32) { (it + 1).toByte() }
     private fun sigBytes(): ByteArray = ByteArray(64) { (it + 10).toByte() }
@@ -260,6 +263,17 @@ class SmartAccountAuthPayloadTest {
         )
         val mapScVal = SCValXdr.Map(SCMapXdr(entries))
         val payload = SmartAccountAuthPayloadCodec.read(mapScVal)
+        assertEquals(listOf(7u), payload.contextRuleIds)
+        assertTrue(payload.signers.isEmpty())
+    }
+
+    @Test
+    fun testRead_keyWhoseBytesAreNotUtf8IsSkipped() {
+        val entries = listOf(
+            SCMapEntryXdr(key = SCValXdr.Sym(SCSymbolXdr(notUtf8)), `val` = Scv.toVec(listOf(Scv.toUint32(5u)))),
+            SCMapEntryXdr(key = Scv.toSymbol("context_rule_ids"), `val` = Scv.toVec(listOf(Scv.toUint32(7u))))
+        )
+        val payload = SmartAccountAuthPayloadCodec.read(SCValXdr.Map(SCMapXdr(entries)))
         assertEquals(listOf(7u), payload.contextRuleIds)
         assertTrue(payload.signers.isEmpty())
     }
@@ -709,6 +723,18 @@ class SmartAccountAuthPayloadTest {
             SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
         }
         assertTrue(ex.message!!.contains("Unknown signer type tag"))
+    }
+
+    @Test
+    fun testSignerFromScVal_typeTagWhoseBytesAreNotUtf8_throwsUnknownTypeTag() {
+        val scVal = Scv.toVec(listOf(
+            SCValXdr.Sym(SCSymbolXdr(notUtf8)),
+            Scv.toAddress(Address(validAccountAddress).toSCAddress())
+        ))
+        val ex = assertFailsWith<TransactionException.SigningFailed> {
+            SmartAccountAuthPayloadCodec.signerFromScVal(scVal)
+        }
+        assertTrue(ex.message!!.contains("Unknown signer type tag: '\\xff\\xfe a'"), ex.message)
     }
 
     @Test

@@ -34,7 +34,9 @@ value class SCMapXdr(val value: List<SCMapEntryXdr>) {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.array(value, depth, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 1) }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

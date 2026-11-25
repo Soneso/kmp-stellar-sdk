@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "HmacSha256MacXdr"
 
@@ -43,8 +42,10 @@ data class HmacSha256MacXdr(
     writer.writeFixedOpaque(mac, 32)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("mac", XdrJson.hex(mac))
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("mac", XdrJson.hex(XdrJson.checkFixedLength(mac, 32)))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

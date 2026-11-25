@@ -658,12 +658,12 @@ class WebAuthForContracts(
                 )
             }
 
-            // Check 4: Function name is "web_auth_verify"
-            val functionName = contractFn.functionName.value
-            if (functionName != WEB_AUTH_VERIFY_FUNCTION) {
+            // Check 4: Function name is "web_auth_verify", compared byte for byte
+            val functionName = contractFn.functionName
+            if (functionName != SCSymbolXdr(WEB_AUTH_VERIFY_FUNCTION)) {
                 throw Sep45InvalidFunctionNameException(
                     expected = WEB_AUTH_VERIFY_FUNCTION,
-                    actual = functionName
+                    actual = XdrJson.displayText(functionName.bytes)
                 )
             }
 
@@ -1039,7 +1039,12 @@ class WebAuthForContracts(
 
     /**
      * Extracts the arguments map from contract function args.
-     * The first arg should be a Map<Symbol, String>.
+     * The first arg should be a Map<Symbol, String>. An entry whose key is not a symbol or
+     * whose value is not a string is skipped, and so is a key whose bytes are not valid UTF-8,
+     * which names no argument the checks read.
+     *
+     * @throws Sep45InvalidArgsException if the first arg is missing or not a map, or a string
+     *   value is not valid UTF-8
      */
     private fun extractArgsFromEntry(args: List<SCValXdr>): Map<String, String> {
         if (args.isEmpty()) {
@@ -1056,12 +1061,15 @@ class WebAuthForContracts(
             // Key should be a symbol
             val mapKey = mapEntry.key
             if (mapKey !is SCValXdr.Sym) continue
-            val keyStr = mapKey.value.value
+            val keyStr = Util.utf8OrNull(mapKey.value.bytes) ?: continue
 
             // Value should be a string (note: property is `val` not `value`)
             val mapVal = mapEntry.`val`
             if (mapVal !is SCValXdr.Str) continue
-            val valueStr = mapVal.value.value
+            val valueBytes = mapVal.value.bytes
+            val valueStr = Util.utf8OrNull(valueBytes) ?: throw Sep45InvalidArgsException(
+                "The value of argument $keyStr is not valid UTF-8: ${XdrJson.displayString(valueBytes)}"
+            )
 
             result[keyStr] = valueStr
         }
@@ -1116,7 +1124,8 @@ class WebAuthForContracts(
             for (mapEntry in firstSig.value.value) {
                 val mapKey = mapEntry.key
                 if (mapKey is SCValXdr.Sym) {
-                    when (mapKey.value.value) {
+                    // A key that is not valid UTF-8 names no field and is skipped.
+                    when (Util.utf8OrNull(mapKey.value.bytes)) {
                         "public_key" -> {
                             val mapVal = mapEntry.`val`
                             if (mapVal is SCValXdr.Bytes) {

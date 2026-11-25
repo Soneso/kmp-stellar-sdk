@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "String64Xdr"
 value class String64Xdr(val value: String) {
   companion object {
     fun decode(reader: XdrReader): String64Xdr {
-      val value = reader.readString()
+      val value = reader.readString(64)
       return String64Xdr(value)
     }
 
@@ -28,10 +28,12 @@ value class String64Xdr(val value: String) {
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(value)
+    writer.writeString(value, 64)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(value)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

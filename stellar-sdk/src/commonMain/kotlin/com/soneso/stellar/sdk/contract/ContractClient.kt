@@ -9,6 +9,7 @@ import com.soneso.stellar.sdk.rpc.responses.SendTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
 import com.soneso.stellar.sdk.rpc.responses.SimulateTransactionResponse
 import com.soneso.stellar.sdk.rpc.responses.SimulationFailureMessage
+import com.soneso.stellar.sdk.scval.Scv
 import com.soneso.stellar.sdk.xdr.*
 
 /**
@@ -102,7 +103,8 @@ class ContractClient private constructor(
     val rpcUrl: String,
     val network: Network,
     private val contractSpec: ContractSpec?,
-    val server: SorobanServer = SorobanServer(rpcUrl)
+    val server: SorobanServer = SorobanServer(rpcUrl),
+    private val readOnly: Boolean = false
 ) {
 
     /**
@@ -118,10 +120,11 @@ class ContractClient private constructor(
 
     /**
      * Get available method names from contract spec.
-     * Returns empty set if spec not loaded.
+     * Returns empty set if spec not loaded. A function whose name is not valid UTF-8 has no
+     * name to call it by and is left out.
      */
     fun getMethodNames(): Set<String> {
-        return contractSpec?.funcs()?.map { it.name.value }?.toSet() ?: emptySet()
+        return contractSpec?.funcs()?.mapNotNull { Util.utf8OrNull(it.name.bytes) }?.toSet() ?: emptySet()
     }
 
     /**
@@ -214,7 +217,7 @@ class ContractClient private constructor(
         spec.getFunc(functionName)
             ?: throw IllegalArgumentException(
                 "Method '$functionName' not found in contract spec. " +
-                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
+                "Available methods: ${spec.funcs().joinToString(", ") { XdrJson.displayText(it.name.bytes) }}"
             )
 
         // Convert arguments using ContractSpec
@@ -379,7 +382,7 @@ class ContractClient private constructor(
         spec.getFunc(functionName)
             ?: throw IllegalArgumentException(
                 "Method '$functionName' not found in contract spec. " +
-                "Available methods: ${spec.funcs().joinToString(", ") { it.name.value }}"
+                "Available methods: ${spec.funcs().joinToString(", ") { XdrJson.displayText(it.name.bytes) }}"
             )
 
         // Convert arguments using ContractSpec
@@ -636,7 +639,9 @@ class ContractClient private constructor(
             parameters = parameters
         )
 
-        val sourceAccount = server.getAccount(source)
+        // A read-only client loads no account: its transactions are never sent, and simulating
+        // one needs no account entry for the source.
+        val sourceAccount = if (readOnly) Account(source, 0L) else server.getAccount(source)
         val builder = TransactionBuilder(
             sourceAccount = sourceAccount,
             network = network
@@ -651,7 +656,8 @@ class ContractClient private constructor(
             transactionSigner = signer,
             parseResultXdrFn = parseResultXdrFn,
             transactionBuilder = builder,
-            useUpgradedAuth = options.useUpgradedAuth
+            useUpgradedAuth = options.useUpgradedAuth,
+            readOnly = readOnly
         )
     }
 
@@ -673,6 +679,10 @@ class ContractClient private constructor(
          * - Contract introspection
          * - Manual result parsing helpers (funcResToNative)
          *
+         * A Stellar Asset Contract runs no wasm, so the network holds no spec for it; such a
+         * contract opens with the embedded spec of [SACSpec] after one more read of its
+         * instance entry. [SACClient] offers typed calls for it.
+         *
          * Throws an exception if the contract spec cannot be loaded.
          *
          * @param contractId The contract ID (C... address)
@@ -689,11 +699,25 @@ class ContractClient private constructor(
         ): ContractClient {
             requireContractStrKey(contractId, "The contract to load")
             val server = sorobanServerFor(rpcUrl)
+            return forContractInternal(contractId, rpcUrl, network, server)
+        }
 
+        /**
+         * [forContract] with the server that loads the spec supplied by the caller, the seam
+         * through which unit tests inject a mocked server.
+         */
+        internal suspend fun forContractInternal(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            server: SorobanServer
+        ): ContractClient {
             val contractSpec = try {
                 val contractInfo = server.loadContractInfoForContractId(contractId)
                 if (contractInfo?.specEntries?.isNotEmpty() == true) {
                     ContractSpec(contractInfo.specEntries)
+                } else if (contractInfo == null && isStellarAssetContract(contractId, server)) {
+                    ContractSpec(SACClient.specEntries())
                 } else {
                     // forContract guarantees a usable spec; an empty spec entry set is a load failure.
                     throw IllegalStateException(
@@ -711,6 +735,41 @@ class ContractClient private constructor(
             }
 
             return ContractClient(contractId, rpcUrl, network, contractSpec, sorobanServerFor(rpcUrl))
+        }
+
+        /**
+         * Whether the instance entry of [contractId] holds the Stellar asset executable. The
+         * spec loader yields no contract info for a missing instance or code entry and for a
+         * Stellar Asset Contract alike, so this one read tells them apart.
+         */
+        private suspend fun isStellarAssetContract(contractId: String, server: SorobanServer): Boolean {
+            val entry = server.getContractData(
+                contractId,
+                Scv.toLedgerKeyContractInstance(),
+                SorobanServer.Durability.PERSISTENT
+            ) ?: return false
+            val data = LedgerEntryDataXdr.fromXdrBase64(entry.xdr) as? LedgerEntryDataXdr.ContractData ?: return false
+            val instance = data.value.`val` as? SCValXdr.Instance ?: return false
+            return instance.value.executable is ContractExecutableXdr.Void
+        }
+
+        /**
+         * Builds a client with the given spec entries without a request, the construction path
+         * of [SACClient]. A [readOnly] client builds its transactions without loading the source
+         * account, and they refuse to sign, submit, or restore.
+         *
+         * @throws IllegalArgumentException if [contractId] is not a contract (C...) address
+         */
+        internal fun forSpecEntries(
+            contractId: String,
+            rpcUrl: String,
+            network: Network,
+            specEntries: List<SCSpecEntryXdr>,
+            readOnly: Boolean,
+            server: SorobanServer = SorobanServer(rpcUrl)
+        ): ContractClient {
+            requireContractStrKey(contractId, "The contract to invoke")
+            return ContractClient(contractId, rpcUrl, network, ContractSpec(specEntries), server, readOnly)
         }
 
         /**
@@ -785,11 +844,13 @@ class ContractClient private constructor(
          * @throws SendTransactionFailedException if the network refuses the upload or
          * deployment transaction at submission
          * @throws IllegalStateException if constructor arguments are provided but the
-         * uploaded code cannot be found on the RPC to convert them
+         * uploaded code cannot be found on the RPC to convert them, or if [loadSpec] is true
+         * and the uploaded code holds no spec entries; the deployment is not submitted
          * @throws IllegalArgumentException if constructor arguments are provided but the
          * contract spec declares no `__constructor` function
-         * @throws SorobanContractParserException if constructor arguments are provided
-         * but the uploaded code cannot be parsed
+         * @throws SorobanContractParserException if [loadSpec] is true or constructor arguments
+         * are provided and the uploaded code cannot be parsed, such as code without a spec section;
+         * the deployment is not submitted, so such code needs `loadSpec = false` and no arguments
          *
          * @sample
          * ```kotlin
@@ -917,6 +978,9 @@ class ContractClient private constructor(
          * @throws SendTransactionFailedException if the network refuses the deployment
          * transaction at submission
          * @throws IllegalArgumentException if [wasmId] is not a valid hex string
+         * @throws SorobanContractParserException if [loadSpec] is true and the code cannot be parsed,
+         * such as code without a spec section; nothing is submitted (deploy it with `loadSpec = false`)
+         * @throws IllegalStateException if [loadSpec] is true and the code holds no spec entries; nothing is submitted
          *
          * @sample
          * ```kotlin
@@ -955,20 +1019,8 @@ class ContractClient private constructor(
 
             // Load the spec from the uploaded code before deploying: the code entry is
             // already settled, while the instance entry this call is about to write can
-            // trail getTransaction's SUCCESS on a busy RPC. Code without a parseable
-            // spec deploys anyway; the forContract fallback reports it with its usual
-            // error semantics.
-            val contractInfo = if (loadSpec) {
-                sorobanServerFor(rpcUrl).use { rpc ->
-                    try {
-                        rpc.loadContractInfoForWasmId(wasmId)
-                    } catch (_: SorobanContractParserException) {
-                        null
-                    }
-                }
-            } else {
-                null
-            }
+            // trail getTransaction's SUCCESS on a busy RPC.
+            val contractInfo = if (loadSpec) sorobanServerFor(rpcUrl).use { preloadContractInfo(it, wasmId) } else null
 
             // Convert hex string to ByteArray
             val wasmHash = hexStringToByteArray(wasmId)
@@ -1024,7 +1076,10 @@ class ContractClient private constructor(
          * or is not a contract address (before any request is issued)
          * @throws IllegalStateException if the reference cannot be resolved (the tag
          * entry is missing, is not a contract data entry, or does not hold a 32-byte
-         * hash; the message names the owner and the tag), or if deployment fails
+         * hash; the message names the owner and the tag), if [loadSpec] is true and the
+         * resolved code holds no spec entries (nothing is submitted), or if deployment fails
+         * @throws SorobanContractParserException if [loadSpec] is true and the resolved code cannot be
+         * parsed, such as code without a spec section; nothing is submitted (deploy it with `loadSpec = false`)
          * @throws SendTransactionFailedException if the network refuses the deployment
          * transaction at submission
          */
@@ -1087,7 +1142,10 @@ class ContractClient private constructor(
          * or is not a contract address (before any request is issued)
          * @throws IllegalStateException if the reference cannot be resolved (the tag
          * entry is missing, is not a contract data entry, or does not hold a 32-byte
-         * hash; the message names the owner and the tag), or if deployment fails
+         * hash; the message names the owner and the tag), if [loadSpec] is true and the
+         * resolved code holds no spec entries (nothing is submitted), or if deployment fails
+         * @throws SorobanContractParserException if [loadSpec] is true and the resolved code cannot be
+         * parsed, such as code without a spec section; nothing is submitted (deploy it with `loadSpec = false`)
          * @throws SendTransactionFailedException if the network refuses the deployment
          * transaction at submission
          */
@@ -1176,18 +1234,8 @@ class ContractClient private constructor(
 
                 // Load the spec from the resolved code before deploying: the code entry
                 // is already settled, while the instance entry this call is about to
-                // write can trail getTransaction's SUCCESS on a busy RPC. Code without
-                // a parseable spec deploys anyway; the forContract fallback reports it
-                // with its usual error semantics.
-                val contractInfo = if (loadSpec) {
-                    try {
-                        rpc.loadContractInfoForWasmId(wasmId)
-                    } catch (_: SorobanContractParserException) {
-                        null
-                    }
-                } else {
-                    null
-                }
+                // write can trail getTransaction's SUCCESS on a busy RPC.
+                val contractInfo = if (loadSpec) preloadContractInfo(rpc, wasmId) else null
 
                 val operation = createContractV2Operation(
                     executable = ContractExecutableXdr.ExternalRef(ref),
@@ -1284,18 +1332,10 @@ class ContractClient private constructor(
             // contract this call creates, so the returned client carries them without
             // reading back the instance entry the deployment just wrote. That read can
             // trail getTransaction's SUCCESS on a busy RPC, whose ledger-entry ingestion
-            // runs behind transaction status. With no arguments to convert, code without
-            // a parseable spec deploys anyway and the forContract fallback reports it
-            // with its usual error semantics; with arguments, the parse failure means
-            // they cannot be converted, so it propagates before anything deploys.
+            // runs behind transaction status; without loadSpec, it is read only to convert the arguments.
             val contractInfo = if (constructorArgs.isNotEmpty() || loadSpec) {
                 sorobanServerFor(rpcUrl).use { rpc ->
-                    try {
-                        rpc.loadContractInfoForWasmId(wasmId)
-                    } catch (e: SorobanContractParserException) {
-                        if (constructorArgs.isNotEmpty()) throw e
-                        null
-                    }
+                    if (loadSpec) preloadContractInfo(rpc, wasmId) else rpc.loadContractInfoForWasmId(wasmId)
                 }
             } else {
                 null
@@ -1459,11 +1499,16 @@ class ContractClient private constructor(
                 ?: throw IllegalStateException("Failed to extract contract ID from transaction response")
         }
 
+        /** The info of the code under [wasmId] before a deployment, or null while the RPC holds no code entry. */
+        private suspend fun preloadContractInfo(rpc: SorobanServer, wasmId: String): SorobanContractInfo? {
+            val contractInfo = rpc.loadContractInfoForWasmId(wasmId) ?: return null
+            check(contractInfo.specEntries.isNotEmpty()) { "Contract spec not found in the code of wasm id $wasmId." }
+            return contractInfo
+        }
+
         /**
-         * Builds the client for a contract this call just deployed. The spec loaded
-         * from the uploaded code before deployment is used when it has entries; code
-         * whose spec section is absent or empty falls back to [forContract], which
-         * reports it with its usual error semantics.
+         * Builds the client for a contract this call just deployed, with the preloaded spec, or
+         * through [forContract] when the RPC held no code entry for the wasm id before the deployment.
          */
         private suspend fun clientForDeployedContract(
             contractId: String,
@@ -1473,7 +1518,7 @@ class ContractClient private constructor(
             loadSpec: Boolean
         ): ContractClient = when {
             !loadSpec -> ContractClient(contractId, rpcUrl, network, null, sorobanServerFor(rpcUrl))
-            contractInfo?.specEntries?.isNotEmpty() == true ->
+            contractInfo != null ->
                 ContractClient(
                     contractId,
                     rpcUrl,

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCSpecUDTUnionCaseTupleV0Xdr"
 
@@ -27,8 +26,8 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
   companion object {
 
     fun decode(reader: XdrReader): SCSpecUDTUnionCaseTupleV0Xdr {
-      val doc = reader.readString()
-      val name = reader.readString()
+      val doc = reader.readString(SC_SPEC_DOC_LIMIT)
+      val name = reader.readString(60)
       val type = List(reader.readArrayLength()) { SCSpecTypeDefXdr.decode(reader) }
       return SCSpecUDTUnionCaseTupleV0Xdr(doc, name, type)
     }
@@ -48,18 +47,20 @@ data class SCSpecUDTUnionCaseTupleV0Xdr(
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(doc)
-    writer.writeString(name)
+    writer.writeString(doc, SC_SPEC_DOC_LIMIT)
+    writer.writeString(name, 60)
     writer.writeInt(type.size)
     type.forEach { item ->
       item.encode(writer)
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("doc", XdrJson.escapedString(doc))
     put("name", XdrJson.escapedString(name))
-    put("type", XdrJson.array(type) { it.toXdrJsonElement() })
+    put("type", XdrJson.array(type, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

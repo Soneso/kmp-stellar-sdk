@@ -26,7 +26,7 @@ data class SignerKeyEd25519SignedPayloadXdr(
 
     fun decode(reader: XdrReader): SignerKeyEd25519SignedPayloadXdr {
       val ed25519 = Uint256Xdr.decode(reader)
-      val payload = reader.readVariableOpaque()
+      val payload = reader.readVariableOpaque(64)
       return SignerKeyEd25519SignedPayloadXdr(ed25519, payload)
     }
 
@@ -42,7 +42,7 @@ data class SignerKeyEd25519SignedPayloadXdr(
 
   fun encode(writer: XdrWriter) {
     ed25519.encode(writer)
-    writer.writeVariableOpaque(payload)
+    writer.writeVariableOpaque(payload, 64)
   }
 
   /**

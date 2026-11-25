@@ -44,7 +44,12 @@ kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
-        withHostTest { }
+        withHostTest {
+            // Credential Manager constructors call android.os.Bundle, whose android.jar stubs
+            // throw by default. With this flag they return null, 0 or false, and a Bundle keeps
+            // no values.
+            isReturnDefaultValues = true
+        }
     }
 
     // JS target (Browser and Node.js)
@@ -206,7 +211,7 @@ kotlin {
         val jvmMain = getByName("jvmMain") {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:3.3.3")
-                implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+                implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
             }
         }
 
@@ -221,7 +226,7 @@ kotlin {
             }
         }
 
-        // Android source set: inherits all JVM platform code (BouncyCastle crypto, XDR, etc.)
+        // Android source set: inherits all JVM platform code (BouncyCastle crypto, etc.)
         // and adds Android-specific APIs (Credential Manager for WebAuthn passkeys).
         // The dependsOn(jvmMain) ensures the JVM actual declarations are used for Android compilation.
         getByName("androidMain") {
@@ -240,6 +245,12 @@ kotlin {
         // common expect declarations with no actuals and fails to resolve them.
         getByName("androidHostTest") {
             dependsOn(jvmTest)
+            dependencies {
+                // 1.6.0 lacks the default-argument constructor that 1.3.0 and 1.5.0 have; the host
+                // tests run against it, with a real org.json.
+                runtimeOnly("androidx.credentials:credentials:1.6.0")
+                runtimeOnly("org.json:json:20260814")
+            }
         }
 
         getByName("jsMain") {

@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SCEnvMetaEntryInterfaceVersionXdr"
 
@@ -47,9 +46,11 @@ data class SCEnvMetaEntryInterfaceVersionXdr(
     preRelease.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("protocol", protocol.toXdrJsonElement())
-    put("pre_release", preRelease.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("protocol", protocol.toXdrJsonElement(depth + 1))
+    put("pre_release", preRelease.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

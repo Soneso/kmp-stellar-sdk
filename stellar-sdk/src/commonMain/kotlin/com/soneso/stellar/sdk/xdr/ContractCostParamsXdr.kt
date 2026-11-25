@@ -16,7 +16,7 @@ private const val XDR_JSON_TYPE = "ContractCostParamsXdr"
 value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
   companion object {
     fun decode(reader: XdrReader): ContractCostParamsXdr {
-      val value = List(reader.readArrayLength()) { ContractCostParamEntryXdr.decode(reader) }
+      val value = List(reader.readArrayLength(CONTRACT_COST_COUNT_LIMIT)) { ContractCostParamEntryXdr.decode(reader) }
       return ContractCostParamsXdr(value)
     }
 
@@ -28,13 +28,16 @@ value class ContractCostParamsXdr(val value: List<ContractCostParamEntryXdr>) {
   }
 
   fun encode(writer: XdrWriter) {
+    require(value.size <= CONTRACT_COST_COUNT_LIMIT) { "XDR array count ${value.size} exceeds maximum $CONTRACT_COST_COUNT_LIMIT" }
     writer.writeInt(value.size)
     value.forEach { item ->
       item.encode(writer)
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.array(value) { it.toXdrJsonElement() }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.array(value, depth, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 1) }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
 }

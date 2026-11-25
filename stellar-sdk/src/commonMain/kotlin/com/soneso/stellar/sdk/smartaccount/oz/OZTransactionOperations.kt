@@ -1256,13 +1256,13 @@ class OZTransactionOperations internal constructor(
         for (ruleScVal in allRules) {
             val fields = (ruleScVal as? SCValXdr.Map)?.value?.value ?: continue
             for (field in fields) {
-                val key = (field.key as? SCValXdr.Sym)?.value?.value ?: continue
+                val key = (field.key as? SCValXdr.Sym)?.let { Util.utf8OrNull(it.value.bytes) } ?: continue
                 if (key != "signers") continue
                 val signerVec = (field.`val` as? SCValXdr.Vec)?.value?.value ?: break
                 for (signerScVal in signerVec) {
                     val parts = (signerScVal as? SCValXdr.Vec)?.value?.value
                     if (parts.isNullOrEmpty()) continue
-                    val tag = (parts[0] as? SCValXdr.Sym)?.value?.value ?: continue
+                    val tag = (parts[0] as? SCValXdr.Sym)?.let { Util.utf8OrNull(it.value.bytes) } ?: continue
                     if (tag != "External" || parts.size < 3) continue
                     val keyDataBytes = (parts[2] as? SCValXdr.Bytes)?.value?.value ?: continue
                     if (keyDataBytes.size > SmartAccountConstants.SECP256R1_PUBLIC_KEY_SIZE) {

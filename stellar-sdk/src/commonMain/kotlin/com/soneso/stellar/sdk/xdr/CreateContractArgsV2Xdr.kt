@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "CreateContractArgsV2Xdr"
 
@@ -57,10 +56,12 @@ data class CreateContractArgsV2Xdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("contract_id_preimage", contractIdPreimage.toXdrJsonElement())
-    put("executable", executable.toXdrJsonElement())
-    put("constructor_args", XdrJson.array(constructorArgs) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("contract_id_preimage", contractIdPreimage.toXdrJsonElement(depth + 1))
+    put("executable", executable.toXdrJsonElement(depth + 1))
+    put("constructor_args", XdrJson.array(constructorArgs, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

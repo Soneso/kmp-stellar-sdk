@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "ConfigSettingEntryXdr"
 
@@ -383,28 +382,30 @@ sealed class ConfigSettingEntryXdr {
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = when (this) {
-    is ContractMaxSizeBytes -> buildJsonObject { put("contract_max_size_bytes", value.toXdrJsonElement()) }
-    is ContractCompute -> buildJsonObject { put("contract_compute_v0", value.toXdrJsonElement()) }
-    is ContractLedgerCost -> buildJsonObject { put("contract_ledger_cost_v0", value.toXdrJsonElement()) }
-    is ContractHistoricalData -> buildJsonObject { put("contract_historical_data_v0", value.toXdrJsonElement()) }
-    is ContractEvents -> buildJsonObject { put("contract_events_v0", value.toXdrJsonElement()) }
-    is ContractBandwidth -> buildJsonObject { put("contract_bandwidth_v0", value.toXdrJsonElement()) }
-    is ContractCostParamsCpuInsns -> buildJsonObject { put("contract_cost_params_cpu_instructions", value.toXdrJsonElement()) }
-    is ContractCostParamsMemBytes -> buildJsonObject { put("contract_cost_params_memory_bytes", value.toXdrJsonElement()) }
-    is ContractDataKeySizeBytes -> buildJsonObject { put("contract_data_key_size_bytes", value.toXdrJsonElement()) }
-    is ContractDataEntrySizeBytes -> buildJsonObject { put("contract_data_entry_size_bytes", value.toXdrJsonElement()) }
-    is StateArchivalSettings -> buildJsonObject { put("state_archival", value.toXdrJsonElement()) }
-    is ContractExecutionLanes -> buildJsonObject { put("contract_execution_lanes", value.toXdrJsonElement()) }
-    is LiveSorobanStateSizeWindow -> buildJsonObject { put("live_soroban_state_size_window", XdrJson.array(value) { it.toXdrJsonElement() }) }
-    is EvictionIterator -> buildJsonObject { put("eviction_iterator", value.toXdrJsonElement()) }
-    is ContractParallelCompute -> buildJsonObject { put("contract_parallel_compute_v0", value.toXdrJsonElement()) }
-    is ContractLedgerCostExt -> buildJsonObject { put("contract_ledger_cost_ext_v0", value.toXdrJsonElement()) }
-    is ContractSCPTiming -> buildJsonObject { put("scp_timing", value.toXdrJsonElement()) }
-    is FrozenLedgerKeys -> buildJsonObject { put("frozen_ledger_keys", value.toXdrJsonElement()) }
-    is FrozenLedgerKeysDelta -> buildJsonObject { put("frozen_ledger_keys_delta", value.toXdrJsonElement()) }
-    is FreezeBypassTxs -> buildJsonObject { put("freeze_bypass_txs", value.toXdrJsonElement()) }
-    is FreezeBypassTxsDelta -> buildJsonObject { put("freeze_bypass_txs_delta", value.toXdrJsonElement()) }
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = when (this) {
+    is ContractMaxSizeBytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_max_size_bytes", value.toXdrJsonElement(depth + 1)) }
+    is ContractCompute -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_compute_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractLedgerCost -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_ledger_cost_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractHistoricalData -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_historical_data_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractEvents -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_events_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractBandwidth -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_bandwidth_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractCostParamsCpuInsns -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_cost_params_cpu_instructions", value.toXdrJsonElement(depth + 1)) }
+    is ContractCostParamsMemBytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_cost_params_memory_bytes", value.toXdrJsonElement(depth + 1)) }
+    is ContractDataKeySizeBytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_data_key_size_bytes", value.toXdrJsonElement(depth + 1)) }
+    is ContractDataEntrySizeBytes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_data_entry_size_bytes", value.toXdrJsonElement(depth + 1)) }
+    is StateArchivalSettings -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("state_archival", value.toXdrJsonElement(depth + 1)) }
+    is ContractExecutionLanes -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_execution_lanes", value.toXdrJsonElement(depth + 1)) }
+    is LiveSorobanStateSizeWindow -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("live_soroban_state_size_window", XdrJson.array(value, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) }) }
+    is EvictionIterator -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("eviction_iterator", value.toXdrJsonElement(depth + 1)) }
+    is ContractParallelCompute -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_parallel_compute_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractLedgerCostExt -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("contract_ledger_cost_ext_v0", value.toXdrJsonElement(depth + 1)) }
+    is ContractSCPTiming -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("scp_timing", value.toXdrJsonElement(depth + 1)) }
+    is FrozenLedgerKeys -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("frozen_ledger_keys", value.toXdrJsonElement(depth + 1)) }
+    is FrozenLedgerKeysDelta -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("frozen_ledger_keys_delta", value.toXdrJsonElement(depth + 1)) }
+    is FreezeBypassTxs -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("freeze_bypass_txs", value.toXdrJsonElement(depth + 1)) }
+    is FreezeBypassTxsDelta -> XdrJson.obj(depth, XDR_JSON_TYPE) { put("freeze_bypass_txs_delta", value.toXdrJsonElement(depth + 1)) }
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

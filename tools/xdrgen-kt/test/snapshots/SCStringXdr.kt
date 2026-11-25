@@ -10,13 +10,34 @@ private const val XDR_JSON_TYPE = "SCStringXdr"
 /**
  * XDR Source:
  * typedef string SCString<>;
+ *
+ * Stores the bytes of the string as the XDR carries them, so bytes that are not valid UTF-8
+ * and leading byte order marks survive a decode and encode unchanged. [value] is the strict
+ * UTF-8 text of the bytes; equality, hashing and both encodings use the bytes.
+ *
+ * @param bytes The bytes of the string; the instance keeps a copy.
  */
-@Suppress("EXPECT_ACTUAL_INCOMPATIBILITY")
-@kotlin.jvm.JvmInline
-value class SCStringXdr(val value: String) {
+class SCStringXdr(bytes: ByteArray) {
+  private val storedBytes: ByteArray = bytes.copyOf()
+
+  /** Holds the UTF-8 encoding of [value]. */
+  constructor(value: String) : this(value.encodeToByteArray())
+
+  /**
+   * The stored bytes decoded as UTF-8, every leading byte order mark kept.
+   *
+   * @throws CharacterCodingException if the bytes are not valid UTF-8; [bytes] holds them.
+   */
+  val value: String
+    get() = storedBytes.decodeToString(throwOnInvalidSequence = true)
+
+  /** A copy of the stored bytes; changing it leaves this instance unchanged. */
+  val bytes: ByteArray
+    get() = storedBytes.copyOf()
+
   companion object {
     fun decode(reader: XdrReader): SCStringXdr {
-      val value = reader.readString()
+      val value = reader.readVariableOpaque()
       return SCStringXdr(value)
     }
 
@@ -24,14 +45,22 @@ value class SCStringXdr(val value: String) {
 
     fun fromXdrJsonElement(element: JsonElement): SCStringXdr = fromXdrJsonTree(XdrJson.checkDepth(element, XDR_JSON_TYPE))
 
-    internal fun fromXdrJsonTree(element: JsonElement): SCStringXdr = SCStringXdr(XdrJson.unescapeString(element, XDR_JSON_TYPE, "value"))
+    internal fun fromXdrJsonTree(element: JsonElement): SCStringXdr = SCStringXdr(XdrJson.unescapeStringBytes(element, XDR_JSON_TYPE, "value"))
   }
 
   fun encode(writer: XdrWriter) {
-    writer.writeString(value)
+    writer.writeVariableOpaque(storedBytes)
   }
 
-  fun toXdrJsonElement(): JsonElement = XdrJson.escapedString(value)
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.escapedString(storedBytes)
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())
+
+  override fun equals(other: Any?): Boolean = other is SCStringXdr && storedBytes.contentEquals(other.storedBytes)
+
+  override fun hashCode(): Int = storedBytes.contentHashCode()
+
+  override fun toString(): String = "SCStringXdr(value=${XdrJson.displayText(storedBytes)})"
 }

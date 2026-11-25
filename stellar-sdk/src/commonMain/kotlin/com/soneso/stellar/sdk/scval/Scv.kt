@@ -216,7 +216,6 @@ object Scv {
             "invalid value, expected between $INT128_MIN_VALUE and $INT128_MAX_VALUE, but got $value"
         }
 
-        // Use platform-specific conversion
         val paddedBytes = bigIntegerToBytesSigned(value, 16)
 
         val hi = bytesToLong(paddedBytes.copyOfRange(0, 8))
@@ -249,7 +248,6 @@ object Scv {
         hiBytes.copyInto(fullBytes, 0, 0, 8)
         loBytes.copyInto(fullBytes, 8, 0, 8)
 
-        // Use platform-specific conversion
         return bytesToBigIntegerSigned(fullBytes)
     }
 
@@ -330,7 +328,6 @@ object Scv {
             "invalid value, expected between $INT256_MIN_VALUE and $INT256_MAX_VALUE, but got $value"
         }
 
-        // Use platform-specific conversion
         val paddedBytes = bigIntegerToBytesSigned(value, 32)
 
         val hiHi = bytesToLong(paddedBytes.copyOfRange(0, 8))
@@ -366,7 +363,6 @@ object Scv {
         ulongToBytes(scVal.value.loHi.value).copyInto(fullBytes, 16, 0, 8)
         ulongToBytes(scVal.value.loLo.value).copyInto(fullBytes, 24, 0, 8)
 
-        // Use platform-specific conversion
         return bytesToBigIntegerSigned(fullBytes)
     }
 
@@ -507,6 +503,7 @@ object Scv {
      * @param scVal [SCValXdr] to convert
      * @return the string value
      * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_STRING]
+     * @throws CharacterCodingException if the string bytes are not valid UTF-8; [SCStringXdr.bytes] holds them
      */
     fun fromString(scVal: SCValXdr): String {
         require(scVal is SCValXdr.Str) {
@@ -535,6 +532,7 @@ object Scv {
      * @param scVal [SCValXdr] to convert
      * @return the symbol
      * @throws IllegalArgumentException if scVal type is not [SCValTypeXdr.SCV_SYMBOL]
+     * @throws CharacterCodingException if the symbol bytes are not valid UTF-8; [SCSymbolXdr.bytes] holds them
      */
     fun fromSymbol(scVal: SCValXdr): String {
         require(scVal is SCValXdr.Sym) {

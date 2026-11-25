@@ -97,6 +97,9 @@ import kotlinx.coroutines.delay
  * @property transactionSigner Optional KeyPair for signing
  * @property parseResultXdrFn Optional function to parse result
  * @property transactionBuilder The transaction builder
+ * @property readOnly Whether a read-only client built this transaction: it simulates without an
+ *   account request, with the source sequence number set to 0, and refuses to sign, submit, or
+ *   restore, because its client has no keypair for the source account
  */
 class AssembledTransaction<T> internal constructor(
     private val server: SorobanServer,
@@ -104,8 +107,21 @@ class AssembledTransaction<T> internal constructor(
     private val transactionSigner: KeyPair?,
     private val parseResultXdrFn: ((SCValXdr) -> T)?,
     private var transactionBuilder: TransactionBuilder,
-    private val useUpgradedAuth: Boolean = true
+    private val useUpgradedAuth: Boolean,
+    private val readOnly: Boolean
 ) {
+    /**
+     * Creates a transaction that is not read-only.
+     */
+    internal constructor(
+        server: SorobanServer,
+        submitTimeout: Int,
+        transactionSigner: KeyPair?,
+        parseResultXdrFn: ((SCValXdr) -> T)?,
+        transactionBuilder: TransactionBuilder,
+        useUpgradedAuth: Boolean = true
+    ) : this(server, submitTimeout, transactionSigner, parseResultXdrFn, transactionBuilder, useUpgradedAuth, readOnly = false)
+
     /**
      * The TransactionBuilder before simulation.
      *
@@ -175,15 +191,22 @@ class AssembledTransaction<T> internal constructor(
      * @return This AssembledTransaction for chaining
      * @throws SimulationFailedException if the simulation failed
      * @throws RestorationFailureException if contract state could not be restored
+     * @throws IllegalStateException if a read-only client built this transaction, the call is not
+     *   a read call, and its contract state needs a restore while [restore] is true
      */
     suspend fun simulate(restore: Boolean = true): AssembledTransaction<T> {
         // Clear cached data
         simulationResult = null
         simulationTransactionData = null
 
-        // Update source account sequence number
-        val sourceAccount = server.getAccount(transactionBuilder.sourceAccount.accountId)
-        transactionBuilder.sourceAccount.setSequenceNumber(sourceAccount.sequenceNumber)
+        // Update source account sequence number. A read-only transaction loads no account: the
+        // simulation needs no account entry for its source, and the transaction is never sent.
+        if (readOnly) {
+            transactionBuilder.sourceAccount.setSequenceNumber(0L)
+        } else {
+            val sourceAccount = server.getAccount(transactionBuilder.sourceAccount.accountId)
+            transactionBuilder.sourceAccount.setSequenceNumber(sourceAccount.sequenceNumber)
+        }
 
         // Build and simulate
         val builtTx = transactionBuilder.build()
@@ -191,6 +214,9 @@ class AssembledTransaction<T> internal constructor(
 
         // Handle restoration if needed
         if (restore && simulation!!.restorePreamble != null && !isReadCall()) {
+            if (readOnly) {
+                throw readOnlyRefusal()
+            }
             try {
                 restoreFootprint()
             } catch (e: ContractException) {
@@ -229,6 +255,8 @@ class AssembledTransaction<T> internal constructor(
      * @return This AssembledTransaction for chaining
      * @throws NotYetSimulatedException if not yet simulated
      * @throws NoSignatureNeededException if read call and force=false
+     * @throws IllegalStateException if a read-only client built this transaction, also with
+     *   force=true or a [transactionSigner]
      * @throws ExpiredStateException if contract state needs restoration
      * @throws NeedsMoreSignaturesException if more auth signatures required
      */
@@ -242,6 +270,10 @@ class AssembledTransaction<T> internal constructor(
                 "This is a read call. It requires no signature or submitting. Set force=true to sign and submit anyway.",
                 this
             )
+        }
+
+        if (readOnly) {
+            throw readOnlyRefusal()
         }
 
         if (simulation != null && simulation!!.restorePreamble != null) {
@@ -283,6 +315,7 @@ class AssembledTransaction<T> internal constructor(
      * @return The parsed result (or raw SCValXdr if parseResultXdrFn is null)
      * @throws NotYetSimulatedException if not yet simulated
      * @throws NoSignatureNeededException if read call and force=false
+     * @throws IllegalStateException if a read-only client built this transaction
      * @throws NeedsMoreSignaturesException if more auth signatures required
      * @throws SendTransactionFailedException if submission failed
      * @throws TransactionStillPendingException if still pending after timeout
@@ -700,6 +733,8 @@ class AssembledTransaction<T> internal constructor(
      * parseResultXdrFn if provided.
      *
      * @return The parsed result (or raw SCValXdr if parseResultXdrFn is null)
+     * @throws IllegalStateException before any request if a read-only client built this
+     *   transaction, also when [builtTransaction] was signed directly
      * @throws NotYetSimulatedException if not yet simulated
      * @throws SendTransactionFailedException if submission failed
      * @throws TransactionStillPendingException if still pending after timeout
@@ -707,6 +742,10 @@ class AssembledTransaction<T> internal constructor(
      * @throws TransactionFailedException if transaction failed
      */
     suspend fun submit(): T {
+        // submitInternal() sends builtTransaction whether sign() ran or not, so the refusal sits here.
+        if (readOnly) {
+            throw readOnlyRefusal()
+        }
         val response = submitInternal()
 
         // Parse result from transaction meta
@@ -772,11 +811,16 @@ class AssembledTransaction<T> internal constructor(
      * Called automatically by [simulate] when restore=true and footprint needs restoration.
      * Can also be called manually if you want to restore before simulation.
      *
+     * @throws IllegalStateException before any request if a read-only client built this transaction
      * @throws TransactionFailedException if restoration transaction failed
      * @throws TransactionStillPendingException if restoration still pending
      * @throws SendTransactionFailedException if sending restoration failed
      */
     suspend fun restoreFootprint() {
+        if (readOnly) {
+            throw readOnlyRefusal()
+        }
+
         if (transactionSigner == null) {
             throw IllegalArgumentException(
                 "For automatic restore to work you must provide a transactionSigner when initializing AssembledTransaction."
@@ -810,6 +854,16 @@ class AssembledTransaction<T> internal constructor(
         restoreAssembled.sign(transactionSigner, force = true)
         restoreAssembled.submitInternal()
     }
+
+    /**
+     * The refusal of a read-only transaction to sign, submit, or restore: its client holds no
+     * keypair for the source account.
+     */
+    private fun readOnlyRefusal(): IllegalStateException = IllegalStateException(
+        "This transaction was built by a read-only client for source account " +
+            "${transactionBuilder.sourceAccount.accountId}, which has no keypair to sign with; " +
+            "build it from a client opened with the submitting account's keypair"
+    )
 
     private suspend fun submitInternal(): GetTransactionResponse {
         if (builtTransaction == null) {

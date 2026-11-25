@@ -7,18 +7,9 @@ import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.utils.io.*
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.yield
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
-import platform.posix.gettimeofday
-import platform.posix.timeval
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -78,101 +69,6 @@ internal actual suspend fun <T : Response> sseRequest(
 }
 
 /**
- * Parses an SSE stream from a ByteReadChannel.
- * Implements the SSE specification for parsing events.
- */
-private suspend fun parseSSEStream(
-    channel: ByteReadChannel,
-    onEvent: (eventId: String?, data: String) -> Unit,
-    onFailure: (error: Throwable, statusCode: Int?) -> Unit,
-    statusCode: Int
-) {
-    var currentEventId: String? = null
-    var currentData = StringBuilder()
-
-    try {
-        while (!channel.isClosedForRead) {
-            coroutineContext.ensureActive()
-
-            // Yield to allow other coroutines to run (important for event processing)
-            yield()
-
-            val line = try {
-                channel.readUTF8Line() ?: break
-            } catch (e: Exception) {
-                if (coroutineContext.isActive) {
-                    onFailure(e, statusCode)
-                }
-                break
-            }
-
-            when {
-                line.isEmpty() -> {
-                    // Empty line signals end of event
-                    if (currentData.isNotEmpty()) {
-                        val data = currentData.toString().trimEnd()
-                        onEvent(currentEventId, data)
-                        currentData = StringBuilder()
-                        // Yield after processing event to allow listeners to react
-                        yield()
-                    }
-                }
-                line.startsWith(":") -> {
-                    // Comment line, ignore
-                    continue
-                }
-                line.startsWith("id:") -> {
-                    currentEventId = line.substring(3).trim()
-                }
-                line.startsWith("data:") -> {
-                    if (currentData.isNotEmpty()) {
-                        currentData.append('\n')
-                    }
-                    currentData.append(line.substring(5).trimStart())
-                }
-                line.startsWith("event:") -> {
-                    // Event type field - we ignore this for now
-                    continue
-                }
-                line.startsWith("retry:") -> {
-                    // Retry field - we ignore this as we have our own reconnection logic
-                    continue
-                }
-            }
-        }
-    } catch (e: Exception) {
-        if (coroutineContext.isActive) {
-            onFailure(e, statusCode)
-        }
-    }
-}
-
-/**
- * Native implementation of currentTimeMillis using gettimeofday.
- */
-@OptIn(ExperimentalForeignApi::class)
-internal actual fun currentTimeMillis(): Long {
-    memScoped {
-        val timeVal = alloc<timeval>()
-        gettimeofday(timeVal.ptr, null)
-        return (timeVal.tv_sec * 1000L) + (timeVal.tv_usec / 1000L)
-    }
-}
-
-/**
- * Native implementation of JSON deserialization.
- */
-internal actual fun <T> deserializeJson(json: String, serializer: KSerializer<T>): T {
-    val jsonConfig = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-        encodeDefaults = true
-    }
-    return jsonConfig.decodeFromString(serializer, json)
-}
-
-/**
  * Native implementation of network error detection.
  */
 internal actual fun isNetworkError(error: Throwable): Boolean {
@@ -184,11 +80,3 @@ internal actual fun isNetworkError(error: Throwable): Boolean {
             message.contains("timeout") ||
             error is HttpResponseException
 }
-
-/**
- * Exception for HTTP response errors.
- */
-private class HttpResponseException(
-    val status: HttpStatusCode,
-    val body: String
-) : Exception("HTTP ${status.value}: $body")

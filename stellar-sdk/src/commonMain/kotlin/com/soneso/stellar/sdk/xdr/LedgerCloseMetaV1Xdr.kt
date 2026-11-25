@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "LedgerCloseMetaV1Xdr"
 
@@ -119,16 +118,18 @@ data class LedgerCloseMetaV1Xdr(
     }
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("ext", ext.toXdrJsonElement())
-    put("ledger_header", ledgerHeader.toXdrJsonElement())
-    put("tx_set", txSet.toXdrJsonElement())
-    put("tx_processing", XdrJson.array(txProcessing) { it.toXdrJsonElement() })
-    put("upgrades_processing", XdrJson.array(upgradesProcessing) { it.toXdrJsonElement() })
-    put("scp_info", XdrJson.array(scpInfo) { it.toXdrJsonElement() })
-    put("total_byte_size_of_live_soroban_state", totalByteSizeOfLiveSorobanState.toXdrJsonElement())
-    put("evicted_keys", XdrJson.array(evictedKeys) { it.toXdrJsonElement() })
-    put("unused", XdrJson.array(unused) { it.toXdrJsonElement() })
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("ext", ext.toXdrJsonElement(depth + 1))
+    put("ledger_header", ledgerHeader.toXdrJsonElement(depth + 1))
+    put("tx_set", txSet.toXdrJsonElement(depth + 1))
+    put("tx_processing", XdrJson.array(txProcessing, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("upgrades_processing", XdrJson.array(upgradesProcessing, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("scp_info", XdrJson.array(scpInfo, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("total_byte_size_of_live_soroban_state", totalByteSizeOfLiveSorobanState.toXdrJsonElement(depth + 1))
+    put("evicted_keys", XdrJson.array(evictedKeys, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("unused", XdrJson.array(unused, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

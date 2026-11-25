@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "SimpleStructXdr"
 
@@ -38,7 +37,7 @@ data class SimpleStructXdr(
       val bigNumber = reader.readLong()
       val unsignedBig = reader.readUnsignedLong()
       val active = reader.readBoolean()
-      val label = reader.readString()
+      val label = reader.readString(64)
       return SimpleStructXdr(count, flags, bigNumber, unsignedBig, active, label)
     }
 
@@ -65,10 +64,12 @@ data class SimpleStructXdr(
     writer.writeLong(bigNumber)
     writer.writeUnsignedLong(unsignedBig)
     writer.writeBoolean(active)
-    writer.writeString(label)
+    writer.writeString(label, 64)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
     put("count", XdrJson.int32(count))
     put("flags", XdrJson.uint32(flags))
     put("big_number", XdrJson.int64(bigNumber))

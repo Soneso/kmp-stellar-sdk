@@ -4,7 +4,6 @@
 package com.soneso.stellar.sdk.xdr
 
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 private const val XDR_JSON_TYPE = "TransactionV0Xdr"
 
@@ -45,7 +44,7 @@ data class TransactionV0Xdr(
       val seqNum = SequenceNumberXdr.decode(reader)
       val timeBounds = if (reader.readBoolean()) TimeBoundsXdr.decode(reader) else null
       val memo = MemoXdr.decode(reader)
-      val operations = List(reader.readArrayLength()) { OperationXdr.decode(reader) }
+      val operations = List(reader.readArrayLength(MAX_OPS_PER_TX)) { OperationXdr.decode(reader) }
       val ext = TransactionV0ExtXdr.decode(reader)
       return TransactionV0Xdr(sourceAccountEd25519, fee, seqNum, timeBounds, memo, operations, ext)
     }
@@ -79,6 +78,7 @@ data class TransactionV0Xdr(
       writer.writeBoolean(false)
     }
     memo.encode(writer)
+    require(operations.size <= MAX_OPS_PER_TX) { "XDR array count ${operations.size} exceeds maximum $MAX_OPS_PER_TX" }
     writer.writeInt(operations.size)
     operations.forEach { item ->
       item.encode(writer)
@@ -86,14 +86,16 @@ data class TransactionV0Xdr(
     ext.encode(writer)
   }
 
-  fun toXdrJsonElement(): JsonElement = buildJsonObject {
-    put("source_account_ed25519", sourceAccountEd25519.toXdrJsonElement())
-    put("fee", fee.toXdrJsonElement())
-    put("seq_num", seqNum.toXdrJsonElement())
-    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement() })
-    put("memo", memo.toXdrJsonElement())
-    put("operations", XdrJson.array(operations) { it.toXdrJsonElement() })
-    put("ext", ext.toXdrJsonElement())
+  fun toXdrJsonElement(): JsonElement = toXdrJsonElement(1)
+
+  internal fun toXdrJsonElement(depth: Int): JsonElement = XdrJson.obj(depth, XDR_JSON_TYPE) {
+    put("source_account_ed25519", sourceAccountEd25519.toXdrJsonElement(depth + 1))
+    put("fee", fee.toXdrJsonElement(depth + 1))
+    put("seq_num", seqNum.toXdrJsonElement(depth + 1))
+    put("time_bounds", XdrJson.optional(timeBounds) { it.toXdrJsonElement(depth + 1) })
+    put("memo", memo.toXdrJsonElement(depth + 1))
+    put("operations", XdrJson.array(operations, depth + 1, XDR_JSON_TYPE) { it.toXdrJsonElement(depth + 2) })
+    put("ext", ext.toXdrJsonElement(depth + 1))
   }
 
   fun toXdrJson(): String = XdrJson.encodeToString(toXdrJsonElement())

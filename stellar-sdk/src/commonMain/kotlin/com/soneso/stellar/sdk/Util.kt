@@ -9,6 +9,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.pow
+import kotlin.time.Clock
 
 /**
  * Utility functions for the Stellar SDK.
@@ -159,6 +160,17 @@ object Util {
     }
 
     /**
+     * Decodes [bytes] as strict UTF-8, every leading byte order mark kept.
+     *
+     * @return the text, or `null` when [bytes] are not valid UTF-8
+     */
+    internal fun utf8OrNull(bytes: ByteArray): String? = try {
+        bytes.decodeToString(throwOnInvalidSequence = true)
+    } catch (_: CharacterCodingException) {
+        null
+    }
+
+    /**
      * Returns SHA-256 hash of the input data.
      *
      * Note: This is an internal utility function and should not be used directly by
@@ -292,12 +304,15 @@ object Util {
 /**
  * Returns the current time in milliseconds since the Unix epoch (January 1, 1970, 00:00:00 UTC).
  *
- * This is a platform-specific implementation used internally by the SDK for timeouts and
+ * Reads the system clock through [Clock.System]. The SDK uses it internally for timeouts and
  * exponential backoff calculations.
  *
  * @return Current time in milliseconds
  */
-internal expect fun currentTimeMillis(): Long
+@OptIn(kotlin.time.ExperimentalTime::class)
+internal fun currentTimeMillis(): Long {
+    return Clock.System.now().toEpochMilliseconds()
+}
 
 /**
  * Suspends for the specified time using a real wall-clock delay.

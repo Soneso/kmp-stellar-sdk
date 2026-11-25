@@ -49,15 +49,9 @@ fun compareScValHostOrder(a: SCValXdr, b: SCValXdr): Int {
         is SCValXdr.Bytes ->
             Util.compareBytesUnsigned(a.value.value, (b as SCValXdr.Bytes).value.value)
         is SCValXdr.Str ->
-            Util.compareBytesUnsigned(
-                a.value.value.encodeToByteArray(),
-                (b as SCValXdr.Str).value.value.encodeToByteArray()
-            )
+            Util.compareBytesUnsigned(a.value.bytes, (b as SCValXdr.Str).value.bytes)
         is SCValXdr.Sym ->
-            Util.compareBytesUnsigned(
-                a.value.value.encodeToByteArray(),
-                (b as SCValXdr.Sym).value.value.encodeToByteArray()
-            )
+            Util.compareBytesUnsigned(a.value.bytes, (b as SCValXdr.Sym).value.bytes)
         is SCValXdr.ExecutableTag ->
             Util.compareBytesUnsigned(a.value, (b as SCValXdr.ExecutableTag).value)
         is SCValXdr.I32 -> a.value.value.compareTo((b as SCValXdr.I32).value.value)
