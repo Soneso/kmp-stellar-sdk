@@ -1,10 +1,10 @@
 # SEP-0038 (Anchor RFQ API) Compatibility Matrix
 
-**Generated:** 2026-11-15 23:21:26
+**Generated:** 2026-11-26 00:03:07
 
-**SEP Version:** 2.5.0  
+**SEP Version:** 2.5.1  
 **SEP Status:** Draft  
-**SDK Version:** 1.18.0  
+**SDK Version:** 1.19.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0038.md
 
 ## SEP Summary
@@ -103,7 +103,7 @@ Lets anchors provide quotes for exchanging on-chain assets for off-chain assets 
 | `sell_amount` |  | ✅ | `sellAmount` | The amount of `sell_asset` to be exchanged for `buy_asset`. |
 | `sell_delivery_method` |  | ✅ | `sellDeliveryMethod` | (optional) The method by which the user plans to deliver an off-chain asset to the anchor. This w... |
 | `buy_asset` |  | ✅ | `buyAsset` | The asset the client would like to exchange for `sell_asset`. |
-| `buy_amount` | ✓ | ✅ | `buyAmount` | The amount of `buy_asset` to be exchanged for `sell_asset`. `price * buy_amount = sell_amount` mu... |
+| `buy_amount` | ✓ | ✅ | `buyAmount` | The amount of `buy_asset` to be exchanged for `sell_asset`. `total_price * buy_amount = sell_amou... |
 | `buy_delivery_method` |  | ✅ | `buyDeliveryMethod` | (optional) The method by which the user plans to receive an off-chain asset from the anchor. This... |
 | `fee` |  | ✅ | `fee` | An object describing the fee used to calculate the conversion price. This can be used to datail t... |
 

@@ -1,10 +1,10 @@
 # SEP-0046 (Contract Meta) Compatibility Matrix
 
-**Generated:** 2026-11-15 23:21:27
+**Generated:** 2026-11-26 00:03:09
 
 **SEP Version:** 1.0.0  
 **SEP Status:** Active  
-**SDK Version:** 1.18.0  
+**SDK Version:** 1.19.0  
 **SEP URL:** https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0046.md
 
 ## SEP Summary
@@ -41,7 +41,7 @@ Defines a standard Wasm custom section (`contractmetav0`) for embedding arbitrar
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
 | `scmetaentry_xdr` | ✓ | ✅ | `SCMetaEntryXdr` | Uses SCMetaEntry XDR type for encoding |
-| `binary_stream_encoding` | ✓ | ✅ | `parseMeta` | Encodes entries as binary stream |
+| `binary_stream_encoding` | ✓ | ✅ | `parseContractByteCode` | Encodes entries as binary stream |
 | `key_value_pairs` | ✓ | ✅ | `metaEntries` | Stores metadata as key-value string pairs |
 
 ### Implementation Support
@@ -56,9 +56,9 @@ Defines a standard Wasm custom section (`contractmetav0`) for embedding arbitrar
 
 | Field | Required | Status | SDK Property | Description |
 |-------|----------|--------|--------------|-------------|
-| `contractmetav0_section` | ✓ | ✅ | `parseMeta` | Support for contractmetav0 Wasm custom section |
-| `multiple_entries_single_section` | ✓ | ✅ | `parseMeta` | Support for multiple entries in single section |
-| `multiple_sections` | ✓ | ✅ | `parseMeta` | Support for multiple sections interpreted sequentially |
+| `contractmetav0_section` | ✓ | ✅ | `parseContractByteCode` | Support for contractmetav0 Wasm custom section |
+| `multiple_entries_single_section` | ✓ | ✅ | `parseContractByteCode` | Support for multiple entries in single section |
+| `multiple_sections` | ✓ | ✅ | `parseContractByteCode` | Support for multiple sections interpreted sequentially |
 
 ## Implementation Gaps
 

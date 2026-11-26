@@ -18,7 +18,7 @@ python3 tools/coverage/coverage_summary.py --min 90
 ```
 
 - Pass `-PexcludeIntegrationTests` to every test task; without it the integration tests run against testnet. `check` and `build` without it run them too, and `check` also runs the browser, iOS simulator, macOS x64, and Android host test tasks, more than 100 tasks.
-- The JVM unit suite (about 10,600 tests) takes 35 to 70 seconds, the JS suite 60 to 90 seconds, and the Android host suite about 30 seconds, about a minute when its test sources recompile. The macOS suite takes about 30 seconds with a warm Kotlin/Native cache and about three minutes when a source change recompiles and links the test binary. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
+- The JVM unit suite takes 35 to 70 seconds, the JS suite 60 to 90 seconds, and the Android host suite about 30 seconds, about a minute when its test sources recompile. The macOS suite takes about 30 seconds with a warm Kotlin/Native cache and about three minutes when a source change recompiles and links the test binary. The JVM and JS suites run with the network blocked once the dependencies are cached; they need loopback sockets.
 - The build cache can answer a test task from cache without running a test. `--rerun` forces execution when you need the evidence.
 - The Android tasks, `check` and the documentation build need the Android SDK location: `ANDROID_HOME` or `sdk.dir` in the gitignored `local.properties`. The iOS simulator tests need `-PexcludeIntegrationTests` because the simulator rejects the testnet certificate chain.
 - `verifyTestNamespaces` fails a test outside the `unitTests` or `integrationTests` packages; CI does not run it.
