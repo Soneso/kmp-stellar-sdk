@@ -802,21 +802,11 @@ val invokeOp = InvokeHostFunctionOperation.invokeContractFunction(
 
 **Deploy Stellar Asset Contract (SAC):**
 
-For deploying a SAC, build the host function XDR manually:
-
 ```kotlin
 val usd = AssetTypeCreditAlphaNum4("USD", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
-val assetXdr = usd.toXdr()
-val preimage = ContractIDPreimageXdr.FromAsset(assetXdr)
-// WRONG: ContractExecutableXdr.StellarAsset — no such variant
-// CORRECT: ContractExecutableXdr.Void — the Stellar Asset type uses the Void variant
-val executable = ContractExecutableXdr.Void
-val createArgs = CreateContractArgsXdr(
-    contractIdPreimage = preimage,
-    executable = executable
-)
-val hostFunction = HostFunctionXdr.CreateContract(createArgs)
-val sacOp = InvokeHostFunctionOperation(hostFunction = hostFunction)
+// WRONG: building HostFunctionXdr.CreateContract by hand from ContractIDPreimageXdr.FromAsset and ContractExecutableXdr.Void
+// CORRECT: InvokeHostFunctionOperation.createStellarAssetContract(usd)
+val sacOp = InvokeHostFunctionOperation.createStellarAssetContract(usd)
 ```
 
 ### ExtendFootprintTTLOperation

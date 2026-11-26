@@ -73,6 +73,12 @@ import com.soneso.stellar.sdk.Claimant
 - [Assets](#assets)
   - [Creating and Using Assets](#creating-and-using-assets)
   - [Stellar Asset Contracts (SAC)](#stellar-asset-contracts-sac)
+    - [Opening a SAC Client](#opening-a-sac-client)
+    - [Read-Only Client](#read-only-client)
+    - [Reading a Balance](#reading-a-balance)
+    - [Sending a Transfer](#sending-a-transfer)
+    - [Transfers Authorized by Another Account](#transfers-authorized-by-another-account)
+    - [Deploying a SAC](#deploying-a-sac)
 
 ## Keypairs & Accounts
 
@@ -1380,7 +1386,7 @@ Reach for `toNative()` when no spec is at hand: contract event values, ledger en
 | `SCV_I64` | `Long` |
 | `SCV_U128`, `SCV_I128`, `SCV_U256`, `SCV_I256` | `BigInteger` (`com.ionspin.kotlin.bignum.integer`) |
 | `SCV_BYTES` | `ByteArray` (the stored payload array, so writes to it go through to the value) |
-| `SCV_STRING`, `SCV_SYMBOL` | `String` |
+| `SCV_STRING`, `SCV_SYMBOL` | `String`; the `SCValXdr` itself when the bytes are not valid UTF-8 |
 | `SCV_ADDRESS` | strkey `String` (`G...`, `C...`, `M...`, `W...`, `B...` or `L...`); the `SCValXdr` itself when the address has no strkey form |
 | `SCV_VEC` | `List<Any?>`, each element converted in order; an absent payload gives an empty list |
 | `SCV_MAP` | `Map<Any?, Any?>` under the key rules below, or the `SCValXdr` itself; an absent payload gives an empty map |
@@ -1392,7 +1398,7 @@ Map keys need value-based equality, which `ByteArray` and the XDR types do not p
 
 | Key Type | Map Key |
 |----------|---------|
-| `SCV_SYMBOL`, `SCV_STRING` | `String` |
+| `SCV_SYMBOL`, `SCV_STRING` | `String` when the bytes are valid UTF-8 |
 | `SCV_U32` / `SCV_I32` | `UInt` / `Int` |
 | `SCV_U64`, `SCV_TIMEPOINT`, `SCV_DURATION` | `ULong` |
 | `SCV_I64` | `Long` |
@@ -1412,7 +1418,7 @@ Key equality is plain Kotlin `equals`/`hashCode` on the converted keys, and a ke
 
 A map converts to the `SCValXdr` itself as a whole when either
 
-- any key is unrepresentable: a vec, map, error, contract instance, nonce key, executable tag or ledger-key-contract-instance key, or an address key with no strkey form; or
+- any key is unrepresentable: a vec, map, error, contract instance, nonce key, executable tag or ledger-key-contract-instance key, a symbol or string key whose bytes are not valid UTF-8, or an address key with no strkey form; or
 - two entries collide on equal converted keys.
 
 A nested map that falls back is contained: the enclosing vec or map still converts, with that map left as an `SCValXdr` element. A converted map preserves the entry order of the XDR map.
@@ -1911,82 +1917,213 @@ when (asset) {
 
 ### Stellar Asset Contracts (SAC)
 
-Stellar Asset Contracts (SAC) wrap classic Stellar assets (XLM, issued assets) as Soroban smart contracts, enabling them to be used in smart contract interactions.
+A Stellar Asset Contract (SAC) is the built-in token contract of a classic asset: through it, accounts and contracts hold and transfer the asset with the SEP-41 token interface. Every classic asset, XLM included, has one SAC per network, whose contract id derives from the asset and the network; the contract becomes usable once it is deployed (see [Deploying a SAC](#deploying-a-sac)). `SACClient` offers typed calls for a SAC: balances, transfers, and the asset's decimals, name, and symbol. `ContractClient.forContract` also opens a SAC, for its other functions such as `approve`, `mint`, or `clawback`.
 
-**Benefits:**
-- Use classic assets in smart contracts without manual bridging
-- Access to standard token interface (SEP-41) for consistent operations
-- Interoperability between classic Stellar operations and Soroban contracts
-- Built-in authorization and compliance features
+Amounts are i128 base units, carried as `com.ionspin.kotlin.bignum.integer.BigInteger`. A SAC has 7 decimals, so one unit of the asset is 10,000,000 base units, and an XLM base unit is a stroop.
 
-**When to use:**
-- Integrating classic assets with Soroban contracts (DeFi, AMMs, etc.)
-- Building dApps that need both classic and smart contract token operations
-- Leveraging the standardized token interface for multi-asset support
+#### Opening a SAC Client
+
+`SACClient.forAsset` opens the SAC of an asset, whose contract id it derives with `Asset.getContractId`, and `SACClient.forContractId` opens a SAC by its contract id. Opening sends no request, and the id is not checked against the network, so a call to a contract that lacks the function fails. The keypair is the source account of every call and signs the transfers.
 
 ```kotlin
-// Get contract ID for Stellar Asset Contract
-// This derives a deterministic contract address for the asset on the specified network
-import com.ionspin.kotlin.bignum.integer.BigInteger
+val rpcUrl = "https://soroban-testnet.stellar.org"
+
+// A client with a keypair loads its source account for every call, so the account must exist
+val sourceKeyPair = KeyPair.random()
+FriendBot.fundTestnetAccount(sourceKeyPair.getAccountId())
+
+// The contract id derives from the asset and the network, without a request
+val xlmContractId = AssetTypeNative.getContractId(Network.TESTNET)  // CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 val usdc = Asset.createNonNativeAsset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN")
-val contractId = usdc.getContractId(Network.TESTNET)
-println("SAC Contract ID: $contractId")
+val usdcContractId = usdc.getContractId(Network.PUBLIC)  // CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75
 
-// Create a ContractClient to interact with the SAC
-// The client automatically loads the contract spec for type-safe operations
-val sacClient = ContractClient.forContract(
-    contractId = contractId,
-    rpcUrl = "https://soroban-testnet.stellar.org",
-    network = Network.TESTNET
+val fromAsset = SACClient.forAsset(AssetTypeNative, sourceKeyPair, Network.TESTNET, rpcUrl)
+val fromId = SACClient.forContractId(xlmContractId, sourceKeyPair, Network.TESTNET, rpcUrl)
+println(fromAsset.contractId == fromId.contractId)  // true
+
+fromAsset.close()
+fromId.close()
+```
+
+`forContractId` throws `IllegalArgumentException` for an id that is not a contract (`C...`) address; the message names the kind of address given when it recognizes one (a secret seed by its kind only), and for a muxed contract (`W...`) address it asks for its base contract address.
+
+#### Read-Only Client
+
+`SACClient.readOnlyForAsset` and `SACClient.readOnlyForContractId` open a client without a keypair. Its source is `SACClient.READ_ONLY_SOURCE_ACCOUNT_ID`, the all-zero public key that no secret key produces, and its reads need no account on the network.
+
+```kotlin
+val reader = SACClient.readOnlyForAsset(AssetTypeNative, Network.TESTNET, "https://soroban-testnet.stellar.org")
+
+println(reader.decimals())  // 7
+println(reader.name())      // native
+println(reader.symbol())    // native
+
+// The balance of any holder; Friendbot funds this account with 10,000 XLM
+val holder = KeyPair.random()
+FriendBot.fundTestnetAccount(holder.getAccountId())
+println(reader.balance(Address(holder.getAccountId())))  // the balance of the Friendbot-funded account, in base units
+
+reader.close()
+```
+
+For an issued asset, `name()` returns `CODE:ISSUER` and `symbol()` the asset code. A read-only client builds and simulates a `transfer`, but the transaction refuses to be signed or submitted: `sign`, `signAndSubmit`, and `submit` throw `IllegalStateException`, and `transferAndSubmit` throws `IllegalStateException` before any request. No read signs, sends, or restores, on any client: when ledger entries a read needs are archived, the read throws `IllegalStateException`. Restore them first, for example with a `RestoreFootprintOperation` (see [Soroban Operations](#soroban-operations)).
+
+#### Reading a Balance
+
+`balance` runs the contract's own `balance` function for an account (`G...`) or contract (`C...`) holder and returns base units; a contract holder without a balance reads 0. An account that does not exist fails the simulation with `Error(Contract, #6)`, and an account without a trustline to an issued asset with `Error(Contract, #13)`. Both throw `SimulationFailedException`, whose message carries the contract error. `reportedContractError` carries the contract error code, and is null when the error has none; the `else` branch of the example rethrows that case.
+
+```kotlin
+import com.soneso.stellar.sdk.contract.exception.SimulationFailedException
+
+val xlm = SACClient.readOnlyForAsset(AssetTypeNative, Network.TESTNET, "https://soroban-testnet.stellar.org")
+
+// Holder ids arrive at run time, for example from user input
+val holderIds = listOf(
+    "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54",  // an account
+    "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",  // a contract
+    "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ"  // a muxed account
 )
-
-// Define the account address to query
-// This is the Stellar account (G... address) to check balance for
-val accountAddress = "GDAT5HWTGIU4TSSZ4752OUC4SABDLTLZFRPZUJ3D6LKBNEPA7V2CIG54"
-
-// Call standard token interface methods (SEP-41)
-// The SAC implements the standard token interface, providing consistent methods
-// across all Stellar Asset Contracts (balance, transfer, approve, etc.)
-
-// Query the token balance for an account
-// Uses funcResToNative for automatic type conversion from XDR to native types
-val balance = sacClient.invoke<BigInteger>(
-    functionName = "balance",
-    arguments = mapOf("id" to accountAddress),
-    source = accountAddress,
-    signer = null,  // Read-only operation, no signature needed
-    parseResultXdrFn = { resultXdr ->
-        // Parse the i128 result to BigInteger using SDK helper
-        sacClient.funcResToNative("balance", resultXdr) as BigInteger
+for (holderId in holderIds) {
+    try {
+        println("$holderId: ${xlm.balance(Address(holderId))}")
+    } catch (e: IllegalArgumentException) {
+        // Thrown before any request: not an address, or a muxed address whose base the message names
+        println("$holderId: ${e.message}")
+    } catch (e: SimulationFailedException) {
+        when (e.reportedContractError?.code) {
+            6u -> println("$holderId: the account does not exist")
+            13u -> println("$holderId: the account has no trustline to the asset")
+            else -> throw e
+        }
     }
+}
+
+xlm.close()
+```
+
+A muxed account (`M...`) or muxed contract (`W...`) holds its balance at its base address, so `balance` rejects it with `IllegalArgumentException` before any request and names the base address to query. For the muxed account above, the message is `The balance holder must be an account (G...) or contract (C...) address, got a muxed account (M...) address: MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJUAAAAAAAAAAAACJUQ; query its base account GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ`.
+
+`SorobanServer.getSACBalance(contractId, asset, network)` reads the balance entry of a contract (`C...`) holder with its `authorized` and `clawback` flags straight from the ledger, without a simulation; `SACClient.balance` runs the contract's own `balance` function for an account or contract holder.
+
+#### Sending a Transfer
+
+`SACClient.toBaseUnits` converts a decimal amount to base units: decimal digits, optionally followed by a point and 1 to 7 fractional digits, with no sign, exponent, grouping, or whitespace. It accepts zero, rounds nothing, and its largest amount is `17014118346046923173168730371588.4105727`, which is 2^127 - 1 base units; any other input throws `IllegalArgumentException`.
+
+With the default options, `transfer` returns a simulated, unsigned `AssembledTransaction<SCValXdr>`. `transferAndSubmit` transfers from the source account, signs with the client's keypair, submits, and returns the successful `GetTransactionResponse`. With `options.simulate = false`, call `simulate()` on the transaction returned by `transfer` before signing. On a keyed client, `transferAndSubmit` with this option throws `NotYetSimulatedException`. A transfer to a muxed account (`M...`) or muxed contract (`W...`) credits its base address, and the data of the `transfer` event is then a map of `amount` and `to_muxed_id`.
+
+```kotlin
+val rpcUrl = "https://soroban-testnet.stellar.org"
+val sender = KeyPair.random()
+val recipient = KeyPair.random()
+FriendBot.fundTestnetAccount(sender.getAccountId())
+FriendBot.fundTestnetAccount(recipient.getAccountId())
+
+val xlm = SACClient.forAsset(AssetTypeNative, sender, Network.TESTNET, rpcUrl)
+
+val amount = SACClient.toBaseUnits("12.5")  // 125000000
+val response = xlm.transferAndSubmit(Address(recipient.getAccountId()), amount)
+println("Transferred in ledger ${response.ledger}")
+
+// A muxed account shares the recipient's balance; the transfer event names its id
+val muxedRecipient = MuxedAccount(recipient.getAccountId(), 42uL).address
+val transfer = xlm.transfer(
+    from = Address(sender.getAccountId()),
+    to = Address(muxedRecipient),
+    amount = SACClient.toBaseUnits("1")
+)
+transfer.signAndSubmit()
+
+val events = transfer.getTransactionResponse!!.events?.parseContractEventsXdr().orEmpty().flatten()
+val transferEvent = events
+    .map { (it.body as ContractEventBodyXdr.V0).value }
+    .first { Scv.fromSymbol(it.topics.first()) == "transfer" }
+val eventData = Scv.fromMap(transferEvent.data)
+println(Scv.fromUint64(eventData.getValue(Scv.toSymbol("to_muxed_id"))))  // 42
+
+xlm.close()
+```
+
+Both writes take `options`, a `ClientOptions` that sets the fee and the timeouts and keeps the client's `sourceAccountKeyPair`, `contractId`, `network`, and `rpcUrl`, and the contract's other functions, such as `approve`, `mint`, or `clawback`, go through `getContractClient().buildInvoke` (see [Advanced Contract Control (buildInvoke)](#advanced-contract-control-buildinvoke)).
+
+#### Transfers Authorized by Another Account
+
+`transfer` takes an account (`G...`) or contract (`C...`) address as `from`, and a `from` other than the client's source account must authorize the transfer. For an account, `needsNonInvokerSigningBy` lists it, `signAuthEntries` signs its authorization entry with its keypair, and `signAndSubmit` then signs the transaction with the client's keypair and submits it.
+
+```kotlin
+val rpcUrl = "https://soroban-testnet.stellar.org"
+
+// The submitter pays the fee; the owner authorizes the transfer of its XLM
+val submitter = KeyPair.random()
+val owner = KeyPair.random()
+val recipient = KeyPair.random()
+for (account in listOf(submitter, owner, recipient)) {
+    FriendBot.fundTestnetAccount(account.getAccountId())
+}
+
+val xlm = SACClient.forAsset(AssetTypeNative, submitter, Network.TESTNET, rpcUrl)
+val transfer = xlm.transfer(
+    from = Address(owner.getAccountId()),
+    to = Address(recipient.getAccountId()),
+    amount = SACClient.toBaseUnits("5")
 )
 
-// Get the token's name
-val name = sacClient.invoke<String>(
-    functionName = "name",
-    arguments = emptyMap(),  // name() takes no arguments
-    source = accountAddress,
-    signer = null,  // Read-only operation
-    parseResultXdrFn = { resultXdr ->
-        // Parse string result using SDK helper
-        sacClient.funcResToNative("name", resultXdr) as String
+println(transfer.needsNonInvokerSigningBy())  // the owner's account id
+transfer.signAuthEntries(owner)
+transfer.signAndSubmit()
+
+xlm.close()
+```
+
+When the owner signs on another device, `signAuthEntries` takes a `KeyPair` built from the owner's account id with `KeyPair.fromAccountId(...)`, which carries no secret key, together with an `authorizeEntryDelegate` (see [Authorization](#authorization)).
+
+A contract `from`, such as a smart wallet, authorizes through its own `__check_auth`. `signAuthEntries` signs the entries of accounts only, and `sign` skips contract addresses, so complete the wallet's entry at the `SorobanServer` level before the transaction is submitted. The entry is in the `auth` list of the `InvokeHostFunctionOperation` that the simulated transaction's `builtTransaction` holds:
+
+1. Set `signatureExpirationLedger` on the entry's address credentials before computing the payload, because the signature covers it. `Auth.authorizeEntry` sets it to `validUntilLedgerSeq`, and on an entry that already carries a signature it requires the stored value.
+2. Obtain the signature value that the wallet's `__check_auth` verifies. `Auth.authorizeEntry` with an `Auth.Signer` writes the format of an account: a vector of maps with the `public_key` and `signature` bytes. For any other format, build the value and set it as the credentials' `signature`.
+3. Attach the signed entries. `AssembledTransaction` has no setter for them, so build `InvokeHostFunctionOperation(hostFunction = operation.hostFunction, auth = signedEntries)` into a new `TransactionBuilder` transaction for the same source account. Its base fee is the inclusion fee only, and it carries no Soroban data.
+4. Re-simulate it with `simulateTransaction(transaction, authMode = SimulateTransactionRequest.AuthMode.ENFORCE)` and check the response's `error`.
+5. Apply the enforcing response with `prepareTransaction(transaction, simulation)`. The fee becomes the inclusion fee plus minResourceFee, and the signed entries are kept.
+6. Sign the prepared transaction with the source account's keypair, send it with `sendTransaction`, and wait for the result with `pollTransaction`. The passage "Submitting delegated or hand-built entries" in [Protocol 27 Authorization Arms (CAP-71)](advanced.md#protocol-27-authorization-arms-cap-71) shows this route in code.
+
+#### Deploying a SAC
+
+A SAC is deployed once per asset and network; the XLM SAC exists already on testnet. `InvokeHostFunctionOperation.createStellarAssetContract(asset)` builds the deploy operation. It carries no authorization entry, so any funded account can prepare, sign, send, and poll a transaction with it through `SorobanServer`. The host derives the new contract id from the asset and the network, so `getCreatedContractId()` of the result equals `asset.getContractId(network)`, and the deployed SAC opens with `SACClient`.
+
+```kotlin
+import com.soneso.stellar.sdk.rpc.responses.GetTransactionStatus
+import com.soneso.stellar.sdk.rpc.responses.SendTransactionStatus
+
+val server = SorobanServer("https://soroban-testnet.stellar.org")
+val issuer = KeyPair.random()
+FriendBot.fundTestnetAccount(issuer.getAccountId())
+
+// A new asset has no SAC until someone deploys it
+val asset = Asset.createNonNativeAsset("DEMO", issuer.getAccountId())
+val transaction = TransactionBuilder(server.getAccount(issuer.getAccountId()), Network.TESTNET)
+    .addOperation(InvokeHostFunctionOperation.createStellarAssetContract(asset))
+    .setTimeout(300)
+    .setBaseFee(AbstractTransaction.MIN_BASE_FEE)
+    .build()
+
+// prepareTransaction simulates the transaction and applies its footprint and resource fee
+val prepared = server.prepareTransaction(transaction)
+prepared.sign(issuer)
+val sent = server.sendTransaction(prepared)
+
+if (sent.status == SendTransactionStatus.PENDING) {
+    val result = server.pollTransaction(sent.hash!!)
+    if (result.status == GetTransactionStatus.SUCCESS) {
+        println(result.getCreatedContractId() == asset.getContractId(Network.TESTNET))  // true
+    } else if (result.status == GetTransactionStatus.FAILED) {
+        println("Deployment failed: ${result.resultXdr}")
+    } else {
+        println("Deployment not confirmed; poll ${sent.hash} again.")
     }
-)
+} else {
+    println("Not accepted: ${sent.errorResultXdr}")
+}
 
-println("Token: $name, Balance: $balance")
-
-// Note: For write operations (transfer, mint, burn), provide a signer:
-// val transferResult = sacClient.invoke<Unit>(
-//     functionName = "transfer",
-//     arguments = mapOf(
-//         "from" to sourceAddress,
-//         "to" to destinationAddress,
-//         "amount" to BigInteger.fromLong(1000000)
-//     ),
-//     source = sourceAddress,
-//     signer = sourceKeypair,  // Required for write operations
-//     parseResultXdrFn = { /* parse result */ }
-// )
+server.close()
 ```
 
 ---

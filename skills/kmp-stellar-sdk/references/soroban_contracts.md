@@ -31,6 +31,7 @@ import com.soneso.stellar.sdk.xdr.*
   - [Result Parsing with funcResToNative](#result-parsing-with-funcrestonative)
   - [Multi-Auth Contract Invocation](#multi-auth-contract-invocation)
   - [Generated Contract Bindings](#generated-contract-bindings)
+  - [Stellar Asset Contracts: SACClient](#stellar-asset-contracts-sacclient)
 - [Low-Level: SorobanServer](#low-level-sorobanserver)
 - [Argument Encoding with Scv](#argument-encoding-with-scv)
 - [Automatic Type Conversion](#automatic-type-conversion)
@@ -453,6 +454,67 @@ token.transfer(
 token.client.close()
 ```
 
+### Stellar Asset Contracts: SACClient
+
+A Stellar Asset Contract (SAC) is the built-in token contract of a classic asset, XLM included: one per asset and network, with the contract id `asset.getContractId(network)`. `SACClient` opens a SAC without an RPC request, and offers typed calls. `ContractClient.forContract` also opens a SAC, for its other functions (`approve`, `mint`, `clawback`, ...); `sacClient.getContractClient()` returns the `ContractClient` a `SACClient` wraps, for `buildInvoke` on those functions.
+
+- Factories (`suspend`, no request): `SACClient.forAsset(asset, sourceAccountKeyPair, network, rpcUrl)`, `SACClient.forContractId(contractId, sourceAccountKeyPair, network, rpcUrl)`, `SACClient.readOnlyForAsset(asset, network, rpcUrl)`, `SACClient.readOnlyForContractId(contractId, network, rpcUrl)`. An id that is not a `C...` address throws `IllegalArgumentException`; the message names the kind of address given when it recognizes one (a secret seed by its kind only), and for a muxed contract (`W...`) address it asks for its base contract address. A keyed client loads its source account on every call, reads included, so that account must exist.
+- Reads: `balance(holder: Address): BigInteger`, `decimals(): UInt` (7), `name(): String` (`CODE:ISSUER`, `native` for XLM), `symbol(): String` (the asset code, `native` for XLM). They only simulate: they never sign, send, or restore, and archived entries throw `IllegalStateException`. A missing account fails with `Error(Contract, #6)` and a missing trustline with `Error(Contract, #13)`, as `SimulationFailedException` (`reportedContractError?.code` is `6u` or `13u`; it is null when the error carries no code). A `C...` holder without a balance reads 0.
+- Read-only client: its source is `SACClient.READ_ONLY_SOURCE_ACCOUNT_ID` (the all-zero public key), and it needs no account. It builds and simulates a `transfer`, but `sign`, `signAndSubmit`, `submit`, and restoring throw `IllegalStateException`, and `transferAndSubmit` throws before any request.
+- Writes: `transfer(from: Address, to: Address, amount: BigInteger, options)` and `transferAndSubmit(to: Address, amount: BigInteger, options)`. With the default options, `transfer` returns a simulated, unsigned `AssembledTransaction<SCValXdr>`. `transferAndSubmit` transfers from the source account, signs with the client's keypair, submits, and returns the successful `GetTransactionResponse`. With `options.simulate = false`, call `simulate()` on the transaction returned by `transfer` before signing. On a keyed client, `transferAndSubmit` with this option throws `NotYetSimulatedException`. `from` is `G...` or `C...`; `to` is `G...`, `M...`, `C...`, or `W...`. `amount` is base units from 0 to 2^127 - 1. A muxed `to` credits its base address, and the `transfer` event's data is a map of `amount` (i128) and `to_muxed_id` (u64). `options` (`ClientOptions`) set `baseFee`, `transactionTimeout`, `submitTimeout`, `useUpgradedAuth`, `simulate`, and `restore`, and must keep the client's `sourceAccountKeyPair`, `contractId`, `network`, and `rpcUrl`, or `IllegalArgumentException` names the field.
+- `SACClient.toBaseUnits(amount: String): BigInteger` (not `suspend`): decimal digits with up to 7 fractional digits, no sign, exponent, grouping, or whitespace, no rounding; the largest amount is `17014118346046923173168730371588.4105727`. Other input throws `IllegalArgumentException`.
+
+A `G...` `from` other than the source account appears in `needsNonInvokerSigningBy()`; call `signAuthEntries(fromKeyPair)`, then `signAndSubmit()`. A `C...` `from` authorizes through its own `__check_auth`, and neither `signAuthEntries` nor `sign` signs for it. Complete its entry at the `SorobanServer` level: sign it so that `signatureExpirationLedger` is set before the payload is computed (`Auth.authorizeEntry` with an `Auth.Signer` does this and writes the account signature format), rebuild the transaction with `InvokeHostFunctionOperation(hostFunction = op.hostFunction, auth = signedEntries)` and the inclusion fee as base fee, re-simulate with `simulateTransaction(tx, authMode = SimulateTransactionRequest.AuthMode.ENFORCE)` (import `com.soneso.stellar.sdk.rpc.requests.SimulateTransactionRequest`) and check `error`, then `prepareTransaction(tx, simulation)`: the fee becomes the inclusion fee plus `minResourceFee`, and the signed entries stay. Sign, `sendTransaction`, `pollTransaction`.
+
+`SorobanServer.getSACBalance(contractId, asset, network)` reads a `C...` holder's balance entry with its `authorized` and `clawback` flags from the ledger, without a simulation.
+
+```kotlin
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
+val rpcUrl = "https://soroban-testnet.stellar.org"
+val sender = KeyPair.random()
+val recipient = KeyPair.random()
+FriendBot.fundTestnetAccount(sender.getAccountId())
+FriendBot.fundTestnetAccount(recipient.getAccountId())
+
+// Read-only client: no keypair and no account; reads simulate and never sign, send, or restore
+val reader: SACClient = SACClient.readOnlyForAsset(AssetTypeNative, Network.TESTNET, rpcUrl)
+val decimals: UInt = reader.decimals()  // 7
+val name: String = reader.name()        // "native"; an issued asset gives "CODE:ISSUER"
+val symbol: String = reader.symbol()    // "native"; an issued asset gives its code
+
+// Keyed client: loads the sender's account for every call and signs its writes
+val sac: SACClient = SACClient.forAsset(AssetTypeNative, sender, Network.TESTNET, rpcUrl)
+
+// WRONG: sac.transferAndSubmit(to, BigInteger.fromInt(5)); amounts are i128 base units, so this sends 0.0000005 XLM
+// CORRECT: convert the decimal amount; a SAC has 7 decimals
+val amount: BigInteger = SACClient.toBaseUnits("5")  // 50000000
+val response: GetTransactionResponse = sac.transferAndSubmit(Address(recipient.getAccountId()), amount)
+
+// Transfer to a muxed account: transfer() returns the simulated, unsigned transaction
+val muxedId: String = MuxedAccount(recipient.getAccountId(), 42uL).address
+val toMuxed: AssembledTransaction<SCValXdr> = sac.transfer(
+    from = Address(sender.getAccountId()),
+    to = Address(muxedId),
+    amount = SACClient.toBaseUnits("1.5")
+)
+toMuxed.signAndSubmit()
+
+// WRONG: reader.balance(Address(muxedId)); an M... or W... holder throws IllegalArgumentException
+//        before any request, and the message names the base address
+// CORRECT: query the base account
+val holder = Address(MuxedAccount(muxedId).accountId)
+
+// The recipient was funded above, so its balance is read directly
+val holderBalance: BigInteger = reader.balance(holder)
+
+// WRONG: reader.balance(id) without a catch, for an id that may have no account (Error(Contract, #6)) or no trustline (Error(Contract, #13))
+// CORRECT: wrap that call in try/catch of SimulationFailedException and branch on the code of its reportedContractError
+
+reader.close()
+sac.close()
+```
+
 ---
 
 ## Low-Level: SorobanServer
@@ -764,7 +826,7 @@ Type mapping (XDR -> Kotlin via toNative):
 | SCV_I64 | Long |
 | SCV_U128, SCV_I128, SCV_U256, SCV_I256 | BigInteger (com.ionspin.kotlin.bignum.integer) |
 | SCV_BYTES | ByteArray (the stored payload array) |
-| SCV_STRING, SCV_SYMBOL | String |
+| SCV_STRING, SCV_SYMBOL | String; the SCValXdr itself when the bytes are not valid UTF-8 |
 | SCV_ADDRESS | String (G.../C.../M.../W.../B.../L...); the SCValXdr itself when the address has no strkey form |
 | SCV_VEC | List\<Any?\>, elements converted in order; absent payload -> empty list |
 | SCV_MAP | Map\<Any?, Any?\> under the key rules below, or the SCValXdr itself; absent payload -> empty map |
@@ -774,7 +836,7 @@ Map key rules:
 
 | Key Type | Map Key |
 |---|---|
-| SCV_SYMBOL, SCV_STRING | String |
+| SCV_SYMBOL, SCV_STRING | String when the bytes are valid UTF-8 |
 | SCV_U32 | UInt |
 | SCV_I32 | Int |
 | SCV_U64, SCV_TIMEPOINT, SCV_DURATION | ULong |
@@ -784,7 +846,7 @@ Map key rules:
 | SCV_VOID | null |
 | SCV_BYTES | lowercase hex String (values stay ByteArray; keys do not) |
 | SCV_ADDRESS | strkey String (same as for a value) |
-| SCV_VEC, SCV_MAP, SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG, an address with no strkey form | unrepresentable |
+| SCV_VEC, SCV_MAP, SCV_ERROR, SCV_CONTRACT_INSTANCE, SCV_LEDGER_KEY_CONTRACT_INSTANCE, SCV_LEDGER_KEY_NONCE, SCV_EXECUTABLE_TAG, a symbol or string whose bytes are not valid UTF-8, an address with no strkey form | unrepresentable |
 
 - Look a key up with the exact type in this table: `UInt` for u32, `ULong` for u64, `BigInteger` for a 128-bit or 256-bit key. The primitive integer types are never normalized against each other, so a u32 key `5` and a u64 key `5` are two distinct entries (`5u` and `5uL`).
 - Collisions: a wide-integer key and a primitive integer key of equal value (i128 `5` and u64 `5`, in either order); wide-integer keys of equal value across arms (u128 `5` and i256 `5`); a bytes key and a symbol or string key spelling its hex (bytes `[0x30, 0x31]` and symbol `"3031"`). Keys of different numeric value coexist (i128 `-1` and u64 `18446744073709551615`).
@@ -1001,25 +1063,16 @@ val xlmAsset = AssetTypeNative
 val xlmSacId: String = xlmAsset.getContractId(Network.TESTNET)
 ```
 
-To deploy the SAC, use the low-level approach with `ContractIDPreimageXdr.FromAsset`:
+To deploy the SAC, build the operation with `InvokeHostFunctionOperation.createStellarAssetContract`:
 
 ```kotlin
 val issuerAccountId = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
 val asset = AssetTypeCreditAlphaNum4("USDC", issuerAccountId)
-val preimage = ContractIDPreimageXdr.FromAsset(asset.toXdr())
-// WRONG: ContractExecutableXdr.StellarAsset -- no such variant name
-// CORRECT: the Stellar Asset executable is the Void data object
-val executable = ContractExecutableXdr.Void
-
-val createContractArgs = CreateContractArgsXdr(
-    contractIdPreimage = preimage,
-    executable = executable
-)
-val hostFunction = HostFunctionXdr.CreateContract(createContractArgs)
-val operation = InvokeHostFunctionOperation(hostFunction = hostFunction)
-
-// Build transaction, simulate, sign, poll (same as other low-level patterns)
+// The deploy operation carries no authorization entry
+val operation = InvokeHostFunctionOperation.createStellarAssetContract(asset)
 ```
+
+The deployed SAC opens with `SACClient.forAsset(asset, keyPair, network, rpcUrl)`; see [Stellar Asset Contracts: SACClient](#stellar-asset-contracts-sacclient).
 
 ---
 

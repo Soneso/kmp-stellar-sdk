@@ -503,21 +503,24 @@ def extract_property_sig(text: str) -> str | None:
 
 
 def extract_companion_body(body: str) -> tuple[str, str]:
-    """Find companion object in a class body and return (companion_body, remaining_body).
+    """Find a depth-zero companion and return (companion_body, remaining_body).
 
-    Returns ("", body) if no companion object found.
+    Returns ("", body) if none is found.
     """
-    m = re.search(r"companion\s+object\s*(?:\w+)?\s*\{", body)
-    if not m:
-        return "", body
-
-    brace_start = m.end() - 1
-    brace_end = balance_braces(body, brace_start)
-    companion_body = body[brace_start + 1 : brace_end]
-
-    # Remove companion block from body
-    remaining = body[: m.start()] + body[brace_end + 1 :]
-    return companion_body, remaining
+    cursor = 0
+    for m in COMPANION_BODY_TOKENS.finditer(body):
+        if m.start() < cursor or m.group().startswith(('"', "'")):
+            continue
+        brace_start = m.end() - 1
+        brace_end = balance_braces(body, brace_start)
+        if m.group() == "{":
+            # A nested body owns its companions, regardless of its visibility.
+            cursor = brace_end + 1
+            continue
+        companion_body = body[brace_start + 1 : brace_end]
+        remaining = body[: m.start()] + body[brace_end + 1 :]
+        return companion_body, remaining
+    return "", body
 
 
 def parse_companion_members(companion_body: str) -> list[str]:
@@ -931,6 +934,12 @@ CLASS_START = re.compile(
     r"(data\s+object|object|enum\s+class|fun\s+interface|interface|class)\s+"  # kind
     r"(\w+)",  # name
     re.MULTILINE,
+)
+
+# Literal alternatives exist only to skip literals; keep their rules equal to balance_braces.
+COMPANION_BODY_TOKENS = re.compile(
+    r'"""[\s\S]*?"""|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\''
+    r'|\bcompanion\s+object\s*(?:\w+)?\s*\{|\{'
 )
 
 

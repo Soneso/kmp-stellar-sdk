@@ -2445,8 +2445,8 @@ class SEPAnalyzer:
             },
             'asset_code_types': {
                 'asset_code': ('AssetCodeXdr.toXdrJsonElement', 'AssetCodeXdr.kt', 'XdrJson.padAssetCode'),
-                'asset_code4': ('AssetCode4Xdr.toXdrJsonElement', 'AssetCode4Xdr.kt', 'XdrJson.trimAssetCode(value, 0)'),
-                'asset_code12': ('AssetCode12Xdr.toXdrJsonElement', 'AssetCode12Xdr.kt', 'XdrJson.trimAssetCode(value, 5)'),
+                'asset_code4': ('AssetCode4Xdr.toXdrJsonElement', 'AssetCode4Xdr.kt', 'XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 4), 0)'),
+                'asset_code12': ('AssetCode12Xdr.toXdrJsonElement', 'AssetCode12Xdr.kt', 'XdrJson.trimAssetCode(XdrJson.checkFixedLength(value, 12), 5)'),
             },
             'integer_types': {
                 'uint128_parts': ('XdrJson.uint128ToDecimalString', 'UInt128PartsXdr.kt', 'XdrJson.uint128ToDecimalString'),

@@ -46,7 +46,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("com.soneso.stellar:stellar-sdk:1.18.0")
+                implementation("com.soneso.stellar:stellar-sdk:1.19.0")
                 implementation(compose.runtime)
                 implementation(compose.material3)
             }

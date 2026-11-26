@@ -111,6 +111,88 @@ class ClassParsing(unittest.TestCase):
         """)
         self.assertEqual(list(classes), ["Visible"])
 
+    def test_nested_companion_without_outer_companion(self):
+        """A nested class owns its companion even when the outer has none."""
+        classes = self.parse("""
+            class Outer {
+                class Nested {
+                    companion object {
+                        fun nested(): Int = 1
+                    }
+                }
+            }
+        """)
+        self.assertEqual(classes["Outer"].companion_members, [])
+        self.assertEqual(classes["Outer.Nested"].companion_members, ["fun nested(): Int"])
+
+    def test_outer_companion_after_nested_companion(self):
+        """A later outer companion is selected independently of the nested one."""
+        classes = self.parse("""
+            class Outer {
+                class Nested {
+                    companion object {
+                        fun nested(): Int = 1
+                    }
+                }
+                companion object Factory {
+                    fun outer(): Int = 2
+                }
+            }
+        """)
+        self.assertEqual(classes["Outer"].companion_members, ["fun outer(): Int"])
+        self.assertEqual(classes["Outer.Nested"].companion_members, ["fun nested(): Int"])
+
+    def test_companion_in_other_nested_types(self):
+        """Nested enum, object and interface bodies do not supply outer members."""
+        for declaration in ("private enum class Nested", "object Nested", "interface Nested"):
+            with self.subTest(declaration=declaration):
+                values = "VALUE;" if "enum" in declaration else ""
+                classes = self.parse(f"""
+                    class Outer {{
+                        {declaration} {{
+                            {values}
+                            companion object {{
+                                fun nested(): Int = 1
+                            }}
+                        }}
+                    }}
+                """)
+                self.assertEqual(classes["Outer"].companion_members, [])
+                if declaration.startswith("private"):
+                    self.assertEqual(list(classes), ["Outer"])
+                else:
+                    self.assertEqual(classes["Outer.Nested"].companion_members,
+                                     ["fun nested(): Int"])
+
+    def test_companion_words_in_literals_and_comments(self):
+        """Literal and comment text cannot create a companion or hide a later one."""
+        prefixes = (
+            'val text: String = "companion object { fun fake(): Int = 1 }"',
+            'val text: String = """\ncompanion object { fun fake(): Int = 1 }\n"""',
+            '// companion object { fun fake(): Int = 1 }',
+            '/* companion object { fun fake(): Int = 1 /* nested */ } */',
+            "val brace: Char = '{' // companion object { fun fake(): Int = 1 }",
+            "val brace: Char = '}' // companion object { fun fake(): Int = 1 }",
+        )
+        for prefix in prefixes:
+            for own_companion in (False, True):
+                with self.subTest(prefix=prefix, own_companion=own_companion):
+                    body = prefix + "\n"
+                    if own_companion:
+                        body += "companion object {\nfun real(): Int = 2\n}\n"
+                    tail = "val retained: Int = 3\n"
+                    body += tail
+                    expected = ["fun real(): Int"] if own_companion else []
+                    classes = self.parse("class Outer {\n" + body + "}")
+                    self.assertEqual(classes["Outer"].companion_members, expected)
+                    companion, remaining = generator.extract_companion_body(
+                        generator.strip_comments(body))
+                    self.assertEqual(generator.parse_companion_members(companion), expected)
+                    expected_remaining = generator.strip_comments(prefix) + "\n"
+                    if own_companion:
+                        expected_remaining += "\n"
+                    self.assertEqual(remaining, expected_remaining + tail)
+
     def check_wrapped_types(self, supertypes):
         declarations = (("class Sample", ""), ("interface Sample", "interface"),
                         ("object Sample", "object"), ("enum class Sample", "enum"),

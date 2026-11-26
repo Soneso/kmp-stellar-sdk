@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-26
+
+Migration guide: [docs/migration/1.19.0.md](docs/migration/1.19.0.md)
+
 ### Added
 - `SACClient` opens a Stellar Asset Contract from an `Asset` or a contract id without an RPC request. It has typed `balance`, `transfer`, `transferAndSubmit`, `decimals`, `name` and `symbol`, `toBaseUnits()` for decimal amounts, and a read-only mode without a keypair.
 - `SACSpec` embeds the Stellar Asset Contract spec at upstream commit 4f08d14.
@@ -16,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ContractClient.forContract` opens Stellar Asset Contracts with the embedded spec.
 - Breaking: `SCStringXdr` and `SCSymbolXdr` are classes that store the bytes the XDR carries, not value classes over a `String`. `SCStringXdr("text")` and `value` stay. `value` throws `CharacterCodingException` for bytes that are not valid UTF-8. The `ByteArray` constructor and `bytes` give the exact bytes. Equality, hashing and `toString` use the bytes. Code compiled against an earlier version must be recompiled, because the JVM signatures of functions that take or return these types change.
 - Breaking: `MemoXdr.Text` stores the bytes of the memo text. `MemoXdr.Text("text")` and `value` stay, and `value` throws `CharacterCodingException` for bytes that are not valid UTF-8. `MemoXdr.Text(bytes)` and `bytes` are added. The class has no `copy` or `component1`.
+- The SEP-51 compatibility matrix targets SEP-51 2.1.0.
+- The usage examples and the agent skill describe `SACClient` and the deployment of a Stellar Asset Contract, and the SEP-51 page describes strings whose bytes are not valid UTF-8.
 
 ### Fixed
 - Smart account Android demo: Gradle resolves the kethereum, java-multibase, and Scarlet packages from JitPack, so the demo builds. Before this change, the build listed the JetBrains Compose development repository ahead of JitPack. Its host no longer resolves in DNS, so those lookups failed. Build configuration only: the published artifacts do not change.
